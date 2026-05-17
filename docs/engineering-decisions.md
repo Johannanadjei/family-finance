@@ -221,3 +221,32 @@ Several files were created locally but never pushed to GitHub. Vercel deploys fr
 **Rule derived:**
 After creating any new file, immediately run:
 Never leave new files uncommitted. The source of truth is GitHub, not the local machine. Before debugging any production error, verify the file exists on GitHub first.
+
+---
+
+## [2026-05-17] RLS chicken-and-egg on household creation
+
+**Context:**
+When a new user completed onboarding and clicked "Launch My Dashboard", the `createHousehold` service failed with "Could not create household". The insert succeeded but the subsequent `.select()` returned nothing because `households_select` used `is_household_member(id)` — the user was not yet a member when the select ran.
+
+**Root cause:**
+The membership row is inserted after the household row. Between those two operations, the user is an owner but not yet a member. The select policy only checked membership, not ownership.
+
+**Fix:**
+Added a second select policy `households_select_owner` that allows `owner_id = auth.uid()`. This lets the owner read their own household immediately after creation, before the membership row exists.
+
+**Rule derived:**
+When designing RLS policies for resources that are created by a user, always include an owner-based select policy alongside the member-based one. The creation flow always has a window where the creator is an owner but not yet a member.
+
+---
+
+## [2026-05-17] Onboarding default categories must be generic, not household-specific
+
+**Context:**
+`StepCategories` initially used `FIXED_EXPENSES` from `constants/index.js` as defaults. This list contained Adjei Family-specific categories (Elijah Driver, Levi Activities, Church/Tithe) that are meaningless to other users.
+
+**Fix:**
+Replaced `FIXED_EXPENSES` defaults with a clean generic list: Rent/Mortgage, Food & Groceries, Transport, Utilities, School Fees, Healthcare, Savings, Internet & Phone. All amounts start at 0 — the user fills them in.
+
+**Rule derived:**
+Onboarding defaults must be universally applicable. Never use household-specific seed data as onboarding defaults. Constants used for the Adjei Family demo should never bleed into the new user experience. When a constant is specific to one household, it must be scoped to that household only.
