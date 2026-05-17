@@ -317,3 +317,39 @@ Fixed `canAddWorkspace` to count `1 + extraWorkspaces.length` instead of `worksp
 
 **Rule derived:**
 The primary household must always be explicitly represented in the workspaces array. Never rely on an implicit default that exists outside the array. Any component that iterates `allWorkspaces` must always see at least one entry. Single source of truth means one array, always complete.
+
+---
+
+## [2026-05-17] Monthly Income shows GHS 0 — product decision on income display
+
+**Context:**
+Home dashboard showed "MONTHLY INCOME: GHS 0" while Payday showed GHS 45,000 received. Users were confused.
+
+**Root cause:**
+Two different values existed:
+- `totalIncome` = `calcTotalIncome(txs)` — sum of Income-type transactions (starts at 0)
+- `monthlyIncome` = `HOUSEHOLD.monthlyIncome` — hardcoded planned income (always 45,000)
+
+Home used `totalIncome` (correct behaviour) but users expected to see the planned household income.
+
+**Product decision:**
+Monthly Income on the home dashboard = actual income transactions logged this month (Option B). This is the correct finance app behaviour — it starts at GHS 0 and grows as income is marked received on the Payday screen. An info icon was added to explain this clearly to users.
+
+**Rule derived:**
+When a dashboard value starts at zero and grows with user actions, always add an info icon explaining why. Never change the calculation to hide the zero — the zero is correct and meaningful. Educate the user instead.
+
+---
+
+## [2026-05-17] Income state not persisted between sessions
+
+**Context:**
+Marking income as received on the Payday screen correctly updates the UI but does not persist to Supabase yet. On refresh, `incomes` reloads from Supabase `income_sources` table where `received` is still false.
+
+**Current state:**
+`markReceived` calls `dbMarkReceived` which updates Supabase — this is wired correctly. However the Supabase RLS policy on `income_sources` for update requires membership, which should work once the user's household membership is set up correctly through onboarding.
+
+**Resolution plan:**
+Once a user completes onboarding and their `household_members` row exists, `markReceived` will persist correctly to Supabase and survive refresh. This will be validated in Phase 2 testing.
+
+**Rule derived:**
+Always verify that write operations complete successfully by checking the Supabase table directly after a user action during development. Do not assume a write succeeded because the UI updated — the UI uses optimistic updates.

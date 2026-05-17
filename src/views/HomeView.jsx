@@ -6,24 +6,29 @@ import { InfoModal, StatCard, heroStyle, cardStyle } from '../components/ui';
 const FIXED_TOTAL = calcTotalFixed();
 
 const INFO = {
-  fixed:    { title: 'Fixed Budget',   body: 'The total of all your planned monthly expenses across your 19 budget categories — rent, school fees, food, utilities and more.' },
+  monthlyIncome: { title: 'Monthly Income', body: 'This shows income transactions actually logged this month. It starts at GHS 0 and increases as you mark each salary received on the Payday screen.' },
+  fixed:    { title: 'Fixed Budget',   body: 'The total of all your planned monthly expenses across your budget categories — rent, school fees, food, utilities and more.' },
   income:   { title: 'Income In',      body: 'Salary and income payments actually received so far this month. Marked received on the Payday screen.' },
-  variable: { title: 'Variable Spent', body: 'Spending outside your 19 fixed categories — gifts, entertainment, one-off purchases. Keep this low to protect your surplus.' },
+  variable: { title: 'Variable Spent', body: 'Spending outside your fixed categories — gifts, entertainment, one-off purchases. Keep this low to protect your surplus.' },
   surplus:  { title: 'Surplus Left',   body: 'What remains after fixed budget and variable spending are subtracted from income. Your target is ' + fmt(SURPLUS_TARGET) + ' — money to save or invest.' },
 };
 
 export function HomeView({ totalIncome, totalSpent, remaining, healthPct, budgetStatus, txs, availableNow, nextUnpaid, totalExpected, totalReceived, variableSpent, surplusLeft, onGoPayday }) {
   const [modal, setModal] = useState(null);
-  const recentTxs = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
+  const recentTxs  = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
   const healthColor = healthPct > 50 ? '#f59e0b' : healthPct > 20 ? '#f97316' : '#ef4444';
-  const payPct = totalExpected > 0 ? Math.round((totalReceived / totalExpected) * 100) : 0;
+  const payPct      = totalExpected > 0 ? Math.round((totalReceived / totalExpected) * 100) : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {modal && <InfoModal item={INFO[modal]} onClose={() => setModal(null)} />}
 
       <div style={{ ...heroStyle, padding: '24px 20px' }}>
-        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, opacity: .7, margin: '0 0 4px' }}>MONTHLY INCOME</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, opacity: .7, margin: 0 }}>MONTHLY INCOME</p>
+          <button onClick={() => setModal('monthlyIncome')}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16, borderRadius: '50%', background: 'rgba(255,255,255,.25)', color: '#fff', fontSize: 10, fontWeight: 800, cursor: 'pointer', border: 'none', flexShrink: 0 }}>i</button>
+        </div>
         <p style={{ fontSize: 36, fontWeight: 900, margin: '0 0 16px' }}>{fmt(totalIncome)}</p>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <div><p style={{ fontSize: 11, opacity: .7, margin: '0 0 2px' }}>Spent</p><p style={{ fontWeight: 800, margin: 0 }}>{fmt(totalSpent)}</p></div>
