@@ -353,3 +353,36 @@ Once a user completes onboarding and their `household_members` row exists, `mark
 
 **Rule derived:**
 Always verify that write operations complete successfully by checking the Supabase table directly after a user action during development. Do not assume a write succeeded because the UI updated — the UI uses optimistic updates.
+
+---
+
+## [2026-05-17] markReceived must create an Income transaction — not just update income source
+
+**Context:**
+Marking income as received on Payday updated the `incomes` array correctly but Monthly Income on Home stayed at GHS 0. `calcTotalIncome(txs)` sums Income-type transactions — but no transaction was being created when income was marked received.
+
+**Root cause:**
+Two separate data models existed without a bridge:
+- `incomes` array — tracks payment sources and received status
+- `txs` array — tracks actual financial transactions used for all calculations
+
+Marking received only updated `incomes`. The `txs` array was never touched, so all dashboard calculations remained at 0.
+
+**Fix:**
+`markReceived` now calls `addTransaction` after updating the income source, creating an Income transaction with the income source name as category. `markPending` removes that transaction by filtering on category and source. This keeps both arrays in sync.
+
+**Rule derived:**
+When a user action has financial significance (receiving income), it must always produce a transaction record. The transaction log is the single source of truth for all financial calculations. Income source state tracks payment status only — calculations always derive from transactions.
+
+---
+
+## [2026-05-17] Stale localStorage transactions caused flash of wrong values
+
+**Context:**
+Home dashboard briefly flashed old transaction data (GHS 1,800) before Supabase data loaded. This happened because `useFinance` initialised `txs` from `localStorage` even when a real `householdId` was present.
+
+**Fix:**
+Added `remove(KEYS.TRANSACTIONS)` at the start of the Supabase data load effect. When a household exists, localStorage transactions are cleared immediately — Supabase is the source of truth.
+
+**Rule derived:**
+When switching from localStorage to a remote database, always clear the localStorage key on the first authenticated load. Never allow stale local data to coexist with live remote data. The remote database wins.

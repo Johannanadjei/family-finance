@@ -8,14 +8,16 @@ import {
   calcTotalExpected, calcTotalReceived, calcAvailableNow,
   calcVariableSpent, calcFixedSpent, calcSurplusLeft,
   syncGuestExpenseToBackend, syncExpectedIncomeToSpreadsheet,
+  getWeekForDate,
 } from '../lib/finance';
 import { createWorkspace } from '../lib/workspaces';
 import { PLAN_LIMITS } from '../constants/workspaces';
-import { persist, load, KEYS } from '../lib/storage';
+import { persist, load, remove, KEYS } from '../lib/storage';
 import { resolveTheme } from '../lib/themes';
 import {
   getTransactions,
   addTransaction as dbAddTransaction,
+  deleteTransaction as dbDeleteTransaction,
 } from '../services/transactions.service';
 import {
   getIncomeSources,
@@ -34,11 +36,11 @@ const mapTransaction = (row) => ({
   week:        row.week,
   type:        row.type === 'income' ? 'Income' : 'Expense',
   category:    row.category_name,
-  categoryId:  row.category_id || null,
-  description: row.description || '',
+  categoryId:  row.category_id  || null,
+  description: row.description  || '',
   amount:      Number(row.amount),
-  submittedBy: row.submitted_by  || null,
-  source:      row.source        || 'main_app',
+  submittedBy: row.submitted_by || null,
+  source:      row.source       || 'main_app',
   createdAt:   row.created_at,
 });
 
@@ -46,10 +48,10 @@ const mapIncome = (row) => ({
   id:             row.id,
   source:         row.label,
   expectedAmount: Number(row.expected_amount),
-  expectedPayDay: row.pay_day       || null,
+  expectedPayDay: row.pay_day        || null,
   payDayType:     row.pay_day_type,
-  icon:           row.icon          || '👤',
-  notes:          row.notes         || '',
+  icon:           row.icon           || '👤',
+  notes:          row.notes          || '',
   received:       row.received,
   receivedAmount: Number(row.received_amount || 0),
   actualPayDate:  row.actual_pay_date || null,
@@ -79,17 +81,23 @@ export function useFinance(householdId = null) {
   useEffect(() => {
     if (!householdId) return;
     let cancelled = false;
+
     const loadData = async () => {
       setDbReady(false);
+      // Clear stale localStorage transactions to prevent flash of old data
+      remove(KEYS.TRANSACTIONS);
+
       const [txResult, incomeResult] = await Promise.all([
         getTransactions(householdId),
         getIncomeSources(householdId),
       ]);
+
       if (cancelled) return;
       if (txResult.data)     setTxsState(txResult.data.map(mapTransaction));
       if (incomeResult.data) setIncomes(incomeResult.data.map(mapIncome));
       setDbReady(true);
     };
+
     loadData();
     return () => { cancelled = true; };
   }, [householdId]);
@@ -120,8 +128,8 @@ export function useFinance(householdId = null) {
   const [activeWsId,      setActiveWsId]      = useState(PRIMARY_WS_ID);
   const [plan,            setPlan]            = useState('free');
 
-  const isExtraWs = activeWsId !== PRIMARY_WS_ID;
-  const activeWs  = extraWorkspaces.find(w => w.id === activeWsId) || null;
+  const isExtraWs     = activeWsId !== PRIMARY_WS_ID;
+  const activeWs      = extraWorkspaces.find(w => w.id === activeWsId) || null;
   const activeTxs     = isExtraWs ? (activeWs?.txs    || []) : txs;
   const activeIncomes = isExtraWs ? (activeWs?.incomes || []) : incomes;
 
@@ -153,7 +161,7 @@ export function useFinance(householdId = null) {
       })[0] || null;
   }, [activeIncomes]);
 
-  // ── Primary workspace object (always present) ─────────────────────────
+  // ── Primary workspace object ──────────────────────────────────────────
   const primaryWorkspace = useMemo(() => ({
     id:            PRIMARY_WS_ID,
     name:          HOUSEHOLD.name,
@@ -164,7 +172,6 @@ export function useFinance(householdId = null) {
     incomes:       incomes,
   }), [monthlyIncome, txs, incomes]);
 
-  // allWorkspaces always includes primary + any extra workspaces
   const allWorkspaces = useMemo(() =>
     [primaryWorkspace, ...extraWorkspaces],
     [primaryWorkspace, extraWorkspaces]
@@ -216,18 +223,49 @@ export function useFinance(householdId = null) {
   }, [householdId, isExtraWs, activeWsId, setTxs]);
 
   const markReceived = useCallback(async (id, receivedAmount, actualPayDate) => {
+    // Update income source state
     applyIncomeUpdater(prev => prev.map(i =>
       i.id === id ? { ...i, received: true, receivedAmount, actualPayDate } : i
     ));
+
+    // Find the income source to get its label
+    const income = incomes.find(i => i.id === id);
+    const label  = income?.source || 'Salary';
+
+    // Create an Income transaction so dashboard totalIncome reflects it
+    const today = actualPayDate || new Date().toISOString().split('T')[0];
+    await addTransaction({
+      date:        today,
+      week:        getWeekForDate(today),
+      type:        'Income',
+      category:    label,
+      description: label + ' received',
+      amount:      receivedAmount,
+      source:      'main_app',
+    });
+
+    // SUPABASE SYNC POINT:
     if (householdId) await dbMarkReceived(id, receivedAmount, actualPayDate);
-  }, [householdId, applyIncomeUpdater]);
+  }, [householdId, applyIncomeUpdater, addTransaction, incomes]);
 
   const markPending = useCallback(async (id) => {
+    // Find the income source before resetting it
+    const income = incomes.find(i => i.id === id);
+
+    // Remove the income transaction that was created when marked received
+    if (income?.source) {
+      setTxs(prev => prev.filter(t =>
+        !(t.type === 'Income' && t.category === income.source && t.source === 'main_app')
+      ));
+      // SUPABASE SYNC POINT: delete matching income transaction
+    }
+
     applyIncomeUpdater(prev => prev.map(i =>
       i.id === id ? { ...i, received: false, receivedAmount: 0, actualPayDate: null } : i
     ));
+
     if (householdId) await dbMarkPending(id);
-  }, [householdId, applyIncomeUpdater]);
+  }, [householdId, applyIncomeUpdater, incomes, setTxs]);
 
   const updateExpectedAmount = useCallback(async (id, newAmount) => {
     applyIncomeUpdater(prev => prev.map(i =>
@@ -238,7 +276,7 @@ export function useFinance(householdId = null) {
   }, [householdId, applyIncomeUpdater]);
 
   // ── Workspace handlers ────────────────────────────────────────────────
-  const totalWsCount   = 1 + extraWorkspaces.length;
+  const totalWsCount    = 1 + extraWorkspaces.length;
   const canAddWorkspace = plan === 'premium'
     ? totalWsCount < PLAN_LIMITS.premium.workspaces
     : totalWsCount < PLAN_LIMITS.free.workspaces;
@@ -250,9 +288,7 @@ export function useFinance(householdId = null) {
     setActiveWsId(ws.id);
     return true;
   };
-
   const switchWorkspace = (id) => setActiveWsId(id);
-
   const deleteWorkspace = (id) => {
     setExtraWorkspaces(prev => prev.filter(w => w.id !== id));
     if (activeWsId === id) setActiveWsId(PRIMARY_WS_ID);

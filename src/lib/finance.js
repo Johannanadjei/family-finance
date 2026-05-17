@@ -230,3 +230,13 @@ export const syncExpectedIncomeToSpreadsheet = async (incomeId, newAmount) => {
   // TODO: implement Google Sheets API sync
   console.debug('[sync] syncExpectedIncomeToSpreadsheet', incomeId, newAmount);
 };
+
+/** Derive week label from a date string ('YYYY-MM-DD') */
+export const getWeekForDate = (dateStr) => {
+  const day = new Date(dateStr).getDate();
+  if (day <= 7)  return 'Week 1';
+  if (day <= 14) return 'Week 2';
+  if (day <= 21) return 'Week 3';
+  if (day <= 28) return 'Week 4';
+  return 'Week 5';
+};
