@@ -4,6 +4,7 @@ import { buildThemeCSS } from './lib/themes';
 import { useFinance } from './hooks/useFinance';
 import { useAuth } from './hooks/useAuth';
 import { useHousehold } from './hooks/useHousehold';
+import { OnboardingFlow } from './features/onboarding/OnboardingFlow';
 import { AuthScreen } from './views/AuthScreen';
 import { Header } from './components/layout/Header';
 import { BottomNav } from './components/layout/BottomNav';
@@ -35,21 +36,6 @@ function LoadingScreen({ message }) {
   );
 }
 
-function OnboardingPlaceholder({ onComplete }) {
-  return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg,#064e3b,#0d7060)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ background: '#fff', borderRadius: 24, padding: '40px 28px', width: '100%', maxWidth: 400, textAlign: 'center' }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>🏡</div>
-        <p style={{ fontWeight: 900, fontSize: 22, margin: '0 0 8px' }}>Welcome!</p>
-        <p style={{ color: '#6b7280', fontSize: 14, margin: '0 0 24px' }}>Let's set up your household. Onboarding coming in the next step.</p>
-        <button onClick={onComplete} style={{ width: '100%', padding: 14, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#064e3b,#0d7060)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>
-          Continue with demo data
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function App() {
   const [tab,          setTab]          = useState('home');
   const [showModal,    setShowModal]    = useState(false);
@@ -58,23 +44,23 @@ export default function App() {
   const [uiState,      setUiState]      = useState(UI.APP);
   const [guestUser,    setGuestUser]    = useState(null);
 
-  const { user, loading: authLoading } = useAuth();
-  const { household, householdId, loading: householdLoading, needsOnboarding, onOnboardingComplete } = useHousehold(user);
-  const finance = useFinance(householdId);
+  const { user, loading: authLoading }                                                          = useAuth();
+  const { householdId, loading: householdLoading, needsOnboarding, onOnboardingComplete }       = useHousehold(user);
+  const finance                                                                                  = useFinance(householdId);
 
   // ── Auth + household gate ─────────────────────────────────────────────
   if (!IS_PORTAL) {
-    if (authLoading)                          return <LoadingScreen message="Loading your family dashboard..." />;
-    if (!user)                                return <AuthScreen />;
-    if (householdLoading)                     return <LoadingScreen message="Setting up your household..." />;
-    if (needsOnboarding)                      return <OnboardingPlaceholder onComplete={onOnboardingComplete} />;
+    if (authLoading)      return <LoadingScreen message="Loading your family dashboard..." />;
+    if (!user)            return <AuthScreen />;
+    if (householdLoading) return <LoadingScreen message="Setting up your household..." />;
+    if (needsOnboarding)  return <OnboardingFlow onComplete={onOnboardingComplete} />;
   }
 
   // ── Handlers ──────────────────────────────────────────────────────────
-  const handleGuestSuccess  = (name) => { setGuestUser({ name }); setUiState(UI.GUEST); };
-  const handleGuestSignOut  = () => { setGuestUser(null); if (!IS_PORTAL) setUiState(UI.APP); };
-  const handleGuestTx       = (tx) => finance.addTransaction(tx);
-  const handleAddWorkspace  = (opts) => { const ok = finance.addWorkspace(opts); if (ok) { setShowWsCreate(false); setTab('home'); } };
+  const handleGuestSuccess = (name) => { setGuestUser({ name }); setUiState(UI.GUEST); };
+  const handleGuestSignOut = () => { setGuestUser(null); if (!IS_PORTAL) setUiState(UI.APP); };
+  const handleGuestTx      = (tx) => finance.addTransaction(tx);
+  const handleAddWorkspace = (opts) => { const ok = finance.addWorkspace(opts); if (ok) { setShowWsCreate(false); setTab('home'); } };
 
   // ── Guest portal flow ─────────────────────────────────────────────────
   if (IS_PORTAL) {
