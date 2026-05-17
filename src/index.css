@@ -1,0 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body, #root { height: 100%; width: 100%; }
+body { font-family: 'Nunito', system-ui, sans-serif; background: #f3f4f6; -webkit-font-smoothing: antialiased; }
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+input[type=number] { -moz-appearance: textfield; }
+select, input { font-family: 'Nunito', sans-serif; }
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
