@@ -73,3 +73,36 @@ export const inputStyle = {
   boxSizing:   'border-box',
   fontFamily:  "'Nunito', sans-serif",
 };
+
+/** Info modal — shown when user taps an i icon on a stat card */
+export function InfoModal({ item, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px 32px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ ...cardStyle, width: '100%', maxWidth: 440, padding: '28px 24px' }}>
+        <p style={{ fontWeight: 800, fontSize: 18, margin: '0 0 10px', color: 'var(--c-text, #1c1917)' }}>{item.title}</p>
+        <p style={{ fontSize: 14, color: 'var(--c-muted, #6b7280)', lineHeight: 1.6, margin: '0 0 20px' }}>{item.body}</p>
+        <button onClick={onClose} style={{ width: '100%', padding: '13px', borderRadius: 'var(--r-btn, 12px)', border: 'none', background: 'var(--c-accent, #064e3b)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
+/** Small circular info icon */
+export function InfoIcon({ onClick }) {
+  return (
+    <span onClick={e => { e.stopPropagation(); onClick(); }} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'var(--c-border, #e5e7eb)', color: 'var(--c-muted, #6b7280)', fontSize: 11, fontWeight: 800, cursor: 'pointer', marginLeft: 6, flexShrink: 0 }}>i</span>
+  );
+}
+
+/** Stat card used on HomeView — label, value, optional info icon */
+export function StatCard({ label, value, color, infoKey, onInfo }) {
+  return (
+    <div style={{ ...cardStyle }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+        <p style={{ fontSize: 12, color: 'var(--c-muted, #9ca3af)', margin: 0 }}>{label}</p>
+        {infoKey && <InfoIcon onClick={() => onInfo(infoKey)} />}
+      </div>
+      <p style={{ fontSize: 20, fontWeight: 900, color: color || 'var(--c-text, #1c1917)', margin: 0 }}>{value}</p>
+    </div>
+  );
+}

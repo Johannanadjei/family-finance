@@ -34,3 +34,6 @@ export const NOTIF_DEFAULTS = {
   weeklySummary:      true,
   monthlySummary:     true,
 };
+
+/** Adjei Family monthly surplus target */
+export const SURPLUS_TARGET = 4630;
