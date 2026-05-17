@@ -224,3 +224,9 @@ export const calcTopCategories = (txs, limit = 5) => {
     .sort((a, b) => b.amount - a.amount)
     .slice(0, limit);
 };
+
+/** GOOGLE SHEETS SYNC POINT: update expected income in spreadsheet */
+export const syncExpectedIncomeToSpreadsheet = async (incomeId, newAmount) => {
+  // TODO: implement Google Sheets API sync
+  console.debug('[sync] syncExpectedIncomeToSpreadsheet', incomeId, newAmount);
+};

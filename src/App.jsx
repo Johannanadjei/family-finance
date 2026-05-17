@@ -72,7 +72,7 @@ export default function App() {
 
   const VIEWS = {
     home: <HomeView totalIncome={finance.totalIncome} totalSpent={finance.totalSpent} remaining={finance.remaining} healthPct={finance.healthPct} budgetStatus={finance.budgetStatus} txs={finance.txs} availableNow={finance.availableNow} nextUnpaid={finance.nextUnpaid} totalExpected={finance.totalExpected} totalReceived={finance.totalReceived} variableSpent={finance.variableSpent} surplusLeft={finance.surplusLeft} onGoPayday={() => setTab('payday')} />,
-    payday: <PaydayView incomes={finance.incomes} txs={finance.txs} totalExpected={finance.totalExpected} totalReceived={finance.totalReceived} availableNow={finance.availableNow} onMarkReceived={finance.markReceived} onMarkPending={finance.markPending} />,
+    payday: <PaydayView incomes={finance.incomes} txs={finance.txs} totalExpected={finance.totalExpected} totalReceived={finance.totalReceived} availableNow={finance.availableNow} onMarkReceived={finance.markReceived} onMarkPending={finance.markPending} onUpdateExpected={finance.updateExpectedAmount} />,
     daily:    <DailyView txs={finance.txs} spendByDay={finance.spendByDay} />,
     budget:   <BudgetView catSpend={finance.catSpend} />,
     log:      <LogView txs={finance.txs} remaining={finance.remaining} />,
