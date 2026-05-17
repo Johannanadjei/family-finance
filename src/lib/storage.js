@@ -18,6 +18,7 @@ const KEYS = {
   GUEST_SETTINGS: 'ff_guest_settings',
   NOTIFS:         'ff_notifs',
   THEME:          'ff_theme',
+  TRANSACTIONS:   'ff_transactions',
 };
 
 /** Save a value to localStorage as JSON */

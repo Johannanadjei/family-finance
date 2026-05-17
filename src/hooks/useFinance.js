@@ -18,14 +18,19 @@ import { DEFAULT_THEME } from '../constants/skins';
 const PRIMARY_WS_ID = 'ws_primary';
 
 export function useFinance() {
-  const [txs,     setTxs]     = useState(INITIAL_TXS);
+  const [txs, setTxsState] = useState(() => load(KEYS.TRANSACTIONS) || INITIAL_TXS);
   const [incomes, setIncomes] = useState(INITIAL_INCOMES);
   const [notifs,  setNotifs]  = useState(NOTIF_DEFAULTS);
 
-  const [guestSettings, setGuestSettingsState] = useState(() => {
-    const saved = load(KEYS.GUEST_SETTINGS);
-    return saved || GUEST_DEFAULTS;
-  });
+  const setTxs = (updater) => {
+    setTxsState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      persist(KEYS.TRANSACTIONS, next);
+      return next;
+    });
+  };
+
+  const [guestSettings, setGuestSettingsState] = useState(() => load(KEYS.GUEST_SETTINGS) || GUEST_DEFAULTS);
 
   const setGuestSettings = (updater) => {
     setGuestSettingsState(prev => {
@@ -102,8 +107,8 @@ export function useFinance() {
       ));
     } else {
       setTxs(prev => [newTx, ...prev]);
-      // GOOGLE SHEETS SYNC POINT: await sheetsService.appendRow(newTx);
       // SUPABASE SYNC POINT: await supabase.from('transactions').insert(newTx);
+      // GOOGLE SHEETS SYNC POINT: await sheetsService.appendRow(newTx);
       if (newTx.source === 'guest_portal') syncGuestExpenseToBackend(newTx);
     }
   };
