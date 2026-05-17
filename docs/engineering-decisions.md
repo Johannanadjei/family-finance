@@ -386,3 +386,21 @@ Added `remove(KEYS.TRANSACTIONS)` at the start of the Supabase data load effect.
 
 **Rule derived:**
 When switching from localStorage to a remote database, always clear the localStorage key on the first authenticated load. Never allow stale local data to coexist with live remote data. The remote database wins.
+
+---
+
+## [2026-05-17] useFinance.js exceeds 200 line limit — planned split in Phase 2
+
+**Context:**
+`useFinance.js` is currently 312 lines, exceeding the 200-line hook guideline. It manages transactions, incomes, workspaces, theme, guest settings, Supabase loading, and all derived calculations in one file.
+
+**Why accepted for now:**
+All logic is internally cohesive and correctly structured. Splitting mid-session would introduce refactor risk while core features are still being built and tested.
+
+**Planned split in Phase 2:**
+- `useFinance.js` — calculations and transactions only (~150 lines)
+- `useIncomes.js` — income sources, markReceived, markPending, updateExpectedAmount (~100 lines)
+- `useWorkspaces.js` — workspace switching, primary/extra workspace logic (~80 lines)
+
+**Rule derived:**
+When a file exceeds size limits but splitting it mid-feature would introduce risk, log it immediately as planned debt with a specific split plan. Never leave it undocumented. Complete the current feature, then refactor as the first task of the next phase.
