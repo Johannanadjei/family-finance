@@ -1,126 +1,130 @@
-import { HOUSEHOLD } from '../data/mockData';
-import { calcTotalFixed, fmt, fmtDate, calcDaysUntil } from '../lib/finance';
-import { ProgressBar, cardStyle, heroStyle } from '../components/ui';
+import { useState } from 'react';
+import { fmt, fmtDate } from '../lib/finance';
+
+const INFO = {
+  fixed:    { title: 'Fixed Budget',    body: 'The total of all your planned monthly expenses across your 19 budget categories — rent, school fees, food, utilities and more. This is what you have committed to spending each month.' },
+  income:   { title: 'Income In',       body: 'The total salary and income payments you have actually received so far this month. As each payday is marked received on the Payday screen, this number grows.' },
+  variable: { title: 'Variable Spent',  body: 'Spending on categories outside your 19 fixed budget categories — things like entertainment, gifts, or one-off purchases. Keep this low to protect your surplus.' },
+  surplus:  { title: 'Surplus Left',    body: 'What remains after your fixed budget and variable spending are subtracted from your monthly income. Your target surplus is GHS 4,630 — money to save or invest.' },
+};
+
+function InfoModal({ item, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 16px 32px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', width: '100%', maxWidth: 440 }}>
+        <p style={{ fontWeight: 800, fontSize: 18, margin: '0 0 10px', color: '#1c1917' }}>{item.title}</p>
+        <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6, margin: '0 0 20px' }}>{item.body}</p>
+        <button onClick={onClose} style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#064e3b,#0d7060)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
+function InfoIcon({ onClick }) {
+  return (
+    <span onClick={e => { e.stopPropagation(); onClick(); }} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: '#e5e7eb', color: '#6b7280', fontSize: 11, fontWeight: 800, cursor: 'pointer', marginLeft: 6, flexShrink: 0 }}>i</span>
+  );
+}
 
 export function HomeView({ totalIncome, totalSpent, remaining, healthPct, budgetStatus, txs, availableNow, nextUnpaid, totalExpected, totalReceived, variableSpent, surplusLeft, onGoPayday }) {
-  const totalFixed  = calcTotalFixed();
-  const receivedPct = totalExpected > 0 ? Math.round((totalReceived / totalExpected) * 100) : 0;
-  const daysToNext  = nextUnpaid ? calcDaysUntil(nextUnpaid.expectedPayDay) : null;
+  const [modal, setModal] = useState(null);
+
+  const recentTxs = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
+
+  const healthColor = healthPct > 50 ? '#f59e0b' : healthPct > 20 ? '#f97316' : '#ef4444';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {modal && <InfoModal item={INFO[modal]} onClose={() => setModal(null)} />}
 
-      {/* Monthly income hero */}
-      <div style={heroStyle}>
-        <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: 2, color: '#6ee7b7', textTransform: 'uppercase', margin: 0 }}>Monthly Income</p>
-        <p style={{ fontSize: 36, fontWeight: 900, margin: '4px 0 0', lineHeight: 1 }}>{fmt(HOUSEHOLD.monthlyIncome)}</p>
-        <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.15)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          {[['Spent', fmt(totalSpent)], ['Remaining', fmt(remaining)], ['Target', fmt(HOUSEHOLD.surplusTarget)]].map(([l, v]) => (
-            <div key={l}>
-              <p style={{ fontSize: 10, color: '#6ee7b7', margin: 0 }}>{l}</p>
-              <p style={{ fontSize: 14, fontWeight: 800, margin: '2px 0 0' }}>{v}</p>
-            </div>
-          ))}
+      <div style={{ background: 'linear-gradient(135deg,#064e3b,#0d9060)', borderRadius: 20, padding: '24px 20px', color: '#fff' }}>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, opacity: .7, margin: '0 0 4px' }}>MONTHLY INCOME</p>
+        <p style={{ fontSize: 36, fontWeight: 900, margin: '0 0 16px' }}>{fmt(totalIncome)}</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div><p style={{ fontSize: 11, opacity: .7, margin: '0 0 2px' }}>Spent</p><p style={{ fontWeight: 800, margin: 0 }}>{fmt(totalSpent)}</p></div>
+          <div><p style={{ fontSize: 11, opacity: .7, margin: '0 0 2px' }}>Remaining</p><p style={{ fontWeight: 800, margin: 0 }}>{fmt(remaining)}</p></div>
+          <div><p style={{ fontSize: 11, opacity: .7, margin: '0 0 2px' }}>Target</p><p style={{ fontWeight: 800, margin: 0 }}>{fmt(4630)}</p></div>
         </div>
       </div>
 
-      {/* Budget health */}
-      <div style={cardStyle}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: '18px 16px', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <p style={{ fontWeight: 800, fontSize: 14, color: '#1c1917', margin: 0 }}>Budget Health</p>
-          <span style={{ fontSize: 12, fontWeight: 800, color: budgetStatus.color }}>{budgetStatus.label}</span>
+          <p style={{ fontWeight: 800, fontSize: 15, margin: 0 }}>Budget Health</p>
+          <span style={{ fontWeight: 800, fontSize: 13, color: healthPct > 30 ? '#16a34a' : '#ef4444' }}>{budgetStatus} {healthPct > 30 ? '🎯' : '⚠️'}</span>
         </div>
-        <ProgressBar pct={healthPct} overspent={remaining < 0} />
-        <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>{healthPct}% of monthly budget remaining</p>
+        <div style={{ height: 8, background: '#f3f4f6', borderRadius: 8 }}>
+          <div style={{ height: 8, borderRadius: 8, background: healthColor, width: String(Math.min(healthPct, 100)) + '%', transition: 'width .4s' }} />
+        </div>
+        <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0' }}>{String(Math.round(healthPct))}% of monthly budget remaining</p>
       </div>
 
-      {/* Payday pulse — tappable shortcut to Payday tab */}
-      <button onClick={onGoPayday}
-        style={{ ...cardStyle, textAlign: 'left', border: 'none', cursor: 'pointer', width: '100%', borderLeft: '4px solid #4f46e5', padding: '14px 16px' }}>
+      <div onClick={onGoPayday} style={{ background: '#fff', borderRadius: 16, padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,.06)', borderLeft: '4px solid #7c3aed', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 10, fontWeight: 800, color: '#4f46e5', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: 1 }}>
-              💜 Payday Tracker
-            </p>
-            <p style={{ fontSize: 26, fontWeight: 900, color: availableNow < 0 ? '#dc2626' : '#1e1b4b', margin: '0 0 2px' }}>
-              {fmt(Math.max(0, availableNow))}
-            </p>
-            <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>available right now</p>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', letterSpacing: 1, margin: '0 0 4px' }}>💜 PAYDAY TRACKER</p>
+            <p style={{ fontSize: 28, fontWeight: 900, color: availableNow > 0 ? '#16a34a' : '#ef4444', margin: '0 0 2px' }}>{fmt(availableNow)}</p>
+            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>available right now</p>
           </div>
           {nextUnpaid && (
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <p style={{ fontSize: 10, color: '#9ca3af', margin: '0 0 2px' }}>Next payday</p>
-              <p style={{ fontSize: 20, fontWeight: 900, color: '#d97706', margin: 0 }}>
-                {daysToNext === 0 ? 'Today!' : daysToNext === 1 ? 'Tomorrow!' : daysToNext + 'd'}
-              </p>
-              <p style={{ fontSize: 10, color: '#9ca3af', margin: '1px 0 0' }}>{nextUnpaid.source}</p>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 2px' }}>Next payday</p>
+              <p style={{ fontSize: 22, fontWeight: 900, color: '#f59e0b', margin: '0 0 2px' }}>{nextUnpaid.daysUntil}d</p>
+              <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{nextUnpaid.label}</p>
             </div>
           )}
         </div>
-        {totalExpected > 0 && (
-          <div style={{ marginTop: 10 }}>
-            <div style={{ background: '#e0e7ff', borderRadius: 6, height: 5, overflow: 'hidden' }}>
-              <div style={{ width: String(receivedPct) + '%', height: '100%', background: '#4f46e5', borderRadius: 6 }} />
-            </div>
-            <p style={{ fontSize: 10, color: '#6b7280', margin: '3px 0 0' }}>
-              {fmt(totalReceived)} of {fmt(totalExpected)} received this month
-            </p>
-          </div>
-        )}
-      </button>
-
-      {/* Quick stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        {[
-          { label: 'Fixed Budget',    value: fmt(totalFixed),    color: '#1c1917' },
-          { label: 'Income In',       value: fmt(totalIncome),   color: '#059669' },
-          { label: 'Variable Spent',  value: fmt(variableSpent), color: '#dc2626' },
-          { label: 'Surplus Left',    value: fmt(Math.max(0, surplusLeft)), color: surplusLeft >= 0 ? '#d97706' : '#dc2626' },
-        ].map(({ label, value, color }) => (
-          <div key={label} style={cardStyle}>
-            <p style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, margin: 0 }}>{label}</p>
-            <p style={{ fontSize: 19, fontWeight: 900, color, margin: '4px 0 0' }}>{value}</p>
-          </div>
-        ))}
+        <div style={{ marginTop: 10, height: 4, background: '#f3f4f6', borderRadius: 4 }}>
+          <div style={{ height: 4, borderRadius: 4, background: '#7c3aed', width: String(totalExpected > 0 ? Math.round((totalReceived / totalExpected) * 100) : 0) + '%' }} />
+        </div>
+        <p style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0 0' }}>{fmt(totalReceived)} of {fmt(totalExpected)} received this month</p>
       </div>
 
-      {/* Recent activity */}
-      <div style={cardStyle}>
-        <p style={{ fontWeight: 800, fontSize: 14, color: '#1c1917', margin: '0 0 14px' }}>Recent Activity</p>
-        {txs.length === 0 ? (
-          <p style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
-            No transactions yet. Tap + to add one!
-          </p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {txs.slice(0, 6).map(tx => (
-              <div key={tx.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-                  background: tx.type === 'Income' ? '#d1fae5' : '#fee2e2',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, fontWeight: 900, color: tx.type === 'Income' ? '#059669' : '#dc2626',
-                }}>
-                  {tx.type === 'Income' ? '↑' : '↓'}
-                </div>
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <p style={{ fontSize: 13, fontWeight: 800, color: '#1c1917', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.category}</p>
-                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 2 }}>
-                    <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{tx.description || tx.week} · {fmtDate(tx.date)}</p>
-                    {tx.source === 'guest_portal' && (
-                      <span style={{ fontSize: 10, fontWeight: 800, background: '#dbeafe', color: '#1d4ed8', padding: '0px 6px', borderRadius: 8 }}>
-                        🔑 {tx.submittedBy || tx.loggedBy}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <p style={{ fontSize: 13, fontWeight: 800, color: tx.type === 'Income' ? '#059669' : '#1c1917', flexShrink: 0 }}>
-                  {tx.type === 'Income' ? '+' : '-'}{fmt(tx.amount)}
-                </p>
-              </div>
-            ))}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ background: '#fff', borderRadius: 16, padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Fixed Budget</p>
+            <InfoIcon onClick={() => setModal('fixed')} />
           </div>
-        )}
+          <p style={{ fontSize: 20, fontWeight: 900, margin: 0 }}>{fmt(40370)}</p>
+        </div>
+        <div style={{ background: '#fff', borderRadius: 16, padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Income In</p>
+            <InfoIcon onClick={() => setModal('income')} />
+          </div>
+          <p style={{ fontSize: 20, fontWeight: 900, color: '#16a34a', margin: 0 }}>{fmt(totalReceived)}</p>
+        </div>
+        <div style={{ background: '#fff', borderRadius: 16, padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Variable Spent</p>
+            <InfoIcon onClick={() => setModal('variable')} />
+          </div>
+          <p style={{ fontSize: 20, fontWeight: 900, color: variableSpent > 0 ? '#ef4444' : '#1c1917', margin: 0 }}>{fmt(variableSpent)}</p>
+        </div>
+        <div style={{ background: '#fff', borderRadius: 16, padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Surplus Left</p>
+            <InfoIcon onClick={() => setModal('surplus')} />
+          </div>
+          <p style={{ fontSize: 20, fontWeight: 900, color: '#f59e0b', margin: 0 }}>{fmt(surplusLeft)}</p>
+        </div>
+      </div>
+
+      <div style={{ background: '#fff', borderRadius: 16, padding: '18px 16px', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
+        <p style={{ fontWeight: 800, fontSize: 15, margin: '0 0 14px' }}>Recent Activity</p>
+        {recentTxs.length === 0 && <p style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>No transactions yet</p>}
+        {recentTxs.map(tx => (
+          <div key={tx.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: tx.type === 'Income' ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: 14, color: tx.type === 'Income' ? '#16a34a' : '#ef4444', fontWeight: 900 }}>{tx.type === 'Income' ? '↑' : '↓'}</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontWeight: 700, fontSize: 14, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tx.category}</p>
+              <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>{tx.description || tx.category} · {fmtDate(tx.date)}</p>
+            </div>
+            <p style={{ fontWeight: 800, fontSize: 14, color: tx.type === 'Income' ? '#16a34a' : '#ef4444', margin: 0, flexShrink: 0 }}>{tx.type === 'Income' ? '+' : '-'}{fmt(tx.amount)}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
