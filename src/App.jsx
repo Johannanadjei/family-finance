@@ -75,7 +75,7 @@ export default function App() {
     payday: <PaydayView incomes={finance.incomes} txs={finance.txs} totalExpected={finance.totalExpected} totalReceived={finance.totalReceived} availableNow={finance.availableNow} onMarkReceived={finance.markReceived} onMarkPending={finance.markPending} />,
     daily:    <DailyView txs={finance.txs} spendByDay={finance.spendByDay} />,
     budget:   <BudgetView catSpend={finance.catSpend} />,
-    log:      <LogView txs={finance.txs} />,
+    log:      <LogView txs={finance.txs} remaining={finance.remaining} />,
     settings: <SettingsView notifs={finance.notifs} setNotifs={finance.setNotifs} guestSettings={finance.guestSettings} setGuestSettings={finance.setGuestSettings} onPreviewGuest={() => setUiState(UI.GUEST_PREVIEW)} theme={finance.theme} setTheme={finance.setTheme} plan={finance.plan} />,
   };
 

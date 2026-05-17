@@ -203,3 +203,24 @@ export const syncGuestExpenseToBackend = async (transaction) => {
   // MVP: no-op. Production: send to Firebase/Supabase.
   console.debug('[syncGuestExpenseToBackend] MVP stub called for:', transaction.id);
 };
+
+/** Weekly summary for a given week filter ('All' or 'Week N') */
+export const calcWeekSummary = (txs, week) => {
+  const scoped = week === 'All' ? txs : txs.filter(t => t.week === week);
+  const expenses = scoped.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
+  const income   = scoped.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
+  return { expenses, income, net: income - expenses, count: scoped.length };
+};
+
+/** Top spending categories with percentage of total */
+export const calcTopCategories = (txs, limit = 5) => {
+  const expenses = txs.filter(t => t.type === 'Expense');
+  const total    = expenses.reduce((s, t) => s + t.amount, 0);
+  if (total === 0) return [];
+  const map = {};
+  expenses.forEach(t => { map[t.category] = (map[t.category] || 0) + t.amount; });
+  return Object.entries(map)
+    .map(([category, amount]) => ({ category, amount, pct: Math.round((amount / total) * 100) }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, limit);
+};
