@@ -250,3 +250,45 @@ Replaced `FIXED_EXPENSES` defaults with a clean generic list: Rent/Mortgage, Foo
 
 **Rule derived:**
 Onboarding defaults must be universally applicable. Never use household-specific seed data as onboarding defaults. Constants used for the Adjei Family demo should never bleed into the new user experience. When a constant is specific to one household, it must be scoped to that household only.
+
+---
+
+## [2026-05-17] Onboarding draft persistence — prevent data loss on refresh
+
+**Context:**
+Onboarding state lived only in React. Any page refresh, PWA background, or accidental navigation destroyed all entered data — household name, income sources, and categories all had to be re-entered from scratch.
+
+**Decision:**
+Added `onboarding.service.js` with `saveDraft`, `loadDraft`, `clearDraft`, `hasDraft`. Draft is saved to localStorage (`ff_onboarding_draft`) after every step navigation and after every category change. On return, a resume prompt asks the user if they want to continue or start again. Draft is cleared only after successful household creation.
+
+**Rule derived:**
+Any multi-step flow with user-entered data must persist its state to localStorage after every meaningful action. Never rely on React state alone for data that takes significant user effort to enter.
+
+---
+
+## [2026-05-17] Duplicate category detection — pure utility function in lib/
+
+**Context:**
+When users add budget categories during onboarding, they may accidentally add duplicates (e.g. "Food" and "food"). Detection logic belongs in a pure utility, not inside a component.
+
+**Decision:**
+Created `src/lib/categories.js` with `detectDuplicateBudgetCategory(newCat, existingCats)`. Normalises names by trimming, lowercasing, and collapsing spaces. Returns `{ isDuplicate, matchType, matchedCategory }`. Component shows a confirmation prompt — user can still add anyway.
+
+**Rule derived:**
+All data validation and matching logic belongs in `src/lib/` as pure functions. Never put business logic directly in a component. Pure functions are reusable, testable, and easy to find.
+
+---
+
+## [2026-05-17] Emoji picker — preset list, not full keyboard
+
+**Context:**
+Categories need emoji icons that carry through to dashboard, budget view, guest portal, and transaction log. A full emoji keyboard would be too heavy for onboarding.
+
+**Decision:**
+Built a preset `EmojiPicker` component with 28 common finance/family emojis. Tapping the icon button on any category row opens the picker. The chosen emoji is stored as `icon` on the category object, which is already in the DB schema. It flows through to all views that display categories.
+
+**Future:**
+A full emoji keyboard can replace the preset picker in settings without changing the data model.
+
+**Rule derived:**
+For MVP emoji/icon selection, use a curated preset list. Never add a full emoji library dependency to keep bundle size small. The data model must support the icon field from day one so future enhancement requires no schema change.
