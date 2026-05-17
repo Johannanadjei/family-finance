@@ -35,7 +35,7 @@ export function HomeView({ totalIncome, totalSpent, remaining, healthPct, budget
       <div style={{ ...cardStyle }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <p style={{ fontWeight: 800, fontSize: 15, margin: 0 }}>Budget Health</p>
-          <span style={{ fontWeight: 800, fontSize: 13, color: healthPct > 30 ? '#16a34a' : '#ef4444' }}>{budgetStatus} {healthPct > 30 ? '🎯' : '⚠️'}</span>
+          <span style={{ fontWeight: 800, fontSize: 13, color: healthPct > 30 ? '#16a34a' : '#ef4444' }}>{budgetStatus.label} {healthPct > 30 ? '🎯' : '⚠️'}</span>
         </div>
         <div style={{ height: 8, background: 'var(--c-border, #f3f4f6)', borderRadius: 8 }}>
           <div style={{ height: 8, borderRadius: 8, background: healthColor, width: String(Math.min(healthPct, 100)) + '%', transition: 'width .4s' }} />
