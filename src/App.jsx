@@ -3,6 +3,7 @@ import { isGuestPortalUrl } from './lib/guest';
 import { buildThemeCSS } from './lib/themes';
 import { useFinance } from './hooks/useFinance';
 import { useAuth } from './hooks/useAuth';
+import { useHousehold } from './hooks/useHousehold';
 import { AuthScreen } from './views/AuthScreen';
 import { Header } from './components/layout/Header';
 import { BottomNav } from './components/layout/BottomNav';
@@ -23,6 +24,32 @@ import { GuestView } from './views/GuestView';
 const IS_PORTAL = isGuestPortalUrl();
 const UI = { APP: 'app', GUEST_PREVIEW: 'guestPreview', GUEST: 'guest' };
 
+function LoadingScreen({ message }) {
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg,#064e3b,#0d7060)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center', color: '#fff' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🏡</div>
+        <p style={{ fontSize: 16, fontWeight: 800, color: '#6ee7b7' }}>{message}</p>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingPlaceholder({ onComplete }) {
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg,#064e3b,#0d7060)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 24, padding: '40px 28px', width: '100%', maxWidth: 400, textAlign: 'center' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🏡</div>
+        <p style={{ fontWeight: 900, fontSize: 22, margin: '0 0 8px' }}>Welcome!</p>
+        <p style={{ color: '#6b7280', fontSize: 14, margin: '0 0 24px' }}>Let's set up your household. Onboarding coming in the next step.</p>
+        <button onClick={onComplete} style={{ width: '100%', padding: 14, borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#064e3b,#0d7060)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>
+          Continue with demo data
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab,          setTab]          = useState('home');
   const [showModal,    setShowModal]    = useState(false);
@@ -31,48 +58,43 @@ export default function App() {
   const [uiState,      setUiState]      = useState(UI.APP);
   const [guestUser,    setGuestUser]    = useState(null);
 
-  const finance = useFinance();
   const { user, loading: authLoading } = useAuth();
+  const { household, householdId, loading: householdLoading, needsOnboarding, onOnboardingComplete } = useHousehold(user);
+  const finance = useFinance(householdId);
 
+  // ── Auth + household gate ─────────────────────────────────────────────
   if (!IS_PORTAL) {
-    if (authLoading) {
-      return (
-        <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg,#064e3b,#0d7060)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ textAlign: 'center', color: '#fff' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🏡</div>
-            <p style={{ fontSize: 16, fontWeight: 800, color: '#6ee7b7' }}>Loading your family dashboard...</p>
-          </div>
-        </div>
-      );
-    }
-    if (!user) return <AuthScreen />;
+    if (authLoading)                          return <LoadingScreen message="Loading your family dashboard..." />;
+    if (!user)                                return <AuthScreen />;
+    if (householdLoading)                     return <LoadingScreen message="Setting up your household..." />;
+    if (needsOnboarding)                      return <OnboardingPlaceholder onComplete={onOnboardingComplete} />;
   }
 
-  const handleGuestSuccess = (name) => { setGuestUser({ name }); setUiState(UI.GUEST); };
-  const handleGuestSignOut = () => { setGuestUser(null); if (!IS_PORTAL) setUiState(UI.APP); };
-  const handleGuestTx = (tx) => finance.addTransaction(tx);
-  const handleAddWorkspace = (opts) => { const ok = finance.addWorkspace(opts); if (ok) { setShowWsCreate(false); setTab('home'); } };
+  // ── Handlers ──────────────────────────────────────────────────────────
+  const handleGuestSuccess  = (name) => { setGuestUser({ name }); setUiState(UI.GUEST); };
+  const handleGuestSignOut  = () => { setGuestUser(null); if (!IS_PORTAL) setUiState(UI.APP); };
+  const handleGuestTx       = (tx) => finance.addTransaction(tx);
+  const handleAddWorkspace  = (opts) => { const ok = finance.addWorkspace(opts); if (ok) { setShowWsCreate(false); setTab('home'); } };
 
+  // ── Guest portal flow ─────────────────────────────────────────────────
   if (IS_PORTAL) {
-    if (uiState === UI.GUEST && guestUser) {
+    if (uiState === UI.GUEST && guestUser)
       return <GuestView guestUser={guestUser} guestSettings={finance.guestSettings} onAddTransaction={handleGuestTx} onSignOut={handleGuestSignOut} isPortalUrl={true} />;
-    }
     return <GuestPortalScreen onSuccess={handleGuestSuccess} />;
   }
 
-  if (uiState === UI.GUEST_PREVIEW) {
+  if (uiState === UI.GUEST_PREVIEW)
     return <GuestLoginModal guestSettings={finance.guestSettings} onSuccess={handleGuestSuccess} onBack={() => setUiState(UI.APP)} />;
-  }
 
-  if (uiState === UI.GUEST && guestUser) {
+  if (uiState === UI.GUEST && guestUser)
     return <GuestView guestUser={guestUser} guestSettings={finance.guestSettings} onAddTransaction={handleGuestTx} onSignOut={handleGuestSignOut} isPortalUrl={false} />;
-  }
 
+  // ── Main dashboard ────────────────────────────────────────────────────
   const themeCSS = buildThemeCSS(finance.theme.skinId, finance.theme.accentId);
 
   const VIEWS = {
-    home: <HomeView totalIncome={finance.totalIncome} totalSpent={finance.totalSpent} remaining={finance.remaining} healthPct={finance.healthPct} budgetStatus={finance.budgetStatus} txs={finance.txs} availableNow={finance.availableNow} nextUnpaid={finance.nextUnpaid} totalExpected={finance.totalExpected} totalReceived={finance.totalReceived} variableSpent={finance.variableSpent} surplusLeft={finance.surplusLeft} onGoPayday={() => setTab('payday')} />,
-    payday: <PaydayView incomes={finance.incomes} txs={finance.txs} totalExpected={finance.totalExpected} totalReceived={finance.totalReceived} availableNow={finance.availableNow} onMarkReceived={finance.markReceived} onMarkPending={finance.markPending} onUpdateExpected={finance.updateExpectedAmount} />,
+    home:     <HomeView totalIncome={finance.totalIncome} totalSpent={finance.totalSpent} remaining={finance.remaining} healthPct={finance.healthPct} budgetStatus={finance.budgetStatus} txs={finance.txs} availableNow={finance.availableNow} nextUnpaid={finance.nextUnpaid} totalExpected={finance.totalExpected} totalReceived={finance.totalReceived} variableSpent={finance.variableSpent} surplusLeft={finance.surplusLeft} onGoPayday={() => setTab('payday')} />,
+    payday:   <PaydayView incomes={finance.incomes} txs={finance.txs} totalExpected={finance.totalExpected} totalReceived={finance.totalReceived} availableNow={finance.availableNow} onMarkReceived={finance.markReceived} onMarkPending={finance.markPending} onUpdateExpected={finance.updateExpectedAmount} />,
     daily:    <DailyView txs={finance.txs} spendByDay={finance.spendByDay} />,
     budget:   <BudgetView catSpend={finance.catSpend} />,
     log:      <LogView txs={finance.txs} remaining={finance.remaining} />,
