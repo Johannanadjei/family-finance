@@ -292,3 +292,28 @@ A full emoji keyboard can replace the preset picker in settings without changing
 
 **Rule derived:**
 For MVP emoji/icon selection, use a curated preset list. Never add a full emoji library dependency to keep bundle size small. The data model must support the icon field from day one so future enhancement requires no schema change.
+
+---
+
+## [2026-05-17] Control Centre count showing 0 — primary workspace not in allWorkspaces
+
+**Context:**
+The Control Centre panel showed "0 CONTROL CENTRES" even though the user had an active Adjei Family household. The header correctly showed "Adjei Family" but the panel showed nothing.
+
+**Root cause:**
+`useFinance` maintained two separate concepts that were never unified:
+- `workspaces` array — only stored extra workspaces (shop, overseas etc). Started as `[]`.
+- Primary workspace — implicit, represented by `ws_primary` constant, never in any array.
+
+`allWorkspaces` returned `workspaces` directly, so the panel always received an empty array on first load. The primary household existed in state but was invisible to the panel.
+
+**Fix:**
+Built a `primaryWorkspace` object from live state and prepended it to `allWorkspaces`:
+```js
+allWorkspaces: [primaryWorkspace, ...extraWorkspaces]
+```
+Also renamed `workspaces` to `extraWorkspaces` internally to make the distinction explicit.
+Fixed `canAddWorkspace` to count `1 + extraWorkspaces.length` instead of `workspaces.length` alone.
+
+**Rule derived:**
+The primary household must always be explicitly represented in the workspaces array. Never rely on an implicit default that exists outside the array. Any component that iterates `allWorkspaces` must always see at least one entry. Single source of truth means one array, always complete.

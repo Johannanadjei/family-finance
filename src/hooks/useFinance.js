@@ -20,7 +20,7 @@ import {
 import {
   getIncomeSources,
   markIncomeReceived as dbMarkReceived,
-  markIncomePending as dbMarkPending,
+  markIncomePending  as dbMarkPending,
   updateExpectedAmount as dbUpdateExpected,
 } from '../services/incomes.service';
 
@@ -37,8 +37,8 @@ const mapTransaction = (row) => ({
   categoryId:  row.category_id || null,
   description: row.description || '',
   amount:      Number(row.amount),
-  submittedBy: row.submitted_by || null,
-  source:      row.source || 'main_app',
+  submittedBy: row.submitted_by  || null,
+  source:      row.source        || 'main_app',
   createdAt:   row.created_at,
 });
 
@@ -46,10 +46,10 @@ const mapIncome = (row) => ({
   id:             row.id,
   source:         row.label,
   expectedAmount: Number(row.expected_amount),
-  expectedPayDay: row.pay_day || null,
+  expectedPayDay: row.pay_day       || null,
   payDayType:     row.pay_day_type,
-  icon:           row.icon || '👤',
-  notes:          row.notes || '',
+  icon:           row.icon          || '👤',
+  notes:          row.notes         || '',
   received:       row.received,
   receivedAmount: Number(row.received_amount || 0),
   actualPayDate:  row.actual_pay_date || null,
@@ -60,12 +60,12 @@ const mapIncome = (row) => ({
 export function useFinance(householdId = null) {
   const hasHousehold = Boolean(householdId);
 
-  const [txs,     setTxsState] = useState(() =>
+  const [txs,    setTxsState] = useState(() =>
     hasHousehold ? [] : (load(KEYS.TRANSACTIONS) || INITIAL_TXS)
   );
-  const [incomes, setIncomes]  = useState(hasHousehold ? [] : INITIAL_INCOMES);
-  const [dbReady, setDbReady]  = useState(!hasHousehold);
-  const [notifs,  setNotifs]   = useState(NOTIF_DEFAULTS);
+  const [incomes, setIncomes] = useState(hasHousehold ? [] : INITIAL_INCOMES);
+  const [dbReady, setDbReady] = useState(!hasHousehold);
+  const [notifs,  setNotifs]  = useState(NOTIF_DEFAULTS);
 
   const setTxs = useCallback((updater) => {
     setTxsState(prev => {
@@ -79,21 +79,17 @@ export function useFinance(householdId = null) {
   useEffect(() => {
     if (!householdId) return;
     let cancelled = false;
-
     const loadData = async () => {
       setDbReady(false);
       const [txResult, incomeResult] = await Promise.all([
         getTransactions(householdId),
         getIncomeSources(householdId),
       ]);
-
       if (cancelled) return;
-
       if (txResult.data)     setTxsState(txResult.data.map(mapTransaction));
       if (incomeResult.data) setIncomes(incomeResult.data.map(mapIncome));
       setDbReady(true);
     };
-
     loadData();
     return () => { cancelled = true; };
   }, [householdId]);
@@ -120,12 +116,12 @@ export function useFinance(householdId = null) {
   }, []);
 
   // ── Workspace state ───────────────────────────────────────────────────
-  const [workspaces, setWorkspaces] = useState([]);
-  const [activeWsId, setActiveWsId] = useState(PRIMARY_WS_ID);
-  const [plan,       setPlan]       = useState('free');
+  const [extraWorkspaces, setExtraWorkspaces] = useState([]);
+  const [activeWsId,      setActiveWsId]      = useState(PRIMARY_WS_ID);
+  const [plan,            setPlan]            = useState('free');
 
-  const isExtraWs     = activeWsId !== PRIMARY_WS_ID;
-  const activeWs      = workspaces.find(w => w.id === activeWsId) || null;
+  const isExtraWs = activeWsId !== PRIMARY_WS_ID;
+  const activeWs  = extraWorkspaces.find(w => w.id === activeWsId) || null;
   const activeTxs     = isExtraWs ? (activeWs?.txs    || []) : txs;
   const activeIncomes = isExtraWs ? (activeWs?.incomes || []) : incomes;
 
@@ -157,11 +153,28 @@ export function useFinance(householdId = null) {
       })[0] || null;
   }, [activeIncomes]);
 
+  // ── Primary workspace object (always present) ─────────────────────────
+  const primaryWorkspace = useMemo(() => ({
+    id:            PRIMARY_WS_ID,
+    name:          HOUSEHOLD.name,
+    typeId:        'home',
+    currency:      HOUSEHOLD.currency || 'GHS',
+    monthlyBudget: monthlyIncome,
+    txs:           txs,
+    incomes:       incomes,
+  }), [monthlyIncome, txs, incomes]);
+
+  // allWorkspaces always includes primary + any extra workspaces
+  const allWorkspaces = useMemo(() =>
+    [primaryWorkspace, ...extraWorkspaces],
+    [primaryWorkspace, extraWorkspaces]
+  );
+
   // ── Handlers ──────────────────────────────────────────────────────────
 
   const applyIncomeUpdater = useCallback((updater) => {
     if (isExtraWs) {
-      setWorkspaces(prev => prev.map(w =>
+      setExtraWorkspaces(prev => prev.map(w =>
         w.id === activeWsId ? { ...w, incomes: updater(w.incomes || []) } : w
       ));
     } else {
@@ -174,16 +187,14 @@ export function useFinance(householdId = null) {
     const newTx  = { ...tx, id: tempId };
 
     if (isExtraWs) {
-      setWorkspaces(prev => prev.map(w =>
+      setExtraWorkspaces(prev => prev.map(w =>
         w.id === activeWsId ? { ...w, txs: [newTx, ...(w.txs || [])] } : w
       ));
       return;
     }
 
-    // Optimistic update
     setTxs(prev => [newTx, ...prev]);
 
-    // SUPABASE SYNC POINT
     if (householdId) {
       const { data, error } = await dbAddTransaction(householdId, {
         date:          tx.date,
@@ -197,7 +208,6 @@ export function useFinance(householdId = null) {
         source:        tx.source || 'main_app',
       });
       if (!error && data) {
-        // Replace temp id with real Supabase id
         setTxs(prev => prev.map(t => t.id === tempId ? { ...newTx, id: data.id } : t));
       }
     }
@@ -228,21 +238,23 @@ export function useFinance(householdId = null) {
   }, [householdId, applyIncomeUpdater]);
 
   // ── Workspace handlers ────────────────────────────────────────────────
-
+  const totalWsCount   = 1 + extraWorkspaces.length;
   const canAddWorkspace = plan === 'premium'
-    ? workspaces.length < PLAN_LIMITS.premium.workspaces - 1
-    : workspaces.length < PLAN_LIMITS.free.workspaces - 1;
+    ? totalWsCount < PLAN_LIMITS.premium.workspaces
+    : totalWsCount < PLAN_LIMITS.free.workspaces;
 
-  const addWorkspace    = (opts) => {
+  const addWorkspace = (opts) => {
     if (!canAddWorkspace) return false;
     const ws = createWorkspace(opts, { monthlyIncome: HOUSEHOLD.monthlyIncome, incomes });
-    setWorkspaces(prev => [...prev, ws]);
+    setExtraWorkspaces(prev => [...prev, ws]);
     setActiveWsId(ws.id);
     return true;
   };
+
   const switchWorkspace = (id) => setActiveWsId(id);
+
   const deleteWorkspace = (id) => {
-    setWorkspaces(prev => prev.filter(w => w.id !== id));
+    setExtraWorkspaces(prev => prev.filter(w => w.id !== id));
     if (activeWsId === id) setActiveWsId(PRIMARY_WS_ID);
   };
 
@@ -257,7 +269,7 @@ export function useFinance(householdId = null) {
     notifs, setNotifs,
     guestSettings, setGuestSettings,
     theme, setTheme,
-    allWorkspaces: workspaces, activeWsId, activeWs, isExtraWs,
+    allWorkspaces, activeWsId, activeWs, isExtraWs,
     plan, setPlan,
     canAddWorkspace, addWorkspace, switchWorkspace, deleteWorkspace,
   };
