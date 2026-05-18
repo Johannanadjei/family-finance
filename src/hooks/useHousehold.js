@@ -2,25 +2,28 @@
  * useHousehold.js
  *
  * Fetches and manages the household context for the authenticated user.
- * This is the single source of truth for household identity in the app.
+ * Loads both the household config AND budget categories in a single fetch.
  *
  * ARCHITECTURE:
- *   App.jsx calls useHousehold(user) after auth resolves.
- *   If needsOnboarding is true → show OnboardingFlow.
- *   If household is loaded → pass householdId down to useFinance.
+ *   - This is the entry point for all household data
+ *   - household + categories are passed to HouseholdProvider in App.jsx
+ *   - useFinance receives the full household object (not just householdId)
+ *   - Supabase is the only source of truth — no localStorage, no constants
  *
  * STATE MACHINE:
- *   loading        → fetching household from Supabase
+ *   loading         → fetching from Supabase
  *   needsOnboarding → user has no household yet
- *   household      → household data is ready, app can render
- *   error          → something went wrong fetching
+ *   ready           → household + categories loaded, app can render
+ *   error           → fetch failed
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { getHousehold } from '../services/households.service';
+import { getBudgetCategories } from '../services/categories.service';
 
 export function useHousehold(user) {
   const [household,       setHousehold]       = useState(null);
+  const [categories,      setCategories]      = useState([]);
   const [loading,         setLoading]         = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [error,           setError]           = useState(null);
@@ -28,6 +31,7 @@ export function useHousehold(user) {
   const fetchHousehold = useCallback(async () => {
     if (!user) {
       setHousehold(null);
+      setCategories([]);
       setLoading(false);
       setNeedsOnboarding(false);
       return;
@@ -36,24 +40,29 @@ export function useHousehold(user) {
     setLoading(true);
     setError(null);
 
-    const { data, error: fetchError } = await getHousehold();
+    // Load household and categories in parallel
+    const { data: householdData, error: householdErr } = await getHousehold();
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      // PGRST116 = no rows found (not an error — means needs onboarding)
-      setError(fetchError.message);
+    if (householdErr && householdErr.code !== 'PGRST116') {
+      setError(householdErr.message);
       setLoading(false);
       return;
     }
 
-    if (!data) {
-      // No household found — user needs to complete onboarding
+    if (!householdData) {
       setNeedsOnboarding(true);
       setHousehold(null);
-    } else {
-      setHousehold(data);
-      setNeedsOnboarding(false);
+      setCategories([]);
+      setLoading(false);
+      return;
     }
 
+    // Household found — load categories in parallel
+    const { data: categoryData } = await getBudgetCategories(householdData.id);
+
+    setHousehold(householdData);
+    setCategories(categoryData || []);
+    setNeedsOnboarding(false);
     setLoading(false);
   }, [user]);
 
@@ -61,17 +70,14 @@ export function useHousehold(user) {
     fetchHousehold();
   }, [fetchHousehold]);
 
-  /**
-   * Called after onboarding completes successfully.
-   * Refreshes household data so the app can render the dashboard.
-   */
   const onOnboardingComplete = useCallback(() => {
     fetchHousehold();
   }, [fetchHousehold]);
 
   return {
     household,
-    householdId:    household?.id || null,
+    householdId:    household?.id     || null,
+    categories,
     loading,
     needsOnboarding,
     error,

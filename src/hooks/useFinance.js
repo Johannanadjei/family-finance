@@ -1,5 +1,22 @@
+/**
+ * useFinance.js
+ *
+ * Manages all financial state for the active household.
+ * Supabase is the only source of truth — no mock data, no constants fallback.
+ *
+ * ARCHITECTURE:
+ *   - Accepts full household object and categories from HouseholdProvider
+ *   - Loads transactions and income sources from Supabase on mount
+ *   - All calculations use live Supabase data
+ *   - localStorage is used only for UI preferences (theme, notifications)
+ *   - Guest portal is the only path that uses no householdId
+ *
+ * DATA FLOW:
+ *   Supabase → useHousehold → HouseholdProvider → useFinance → views
+ */
+
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { INITIAL_TXS, INITIAL_INCOMES, GUEST_DEFAULTS, HOUSEHOLD } from '../data/mockData';
+import { GUEST_DEFAULTS, INITIAL_TXS, INITIAL_INCOMES } from '../data/mockData';
 import { NOTIF_DEFAULTS } from '../constants';
 import {
   calcTotalIncome, calcTotalSpent, calcRemaining,
@@ -26,6 +43,8 @@ import {
 } from '../services/incomes.service';
 
 const PRIMARY_WS_ID = 'ws_primary';
+
+// ── Data shape mappers ────────────────────────────────────────────────────────
 
 const mapTransaction = (row) => ({
   id:          row.id,
@@ -54,43 +73,57 @@ const mapIncome = (row) => ({
   actualPayDate:  row.actual_pay_date || null,
 });
 
-export function useFinance(householdId = null) {
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
+/**
+ * @param {object|null} household — full Supabase household row
+ * @param {Array} categories — Supabase budget_categories
+ */
+export function useFinance(household = null, categories = []) {
+  const householdId  = household?.id     || null;
   const hasHousehold = Boolean(householdId);
 
-  const [txs,    setTxsState] = useState(() =>
-    hasHousehold ? [] : (load(KEYS.TRANSACTIONS) || INITIAL_TXS)
-  );
-  const [incomes, setIncomes] = useState(hasHousehold ? [] : INITIAL_INCOMES);
-  const [dbReady, setDbReady] = useState(!hasHousehold);
+  // ── Core state ────────────────────────────────────────────────────────
+  const [txs,    setTxsState] = useState([]);
+  const [incomes, setIncomes] = useState([]);
+  const [dbReady, setDbReady] = useState(false);
   const [notifs,  setNotifs]  = useState(NOTIF_DEFAULTS);
 
   const setTxs = useCallback((updater) => {
-    setTxsState(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      if (!hasHousehold) persist(KEYS.TRANSACTIONS, next);
-      return next;
-    });
-  }, [hasHousehold]);
+    setTxsState(prev => typeof updater === 'function' ? updater(prev) : updater);
+  }, []);
 
+  // ── Supabase data loading — no localStorage fallback for auth users ────
   useEffect(() => {
-    if (!householdId) return;
+    if (!householdId) {
+      // Guest portal — use empty state, no mock data
+      setTxsState([]);
+      setIncomes([]);
+      setDbReady(true);
+      return;
+    }
+
     let cancelled = false;
-    const loadData = async () => {
+    const load = async () => {
       setDbReady(false);
-      remove(KEYS.TRANSACTIONS);
+      remove(KEYS.TRANSACTIONS); // clear any stale localStorage
+
       const [txResult, incomeResult] = await Promise.all([
         getTransactions(householdId),
         getIncomeSources(householdId),
       ]);
+
       if (cancelled) return;
       if (txResult.data)     setTxsState(txResult.data.map(mapTransaction));
       if (incomeResult.data) setIncomes(incomeResult.data.map(mapIncome));
       setDbReady(true);
     };
-    loadData();
+
+    load();
     return () => { cancelled = true; };
   }, [householdId]);
 
+  // ── UI preferences — localStorage only ───────────────────────────────
   const [guestSettings, setGuestSettingsState] = useState(
     () => load(KEYS.GUEST_SETTINGS) || GUEST_DEFAULTS
   );
@@ -111,32 +144,40 @@ export function useFinance(householdId = null) {
     });
   }, []);
 
+  // ── Workspace state ───────────────────────────────────────────────────
   const [extraWorkspaces, setExtraWorkspaces] = useState([]);
   const [activeWsId,      setActiveWsId]      = useState(PRIMARY_WS_ID);
-  const [plan,            setPlan]            = useState('free');
+  const [plan,            setPlan]            = useState(household?.plan || 'free');
 
   const isExtraWs     = activeWsId !== PRIMARY_WS_ID;
   const activeWs      = extraWorkspaces.find(w => w.id === activeWsId) || null;
   const activeTxs     = isExtraWs ? (activeWs?.txs    || []) : txs;
   const activeIncomes = isExtraWs ? (activeWs?.incomes || []) : incomes;
 
-  const monthlyIncome = isExtraWs ? (activeWs?.monthlyBudget || 0) : HOUSEHOLD.monthlyIncome;
-  const totalIncome   = useMemo(() => calcTotalIncome(activeTxs),   [activeTxs]);
-  const totalSpent    = useMemo(() => calcTotalSpent(activeTxs),    [activeTxs]);
-  const totalFixed    = useMemo(() => calcTotalFixed(),               []);
-  const remaining     = useMemo(() => calcRemaining(monthlyIncome, totalSpent),    [monthlyIncome, totalSpent]);
-  const healthPct     = useMemo(() => calcHealthPct(remaining, monthlyIncome),     [remaining, monthlyIncome]);
-  const budgetStatus  = useMemo(() => getBudgetStatus(remaining, HOUSEHOLD.surplusTarget), [remaining]);
-  const catSpend      = useMemo(() => calcCategorySpend(activeTxs),  [activeTxs]);
-  const weeklyData    = useMemo(() => calcWeeklyData(activeTxs),     [activeTxs]);
-  const spendByDay    = useMemo(() => calcSpendByDay(activeTxs),     [activeTxs]);
-  const variableSpent = useMemo(() => calcVariableSpent(activeTxs),  [activeTxs]);
-  const fixedSpent    = useMemo(() => calcFixedSpent(activeTxs),     [activeTxs]);
+  // ── Derived values — all from Supabase data ───────────────────────────
+  const monthlyIncome = isExtraWs
+    ? (activeWs?.monthlyBudget || 0)
+    : (household?.monthly_income || 0);
+
+  const surplusTarget = household?.surplus_target || 0;
+
+  const totalIncome   = useMemo(() => calcTotalIncome(activeTxs),                              [activeTxs]);
+  const totalSpent    = useMemo(() => calcTotalSpent(activeTxs),                               [activeTxs]);
+  const totalFixed    = useMemo(() => calcTotalFixed(categories),                              [categories]);
+  const remaining     = useMemo(() => calcRemaining(monthlyIncome, totalSpent),                [monthlyIncome, totalSpent]);
+  const healthPct     = useMemo(() => calcHealthPct(remaining, monthlyIncome),                 [remaining, monthlyIncome]);
+  const budgetStatus  = useMemo(() => getBudgetStatus(remaining, surplusTarget),               [remaining, surplusTarget]);
+  const catSpend      = useMemo(() => calcCategorySpend(activeTxs, categories),               [activeTxs, categories]);
+  const weeklyData    = useMemo(() => calcWeeklyData(activeTxs, categories, monthlyIncome),   [activeTxs, categories, monthlyIncome]);
+  const spendByDay    = useMemo(() => calcSpendByDay(activeTxs),                              [activeTxs]);
+  const variableSpent = useMemo(() => calcVariableSpent(activeTxs, categories),               [activeTxs, categories]);
+  const fixedSpent    = useMemo(() => calcFixedSpent(activeTxs, categories),                  [activeTxs, categories]);
   const surplusLeft   = useMemo(() => calcSurplusLeft(monthlyIncome, totalFixed, variableSpent), [monthlyIncome, totalFixed, variableSpent]);
-  const totalExpected = useMemo(() => calcTotalExpected(activeIncomes),            [activeIncomes]);
-  const totalReceived = useMemo(() => calcTotalReceived(activeIncomes),            [activeIncomes]);
-  const availableNow  = useMemo(() => calcAvailableNow(activeIncomes, activeTxs),  [activeIncomes, activeTxs]);
-  const nextUnpaid    = useMemo(() => {
+  const totalExpected = useMemo(() => calcTotalExpected(activeIncomes),                        [activeIncomes]);
+  const totalReceived = useMemo(() => calcTotalReceived(activeIncomes),                        [activeIncomes]);
+  const availableNow  = useMemo(() => calcAvailableNow(activeIncomes, activeTxs),             [activeIncomes, activeTxs]);
+
+  const nextUnpaid = useMemo(() => {
     const today = new Date();
     return activeIncomes
       .filter(i => !i.received && i.expectedPayDay)
@@ -147,21 +188,23 @@ export function useFinance(householdId = null) {
       })[0] || null;
   }, [activeIncomes]);
 
+  // ── Primary workspace — always represents the main household ──────────
   const primaryWorkspace = useMemo(() => ({
     id:            PRIMARY_WS_ID,
-    name:          HOUSEHOLD.name,
+    name:          household?.name     || '',
     typeId:        'home',
-    currency:      HOUSEHOLD.currency || 'GHS',
+    currency:      household?.currency || 'GHS',
     monthlyBudget: monthlyIncome,
-    txs:           txs,
-    incomes:       incomes,
-  }), [monthlyIncome, txs, incomes]);
+    txs,
+    incomes,
+  }), [household, monthlyIncome, txs, incomes]);
 
   const allWorkspaces = useMemo(() =>
     [primaryWorkspace, ...extraWorkspaces],
     [primaryWorkspace, extraWorkspaces]
   );
 
+  // ── Income updater helper ─────────────────────────────────────────────
   const applyIncomeUpdater = useCallback((updater) => {
     if (isExtraWs) {
       setExtraWorkspaces(prev => prev.map(w =>
@@ -172,6 +215,7 @@ export function useFinance(householdId = null) {
     }
   }, [isExtraWs, activeWsId]);
 
+  // ── Transaction handlers ──────────────────────────────────────────────
   const addTransaction = useCallback(async (tx) => {
     const tempId = Date.now();
     const newTx  = { ...tx, id: tempId };
@@ -191,11 +235,11 @@ export function useFinance(householdId = null) {
         week:          tx.week,
         type:          tx.type === 'Income' ? 'income' : 'expense',
         category_name: tx.category,
-        category_id:   tx.categoryId || null,
-        description:   tx.description || '',
+        category_id:   tx.categoryId   || null,
+        description:   tx.description  || '',
         amount:        tx.amount,
-        submitted_by:  tx.submittedBy || null,
-        source:        tx.source || 'main_app',
+        submitted_by:  tx.submittedBy  || null,
+        source:        tx.source       || 'main_app',
       });
       if (!error && data) {
         setTxs(prev => prev.map(t => t.id === tempId ? { ...newTx, id: data.id } : t));
@@ -205,11 +249,11 @@ export function useFinance(householdId = null) {
     if (newTx.source === 'guest_portal') syncGuestExpenseToBackend(newTx);
   }, [householdId, isExtraWs, activeWsId, setTxs]);
 
+  // ── Income handlers ───────────────────────────────────────────────────
   const markReceived = useCallback(async (id, receivedAmount, actualPayDate) => {
     const income = incomes.find(i => i.id === id);
     if (!income) return;
 
-    // Guard — do not create duplicate income transaction
     const alreadyExists = txs.some(t =>
       t.type === 'Income' &&
       t.category === income.source &&
@@ -257,6 +301,7 @@ export function useFinance(householdId = null) {
     syncExpectedIncomeToSpreadsheet(id, newAmount);
   }, [householdId, applyIncomeUpdater]);
 
+  // ── Workspace handlers ────────────────────────────────────────────────
   const totalWsCount    = 1 + extraWorkspaces.length;
   const canAddWorkspace = plan === 'premium'
     ? totalWsCount < PLAN_LIMITS.premium.workspaces
@@ -264,7 +309,7 @@ export function useFinance(householdId = null) {
 
   const addWorkspace = (opts) => {
     if (!canAddWorkspace) return false;
-    const ws = createWorkspace(opts, { monthlyIncome: HOUSEHOLD.monthlyIncome, incomes });
+    const ws = createWorkspace(opts);
     setExtraWorkspaces(prev => [...prev, ws]);
     setActiveWsId(ws.id);
     return true;

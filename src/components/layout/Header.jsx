@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
-import { HOUSEHOLD } from '../../data/mockData';
-import { fmt } from '../../lib/finance';
+import { useHouseholdContext } from '../../context/HouseholdContext';
 import { getWorkspaceType } from '../../lib/workspaces';
 
 export function Header({ remaining, activeWs, isExtraWs, workspaceCount, onSettingsClick, onWorkspaceClick }) {
+  const { household, fmt } = useHouseholdContext();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -14,23 +14,28 @@ export function Header({ remaining, activeWs, isExtraWs, workspaceCount, onSetti
   }, []);
 
   const wsType      = getWorkspaceType(isExtraWs ? activeWs?.typeId : 'home');
-  const bgColor     = wsType.color;
   const accentColor = wsType.accent;
-  const displayName = isExtraWs ? activeWs?.name : HOUSEHOLD.name;
-  const displayIcon = wsType.icon;
-  const subtitle    = isExtraWs
-    ? wsType.label + ' · ' + (activeWs?.currency || 'GHS')
-    : HOUSEHOLD.adults + ' adults · ' + HOUSEHOLD.children + ' kids · ' + HOUSEHOLD.month;
+  const bgColor     = wsType.color;
+
+  const displayName = isExtraWs
+    ? activeWs?.name
+    : (household?.name || '');
+
+  const subtitle = isExtraWs
+    ? wsType.label + ' · ' + (activeWs?.currency || household?.currency || 'GHS')
+    : (household?.adults_count || 0) + ' adults · '
+      + (household?.children_count || 0) + ' kids · '
+      + new Date().toLocaleDateString('en-GH', { month: 'long', year: 'numeric' });
 
   return (
     <div style={{
-      background: 'linear-gradient(145deg,' + bgColor + ',' + bgColor + (scrolled ? '' : 'dd') + ')',
-      padding: '40px 20px 20px',
-      position: 'sticky',
-      top: 0,
-      zIndex: 100,
-      boxShadow: scrolled ? '0 4px 24px rgba(0,0,0,.25)' : 'none',
-      transition: 'box-shadow .2s, background .2s',
+      background:  'linear-gradient(145deg,' + bgColor + ',' + bgColor + (scrolled ? '' : 'dd') + ')',
+      padding:     '40px 20px 20px',
+      position:    'sticky',
+      top:         0,
+      zIndex:      100,
+      boxShadow:   scrolled ? '0 4px 24px rgba(0,0,0,.25)' : 'none',
+      transition:  'box-shadow .2s, background .2s',
     }}>
       <button onClick={onWorkspaceClick}
         style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,.18)', border: 'none', borderRadius: 20, padding: '5px 12px', cursor: 'pointer', marginBottom: 10 }}>
@@ -43,7 +48,7 @@ export function Header({ remaining, activeWs, isExtraWs, workspaceCount, onSetti
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
           <h1 style={{ fontSize: 21, fontWeight: 900, color: '#fff', margin: 0 }}>
-            {displayIcon} {displayName}
+            {wsType.icon} {displayName}
           </h1>
           <p style={{ fontSize: 11, color: accentColor, margin: '2px 0 0', opacity: 0.9 }}>
             {subtitle}

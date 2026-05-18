@@ -1,7 +1,85 @@
-import { FIXED_EXPENSES, WEEKS } from '../constants';
+/**
+ * lib/finance.js — Pure calculation functions.
+ *
+ * ARCHITECTURE:
+ * - No imports from mockData, constants, or any user-specific data
+ * - All functions that need categories accept them as a parameter
+ * - Currency formatting is created per-household via makeFmt()
+ * - Supabase is the only source of truth for all inputs to these functions
+ *
+ * Category shape (from Supabase):
+ *   { id, name, icon, budget_amount, is_fixed, sort_order }
+ */
 
-/** Format a number as GHS currency */
-export const fmt = (n) => 'GHS ' + Math.round(n || 0).toLocaleString('en-GH');
+import { WEEKS } from '../constants';
+
+// ── Currency ──────────────────────────────────────────────────────────────────
+
+const CURRENCY_CONFIG = {
+  GHS: { symbol: 'GHS', locale: 'en-GH' },
+  USD: { symbol: '$',   locale: 'en-US' },
+  GBP: { symbol: '£',   locale: 'en-GB' },
+  EUR: { symbol: '€',   locale: 'de-DE' },
+  NGN: { symbol: '₦',   locale: 'en-NG' },
+  KES: { symbol: 'KSh', locale: 'en-KE' },
+  ZAR: { symbol: 'R',   locale: 'en-ZA' },
+  CAD: { symbol: 'CA$', locale: 'en-CA' },
+  GBP: { symbol: '£',   locale: 'en-GB' },
+};
+
+/**
+ * Create a currency-aware formatter for a household.
+ * Call once when the household loads — not on every render.
+ *
+ * @param {string} currency — e.g. 'GHS', 'USD', 'GBP'
+ * @returns {(n: number) => string}
+ *
+ * @example
+ * const fmt = makeFmt('GHS')
+ * fmt(1200) // → 'GHS 1,200'
+ *
+ * const fmt = makeFmt('USD')
+ * fmt(1200) // → '$1,200'
+ */
+export const makeFmt = (currency = 'GHS') => {
+  const config = CURRENCY_CONFIG[currency] || CURRENCY_CONFIG.GHS;
+  return (n) => config.symbol + ' ' + Math.round(n || 0).toLocaleString(config.locale);
+};
+
+/**
+ * Fallback formatter — used only before household loads.
+ * Components should use makeFmt(household.currency) via HouseholdContext.
+ */
+export const fmt = makeFmt('GHS');
+
+// ── Date formatting ───────────────────────────────────────────────────────────
+
+/** Format a date string to a short readable label */
+export const fmtDate = (d) =>
+  new Date(d).toLocaleDateString('en-GH', { day: 'numeric', month: 'short' });
+
+/** Format a date as a day header (Today / Yesterday / weekday) */
+export const fmtDayHeader = (dateStr) => {
+  const today     = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  if (dateStr === today)     return 'Today';
+  if (dateStr === yesterday) return 'Yesterday';
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GH', {
+    weekday: 'long', day: 'numeric', month: 'short',
+  });
+};
+
+/** Derive week label from a date string ('YYYY-MM-DD') */
+export const getWeekForDate = (dateStr) => {
+  const day = new Date(dateStr).getDate();
+  if (day <= 7)  return 'Week 1';
+  if (day <= 14) return 'Week 2';
+  if (day <= 21) return 'Week 3';
+  if (day <= 28) return 'Week 4';
+  return 'Week 5';
+};
+
+// ── Core transaction calculations ─────────────────────────────────────────────
 
 /** Total income from all Income transactions */
 export const calcTotalIncome = (txs) =>
@@ -11,41 +89,24 @@ export const calcTotalIncome = (txs) =>
 export const calcTotalSpent = (txs) =>
   txs.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
 
-/** Remaining monthly budget */
+/** Remaining = monthlyIncome - totalSpent */
 export const calcRemaining = (monthlyIncome, totalSpent) =>
   monthlyIncome - totalSpent;
 
 /** Budget health as a percentage (0–100) */
 export const calcHealthPct = (remaining, monthlyIncome) =>
-  monthlyIncome > 0 ? Math.max(0, Math.min(100, Math.round((remaining / monthlyIncome) * 100))) : 0;
+  monthlyIncome > 0
+    ? Math.max(0, Math.min(100, Math.round((remaining / monthlyIncome) * 100)))
+    : 0;
 
-/** Spending per category — returns { categoryName: amount } */
-export const calcCategorySpend = (txs) => {
-  const map = {};
-  FIXED_EXPENSES.forEach(e => { map[e.category] = 0; });
-  txs
-    .filter(t => t.type === 'Expense')
-    .forEach(t => { map[t.category] = (map[t.category] || 0) + t.amount; });
-  return map;
-};
-
-/** Weekly monitor data for all 5 weeks */
-export const calcWeeklyData = (txs) => {
-  const totalFixed = FIXED_EXPENSES.reduce((s, e) => s + e.budget, 0);
-  const weeklyFixed = Math.round(totalFixed / 5);
-
-  return WEEKS.map(week => {
-    const income   = txs.filter(t => t.week === week && t.type === 'Income').reduce((s,t) => s+t.amount, 0);
-    const variable = txs.filter(t => t.week === week && t.type === 'Expense').reduce((s,t) => s+t.amount, 0);
-    return {
-      week,
-      plannedIncome:    9000,
-      actualIncome:     income,
-      fixedExpenses:    weeklyFixed,
-      variableSpending: variable,
-      net:              income - weeklyFixed - variable,
-    };
-  });
+/**
+ * Budget status — returns { label, color }
+ * surplusTarget comes from household.surplus_target (Supabase)
+ */
+export const getBudgetStatus = (remaining, surplusTarget) => {
+  if (remaining > surplusTarget) return { label: 'On Track 🎯',   color: '#059669' };
+  if (remaining > 0)             return { label: 'Watch Out ⚠️',  color: '#d97706' };
+  return                                { label: 'Over Budget 🚨', color: '#dc2626' };
 };
 
 /** Spending per day — returns { 'YYYY-MM-DD': amount } */
@@ -57,47 +118,120 @@ export const calcSpendByDay = (txs) => {
   return m;
 };
 
-/** Total fixed budget */
-export const calcTotalFixed = () =>
-  FIXED_EXPENSES.reduce((s, e) => s + e.budget, 0);
+// ── Category-aware calculations ───────────────────────────────────────────────
+// All accept `categories` from Supabase — shape: { name, icon, budget_amount }
+// No fallback to FIXED_EXPENSES. Supabase is the only source.
 
-/** Budget status label */
-export const getBudgetStatus = (remaining, surplusTarget) => {
-  if (remaining > surplusTarget) return { label: 'On Track 🎯', color: '#059669' };
-  if (remaining > 0)             return { label: 'Watch Out ⚠️', color: '#d97706' };
-  return                                { label: 'Over Budget 🚨', color: '#dc2626' };
+/** Normalise a category name for reliable matching */
+const norm = (name) => (name || '').trim().toLowerCase();
+
+/**
+ * Total fixed budget — sum of all household category budgets.
+ * @param {Array} categories — from Supabase budget_categories
+ */
+export const calcTotalFixed = (categories = []) =>
+  categories.reduce((s, c) => s + (c.budget_amount || 0), 0);
+
+/**
+ * Spending per category — returns { categoryName: amount }
+ * Initialises all known categories to 0 so the UI always has a value.
+ * @param {Array} txs
+ * @param {Array} categories — from Supabase budget_categories
+ */
+export const calcCategorySpend = (txs, categories = []) => {
+  const map = {};
+  categories.forEach(c => { map[c.name] = 0; });
+  txs
+    .filter(t => t.type === 'Expense')
+    .forEach(t => { map[t.category] = (map[t.category] || 0) + t.amount; });
+  return map;
 };
 
-/** Format a date string to a short readable label */
-export const fmtDate = (d) =>
-  new Date(d).toLocaleDateString('en-GH', { day: 'numeric', month: 'short' });
+/**
+ * Weekly monitor data for all 5 weeks.
+ * @param {Array} txs
+ * @param {Array} categories — from Supabase
+ * @param {number} monthlyIncome — from household.monthly_income (Supabase)
+ */
+export const calcWeeklyData = (txs, categories = [], monthlyIncome = 0) => {
+  const totalFixed  = calcTotalFixed(categories);
+  const weeklyFixed = Math.round(totalFixed / 5);
+  const weeklyIncome = Math.round(monthlyIncome / 5);
 
-/** Format a date as a day header (Today / Yesterday / full date) */
-export const fmtDayHeader = (dateStr) => {
-  const today     = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-  if (dateStr === today)     return 'Today';
-  if (dateStr === yesterday) return 'Yesterday';
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GH', {
-    weekday: 'long', day: 'numeric', month: 'short',
+  return WEEKS.map(week => {
+    const income   = txs.filter(t => t.week === week && t.type === 'Income').reduce((s, t) => s + t.amount, 0);
+    const variable = txs.filter(t => t.week === week && t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
+    return {
+      week,
+      plannedIncome:    weeklyIncome,
+      actualIncome:     income,
+      fixedExpenses:    weeklyFixed,
+      variableSpending: variable,
+      net:              income - weeklyFixed - variable,
+    };
   });
 };
 
-// ─── Payday calculations ───────────────────────────────────────────────────
+/**
+ * Check if a category name matches any of the household's budget categories.
+ * @param {string} categoryName
+ * @param {Array} categories — from Supabase
+ */
+export const isKnownCategory = (categoryName, categories = []) =>
+  categories.some(c => norm(c.name) === norm(categoryName));
 
-/** Total expected income across all sources */
+/**
+ * Get the icon for a category by name.
+ * @param {string} categoryName
+ * @param {Array} categories — from Supabase
+ */
+export const getCategoryIcon = (categoryName, categories = []) => {
+  const match = categories.find(c => norm(c.name) === norm(categoryName));
+  return match?.icon || '💸';
+};
+
+/**
+ * Calculate total spent on known budget categories only.
+ * @param {Array} txs
+ * @param {Array} categories — from Supabase
+ */
+export const calcFixedSpent = (txs, categories = []) =>
+  txs
+    .filter(t => t.type === 'Expense' && isKnownCategory(t.category, categories))
+    .reduce((s, t) => s + t.amount, 0);
+
+/**
+ * Calculate variable spending — expenses NOT in any known budget category.
+ * @param {Array} txs
+ * @param {Array} categories — from Supabase
+ */
+export const calcVariableSpent = (txs, categories = []) =>
+  txs
+    .filter(t => t.type === 'Expense' && !isKnownCategory(t.category, categories))
+    .reduce((s, t) => s + t.amount, 0);
+
+/**
+ * Calculate surplus left:
+ *   monthlyIncome - totalBudgeted - variableSpent
+ */
+export const calcSurplusLeft = (monthlyIncome, totalBudgeted, variableSpent) =>
+  monthlyIncome - totalBudgeted - variableSpent;
+
+// ── Payday calculations ────────────────────────────────────────────────────────
+
+/** Total expected income across all income sources */
 export const calcTotalExpected = (incomes) =>
   incomes.reduce((s, i) => s + (i.expectedAmount || 0), 0);
 
-/** Total income received so far */
+/** Total income received so far this month */
 export const calcTotalReceived = (incomes) =>
   incomes.reduce((s, i) => s + (i.receivedAmount || 0), 0);
 
-/** Amount available right now: received minus expenses this calendar month */
+/** Available right now = received income minus expenses this calendar month */
 export const calcAvailableNow = (incomes, txs) => {
-  const today = new Date();
+  const today    = new Date();
   const received = calcTotalReceived(incomes);
-  const spent = txs
+  const spent    = txs
     .filter(t => {
       const d = new Date(t.date);
       return t.type === 'Expense'
@@ -108,7 +242,7 @@ export const calcAvailableNow = (incomes, txs) => {
   return received - spent;
 };
 
-/** Days until the next occurrence of a day-of-month (always >= 0) */
+/** Days until the next occurrence of a day-of-month */
 export const calcDaysUntil = (dayOfMonth) => {
   if (!dayOfMonth) return null;
   const today  = new Date();
@@ -138,75 +272,18 @@ export const getIncomeStatus = (income) => {
 };
 
 export const INCOME_STATUS_CONFIG = {
-  received: { label: 'Received ✓', bg: '#d1fae5', color: '#065f46', border: '#6ee7b7' },
-  today:    { label: 'Today! 🎉',  bg: '#fef3c7', color: '#92400e', border: '#f59e0b' },
-  soon:     { label: 'Coming soon',bg: '#ffe4e6', color: '#9f1239', border: '#fda4af' },
-  upcoming: { label: 'Upcoming',   bg: '#f3f4f6', color: '#6b7280', border: '#e5e7eb' },
-  flexible: { label: 'Flexible',   bg: '#f3f4f6', color: '#6b7280', border: '#e5e7eb' },
+  received: { label: 'Received ✓',  bg: '#d1fae5', color: '#065f46', border: '#6ee7b7' },
+  today:    { label: 'Today! 🎉',   bg: '#fef3c7', color: '#92400e', border: '#f59e0b' },
+  soon:     { label: 'Coming soon', bg: '#ffe4e6', color: '#9f1239', border: '#fda4af' },
+  upcoming: { label: 'Upcoming',    bg: '#f3f4f6', color: '#6b7280', border: '#e5e7eb' },
+  flexible: { label: 'Flexible',    bg: '#f3f4f6', color: '#6b7280', border: '#e5e7eb' },
 };
 
-// ─── Formalised calculation functions (per engineering spec) ──────────────
-
-/** Set of fixed budget category names for fast lookup */
-const FIXED_CATEGORY_NAMES = new Set(
-  FIXED_EXPENSES.map(e => e.category.trim().toLowerCase())
-);
-
-/** Normalise a category name for reliable matching */
-const normCat = (name) => (name || '').trim().toLowerCase();
-
-/** Check if a category matches a fixed budget category */
-export const isFixedCategory = (categoryName) =>
-  FIXED_CATEGORY_NAMES.has(normCat(categoryName));
-
-/**
- * Calculate total spent on fixed budget categories only.
- * Used for budget screen category cards.
- */
-export const calcFixedSpent = (txs) =>
-  txs
-    .filter(t => t.type === 'Expense' && isFixedCategory(t.category))
-    .reduce((s, t) => s + t.amount, 0);
-
-/**
- * Calculate variable spending — expenses NOT in any fixed budget category.
- * Includes "Other", custom categories, and unrecognised guest categories.
- */
-export const calcVariableSpent = (txs) =>
-  txs
-    .filter(t => t.type === 'Expense' && !isFixedCategory(t.category))
-    .reduce((s, t) => s + t.amount, 0);
-
-/**
- * Calculate how much has been spent on a specific category.
- * Uses normalised name matching so casing differences don't break it.
- */
-export const calcCategorySpentByName = (categoryName, txs) =>
-  txs
-    .filter(t => t.type === 'Expense' && normCat(t.category) === normCat(categoryName))
-    .reduce((s, t) => s + t.amount, 0);
-
-/**
- * Calculate surplus left:
- *   monthlyIncome - fixedBudgetTotal - variableSpent
- * If positive, the family is under budget. If negative, overspent.
- */
-export const calcSurplusLeft = (monthlyIncome, fixedBudgetTotal, variableSpent) =>
-  monthlyIncome - fixedBudgetTotal - variableSpent;
-
-/**
- * Placeholder — replace with real backend call in production.
- * FIREBASE SYNC POINT: await addDoc(collection(db, 'families', familyId, 'transactions'), tx);
- * SUPABASE SYNC POINT: await supabase.from('transactions').insert(tx);
- */
-export const syncGuestExpenseToBackend = async (transaction) => {
-  // MVP: no-op. Production: send to Firebase/Supabase.
-  console.debug('[syncGuestExpenseToBackend] MVP stub called for:', transaction.id);
-};
+// ── Analytics ─────────────────────────────────────────────────────────────────
 
 /** Weekly summary for a given week filter ('All' or 'Week N') */
 export const calcWeekSummary = (txs, week) => {
-  const scoped = week === 'All' ? txs : txs.filter(t => t.week === week);
+  const scoped   = week === 'All' ? txs : txs.filter(t => t.week === week);
   const expenses = scoped.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
   const income   = scoped.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
   return { expenses, income, net: income - expenses, count: scoped.length };
@@ -225,18 +302,14 @@ export const calcTopCategories = (txs, limit = 5) => {
     .slice(0, limit);
 };
 
-/** GOOGLE SHEETS SYNC POINT: update expected income in spreadsheet */
-export const syncExpectedIncomeToSpreadsheet = async (incomeId, newAmount) => {
-  // TODO: implement Google Sheets API sync
-  console.debug('[sync] syncExpectedIncomeToSpreadsheet', incomeId, newAmount);
+// ── Sync stubs ────────────────────────────────────────────────────────────────
+
+/** MVP stub — replace with Supabase real-time in Phase 2 */
+export const syncGuestExpenseToBackend = async (transaction) => {
+  console.debug('[syncGuestExpenseToBackend] MVP stub:', transaction.id);
 };
 
-/** Derive week label from a date string ('YYYY-MM-DD') */
-export const getWeekForDate = (dateStr) => {
-  const day = new Date(dateStr).getDate();
-  if (day <= 7)  return 'Week 1';
-  if (day <= 14) return 'Week 2';
-  if (day <= 21) return 'Week 3';
-  if (day <= 28) return 'Week 4';
-  return 'Week 5';
+/** MVP stub — replace with Google Sheets API in Phase 3 */
+export const syncExpectedIncomeToSpreadsheet = async (incomeId, newAmount) => {
+  console.debug('[syncExpectedIncomeToSpreadsheet] MVP stub:', incomeId, newAmount);
 };
