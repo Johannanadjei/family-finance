@@ -1,8 +1,7 @@
-import { fmt } from '../../lib/finance';
 import { cardStyle } from '../ui';
 
-/** Summary card shown at top of LogView for selected week/filter */
-export function WeeklySummaryCard({ summary, weekLabel }) {
+/** Summary card shown at top of LogView — fmt passed from parent */
+export function WeeklySummaryCard({ summary, weekLabel, fmt }) {
   const netPositive = summary.net >= 0;
   return (
     <div style={{ ...cardStyle, background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))', color: '#fff', padding: '18px 20px' }}>

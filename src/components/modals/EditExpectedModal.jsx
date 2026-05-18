@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { fmt } from '../../lib/finance';
 
-/** Modal to edit expected income amount for an income source */
-export function EditExpectedModal({ income, onSave, onClose }) {
+/** Modal to edit expected income amount — fmt passed from parent PaydayView */
+export function EditExpectedModal({ income, fmt, onSave, onClose }) {
   const [amount, setAmount] = useState(String(income.expectedAmount));
   const [saved,  setSaved]  = useState(false);
 

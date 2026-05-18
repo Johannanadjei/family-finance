@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ChevronDown } from 'lucide-react';
-import { WEEKS, INCOME_CATS, EXPENSE_CATS } from '../../constants';
-import { fmt } from '../../lib/finance';
+import { WEEKS } from '../../constants';
+import { useHouseholdContext } from '../../context/HouseholdContext';
 import { inputStyle } from '../ui';
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -16,11 +16,17 @@ const EMPTY_FORM = {
 };
 
 export function AddModal({ onSubmit, onClose }) {
+  const { fmt, categories, household } = useHouseholdContext();
   const [form, setForm] = useState(EMPTY_FORM);
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
-  const cats  = form.type === 'Income' ? INCOME_CATS : EXPENSE_CATS;
-  const valid = form.category && form.amount && parseFloat(form.amount) > 0;
+  // Expense categories come from Supabase via context
+  // Income uses income source names or a simple fallback
+  const expenseCats = categories.map(c => c.name);
+  const incomeCats  = ['Salary', 'Freelance', 'Business', 'Investment', 'Other Income'];
+  const cats        = form.type === 'Income' ? incomeCats : expenseCats;
+  const currency    = household?.currency || 'GHS';
+  const valid       = form.category && form.amount && parseFloat(form.amount) > 0;
 
   const handleSubmit = () => {
     if (!valid) return;
@@ -40,9 +46,8 @@ export function AddModal({ onSubmit, onClose }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-end' }}>
       <div style={{ background: '#fff', borderRadius: '24px 24px 0 0', padding: '24px 20px 40px', width: '100%', maxWidth: 440, margin: '0 auto', maxHeight: '92vh', overflowY: 'auto' }}>
 
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <p style={{ fontWeight: 900, fontSize: 18, color: '#1c1917', margin: 0 }}>Add Payment</p>
+          <p style={{ fontWeight: 900, fontSize: 18, color: '#1c1917', margin: 0 }}>Add Transaction</p>
           <button onClick={onClose} style={{ background: '#f3f4f6', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={16} color="#6b7280" />
           </button>
@@ -50,7 +55,6 @@ export function AddModal({ onSubmit, onClose }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Type */}
           <div>
             <p style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Type</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -66,7 +70,6 @@ export function AddModal({ onSubmit, onClose }) {
             </div>
           </div>
 
-          {/* Week */}
           <div>
             <p style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Week</p>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -82,14 +85,12 @@ export function AddModal({ onSubmit, onClose }) {
             </div>
           </div>
 
-          {/* Date */}
           <div>
             <p style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Date</p>
             <input type="date" value={form.date} onChange={e => set('date', e.target.value)}
               max={today()} style={inputStyle} />
           </div>
 
-          {/* Category */}
           <div>
             <p style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Category</p>
             <div style={{ position: 'relative' }}>
@@ -102,21 +103,18 @@ export function AddModal({ onSubmit, onClose }) {
             </div>
           </div>
 
-          {/* Amount */}
           <div>
-            <p style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Amount (GHS)</p>
+            <p style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Amount ({currency})</p>
             <input type="number" placeholder="0" value={form.amount} onChange={e => set('amount', e.target.value)}
               min="0" style={{ ...inputStyle, fontSize: 22, fontWeight: 900 }} />
           </div>
 
-          {/* Description */}
           <div>
             <p style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Description (optional)</p>
             <input type="text" placeholder="e.g. Weekly groceries" value={form.description}
               onChange={e => set('description', e.target.value)} style={inputStyle} />
           </div>
 
-          {/* Submit */}
           <button onClick={handleSubmit} disabled={!valid}
             style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', marginTop: 4, cursor: valid ? 'pointer' : 'not-allowed',
               background: valid ? 'linear-gradient(135deg,#f59e0b,#d97706)' : '#e5e7eb',

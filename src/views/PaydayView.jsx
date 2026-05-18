@@ -1,13 +1,10 @@
 import { useState } from 'react';
-import {
-  fmt, fmtDate,
-  calcDaysUntil, fmtNextPayDate,
-  getIncomeStatus, INCOME_STATUS_CONFIG,
-} from '../lib/finance';
+import { fmtDate, calcDaysUntil, fmtNextPayDate, getIncomeStatus, INCOME_STATUS_CONFIG } from '../lib/finance';
+import { useHouseholdContext } from '../context/HouseholdContext';
 import { cardStyle } from '../components/ui';
 import { EditExpectedModal } from '../components/modals/EditExpectedModal';
 
-function MarkReceivedForm({ income, onConfirm, onCancel }) {
+function MarkReceivedForm({ income, fmt, onConfirm, onCancel }) {
   const today = new Date().toISOString().split('T')[0];
   const [amount, setAmount] = useState(String(income.expectedAmount));
   const [date,   setDate]   = useState(today);
@@ -29,7 +26,7 @@ function MarkReceivedForm({ income, onConfirm, onCancel }) {
   );
 }
 
-function IncomeCard({ income, onMarkReceived, onMarkPending, onUpdateExpected }) {
+function IncomeCard({ income, fmt, onMarkReceived, onMarkPending, onUpdateExpected }) {
   const [confirming, setConfirming] = useState(false);
   const [editing,    setEditing]    = useState(false);
   const status = getIncomeStatus(income);
@@ -38,7 +35,7 @@ function IncomeCard({ income, onMarkReceived, onMarkPending, onUpdateExpected })
 
   return (
     <div style={{ ...cardStyle, borderLeft: '4px solid ' + cfg.border }}>
-      {editing && <EditExpectedModal income={income} onSave={onUpdateExpected} onClose={() => setEditing(false)} />}
+      {editing && <EditExpectedModal income={income} fmt={fmt} onSave={onUpdateExpected} onClose={() => setEditing(false)} />}
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
         <div style={{ width: 44, height: 44, borderRadius: 12, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{income.icon}</div>
@@ -87,7 +84,7 @@ function IncomeCard({ income, onMarkReceived, onMarkPending, onUpdateExpected })
 
       {!income.received ? (
         confirming ? (
-          <MarkReceivedForm income={income} onConfirm={(id, amt, date) => { onMarkReceived(id, amt, date); setConfirming(false); }} onCancel={() => setConfirming(false)} />
+          <MarkReceivedForm income={income} fmt={fmt} onConfirm={(id, amt, date) => { onMarkReceived(id, amt, date); setConfirming(false); }} onCancel={() => setConfirming(false)} />
         ) : (
           <button onClick={() => setConfirming(true)} style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>Mark as Received</button>
         )
@@ -99,8 +96,10 @@ function IncomeCard({ income, onMarkReceived, onMarkPending, onUpdateExpected })
 }
 
 export function PaydayView({ incomes, txs, totalExpected, totalReceived, availableNow, onMarkReceived, onMarkPending, onUpdateExpected }) {
+  const { fmt } = useHouseholdContext();
   const totalPending = totalExpected - totalReceived;
   const receivedPct  = totalExpected > 0 ? Math.round((totalReceived / totalExpected) * 100) : 0;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ background: 'linear-gradient(145deg,#1e1b4b,#3730a3)', borderRadius: 20, padding: '20px', color: '#fff' }}>
@@ -121,7 +120,7 @@ export function PaydayView({ incomes, txs, totalExpected, totalReceived, availab
       </div>
       <p style={{ fontWeight: 900, fontSize: 15, color: '#1c1917', margin: '2px 0 0' }}>Income Sources</p>
       {incomes.map(income => (
-        <IncomeCard key={income.id} income={income} onMarkReceived={onMarkReceived} onMarkPending={onMarkPending} onUpdateExpected={onUpdateExpected} />
+        <IncomeCard key={income.id} income={income} fmt={fmt} onMarkReceived={onMarkReceived} onMarkPending={onMarkPending} onUpdateExpected={onUpdateExpected} />
       ))}
     </div>
   );

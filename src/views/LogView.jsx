@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
 import { WEEKS } from '../constants';
-import { fmt, fmtDate, fmtDayHeader, calcWeekSummary, calcTopCategories } from '../lib/finance';
+import { fmtDate, fmtDayHeader, calcWeekSummary, calcTopCategories } from '../lib/finance';
+import { useHouseholdContext } from '../context/HouseholdContext';
 import { Chip, cardStyle } from '../components/ui';
 import { WeeklySummaryCard } from '../components/layout/WeeklySummaryCard';
 import { CategoryBreakdown } from '../components/layout/CategoryBreakdown';
 
 export function LogView({ txs, remaining }) {
+  const { fmt } = useHouseholdContext();
   const [typeFilter, setTypeFilter] = useState('All');
   const [weekFilter, setWeekFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
@@ -24,7 +26,7 @@ export function LogView({ txs, remaining }) {
     return Object.entries(g).sort((a, b) => b[0].localeCompare(a[0]));
   }, [filtered]);
 
-  const summary    = useMemo(() => calcWeekSummary(txs, weekFilter), [txs, weekFilter]);
+  const summary   = useMemo(() => calcWeekSummary(txs, weekFilter), [txs, weekFilter]);
   const categories = useMemo(() => calcTopCategories(filtered), [filtered]);
   const weekLabel  = weekFilter === 'All' ? 'All Weeks' : weekFilter;
 
@@ -33,7 +35,7 @@ export function LogView({ txs, remaining }) {
     income: dayTxs.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0),
   });
 
-  const topCat = categories[0];
+  const topCat  = categories[0];
   const insight = topCat ? topCat.category + ' is your highest spending category (' + String(topCat.pct) + '% of spend)' : null;
 
   return (
@@ -64,7 +66,7 @@ export function LogView({ txs, remaining }) {
         </div>
       </div>
 
-      <WeeklySummaryCard summary={summary} weekLabel={weekLabel} />
+      <WeeklySummaryCard summary={summary} weekLabel={weekLabel} fmt={fmt} />
 
       {insight && (
         <div style={{ ...cardStyle, background: 'var(--c-accent-light, #f0fdf4)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -80,7 +82,7 @@ export function LogView({ txs, remaining }) {
         </div>
       )}
 
-      <CategoryBreakdown categories={categories} />
+      <CategoryBreakdown categories={categories} fmt={fmt} />
 
       <p style={{ fontSize: 12, color: 'var(--c-muted, #9ca3af)', margin: 0 }}>{filtered.length} transaction{filtered.length !== 1 ? 's' : ''}</p>
 
