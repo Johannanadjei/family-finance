@@ -17,7 +17,6 @@ import { resolveTheme } from '../lib/themes';
 import {
   getTransactions,
   addTransaction as dbAddTransaction,
-  deleteTransaction as dbDeleteTransaction,
 } from '../services/transactions.service';
 import {
   getIncomeSources,
@@ -27,8 +26,6 @@ import {
 } from '../services/incomes.service';
 
 const PRIMARY_WS_ID = 'ws_primary';
-
-// ── Data shape mappers ────────────────────────────────────────────────────────
 
 const mapTransaction = (row) => ({
   id:          row.id,
@@ -57,8 +54,6 @@ const mapIncome = (row) => ({
   actualPayDate:  row.actual_pay_date || null,
 });
 
-// ── Hook ──────────────────────────────────────────────────────────────────────
-
 export function useFinance(householdId = null) {
   const hasHousehold = Boolean(householdId);
 
@@ -77,32 +72,25 @@ export function useFinance(householdId = null) {
     });
   }, [hasHousehold]);
 
-  // ── Supabase data loading ─────────────────────────────────────────────
   useEffect(() => {
     if (!householdId) return;
     let cancelled = false;
-
     const loadData = async () => {
       setDbReady(false);
-      // Clear stale localStorage transactions to prevent flash of old data
       remove(KEYS.TRANSACTIONS);
-
       const [txResult, incomeResult] = await Promise.all([
         getTransactions(householdId),
         getIncomeSources(householdId),
       ]);
-
       if (cancelled) return;
       if (txResult.data)     setTxsState(txResult.data.map(mapTransaction));
       if (incomeResult.data) setIncomes(incomeResult.data.map(mapIncome));
       setDbReady(true);
     };
-
     loadData();
     return () => { cancelled = true; };
   }, [householdId]);
 
-  // ── Theme + guest settings ────────────────────────────────────────────
   const [guestSettings, setGuestSettingsState] = useState(
     () => load(KEYS.GUEST_SETTINGS) || GUEST_DEFAULTS
   );
@@ -123,7 +111,6 @@ export function useFinance(householdId = null) {
     });
   }, []);
 
-  // ── Workspace state ───────────────────────────────────────────────────
   const [extraWorkspaces, setExtraWorkspaces] = useState([]);
   const [activeWsId,      setActiveWsId]      = useState(PRIMARY_WS_ID);
   const [plan,            setPlan]            = useState('free');
@@ -133,7 +120,6 @@ export function useFinance(householdId = null) {
   const activeTxs     = isExtraWs ? (activeWs?.txs    || []) : txs;
   const activeIncomes = isExtraWs ? (activeWs?.incomes || []) : incomes;
 
-  // ── Derived values ────────────────────────────────────────────────────
   const monthlyIncome = isExtraWs ? (activeWs?.monthlyBudget || 0) : HOUSEHOLD.monthlyIncome;
   const totalIncome   = useMemo(() => calcTotalIncome(activeTxs),   [activeTxs]);
   const totalSpent    = useMemo(() => calcTotalSpent(activeTxs),    [activeTxs]);
@@ -161,7 +147,6 @@ export function useFinance(householdId = null) {
       })[0] || null;
   }, [activeIncomes]);
 
-  // ── Primary workspace object ──────────────────────────────────────────
   const primaryWorkspace = useMemo(() => ({
     id:            PRIMARY_WS_ID,
     name:          HOUSEHOLD.name,
@@ -176,8 +161,6 @@ export function useFinance(householdId = null) {
     [primaryWorkspace, ...extraWorkspaces],
     [primaryWorkspace, extraWorkspaces]
   );
-
-  // ── Handlers ──────────────────────────────────────────────────────────
 
   const applyIncomeUpdater = useCallback((updater) => {
     if (isExtraWs) {
@@ -223,47 +206,46 @@ export function useFinance(householdId = null) {
   }, [householdId, isExtraWs, activeWsId, setTxs]);
 
   const markReceived = useCallback(async (id, receivedAmount, actualPayDate) => {
-    // Update income source state
+    const income = incomes.find(i => i.id === id);
+    if (!income) return;
+
+    // Guard — do not create duplicate income transaction
+    const alreadyExists = txs.some(t =>
+      t.type === 'Income' &&
+      t.category === income.source &&
+      t.source === 'main_app' &&
+      t.amount === receivedAmount
+    );
+    if (alreadyExists) return;
+
     applyIncomeUpdater(prev => prev.map(i =>
       i.id === id ? { ...i, received: true, receivedAmount, actualPayDate } : i
     ));
 
-    // Find the income source to get its label
-    const income = incomes.find(i => i.id === id);
-    const label  = income?.source || 'Salary';
-
-    // Create an Income transaction so dashboard totalIncome reflects it
     const today = actualPayDate || new Date().toISOString().split('T')[0];
     await addTransaction({
       date:        today,
       week:        getWeekForDate(today),
       type:        'Income',
-      category:    label,
-      description: label + ' received',
+      category:    income.source,
+      description: income.source + ' received',
       amount:      receivedAmount,
       source:      'main_app',
     });
 
-    // SUPABASE SYNC POINT:
     if (householdId) await dbMarkReceived(id, receivedAmount, actualPayDate);
-  }, [householdId, applyIncomeUpdater, addTransaction, incomes]);
+  }, [householdId, applyIncomeUpdater, addTransaction, incomes, txs]);
 
   const markPending = useCallback(async (id) => {
-    // Find the income source before resetting it
     const income = incomes.find(i => i.id === id);
-
-    // Remove the income transaction that was created when marked received
     if (income?.source) {
       setTxs(prev => prev.filter(t =>
         !(t.type === 'Income' && t.category === income.source && t.source === 'main_app')
       ));
-      // SUPABASE SYNC POINT: delete matching income transaction
     }
-
     applyIncomeUpdater(prev => prev.map(i =>
       i.id === id ? { ...i, received: false, receivedAmount: 0, actualPayDate: null } : i
     ));
-
     if (householdId) await dbMarkPending(id);
   }, [householdId, applyIncomeUpdater, incomes, setTxs]);
 
@@ -275,7 +257,6 @@ export function useFinance(householdId = null) {
     syncExpectedIncomeToSpreadsheet(id, newAmount);
   }, [householdId, applyIncomeUpdater]);
 
-  // ── Workspace handlers ────────────────────────────────────────────────
   const totalWsCount    = 1 + extraWorkspaces.length;
   const canAddWorkspace = plan === 'premium'
     ? totalWsCount < PLAN_LIMITS.premium.workspaces

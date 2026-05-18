@@ -404,3 +404,30 @@ All logic is internally cohesive and correctly structured. Splitting mid-session
 
 **Rule derived:**
 When a file exceeds size limits but splitting it mid-feature would introduce risk, log it immediately as planned debt with a specific split plan. Never leave it undocumented. Complete the current feature, then refactor as the first task of the next phase.
+
+---
+
+## [2026-05-18] Duplicate income transactions caused by missing idempotency guard
+
+**Context:**
+Monthly Income showed GHS 90,000 instead of GHS 45,000. Investigation revealed duplicate income transactions in Supabase — Jay and Dita each appeared twice.
+
+**Root cause:**
+`markReceived` created an Income transaction every time it was called without checking if one already existed for that income source. When the user marked income received twice, or when a re-render triggered the handler again, a second transaction was inserted.
+
+**Fix:**
+Added an idempotency guard at the top of `markReceived`:
+```js
+const alreadyExists = txs.some(t =>
+  t.type === 'Income' &&
+  t.category === income.source &&
+  t.source === 'main_app' &&
+  t.amount === receivedAmount
+);
+if (alreadyExists) return;
+```
+
+Duplicate transactions in Supabase were soft-deleted via SQL.
+
+**Rule derived:**
+Any handler that creates a record must check for an existing matching record before inserting. This is the idempotency principle — calling a function twice must produce the same result as calling it once. Always add existence checks before write operations that could be triggered multiple times.
