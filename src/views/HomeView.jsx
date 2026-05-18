@@ -1,23 +1,25 @@
 import { useState } from 'react';
-import { fmt, fmtDate, calcTotalFixed } from '../lib/finance';
-import { SURPLUS_TARGET } from '../constants';
+import { useHouseholdContext } from '../context/HouseholdContext';
+import { fmtDate, calcTotalFixed } from '../lib/finance';
 import { InfoModal, StatCard, heroStyle, cardStyle } from '../components/ui';
 
-const FIXED_TOTAL = calcTotalFixed();
-
-const INFO = {
-  monthlyIncome: { title: 'Monthly Income', body: 'This shows income transactions actually logged this month. It starts at GHS 0 and increases as you mark each salary received on the Payday screen.' },
-  fixed:    { title: 'Fixed Budget',   body: 'The total of all your planned monthly expenses across your budget categories — rent, school fees, food, utilities and more.' },
-  income:   { title: 'Income In',      body: 'Salary and income payments actually received so far this month. Marked received on the Payday screen.' },
-  variable: { title: 'Variable Spent', body: 'Spending outside your fixed categories — gifts, entertainment, one-off purchases. Keep this low to protect your surplus.' },
-  surplus:  { title: 'Surplus Left',   body: 'What remains after fixed budget and variable spending are subtracted from income. Your target is ' + fmt(SURPLUS_TARGET) + ' — money to save or invest.' },
-};
-
 export function HomeView({ totalIncome, totalSpent, remaining, healthPct, budgetStatus, txs, availableNow, nextUnpaid, totalExpected, totalReceived, variableSpent, surplusLeft, onGoPayday }) {
+  const { fmt, household, categories } = useHouseholdContext();
   const [modal, setModal] = useState(null);
-  const recentTxs  = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
-  const healthColor = healthPct > 50 ? '#f59e0b' : healthPct > 20 ? '#f97316' : '#ef4444';
-  const payPct      = totalExpected > 0 ? Math.round((totalReceived / totalExpected) * 100) : 0;
+
+  const fixedTotal    = calcTotalFixed(categories);
+  const surplusTarget = household?.surplus_target || 0;
+  const recentTxs     = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
+  const healthColor   = healthPct > 50 ? '#10b981' : healthPct > 20 ? '#f59e0b' : '#ef4444';
+  const payPct        = totalExpected > 0 ? Math.round((totalReceived / totalExpected) * 100) : 0;
+
+  const INFO = {
+    monthlyIncome: { title: 'Monthly Income',  body: 'Income transactions logged this month. Starts at zero and grows as you mark each salary received on the Payday screen.' },
+    fixed:         { title: 'Fixed Budget',     body: 'Total of all your planned monthly category budgets — rent, school fees, food, utilities and more.' },
+    income:        { title: 'Income In',        body: 'Salary and income payments actually received so far this month.' },
+    variable:      { title: 'Variable Spent',   body: 'Spending outside your budget categories — gifts, entertainment, one-off purchases.' },
+    surplus:       { title: 'Surplus Left',     body: 'What remains after fixed budget and variable spending. Your target is ' + fmt(surplusTarget) + ' — money to save or invest.' },
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -33,14 +35,16 @@ export function HomeView({ totalIncome, totalSpent, remaining, healthPct, budget
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <div><p style={{ fontSize: 11, opacity: .7, margin: '0 0 2px' }}>Spent</p><p style={{ fontWeight: 800, margin: 0 }}>{fmt(totalSpent)}</p></div>
           <div><p style={{ fontSize: 11, opacity: .7, margin: '0 0 2px' }}>Remaining</p><p style={{ fontWeight: 800, margin: 0 }}>{fmt(remaining)}</p></div>
-          <div><p style={{ fontSize: 11, opacity: .7, margin: '0 0 2px' }}>Target</p><p style={{ fontWeight: 800, margin: 0 }}>{fmt(SURPLUS_TARGET)}</p></div>
+          <div><p style={{ fontSize: 11, opacity: .7, margin: '0 0 2px' }}>Target</p><p style={{ fontWeight: 800, margin: 0 }}>{fmt(surplusTarget)}</p></div>
         </div>
       </div>
 
       <div style={{ ...cardStyle }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <p style={{ fontWeight: 800, fontSize: 15, margin: 0 }}>Budget Health</p>
-          <span style={{ fontWeight: 800, fontSize: 13, color: healthPct > 30 ? '#16a34a' : '#ef4444' }}>{budgetStatus.label} {healthPct > 30 ? '🎯' : '⚠️'}</span>
+          <span style={{ fontWeight: 800, fontSize: 13, color: healthPct > 30 ? '#16a34a' : '#ef4444' }}>
+            {budgetStatus.label} {healthPct > 30 ? '🎯' : '⚠️'}
+          </span>
         </div>
         <div style={{ height: 8, background: 'var(--c-border, #f3f4f6)', borderRadius: 8 }}>
           <div style={{ height: 8, borderRadius: 8, background: healthColor, width: String(Math.min(healthPct, 100)) + '%', transition: 'width .4s' }} />
@@ -70,7 +74,7 @@ export function HomeView({ totalIncome, totalSpent, remaining, healthPct, budget
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <StatCard label="Fixed Budget"   value={fmt(FIXED_TOTAL)}  infoKey="fixed"    onInfo={setModal} />
+        <StatCard label="Fixed Budget"   value={fmt(fixedTotal)}    infoKey="fixed"    onInfo={setModal} />
         <StatCard label="Income In"      value={fmt(totalReceived)} infoKey="income"   onInfo={setModal} color="#16a34a" />
         <StatCard label="Variable Spent" value={fmt(variableSpent)} infoKey="variable" onInfo={setModal} color={variableSpent > 0 ? '#ef4444' : 'var(--c-text, #1c1917)'} />
         <StatCard label="Surplus Left"   value={fmt(surplusLeft)}   infoKey="surplus"  onInfo={setModal} color="#f59e0b" />
@@ -78,7 +82,9 @@ export function HomeView({ totalIncome, totalSpent, remaining, healthPct, budget
 
       <div style={{ ...cardStyle }}>
         <p style={{ fontWeight: 800, fontSize: 15, margin: '0 0 14px' }}>Recent Activity</p>
-        {recentTxs.length === 0 && <p style={{ color: 'var(--c-muted, #9ca3af)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>No transactions yet</p>}
+        {recentTxs.length === 0 && (
+          <p style={{ color: 'var(--c-muted, #9ca3af)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>No transactions yet</p>
+        )}
         {recentTxs.map(tx => (
           <div key={tx.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: tx.type === 'Income' ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -88,7 +94,9 @@ export function HomeView({ totalIncome, totalSpent, remaining, healthPct, budget
               <p style={{ fontWeight: 700, fontSize: 14, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tx.category}</p>
               <p style={{ fontSize: 12, color: 'var(--c-muted, #9ca3af)', margin: 0 }}>{tx.description || tx.category} · {fmtDate(tx.date)}</p>
             </div>
-            <p style={{ fontWeight: 800, fontSize: 14, color: tx.type === 'Income' ? '#16a34a' : '#ef4444', margin: 0, flexShrink: 0 }}>{tx.type === 'Income' ? '+' : '-'}{fmt(tx.amount)}</p>
+            <p style={{ fontWeight: 800, fontSize: 14, color: tx.type === 'Income' ? '#16a34a' : '#ef4444', margin: 0, flexShrink: 0 }}>
+              {tx.type === 'Income' ? '+' : '-'}{fmt(tx.amount)}
+            </p>
           </div>
         ))}
       </div>
