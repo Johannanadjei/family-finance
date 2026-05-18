@@ -179,13 +179,16 @@ export function useFinance(household = null, categories = []) {
 
   const nextUnpaid = useMemo(() => {
     const today = new Date();
-    return activeIncomes
+    const next = activeIncomes
       .filter(i => !i.received && i.expectedPayDay)
       .sort((a, b) => {
         const dA = ((a.expectedPayDay - today.getDate()) + 31) % 31;
         const dB = ((b.expectedPayDay - today.getDate()) + 31) % 31;
         return dA - dB;
       })[0] || null;
+    if (!next) return null;
+    const daysUntil = ((next.expectedPayDay - today.getDate()) + 31) % 31;
+    return { ...next, daysUntil, label: next.source };
   }, [activeIncomes]);
 
   // ── Primary workspace — always represents the main household ──────────
@@ -254,11 +257,13 @@ export function useFinance(household = null, categories = []) {
     const income = incomes.find(i => i.id === id);
     if (!income) return;
 
+    const payDate = actualPayDate || new Date().toISOString().split('T')[0];
     const alreadyExists = txs.some(t =>
       t.type === 'Income' &&
       t.category === income.source &&
       t.source === 'main_app' &&
-      t.amount === receivedAmount
+      t.amount === receivedAmount &&
+      t.date === payDate
     );
     if (alreadyExists) return;
 
@@ -266,7 +271,6 @@ export function useFinance(household = null, categories = []) {
       i.id === id ? { ...i, received: true, receivedAmount, actualPayDate } : i
     ));
 
-    const today = actualPayDate || new Date().toISOString().split('T')[0];
     await addTransaction({
       date:        today,
       week:        getWeekForDate(today),
