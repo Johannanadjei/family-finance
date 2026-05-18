@@ -431,3 +431,72 @@ Duplicate transactions in Supabase were soft-deleted via SQL.
 
 **Rule derived:**
 Any handler that creates a record must check for an existing matching record before inserting. This is the idempotency principle — calling a function twice must produce the same result as calling it once. Always add existence checks before write operations that could be triggered multiple times.
+
+---
+
+## [2026-05-18] Constants audit — what stays and what moves to Supabase
+
+**Rule:** If a value differs per household, it belongs in Supabase. If it is structural app config, it stays as a constant.
+
+**WEEKS** — `['Week 1'...'Week 5']` — fixed app structure, not per-household. Stays as constant.
+
+**CURRENCIES** — supported currency list for the app. Not per-household. Stays as constant.
+
+**NOTIF_DEFAULTS** — notification preferences. Should eventually be per-user in Supabase. MVP: localStorage. Phase 2: move to `user_preferences` table.
+
+**INCOME_CATS** — hardcoded income category names in AddModal. Phase 2: wire to `income_sources` table so the user sees their own income source names when logging income.
+
+**EXPENSE_CATS** — derived from FIXED_EXPENSES. Now dead code — AddModal uses real Supabase categories from HouseholdContext. Can be removed from constants/index.js in cleanup.
+
+**SURPLUS_TARGET** — hardcoded Adjei Family value. Now dead — all calculations use `household.surplus_target` from Supabase.
+
+**Rule derived:**
+Before using any constant in a calculation or UI, ask: does this value differ per household? If yes, it must come from Supabase. Constants are for structural app config only — week labels, supported currencies, enum values. Never for financial or household-specific data.
+
+---
+
+## [2026-05-18] RLS policy missing on budget_categories for authenticated reads
+
+**Context:**
+After wiring `useHousehold` to load categories from Supabase, all categories returned empty. The data existed in the database (confirmed via postgres role) but the app received nothing.
+
+**Root cause:**
+The `budget_categories_select` policy used `is_household_member(household_id)`. The function correctly checks `household_members` for the user. However the same RLS chicken-and-egg pattern from households applied — in some auth states the function returned false.
+
+**Fix:**
+Added `budget_categories_select_owner` policy:
+```sql
+create policy "budget_categories_select_owner"
+on budget_categories for select
+using (
+  household_id in (
+    select id from households where owner_id = auth.uid()
+  )
+);
+```
+
+**Rule derived:**
+Every financial table that is created by a household owner must have TWO select policies: one for members (`is_household_member`) and one for the owner (`owner_id = auth.uid()`). The owner policy ensures reads work immediately after creation, before any member rows exist.
+
+Tables that need both policies: households, budget_categories, income_sources, transactions, guest_portal_settings.
+
+---
+
+## [2026-05-18] Unique constraint on income transactions prevents duplicates at database level
+
+**Context:**
+Duplicate income transactions kept appearing because the idempotency guard in `markReceived` only checked in-memory `txs`. On page reload, `txs` is empty until Supabase loads — so the guard passed and a new transaction inserted before old ones arrived.
+
+**Fix:**
+Added a partial unique index:
+```sql
+create unique index transactions_income_unique
+on transactions (household_id, category_name, amount, date)
+where type = 'income' and deleted_at is null;
+```
+
+**Why this is the correct approach:**
+Data integrity enforced at the database level is structurally impossible to bypass — regardless of any code bug, network retry, or race condition. Application-level guards are defence-in-depth, not the primary protection.
+
+**Rule derived:**
+Any record that must be unique should have a database-level unique constraint. Never rely solely on application code for uniqueness. The database is the last line of defence and must enforce its own integrity.
