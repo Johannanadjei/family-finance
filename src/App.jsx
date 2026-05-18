@@ -60,7 +60,7 @@ function ErrorScreen({ message }) {
 export default function App() {
   const { user, loading: authLoading }                          = useAuth();
   const { centre, categories, members, loading: centreLoading,
-          needsOnboarding, error, onOnboardingComplete }        = useBudgetCentre(user);
+          needsOnboarding, error }        = useBudgetCentre(user);
 
   // ── Auth gate ─────────────────────────────────────────────────────────
   if (authLoading)    return <LoadingScreen message="Loading..." />;
