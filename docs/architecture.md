@@ -301,3 +301,206 @@ src/
 8. Every new Supabase table needs both owner AND member SELECT policies
 9. Commit after every verified step
 10. No patches — find the root cause and fix it properly
+
+---
+
+## Validation Rules
+
+Every value must be validated in the service layer before any Supabase write.
+Never trust the UI. Never skip validation because "the form already checks it".
+
+### Amount validation
+```js
+const validateAmount = (amount) => {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) throw new Error('Amount must be a number');
+  if (n <= 0)              throw new Error('Amount must be greater than zero');
+  return Math.round(n);    // always round to nearest integer before storing
+};
+```
+
+### Date validation
+```js
+const validateDate = (dateStr) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new Error('Date must be YYYY-MM-DD');
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime()))                    throw new Error('Date is invalid');
+  return dateStr;
+};
+```
+
+### Week validation
+```js
+const VALID_WEEKS = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'];
+const validateWeek = (week) => {
+  if (!VALID_WEEKS.includes(week)) throw new Error('Week must be Week 1–5');
+  return week;
+};
+```
+
+### Currency validation
+```js
+const VALID_CURRENCIES = ['GHS', 'USD', 'GBP', 'EUR', 'NGN', 'KES', 'ZAR', 'CAD'];
+const validateCurrency = (currency) => {
+  if (!VALID_CURRENCIES.includes(currency)) throw new Error('Unsupported currency: ' + currency);
+  return currency;
+};
+```
+
+### String validation
+```js
+const validateString = (value, field) => {
+  if (typeof value !== 'string' || !value.trim()) throw new Error(field + ' must be a non-empty string');
+  return value.trim();
+};
+```
+
+### Rules
+- Call validate functions at the top of every service insert/update function
+- If validation fails, throw immediately — never write partial data
+- Validation errors are caught by the calling hook and shown to the user
+- Never validate in components — always in services
+
+---
+
+## Optimistic Update Pattern
+
+All user-initiated writes follow this pattern exactly.
+Never deviate from it.
+
+```js
+const addTransaction = async (tx) => {
+  // 1. Validate first — throw if invalid
+  const validated = validateTransaction(tx);
+
+  // 2. Generate a temporary ID for optimistic state
+  const tempId = crypto.randomUUID();
+  const optimistic = { ...validated, id: tempId, _optimistic: true };
+
+  // 3. Update UI immediately
+  setTxs(prev => [optimistic, ...prev]);
+
+  // 4. Write to Supabase
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert(validated)
+    .select()
+    .single();
+
+  if (error) {
+    // 5a. Rollback on failure — remove optimistic row, show error
+    setTxs(prev => prev.filter(t => t.id !== tempId));
+    throw error;
+  }
+
+  // 5b. Replace temp ID with real Supabase ID
+  setTxs(prev => prev.map(t => t.id === tempId ? { ...data, _optimistic: false } : t));
+};
+```
+
+### Rules
+- Every optimistic update must have an explicit rollback
+- Never leave a `_optimistic: true` row in state if the write fails
+- Always replace the temp ID with the real Supabase ID on success
+- Never assume a write succeeded because no JavaScript error was thrown
+
+---
+
+## Amount Precision Rules
+
+JavaScript floating point arithmetic is unreliable for financial calculations.
+`0.1 + 0.2 = 0.30000000000000004`
+
+### Rules
+- All amounts are stored as integers (minor units) in Supabase where possible
+- Always use `Math.round()` at every calculation boundary
+- Never display a raw floating point number — always pass through `fmt()`
+- Never compare amounts with `===` after arithmetic — round first
+- The `validateAmount` function always rounds before returning
+
+---
+
+## Security Rules
+
+### PIN hashing
+- Guest user PINs must be hashed before storing in Supabase
+- Never store a plain text PIN in any database column, URL, or localStorage
+- Use a bcrypt or SHA-256 hash in the service layer before insert
+- The application never stores or transmits the raw PIN after the user enters it
+
+```js
+// In guests.service.js — always hash before writing
+import { hashPin } from '../lib/crypto';
+
+export const createGuestUser = async (centreId, { name, pin, allowedCategories }) => {
+  const pin_hash = await hashPin(pin); // never store raw pin
+  const { data, error } = await supabase
+    .from('guest_users')
+    .insert({ budget_centre_id: centreId, name, pin_hash, allowed_categories: allowedCategories });
+  return { data, error };
+};
+```
+
+### localStorage — UI only
+- Never store financial data in localStorage
+- Never store transaction amounts, category data, or income figures in localStorage
+- localStorage is for: theme skin, theme accent, notification preferences only
+- Guest portal settings are encoded in the URL for cross-device sharing — never in localStorage
+
+### URLs
+- Never put financial amounts, budget centre IDs, or sensitive data in URL parameters
+- Guest portal URL encodes only: portal flag, enabled state, portal name
+- Never include PINs, amounts, or user IDs in any URL
+
+---
+
+## Error Handling Rules
+
+### Service layer
+- Every Supabase call destructures `{ data, error }`
+- Always check `error` before using `data`
+- Always `console.error` with table name and operation on error
+- Never swallow errors silently
+
+```js
+// Correct pattern
+const { data, error } = await supabase.from('transactions').insert(row).select().single();
+if (error) {
+  console.error('[transactions.service] insert error:', error.message);
+  return { data: null, error };
+}
+return { data, error: null };
+```
+
+### Hook layer
+- Hooks catch errors from services and set error state
+- Error state is always surfaced to the UI — never hidden
+- Loading state is always reset on both success and error paths
+
+### UI layer
+- Error boundaries wrap every major view section
+- A crashed component shows a fallback — never a blank screen
+- Auth session expiry redirects to the auth screen gracefully
+
+---
+
+## Audit Commands
+
+Run all five after every session. No session is complete until all five return zero results.
+
+```bash
+# A: Banned imports
+grep -rn "import.*\bfmt\b.*finance\|import.*HOUSEHOLD\|import.*FIXED_EXPENSES\|import.*mockData" src/ --include="*.jsx" --include="*.js" | grep -v "node_modules\|lib/finance.js"
+
+# B: Module-level calculations
+grep -rn "^const.*= calc\|^const.*= fmt\|^const.*= get" src/views/ src/components/ --include="*.jsx"
+
+# C: Hardcoded currency in components
+grep -rn "'GHS'\|\"GHS\"\|'USD'\|'£'\|'₦'" src/views/ src/components/ src/hooks/ --include="*.jsx" --include="*.js" | grep -v "makeFmt\|CURRENCY\|finance.js\|storage.js\|fallback"
+
+# D: Silent error swallowing
+grep -rn "const { data" src/hooks/ src/services/ --include="*.js" | grep -v "error\|subscription"
+
+# E: Missing deleted_at filter on selects
+grep -rn "\.select(" src/services/ --include="*.js" | grep -v "deleted_at\|auth\|node_modules\|single\|count"
+```
