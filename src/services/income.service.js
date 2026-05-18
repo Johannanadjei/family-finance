@@ -12,7 +12,7 @@
  */
 
 import { supabase } from '../lib/supabase';
-import { validateIncomeSource, validateAmount, validateDate } from '../lib/validation';
+import { validateIncomeSource, validateAmount, validateDate, validateCurrency } from '../lib/validation';
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
@@ -113,9 +113,19 @@ export const bulkAddIncomeSources = async (centreId, sources) => {
  * @param {Partial<{ label, icon, expected_amount, currency, pay_day, pay_day_type, notes }>} updates
  */
 export const updateIncomeSource = async (sourceId, updates) => {
-  let validated;
+  const cleaned = {};
+
   try {
-    validated = validateIncomeSource(updates);
+    if (updates.label           !== undefined) cleaned.label           = updates.label.trim();
+    if (updates.icon            !== undefined) cleaned.icon            = updates.icon || '💰';
+    if (updates.expected_amount !== undefined) cleaned.expected_amount = Math.round(Math.max(0, Number(updates.expected_amount) || 0));
+    if (updates.currency        !== undefined) cleaned.currency        = validateCurrency(updates.currency);
+    if (updates.pay_day         !== undefined) cleaned.pay_day         = updates.pay_day ? Math.min(31, Math.max(1, parseInt(updates.pay_day))) : null;
+    if (updates.pay_day_type    !== undefined) {
+      const VALID = ['fixed_date', 'last_working_day', 'flexible'];
+      cleaned.pay_day_type = VALID.includes(updates.pay_day_type) ? updates.pay_day_type : 'flexible';
+    }
+    if (updates.notes !== undefined) cleaned.notes = typeof updates.notes === 'string' ? updates.notes.trim() : '';
   } catch (e) {
     console.error('[income.service] updateIncomeSource validation error:', e.message);
     return { data: null, error: e };
@@ -123,7 +133,7 @@ export const updateIncomeSource = async (sourceId, updates) => {
 
   const { data, error } = await supabase
     .from('income_sources')
-    .update(validated)
+    .update(cleaned)
     .eq('id', sourceId)
     .is('deleted_at', null)
     .select()
