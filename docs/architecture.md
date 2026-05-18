@@ -504,3 +504,20 @@ grep -rn "const { data" src/hooks/ src/services/ --include="*.js" | grep -v "err
 # E: Missing deleted_at filter on selects
 grep -rn "\.select(" src/services/ --include="*.js" | grep -v "deleted_at\|auth\|node_modules\|single\|count"
 ```
+
+---
+
+## Session Completion Checklist
+
+Before starting any new session, every item must be confirmed.
+No exceptions. No partial completions.
+
+1. All planned files for the current session exist
+2. All five audit commands return zero results
+3. The build is not broken — main.jsx and App.jsx always in valid state
+4. No file imports another file that does not exist yet
+5. All changes committed and pushed to GitHub
+6. SQL data audit run and confirmed if any Supabase writes were made
+7. Live app checked if any UI was built
+
+This rule applies to every session, every phase, every feature.
