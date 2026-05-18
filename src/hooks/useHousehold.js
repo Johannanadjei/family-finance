@@ -58,7 +58,8 @@ export function useHousehold(user) {
     }
 
     // Household found — load categories in parallel
-    const { data: categoryData } = await getBudgetCategories(householdData.id);
+    const { data: categoryData, error: catErr } = await getBudgetCategories(householdData.id);
+    if (catErr) console.error("[useHousehold] categories fetch error:", catErr.message);
 
     setHousehold(householdData);
     setCategories(categoryData || []);
