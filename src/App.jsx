@@ -3,10 +3,9 @@
  *
  * Root component — auth gate + onboarding gate + BudgetCentreProvider.
  * Built in stages:
- *   Session 5  — this skeleton
- *   Session 6  — AuthScreen added
- *   Session 7  — OnboardingFlow added
- *   Session 8+ — views added one at a time
+ *   Session 5  — AuthScreen added
+ *   Session 6  — OnboardingFlow added
+ *   Session 7+ — views added one at a time
  *
  * ARCHITECTURE:
  *   useAuth()          → auth state
@@ -17,6 +16,7 @@
 import { useAuth } from './hooks/useAuth';
 import { useBudgetCentre } from './hooks/useBudgetCentre';
 import { BudgetCentreProvider } from './context/BudgetCentreContext';
+import { AuthScreen } from './views/AuthScreen';
 
 function LoadingScreen({ message }) {
   return (
@@ -58,15 +58,16 @@ function ErrorScreen({ message }) {
 }
 
 export default function App() {
-  const { user, loading: authLoading }                          = useAuth();
-  const { centre, categories, members, loading: centreLoading,
-          needsOnboarding, error }        = useBudgetCentre(user);
+  const { user, loading: authLoading }             = useAuth();
+  const { centre, categories, members,
+          loading: centreLoading,
+          needsOnboarding, error }                 = useBudgetCentre(user);
 
   // ── Auth gate ─────────────────────────────────────────────────────────
-  if (authLoading)    return <LoadingScreen message="Loading..." />;
-  if (!user)          return <LoadingScreen message="Please sign in" />;
+  if (authLoading)  return <LoadingScreen message="Loading..." />;
+  if (!user)        return <AuthScreen />;
 
-  // ── Household gate ────────────────────────────────────────────────────
+  // ── Centre gate ───────────────────────────────────────────────────────
   if (centreLoading)   return <LoadingScreen message="Setting up your dashboard..." />;
   if (error)           return <ErrorScreen message={error} />;
   if (needsOnboarding) return <LoadingScreen message="Welcome! Let's set up your budget centre." />;
@@ -76,7 +77,7 @@ export default function App() {
     <BudgetCentreProvider centre={centre} categories={categories} members={members}>
       <div style={{ fontFamily: "'Nunito', sans-serif", maxWidth: 440, margin: '0 auto', minHeight: '100vh' }}>
         <p style={{ padding: 24, fontWeight: 800, color: '#064e3b' }}>
-          Dashboard coming in Session 8 — {centre?.name}
+          Dashboard coming in Session 7 — {centre?.name}
         </p>
       </div>
     </BudgetCentreProvider>
