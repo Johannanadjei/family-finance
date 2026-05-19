@@ -100,7 +100,7 @@ export default function App() {
           <ErrorBoundary>
             <main style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
               <Routes>
-                <Route path="/"        element={<HomeView />} />
+                <Route path="/"        element={<HomeView financeValues={financeValues} />} />
                 <Route path="/payday"  element={<PaydayView />} />
                 <Route path="/daily"   element={<DailyView />} />
                 <Route path="/budget"  element={<BudgetView />} />
