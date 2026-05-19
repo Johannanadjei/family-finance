@@ -400,3 +400,25 @@ on the FAB height calculation.
 **Rule derived:**
 Always test fixed-position elements on both iOS and Android before marking
 a UI session complete.
+
+---
+
+## [2026-05-19] data-testid pattern for value elements
+
+**Context:**
+React renders inline expressions like `Label: {fmt(value)}` as split text nodes.
+`getByText('GHS 19,600')` fails because the full element text is
+"Label: GHS 19,600" not "GHS 19,600". Regex workarounds are fragile.
+
+**Decision:**
+All value elements that need to be independently queryable in tests
+must have a data-testid attribute:
+  <span data-testid="suggested-surplus">{fmt(suggested)}</span>
+
+This applies to all inline label+value patterns across the codebase.
+Tests query by testid, not by text content, for values.
+
+**Rule derived:**
+Never use getByText() for formatted financial values inline with labels.
+Always use data-testid on value spans. Apply this pattern to all new
+components from this session onwards.

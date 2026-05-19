@@ -2,21 +2,15 @@
  * features/onboarding/steps/StepTarget.jsx
  *
  * Step 4 — Monthly surplus target.
- * Shows total expected income for reference.
- * Suggests 10% of income as a starting target.
- *
- * @param {number} data         — current surplusTarget
- * @param {number} totalIncome  — sum of income stream expected amounts
- * @param {function} fmt        — currency formatter
- * @param {function} onNext     — (surplusTarget: number) => void
- * @param {function} onBack     — () => void
+ * Suggested surplus = totalIncome - totalBudgeted.
+ * All value elements have data-testid for reliable testing.
  */
 
 import { useState } from 'react';
 import { validateTargetStep } from '../onboarding.validation';
 
-export function StepTarget({ data, totalIncome, fmt, onNext, onBack }) {
-  const suggested = Math.round(totalIncome * 0.1);
+export function StepTarget({ data, totalIncome, totalBudgeted, fmt, onNext, onBack }) {
+  const suggested = Math.max(0, Math.round(totalIncome - totalBudgeted));
   const [target, setTarget] = useState(data > 0 ? String(data) : String(suggested));
   const [error,  setError]  = useState(null);
 
@@ -41,10 +35,13 @@ export function StepTarget({ data, totalIncome, fmt, onNext, onBack }) {
       {totalIncome > 0 && (
         <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '14px 16px' }}>
           <p style={{ fontSize: 13, color: '#065f46', margin: '0 0 4px', fontWeight: 700 }}>
-            Total expected income: {fmt(totalIncome)}
+            Total expected income: <span data-testid="total-income">{fmt(totalIncome)}</span>
+          </p>
+          <p style={{ fontSize: 13, color: '#065f46', margin: '0 0 4px', fontWeight: 700 }}>
+            Total budgeted: <span data-testid="total-budgeted">{fmt(totalBudgeted)}</span>
           </p>
           <p style={{ fontSize: 12, color: '#059669', margin: 0 }}>
-            Suggested target (10%): {fmt(suggested)}
+            Suggested surplus: <span data-testid="suggested-surplus">{fmt(suggested)}</span>
           </p>
         </div>
       )}
@@ -59,6 +56,7 @@ export function StepTarget({ data, totalIncome, fmt, onNext, onBack }) {
           onChange={e => { setTarget(e.target.value); setError(null); }}
           placeholder="0"
           min="0"
+          data-testid="surplus-input"
           style={{
             width: '100%', padding: '16px', borderRadius: 12,
             border: '1.5px solid #e5e7eb', fontSize: 24, fontWeight: 900,

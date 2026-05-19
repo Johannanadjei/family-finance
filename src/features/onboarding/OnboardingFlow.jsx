@@ -79,7 +79,7 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
         surplus_target: surplusTarget,
       });
       if (centreErr) {
-        setError(centreErr.message || 'Failed to create budget centre. Please try again.');
+        setError('We could not create your budget centre. Please check your connection and try again.');
         setLoading(false);
         return;
       }
@@ -94,7 +94,7 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
     }));
     const { error: catErr } = await bulkAddCategories(activeCentreId, categoryRows);
     if (catErr) {
-      setError(catErr.message || 'Failed to save categories. Please try again.');
+      setError('We could not save your budget categories. Please try again.');
       setLoading(false);
       return;
     }
@@ -103,7 +103,7 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
     const incomeRows = incomes.map(({ id, ...income }) => income);
     const { error: incomeErr } = await bulkAddIncomeSources(activeCentreId, incomeRows);
     if (incomeErr) {
-      setError(incomeErr.message || 'Failed to save income sources. Please try again.');
+      setError('We could not save your income streams. Please try again.');
       setLoading(false);
       return;
     }
@@ -130,7 +130,7 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
         {step === 0 && <StepCentre     data={centreData}    onNext={handleCentreNext} />}
         {step === 1 && <StepIncome     data={incomes}       centreCurrency={centreData.currency} plan={plan} onNext={handleIncomeNext} onBack={goBack} />}
         {step === 2 && <StepCategories data={categories}    fmt={fmt} onNext={handleCatsNext}   onBack={goBack} />}
-        {step === 3 && <StepTarget     data={surplusTarget} totalIncome={totalIncome} fmt={fmt} onNext={handleTargetNext} onBack={goBack} />}
+        {step === 3 && <StepTarget     data={surplusTarget} totalIncome={totalIncome} totalBudgeted={totalBudgeted} fmt={fmt} onNext={handleTargetNext} onBack={goBack} />}
         {step === 4 && <StepComplete   centreData={centreData} incomes={incomes} categories={categories} surplusTarget={surplusTarget} totalIncome={totalIncome} totalBudgeted={totalBudgeted} overBudget={overBudget} fmt={fmt} loading={loading} error={error} onConfirm={handleConfirm} onBack={goBack} />}
       </div>
     </div>

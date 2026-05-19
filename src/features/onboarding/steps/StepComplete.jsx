@@ -80,6 +80,15 @@ export function StepComplete({
         <p style={{ fontSize: 13, fontWeight: 900, color: '#064e3b', margin: 0 }}>{fmt(surplusTarget)}</p>
       </div>
 
+      {/* Zero budget warning */}
+      {categories.filter(c => Number(c.budget_amount) === 0).length > 0 && (
+        <div style={{ background: '#fef3c7', borderRadius: 10, padding: '12px 14px' }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#92400e', margin: 0 }}>
+            ℹ️ {categories.filter(c => Number(c.budget_amount) === 0).length} categories have no budget set. You can update amounts in the Budget screen after setup.
+          </p>
+        </div>
+      )}
+
       {/* Over budget warning */}
       {overBudget && (
         <div style={{ background: '#fef3c7', borderRadius: 10, padding: '12px 14px' }}>
