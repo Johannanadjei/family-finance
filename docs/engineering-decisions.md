@@ -157,3 +157,103 @@ The currency is stored on each transaction row for future conversion support.
 - Always pre-fill currency from the active budget centre
 - Never force the user to select currency on every transaction
 - Always store the original currency on the transaction — never assume centre currency
+
+---
+
+## [2026-05-19] Partial update pattern for service updates
+
+**Context:**
+`updateIncomeSource` originally called `validateIncomeSource(updates)` on a partial
+object. `validateIncomeSource` expects a full object and sets defaults for missing
+fields — meaning a partial update like `{ expected_amount: 5000 }` would overwrite
+label, icon, pay_day, notes with empty defaults. Silent data corruption.
+
+**Decision:**
+All update functions use the partial update pattern — build a `cleaned` object,
+only set fields that are explicitly provided in `updates`. Never pass partial
+objects to full-object validators.
+
+**Rule derived:**
+Full validators (validateTransaction, validateIncomeSource etc) are for inserts only.
+Update functions always build a cleaned partial object field by field.
+
+---
+
+## [2026-05-19] Permanent audit script at scripts/audit.sh
+
+**Context:**
+Manual audit commands were being regenerated each session, had grep pattern bugs
+(matching comments, not matching multi-line imports, not resolving file extensions),
+and were run from the wrong directory causing false passes.
+
+**Decision:**
+A permanent audit script at scripts/audit.sh with absolute paths, proven patterns,
+and 12 check categories. Committed to the repo. Run with `bash scripts/audit.sh`
+from any directory. Zero failures required before any commit.
+
+**Rule derived:**
+Never write audit commands inline in the terminal. Always use scripts/audit.sh.
+If a new pattern needs checking, add it to the script permanently.
+
+---
+
+## [2026-05-19] Double-load bug in useFinance loadMonth
+
+**Context:**
+`loadTxs` and `load` had `activeMonth` in their useCallback dependency arrays.
+When `loadMonth(month)` was called it:
+1. Called `setActiveMonth(month)` — triggered re-render
+2. Called `await load(month)` — loaded immediately
+3. Re-render caused `activeMonth` to change — `loadTxs` recreated — `load`
+   recreated — `useEffect` fired — loaded again
+
+Two Supabase fetches for one user action.
+
+**Decision:**
+Removed `activeMonth` from `loadTxs` and `load` dependency arrays. Both functions
+now always require an explicit `month` parameter. `useEffect` passes `activeMonth`
+explicitly. `loadMonth` sets state and calls `load(month)` — the useEffect fires
+but `load` is stable so no double fetch.
+
+**Rule derived:**
+Never use state values as default parameters in useCallback functions that are
+also in the dependency array. Always pass values explicitly as parameters.
+useState is for storage. useCallback deps are for referential stability.
+
+---
+
+## [2026-05-19] useFinance is a hook not a provider
+
+**Context:**
+Question arose whether useFinance values should be wrapped in a FinanceContext
+so views can access them without prop drilling.
+
+**Decision:**
+useFinance is called once in App.jsx and its values are passed down. A thin
+FinanceContext wrapper will be added in Session 5 when the dashboard shell is
+built and we know exactly what each view needs. Adding a context before any
+views exist would be premature architecture.
+
+**Rule derived:**
+Never create a context before its consumers exist. Build the consumer first,
+identify the prop drilling pain, then extract to context.
+
+---
+
+## [2026-05-19] File size limits enforced by audit script
+
+**Context:**
+No rule existed for maximum file size. Long files are harder to reason about,
+harder to audit, and usually indicate a file is doing too much.
+
+**Decision:**
+Limits enforced by scripts/audit.sh:
+- Hooks: 400 lines max
+- Services: 250 lines max
+- Context files: 100 lines max
+- Views and components: 200 lines max
+- Lib files: 300 lines max (not yet in audit script — add when views are built)
+
+**Rule derived:**
+If a file approaches its limit, split it before adding more code. Never exceed
+the limit by adding "just one more function".
