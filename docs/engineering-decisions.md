@@ -381,3 +381,22 @@ in testing, type safety, CI/CD, environment management, and documentation.
 - Sentry error monitoring
 - E2E tests with Playwright
 - Colour contrast and accessibility audit
+
+---
+
+## [2026-05-19] FAB bottom padding — Android vs iOS difference
+
+**Context:**
+FAB uses `calc(72px + env(safe-area-inset-bottom))` for bottom positioning.
+On iOS Safari this works correctly. On Android Chrome the safe area inset
+behaves differently, causing slight overlap with recent activity on some devices.
+
+**Decision:**
+Deferred to design pass session. Fix will require device-specific testing.
+Potential fix: increase base padding from 72px to 88px as a safe default,
+or use a fixed paddingBottom on the last HomeView element instead of relying
+on the FAB height calculation.
+
+**Rule derived:**
+Always test fixed-position elements on both iOS and Android before marking
+a UI session complete.
