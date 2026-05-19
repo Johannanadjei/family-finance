@@ -340,3 +340,44 @@ login without re-entering their full email and password each time.
 **Rule derived:**
 PIN hashing for user login uses the same lib/crypto.js pattern as guest PINs.
 Raw PIN never stored anywhere. Always hashed before any storage operation.
+
+---
+
+## [2026-05-19] World class engineering practices — what we are adding
+
+**Context:**
+Audit of current practices against world class standards revealed gaps
+in testing, type safety, CI/CD, environment management, and documentation.
+
+**Immediate additions to our rules:**
+
+1. TESTING — Vitest for unit tests. All pure functions in lib/ must have
+   tests. All validation functions must have tests. Tests run before every
+   commit. No session is complete without passing tests for new logic.
+
+2. ENV EXAMPLE — .env.example documents all required environment variables.
+   Never commit .env files. Every developer knows what variables are needed.
+
+3. README — setup instructions, tech stack, build commands, environment
+   variables, deployment process. Updated whenever any of these change.
+
+4. LAZY LOADING — views are lazy loaded via React.lazy() and Suspense.
+   The initial bundle should only contain auth and routing logic.
+
+5. GITHUB ACTIONS — audit script runs on every push to main.
+   Build must pass. Audit must pass. No exceptions.
+
+6. BRANCH STRATEGY — never commit directly to main after Session 6.
+   Feature branches: feat/session-7-dashboard etc.
+   Merge to main only after audit passes.
+
+7. COVERAGE — test coverage reported after every test run.
+   Target: 100% coverage on lib/finance.js and lib/validation.js.
+
+**Phase 2 additions:**
+- TypeScript migration
+- Separate dev and prod Supabase projects
+- Database migrations via Supabase CLI
+- Sentry error monitoring
+- E2E tests with Playwright
+- Colour contrast and accessibility audit

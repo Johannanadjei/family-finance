@@ -133,7 +133,20 @@ while IFS= read -r file; do
   else
     green "$name: $lines lines (limit $limit)"
   fi
-done < <(find "$SRC" -name "*.jsx" -o -name "*.js" | grep -v "node_modules" | sort)
+done < <(find "$SRC" -name "*.jsx" -o -name "*.js" | grep -v "node_modules" | grep -v ".test." | sort)
+
+# ── Test file size limits ────────────────────────────────────────
+header "K2: Test file size limits (max 600 lines)"
+
+while IFS= read -r file; do
+  lines=$(wc -l < "$file")
+  name=$(basename "$file")
+  if [ "$lines" -gt 600 ]; then
+    red "$name: $lines lines (limit 600)" ""
+  else
+    green "$name: $lines lines (limit 600)"
+  fi
+done < <(find "$SRC" -name "*.test.js" -o -name "*.test.jsx" | grep -v "node_modules" | sort)
 
 # ── L: No TODO or FIXME ─────────────────────────────────────
 header "L: No TODO or FIXME"
