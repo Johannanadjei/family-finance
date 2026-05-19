@@ -313,3 +313,30 @@ Email/password auth is sufficient for all development and testing.
 3. Add authorised redirect URI: https://family-finance-plum.vercel.app
 4. Copy Client ID and Secret to Supabase Authentication → Providers → Google
 5. Test full redirect flow end to end
+
+---
+
+## [2026-05-19] 4-digit PIN login — deferred to Phase 2
+
+**Context:**
+After initial setup, users should be able to set a 4-digit PIN for faster
+login without re-entering their full email and password each time.
+
+**Planned behaviour:**
+- User sets PIN during or after onboarding in Settings
+- On subsequent app opens, PIN screen shows instead of full auth screen
+- PIN is hashed with SHA-256 before storing — same pattern as guest PINs
+- PIN stored in user_preferences table — new column: pin_hash
+- If PIN forgotten, user falls back to email/password login
+- PIN is per-device — stored locally, verified against Supabase hash
+
+**Phase 2 steps:**
+1. Add pin_hash column to user_preferences table
+2. Add PIN setup screen in Settings
+3. Add PIN login screen — shown after session expires if PIN is set
+4. Use existing hashPin and verifyPin from lib/crypto.js
+5. Store PIN preference in localStorage — never the raw PIN
+
+**Rule derived:**
+PIN hashing for user login uses the same lib/crypto.js pattern as guest PINs.
+Raw PIN never stored anywhere. Always hashed before any storage operation.
