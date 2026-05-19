@@ -257,3 +257,39 @@ Limits enforced by scripts/audit.sh:
 **Rule derived:**
 If a file approaches its limit, split it before adding more code. Never exceed
 the limit by adding "just one more function".
+
+---
+
+## [2026-05-19] Email confirmation disabled for development
+
+**Context:**
+Supabase has email confirmation enabled by default. During development this
+causes friction — every test signup requires checking email and clicking a
+confirmation link. Rate limits also apply to confirmation emails.
+
+**Decision:**
+Email confirmation is disabled in Supabase Authentication settings during
+development. When deploying to production, re-enable it under:
+Authentication → Providers → Email → Confirm email → ON
+
+**Rule derived:**
+Never disable email confirmation in production. Always re-enable before
+going live with real users.
+
+---
+
+## [2026-05-19] AuthScreen calls supabase.auth directly
+
+**Context:**
+All other Supabase operations go through services. AuthScreen is the one
+exception — it calls supabase.auth.signInWithPassword, signUp, and
+signInWithOAuth directly.
+
+**Decision:**
+Auth operations are not financial data operations. They do not need
+validation, soft deletes, or the service layer pattern. Direct supabase.auth
+calls in AuthScreen are correct and intentional.
+
+**Rule derived:**
+supabase.auth.* calls are permitted in AuthScreen only.
+All other supabase.from() calls must go through services.
