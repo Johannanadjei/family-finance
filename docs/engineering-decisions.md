@@ -293,3 +293,23 @@ calls in AuthScreen are correct and intentional.
 **Rule derived:**
 supabase.auth.* calls are permitted in AuthScreen only.
 All other supabase.from() calls must go through services.
+
+---
+
+## [2026-05-19] Google OAuth deferred to Phase 2
+
+**Context:**
+Google OAuth requires a Google Cloud project, OAuth credentials, and
+authorised redirect URIs configured in both Google Console and Supabase.
+This is a standalone setup task independent of core financial features.
+
+**Decision:**
+Google OAuth button exists in AuthScreen but is deferred to Phase 2.
+Email/password auth is sufficient for all development and testing.
+
+**Phase 2 steps:**
+1. Create Google Cloud project
+2. Enable Google OAuth API
+3. Add authorised redirect URI: https://family-finance-plum.vercel.app
+4. Copy Client ID and Secret to Supabase Authentication → Providers → Google
+5. Test full redirect flow end to end
