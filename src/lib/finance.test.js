@@ -494,3 +494,17 @@ describe('getIncomeStatus', () => {
     expect(['upcoming', 'soon', 'today']).toContain(status);
   });
 });
+
+// ── surplusKnown (via calcTotalReceived) ──────────────────────────────────────
+
+describe('surplusKnown logic', () => {
+  it('is true when totalReceived > 0', () => {
+    const sources = [makeIncome({ received: true, received_amount: 5000 })];
+    expect(calcTotalReceived(sources) > 0).toBe(true);
+  });
+
+  it('is false when totalReceived is 0', () => {
+    const sources = [makeIncome({ received: false, received_amount: 0 })];
+    expect(calcTotalReceived(sources) > 0).toBe(false);
+  });
+});

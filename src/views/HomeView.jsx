@@ -3,11 +3,12 @@
  *
  * Home dashboard — thin orchestrator.
  * Receives financeValues as props from App.jsx.
- * fmt read by sub-components via BudgetCentreContext.
+ * Formats all values before passing to StatCard.
  * Sub-components live in src/views/home/
  */
 
 import { useState }               from 'react';
+import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { MonthlyIncomeCard }      from './home/MonthlyIncomeCard';
 import { BudgetHealthBar }        from './home/BudgetHealthBar';
@@ -45,6 +46,7 @@ function HomeViewSkeleton() {
 }
 
 export function HomeView({ financeValues }) {
+  const { fmt }         = useBudgetCentreContext();
   const [activeInfo, setActiveInfo] = useState(null);
 
   if (financeValues.loading) return <HomeViewSkeleton />;
@@ -52,19 +54,59 @@ export function HomeView({ financeValues }) {
   const {
     totalReceived, monthlyIncome, totalSpent, remaining,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
-    fixedTotal, variableSpent, surplusLeft, txs,
+    fixedTotal, variableSpent, surplusLeft, surplusTarget, txs,
   } = financeValues;
+
+  const surplusKnown = totalReceived > 0;
 
   return (
     <div style={{ padding: '16px 16px 0' }}>
-      <MonthlyIncomeCard totalReceived={totalReceived} monthlyIncome={monthlyIncome} totalSpent={totalSpent} remaining={remaining} />
+      <MonthlyIncomeCard
+        totalReceived={totalReceived}
+        monthlyIncome={monthlyIncome}
+        totalSpent={totalSpent}
+        remaining={remaining}
+        surplusTarget={surplusTarget}
+      />
       <BudgetHealthBar healthPct={healthPct} budgetStatus={budgetStatus} />
-      <PaydaySummaryCard nextUnpaid={nextUnpaid} totalReceived={totalReceived} totalExpected={totalExpected} />
+      <PaydaySummaryCard
+        nextUnpaid={nextUnpaid}
+        totalReceived={totalReceived}
+        totalExpected={totalExpected}
+      />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-        <StatCard label="Fixed Budget"   value={fixedTotal}    infoKey="fixed"    activeInfo={activeInfo} onInfo={setActiveInfo} />
-        <StatCard label="Income In"      value={totalReceived} infoKey="income"   activeInfo={activeInfo} onInfo={setActiveInfo} color="var(--c-success,#059669)" />
-        <StatCard label="Variable Spent" value={variableSpent} infoKey="variable" activeInfo={activeInfo} onInfo={setActiveInfo} color={variableSpent > 0 ? 'var(--c-danger,#dc2626)' : undefined} />
-        <StatCard label="Surplus Left"   value={surplusLeft}   infoKey="surplus"  activeInfo={activeInfo} onInfo={setActiveInfo} color="var(--c-warning,#d97706)" />
+        <StatCard
+          label="Fixed Budget"
+          value={fmt(fixedTotal)}
+          infoKey="fixed"
+          activeInfo={activeInfo}
+          onInfo={setActiveInfo}
+        />
+        <StatCard
+          label="Income In"
+          value={fmt(totalReceived)}
+          infoKey="income"
+          activeInfo={activeInfo}
+          onInfo={setActiveInfo}
+          color="var(--c-success,#059669)"
+        />
+        <StatCard
+          label="Variable Spent"
+          value={fmt(variableSpent)}
+          infoKey="variable"
+          activeInfo={activeInfo}
+          onInfo={setActiveInfo}
+          color={variableSpent > 0 ? 'var(--c-danger,#dc2626)' : undefined}
+        />
+        <StatCard
+          label="Surplus Left"
+          value={surplusKnown ? fmt(surplusLeft) : '—'}
+          subtitle={surplusKnown ? null : 'Confirm income first'}
+          infoKey="surplus"
+          activeInfo={activeInfo}
+          onInfo={setActiveInfo}
+          color="var(--c-warning,#d97706)"
+        />
       </div>
       <RecentActivity txs={txs} />
     </div>

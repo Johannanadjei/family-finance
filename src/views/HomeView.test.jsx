@@ -25,6 +25,7 @@ const baseValues = {
   fixedTotal:    28000,
   variableSpent: 977,
   surplusLeft:   2253,
+  surplusTarget: 4500,
   txs: [
     { id: 'tx-1', type: 'expense', amount: 200,   category_name: 'Groceries',    date: '2026-05-19', logged_by_name: 'Johannan' },
     { id: 'tx-2', type: 'income',  amount: 30000, category_name: 'Adjei Salary', date: '2026-05-19', logged_by_name: 'Johannan' },
@@ -76,6 +77,23 @@ describe('HomeView', () => {
     expect(screen.getByText('Income In')).toBeTruthy();
     expect(screen.getByText('Variable Spent')).toBeTruthy();
     expect(screen.getByText('Surplus Left')).toBeTruthy();
+  });
+
+  it('stat cards show formatted values', () => {
+    renderHome();
+    expect(screen.getByText('GHS 28,000')).toBeTruthy();
+    expect(screen.getByText('GHS 977')).toBeTruthy();
+  });
+
+  it('surplus shows dash and subtitle when no income received', () => {
+    renderHome({ totalReceived: 0, surplusLeft: 19600 });
+    expect(screen.getByText('—')).toBeTruthy();
+    expect(screen.getByText('Confirm income first')).toBeTruthy();
+  });
+
+  it('surplus shows formatted value when income received', () => {
+    renderHome({ totalReceived: 30000, surplusLeft: 2253 });
+    expect(screen.getByText('GHS 2,253')).toBeTruthy();
   });
 
   it('renders recent activity', () => {
