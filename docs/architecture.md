@@ -521,3 +521,34 @@ No exceptions. No partial completions.
 7. Live app checked if any UI was built
 
 This rule applies to every session, every phase, every feature.
+
+---
+
+## Visual Review Checklist — Required After Every UI Session
+
+Run after every session that touches UI components.
+No session is complete until all visual checks pass in the live app.
+
+1. App loads without white screen or console errors
+2. Header shows correct centre name and available balance
+3. Bottom navigation shows all tabs with correct labels
+4. Active tab is highlighted correctly
+5. URL changes when tabs are tapped
+6. Browser back button works between tabs
+7. FAB is visible and positioned correctly above bottom nav
+8. Side panel opens and closes correctly — no white space gaps
+9. Side panel backdrop dims the screen behind it
+10. App is usable on mobile viewport (375px wide)
+11. No layout overflow or horizontal scroll
+
+## Component Rendering Tests
+
+Every layout component must have a rendering test that verifies:
+- Component renders without crashing
+- Key text content is present
+- Interactive elements respond correctly
+- Aria labels are present for accessibility
+
+Test files sit next to the component:
+  src/components/layout/Header.test.jsx
+  src/components/layout/BottomNav.test.jsx

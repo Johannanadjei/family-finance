@@ -36,8 +36,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId }) {
         style={{
           position:   'fixed',
           top:        0,
-          left:       isOpen ? '50%' : 'calc(50% - 440px)',
-          transform:  'translateX(-100%)',
+          left:       isOpen ? 0 : -280,
           width:      280,
           height:     '100vh',
           background: 'var(--c-card, #fff)',
