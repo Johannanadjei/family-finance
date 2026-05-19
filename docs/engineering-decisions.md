@@ -422,3 +422,59 @@ Tests query by testid, not by text content, for values.
 Never use getByText() for formatted financial values inline with labels.
 Always use data-testid on value spans. Apply this pattern to all new
 components from this session onwards.
+
+---
+
+## [2026-05-19] act() warnings in useCentres.test.js — deferred fix
+
+**Context:**
+Two act() warnings appear in useCentres.test.js:
+- "starts in loading state" test
+- "sets error when fetch fails" test
+
+These are warnings not failures. Tests pass. The warnings occur because
+renderHook triggers async state updates after the test assertion completes,
+outside of act(). This is a known React Testing Library pattern for async hooks.
+
+**Fix when addressed:**
+Wrap the loading state test in waitFor to let the async updates complete
+before the test ends. Or use a suppressWarnings helper.
+
+**Impact:** Zero — tests pass, no production code affected.
+
+---
+
+## [2026-05-19] FinanceContext planned for Session 10
+
+**Context:**
+After Session 9, financeValues is passed as props to Header, HomeView,
+and PaydayView. Three consumers is the threshold for extracting to context.
+
+**Decision:**
+Session 10 will introduce FinanceContext wrapping useFinance values.
+All views will read from context instead of receiving props.
+App.jsx will be significantly simplified.
+
+**Rule derived:**
+When a prop is passed to 3+ consumers, extract to context.
+Never create context before its consumers exist.
+
+---
+
+## [2026-05-19] Income sources are not month-scoped — known limitation
+
+**Context:**
+Income sources in Supabase have a single received flag per source.
+When viewing a past month in PaydayView, the received status shows
+the current state not the historical state for that month.
+
+**Decision:**
+Show a clear warning when viewing a past month:
+"Income status shown reflects current state, not historical data.
+Full historical income tracking is coming in a future update."
+
+Phase 2: Add monthly income snapshots to track historical received state.
+
+**Rule derived:**
+Never show data that could mislead the user without a clear caveat.
+Honest UI beats silent inaccuracy.
