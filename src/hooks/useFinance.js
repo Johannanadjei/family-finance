@@ -45,14 +45,14 @@ export function useFinance({ centre, categories }) {
 
   // ── Load functions ────────────────────────────────────────────────────────
 
-  const loadTxs = useCallback(async (month = activeMonth) => {
+  const loadTxs = useCallback(async (month) => {
     if (!centreId) return { data: [], error: null };
     const result = await getTransactionsByMonth(centreId, month);
     if (result.error) {
       console.error('[useFinance] loadTxs error:', result.error.message);
     }
     return result;
-  }, [centreId, activeMonth]);
+  }, [centreId]);
 
   const loadIncomes = useCallback(async () => {
     if (!centreId) return { data: [], error: null };
@@ -63,7 +63,7 @@ export function useFinance({ centre, categories }) {
     return result;
   }, [centreId]);
 
-  const load = useCallback(async (month = activeMonth) => {
+  const load = useCallback(async (month) => {
     if (!centreId) {
       setTxs([]);
       setIncomes([]);
@@ -85,11 +85,11 @@ export function useFinance({ centre, categories }) {
     setTxs(txResult.data);
     setIncomes(incomeResult.data);
     setLoading(false);
-  }, [centreId, loadTxs, loadIncomes, activeMonth]);
+  }, [centreId, loadTxs, loadIncomes]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    load(activeMonth);
+  }, [load, activeMonth]);
 
   // ── Derived values ────────────────────────────────────────────────────────
 
