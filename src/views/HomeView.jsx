@@ -68,7 +68,7 @@ export function HomeView({ financeValues }) {
         remaining={remaining}
         surplusTarget={surplusTarget}
       />
-      <BudgetHealthBar healthPct={healthPct} budgetStatus={budgetStatus} />
+      <BudgetHealthBar healthPct={healthPct} budgetStatus={budgetStatus} totalSpent={totalSpent} />
       <PaydaySummaryCard
         nextUnpaid={nextUnpaid}
         totalReceived={totalReceived}

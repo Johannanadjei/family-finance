@@ -6,7 +6,7 @@ export function RecentActivity({ txs }) {
   const navigate = useNavigate();
   const recent   = txs.slice(0, 5);
   return (
-    <div style={{ background: 'var(--c-card,#fff)', borderRadius: 16, padding: '16px 18px', marginBottom: 12 }}>
+    <div style={{ background: 'var(--c-card,#fff)', borderRadius: 16, padding: '16px 18px', marginBottom: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <p style={{ fontSize: 14, fontWeight: 900, color: 'var(--c-text,#1c1917)', margin: 0 }}>Recent Activity</p>
         <button onClick={() => navigate('/log')} style={{ background: 'none', border: 'none', fontSize: 12, fontWeight: 700, color: 'var(--c-accent,#059669)', cursor: 'pointer', padding: 0 }}>See all</button>
