@@ -90,7 +90,8 @@ export function useBudgetCentre(user) {
       return;
     }
 
-    // Centre found — load categories and members in parallel
+    // Resume detection — centre exists but has no categories for current month
+    // This happens if a previous onboarding write partially failed
     const [catResult, memberResult] = await Promise.all([
       fetchCategories(centreData.id),
       fetchMembers(centreData.id),
@@ -103,12 +104,24 @@ export function useBudgetCentre(user) {
       console.error('[useBudgetCentre] members fetch error:', memberResult.error.message);
     }
 
+    if (catResult.data.length === 0) {
+      // Centre exists but no categories — resume onboarding
+      setNeedsOnboarding(true);
+      setCentre(centreData);
+      setCategories([]);
+      setMembers(memberResult.data);
+      setLoading(false);
+      return;
+    }
+
     setCentre(centreData);
     setCategories(catResult.data);
     setMembers(memberResult.data);
     setNeedsOnboarding(false);
     setLoading(false);
   }, [user]);
+
+
 
   useEffect(() => {
     load();

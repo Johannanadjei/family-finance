@@ -13,21 +13,19 @@
  *   BudgetCentreProvider → wraps dashboard, provides context to all views
  */
 
-import { useAuth } from './hooks/useAuth';
-import { useBudgetCentre } from './hooks/useBudgetCentre';
+import { useAuth }             from './hooks/useAuth';
+import { useBudgetCentre }     from './hooks/useBudgetCentre';
 import { BudgetCentreProvider } from './context/BudgetCentreContext';
-import { AuthScreen } from './views/AuthScreen';
+import { AuthScreen }          from './views/AuthScreen';
+import { OnboardingFlow }      from './features/onboarding/OnboardingFlow';
 
 function LoadingScreen({ message }) {
   return (
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(145deg, #064e3b, #0d7060)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'column',
-      gap: 16,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexDirection: 'column', gap: 16,
     }}>
       <div style={{ fontSize: 48 }}>🏠</div>
       <p style={{ fontSize: 16, fontWeight: 800, color: '#6ee7b7', margin: 0 }}>
@@ -40,14 +38,9 @@ function LoadingScreen({ message }) {
 function ErrorScreen({ message }) {
   return (
     <div style={{
-      minHeight: '100vh',
-      background: '#fef2f2',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'column',
-      gap: 16,
-      padding: 24,
+      minHeight: '100vh', background: '#fef2f2',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexDirection: 'column', gap: 16, padding: 24,
     }}>
       <div style={{ fontSize: 48 }}>⚠️</div>
       <p style={{ fontSize: 16, fontWeight: 800, color: '#dc2626', margin: 0, textAlign: 'center' }}>
@@ -58,19 +51,25 @@ function ErrorScreen({ message }) {
 }
 
 export default function App() {
-  const { user, loading: authLoading }             = useAuth();
+  const { user, loading: authLoading }          = useAuth();
   const { centre, categories, members,
           loading: centreLoading,
-          needsOnboarding, error }                 = useBudgetCentre(user);
+          needsOnboarding, error,
+          onOnboardingComplete }                = useBudgetCentre(user);
 
   // ── Auth gate ─────────────────────────────────────────────────────────
   if (authLoading)  return <LoadingScreen message="Loading..." />;
   if (!user)        return <AuthScreen />;
 
   // ── Centre gate ───────────────────────────────────────────────────────
-  if (centreLoading)   return <LoadingScreen message="Setting up your dashboard..." />;
-  if (error)           return <ErrorScreen message={error} />;
-  if (needsOnboarding) return <LoadingScreen message="Welcome! Let's set up your budget centre." />;
+  if (centreLoading) return <LoadingScreen message="Setting up your dashboard..." />;
+  if (error)         return <ErrorScreen message={error} />;
+  if (needsOnboarding) return (
+    <OnboardingFlow
+      onComplete={onOnboardingComplete}
+      existingCentreId={centre?.id || null}
+    />
+  );
 
   // ── Dashboard ─────────────────────────────────────────────────────────
   return (

@@ -1,0 +1,138 @@
+/**
+ * features/onboarding/OnboardingFlow.jsx
+ *
+ * Orchestrates the 5-step onboarding flow.
+ * Owns all onboarding state. Only component that writes to Supabase.
+ * Each step manages its own field state and calls onNext(data) when valid.
+ *
+ * Error recovery: centreId is persisted in state after createCentre succeeds.
+ * If bulkAddCategories or bulkAddIncomeSources fails, retry skips createCentre.
+ *
+ * @param {function}    onComplete        — called after all writes succeed
+ * @param {string|null} existingCentreId  — set when resuming after partial write
+ */
+
+import { useState, useMemo } from 'react';
+import { supabase }           from '../../lib/supabase';
+import { makeFmt, getCurrentMonth } from '../../lib/finance';
+import { createCentre }       from '../../services/centres.service';
+import { bulkAddCategories }  from '../../services/categories.service';
+import { bulkAddIncomeSources } from '../../services/income.service';
+import { STEPS, DEFAULT_CATEGORIES } from './onboarding.constants';
+import { OnboardingProgress } from './OnboardingProgress';
+import { StepCentre }         from './steps/StepCentre';
+import { StepIncome }         from './steps/StepIncome';
+import { StepCategories }     from './steps/StepCategories';
+import { StepTarget }         from './steps/StepTarget';
+import { StepComplete }       from './steps/StepComplete';
+
+export function OnboardingFlow({ onComplete, existingCentreId }) {
+  const [step,          setStep]          = useState(0);
+  const [centreData,    setCentreData]    = useState({ name: '', currency: 'GHS', icon: '🏠' });
+  const [incomes,       setIncomes]       = useState([]);
+  const [categories,    setCategories]    = useState(
+    DEFAULT_CATEGORIES.map(c => ({ ...c, id: crypto.randomUUID() }))
+  );
+  const [surplusTarget, setSurplusTarget] = useState(0);
+  const [centreId,      setCentreId]      = useState(existingCentreId || null);
+  const [plan,          setPlan]          = useState('free');
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState(null);
+
+  // Fetch user plan on mount
+  useState(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from('users')
+        .select('plan')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => { if (data?.plan) setPlan(data.plan); });
+    });
+  });
+
+  const fmt          = useMemo(() => makeFmt(centreData.currency), [centreData.currency]);
+  const totalIncome  = useMemo(() => incomes.reduce((s, i) => s + Number(i.expected_amount || 0), 0), [incomes]);
+  const totalBudgeted = useMemo(() => categories.reduce((s, c) => s + Number(c.budget_amount || 0), 0), [categories]);
+  const overBudget   = totalBudgeted > totalIncome && totalIncome > 0;
+
+  const goBack = () => { setError(null); setStep(s => Math.max(0, s - 1)); };
+
+  const handleCentreNext = (data) => { setCentreData(data); setStep(1); };
+  const handleIncomeNext = (data) => { setIncomes(data);    setStep(2); };
+  const handleCatsNext   = (data) => { setCategories(data); setStep(3); };
+  const handleTargetNext = (data) => { setSurplusTarget(data); setStep(4); };
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setError(null);
+
+    let activeCentreId = centreId;
+
+    // Step 1 — create centre only if not already created
+    if (!activeCentreId) {
+      const { data, error: centreErr } = await createCentre({
+        name:           centreData.name,
+        currency:       centreData.currency,
+        icon:           centreData.icon,
+        surplus_target: surplusTarget,
+      });
+      if (centreErr) {
+        setError(centreErr.message || 'Failed to create budget centre. Please try again.');
+        setLoading(false);
+        return;
+      }
+      activeCentreId = data.id;
+      setCentreId(activeCentreId);
+    }
+
+    // Step 2 — bulk insert categories with current month
+    const categoryRows = categories.map(({ id, ...cat }) => ({
+      ...cat,
+      month: getCurrentMonth(),
+    }));
+    const { error: catErr } = await bulkAddCategories(activeCentreId, categoryRows);
+    if (catErr) {
+      setError(catErr.message || 'Failed to save categories. Please try again.');
+      setLoading(false);
+      return;
+    }
+
+    // Step 3 — bulk insert income sources
+    const incomeRows = incomes.map(({ id, ...income }) => income);
+    const { error: incomeErr } = await bulkAddIncomeSources(activeCentreId, incomeRows);
+    if (incomeErr) {
+      setError(incomeErr.message || 'Failed to save income sources. Please try again.');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(false);
+    onComplete();
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(145deg, #064e3b, #0d7060)',
+      display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      padding: '32px 16px 48px',
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 24, padding: '32px 24px',
+        width: '100%', maxWidth: 440,
+        boxShadow: '0 24px 64px rgba(0,0,0,.18)',
+        maxHeight: '90vh', overflowY: 'auto',
+      }}>
+        <OnboardingProgress currentStep={step} totalSteps={STEPS.length} steps={STEPS} />
+
+        {step === 0 && <StepCentre     data={centreData}    onNext={handleCentreNext} />}
+        {step === 1 && <StepIncome     data={incomes}       centreCurrency={centreData.currency} plan={plan} onNext={handleIncomeNext} onBack={goBack} />}
+        {step === 2 && <StepCategories data={categories}    fmt={fmt} onNext={handleCatsNext}   onBack={goBack} />}
+        {step === 3 && <StepTarget     data={surplusTarget} totalIncome={totalIncome} fmt={fmt} onNext={handleTargetNext} onBack={goBack} />}
+        {step === 4 && <StepComplete   centreData={centreData} incomes={incomes} categories={categories} surplusTarget={surplusTarget} totalIncome={totalIncome} totalBudgeted={totalBudgeted} overBudget={overBudget} fmt={fmt} loading={loading} error={error} onConfirm={handleConfirm} onBack={goBack} />}
+      </div>
+    </div>
+  );
+}
