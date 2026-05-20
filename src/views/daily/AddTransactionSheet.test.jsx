@@ -89,13 +89,16 @@ describe('AddTransactionSheet', () => {
     expect(screen.getByText(/Amount must be greater than zero/)).toBeTruthy();
   });
 
-  it('shows validation error when category is empty', async () => {
-    renderSheet();
+  it('saves as Other when no category selected', async () => {
+    const onSaved = vi.fn();
+    renderSheet({ onSaved });
     await act(async () => {
       fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '100' } });
     });
     await act(async () => { screen.getByText('Save').click(); });
-    expect(screen.getByText(/Please select or enter a category/)).toBeTruthy();
+    expect(mockAddTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ category_name: 'Other' })
+    );
   });
 
   it('calls addTransaction and closes on valid submit', async () => {

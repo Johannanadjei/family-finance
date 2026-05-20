@@ -10,7 +10,7 @@ import { Toast }                    from './Toast';
 const renderToast = (props = {}) =>
   render(
     <Toast
-      message="Logged ✓ — counted as Spare Money"
+      message="This will come from your Spare Money"
       onEdit={vi.fn()}
       onDismiss={vi.fn()}
       {...props}
@@ -20,7 +20,7 @@ const renderToast = (props = {}) =>
 describe('Toast', () => {
   it('renders message', () => {
     renderToast();
-    expect(screen.getByText(/Logged ✓ — counted as Spare Money/)).toBeTruthy();
+    expect(screen.getByText(/This will come from your Spare Money/)).toBeTruthy();
   });
 
   it('renders Edit button', () => {

@@ -131,7 +131,7 @@ export default function App() {
           />
           {toast && (
             <Toast
-              message="Logged ✓ — counted as Spare Money"
+              message="This will come from your Spare Money"
               onEdit={() => { setEditTx(toast); setAddSheetOpen(true); setToast(null); }}
               onDismiss={() => setToast(null)}
             />

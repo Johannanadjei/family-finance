@@ -59,9 +59,10 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
 
   const handleSubmit = async () => {
     const n = Math.round(parseFloat(amount) || 0);
-    if (!n || n <= 0)         { setError('Amount must be greater than zero'); return; }
-    if (!categoryName.trim()) { setError('Please select or enter a category'); return; }
-    if (!date)                { setError('Please select a date'); return; }
+    if (!n || n <= 0) { setError('Amount must be greater than zero'); return; }
+    if (!date)          { setError('Please select a date'); return; }
+    const finalCategory = categoryName.trim() || 'Other';
+    const finalCategoryId = categoryName.trim() ? categoryId : null;
     setLoading(true);
     let savedTx = null;
     let err     = null;
@@ -69,8 +70,8 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
     if (editTx) {
       const result = await updateTransaction(editTx.id, {
         amount:        n,
-        category_name: categoryName.trim(),
-        category_id:   categoryId,
+        category_name: finalCategory,
+        category_id:   finalCategoryId,
         description:   description.trim(),
         date,
         week:          getWeekForDate(date),
@@ -81,8 +82,8 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
       const result = await addTransaction({
         type,
         amount:        n,
-        category_name: categoryName.trim(),
-        category_id:   categoryId,
+        category_name: finalCategory,
+        category_id:   finalCategoryId,
         description:   description.trim(),
         date,
         week:          getWeekForDate(date),
@@ -94,7 +95,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
     }
 
     if (err) { setError('Could not save transaction. Please try again.'); }
-    else     { if (onSaved) onSaved(savedTx || { type, category_name: categoryName.trim() }); onClose(); }
+    else     { if (onSaved) onSaved(savedTx || { type, category_name: finalCategory }); onClose(); }
     setLoading(false);
   };
 
