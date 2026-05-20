@@ -13,6 +13,7 @@
 
 import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
+import { useFinanceContext }      from '../context/FinanceContext';
 import { getCurrentMonth }        from '../lib/finance';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { IncomeCard }             from './payday/IncomeCard';
@@ -49,8 +50,9 @@ function PaydayViewSkeleton() {
   );
 }
 
-export function PaydayView({ financeValues }) {
+export function PaydayView() {
   const { fmt }                             = useBudgetCentreContext();
+  const financeValues                       = useFinanceContext();
   const [selectedIncome, setSelectedIncome] = useState(null);
   const [sheetOpen,      setSheetOpen]      = useState(false);
   const [mutating,       setMutating]       = useState(false);

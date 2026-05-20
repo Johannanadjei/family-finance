@@ -1,6 +1,6 @@
 /**
  * components/layout/Header.test.jsx
- * Component rendering tests for Header.
+ * Reads availableNow and totalReceived from FinanceContext.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -10,16 +10,22 @@ import { Header }                   from './Header';
 import { mockCentre, mockFmt }      from '../../test-utils/fixtures';
 
 vi.mock('../../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({
-    centre: mockCentre,
-    fmt:    mockFmt,
-  }),
+  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt }),
+}));
+
+const mockFinance = {
+  availableNow:  1000,
+  totalReceived: 5000,
+};
+
+vi.mock('../../context/FinanceContext', () => ({
+  useFinanceContext: () => mockFinance,
 }));
 
 const renderHeader = (props = {}) =>
   render(
     <MemoryRouter>
-      <Header availableNow={1000} totalReceived={5000} onOpenPanel={vi.fn()} {...props} />
+      <Header onOpenPanel={vi.fn()} {...props} />
     </MemoryRouter>
   );
 
@@ -35,12 +41,17 @@ describe('Header', () => {
   });
 
   it('shows info icon when no income received', () => {
-    renderHeader({ totalReceived: 0, availableNow: -500 });
+    mockFinance.totalReceived = 0;
+    mockFinance.availableNow  = -500;
+    renderHeader();
     expect(screen.getByLabelText('No income confirmed yet')).toBeTruthy();
+    mockFinance.totalReceived = 5000;
+    mockFinance.availableNow  = 1000;
   });
 
   it('hides info icon when income received', () => {
-    renderHeader({ totalReceived: 5000, availableNow: 1000 });
+    mockFinance.totalReceived = 5000;
+    renderHeader();
     expect(screen.queryByLabelText('No income confirmed yet')).toBeNull();
   });
 

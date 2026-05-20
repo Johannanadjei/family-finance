@@ -9,6 +9,7 @@
 
 import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
+import { useFinanceContext }      from '../context/FinanceContext';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { MonthlyIncomeCard }      from './home/MonthlyIncomeCard';
 import { BudgetHealthBar }        from './home/BudgetHealthBar';
@@ -45,8 +46,9 @@ function HomeViewSkeleton() {
   );
 }
 
-export function HomeView({ financeValues }) {
+export function HomeView() {
   const { fmt }         = useBudgetCentreContext();
+  const financeValues   = useFinanceContext();
   const [activeInfo, setActiveInfo] = useState(null);
 
   if (financeValues.loading) return <HomeViewSkeleton />;

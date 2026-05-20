@@ -15,12 +15,14 @@
 
 import { useNavigate } from 'react-router-dom';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
+import { useFinanceContext }      from '../../context/FinanceContext';
 
-export function Header({ availableNow, totalReceived, onOpenPanel }) {
-  const { centre, fmt } = useBudgetCentreContext();
-  const navigate        = useNavigate();
-  const noIncome        = totalReceived === 0;
-  const isNegative      = availableNow < 0;
+export function Header({ onOpenPanel }) {
+  const { centre, fmt }            = useBudgetCentreContext();
+  const { availableNow, totalReceived } = useFinanceContext();
+  const navigate                   = useNavigate();
+  const noIncome                   = totalReceived === 0;
+  const isNegative                 = availableNow < 0;
 
   return (
     <header style={{

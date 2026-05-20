@@ -20,6 +20,7 @@ import { useBudgetCentre }            from './hooks/useBudgetCentre';
 import { useCentres }                 from './hooks/useCentres';
 import { useFinance }                 from './hooks/useFinance';
 import { BudgetCentreProvider }       from './context/BudgetCentreContext';
+import { FinanceProvider }           from './context/FinanceContext';
 import { applyTheme }                 from './lib/themes';
 import { AuthScreen }                 from './views/AuthScreen';
 import { OnboardingFlow }             from './features/onboarding/OnboardingFlow';
@@ -83,6 +84,7 @@ export default function App() {
   // ── Dashboard ─────────────────────────────────────────────────────────
   return (
     <BudgetCentreProvider centre={centre} categories={categories} members={members}>
+      <FinanceProvider value={financeValues}>
       <BrowserRouter>
         <div style={{
           maxWidth:   440,
@@ -92,16 +94,12 @@ export default function App() {
           fontFamily: "'Nunito', sans-serif",
           position:   'relative',
         }}>
-          <Header
-            availableNow={financeValues.availableNow}
-            totalReceived={financeValues.totalReceived}
-            onOpenPanel={() => setPanelOpen(true)}
-          />
+          <Header onOpenPanel={() => setPanelOpen(true)} />
           <ErrorBoundary>
             <main style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
               <Routes>
-                <Route path="/"        element={<HomeView financeValues={financeValues} />} />
-                <Route path="/payday"  element={<PaydayView financeValues={financeValues} />} />
+                <Route path="/"        element={<HomeView />} />
+                <Route path="/payday"  element={<PaydayView />} />
                 <Route path="/daily"   element={<DailyView />} />
                 <Route path="/budget"  element={<BudgetView />} />
                 <Route path="/log"     element={<LogView />} />
@@ -118,6 +116,7 @@ export default function App() {
           />
         </div>
       </BrowserRouter>
+      </FinanceProvider>
     </BudgetCentreProvider>
   );
 }

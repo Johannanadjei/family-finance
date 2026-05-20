@@ -318,6 +318,14 @@ describe('calcSurplusLeft', () => {
 
   it('returns full income when nothing budgeted or spent', () =>
     expect(calcSurplusLeft(5000, 0, 0)).toBe(5000));
+
+  it('uses received amount when income received — reflects reality not projection', () =>
+    // received 28000 of expected 30000 — surplus based on actual received
+    expect(calcSurplusLeft(28000, 6000, 1000)).toBe(21000));
+
+  it('uses expected amount as projection when nothing received yet', () =>
+    // nothing received — surplus is a projection based on expected
+    expect(calcSurplusLeft(30000, 6000, 0)).toBe(24000));
 });
 
 // ── calcTotalExpected / calcTotalReceived ─────────────────────────────────────

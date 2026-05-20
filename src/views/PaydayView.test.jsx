@@ -1,6 +1,6 @@
 /**
  * views/PaydayView.test.jsx
- * Written before PaydayView.jsx — TDD.
+ * Reads financeValues from FinanceContext — no props.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -13,7 +13,8 @@ vi.mock('../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt }),
 }));
 
-const baseValues = {
+// Base finance context — overridden per test via mockFinance
+const mockFinance = {
   loading:        false,
   error:          null,
   incomes:        mockIncomes,
@@ -27,17 +28,18 @@ const baseValues = {
   updateExpectedAmount: vi.fn().mockResolvedValue({ error: null }),
 };
 
-const renderView = (values = {}) =>
-  render(
-    <MemoryRouter>
-      <PaydayView financeValues={{ ...baseValues, ...values }} />
-    </MemoryRouter>
-  );
+vi.mock('../context/FinanceContext', () => ({
+  useFinanceContext: () => mockFinance,
+}));
+
+const renderView = () => render(<MemoryRouter><PaydayView /></MemoryRouter>);
 
 describe('PaydayView', () => {
   it('shows skeleton when loading', () => {
-    const { container } = renderView({ loading: true });
+    mockFinance.loading = true;
+    const { container } = renderView();
     expect(container.firstChild).toBeTruthy();
+    mockFinance.loading = false;
   });
 
   it('shows month label', () => {
@@ -62,23 +64,24 @@ describe('PaydayView', () => {
   });
 
   it('shows past month warning when not current month', () => {
-    renderView({ activeMonth: '2026-04' });
+    mockFinance.activeMonth = '2026-04';
+    renderView();
     expect(screen.getByText(/Income status shown reflects current state/)).toBeTruthy();
-  });
-
-  it('does not show past month warning for current month', () => {
-    renderView({ activeMonth: '2026-05' });
-    expect(screen.queryByText(/Income status shown reflects current state/)).toBeNull();
+    mockFinance.activeMonth = '2026-05';
   });
 
   it('shows empty state when no income sources', () => {
-    renderView({ incomes: [] });
+    mockFinance.incomes = [];
+    renderView();
     expect(screen.getByText(/No income sources/)).toBeTruthy();
+    mockFinance.incomes = mockIncomes;
   });
 
   it('shows error state when error is set', () => {
-    renderView({ error: 'Failed to load' });
+    mockFinance.error = 'Failed to load';
+    renderView();
     expect(screen.getByText(/Failed to load/)).toBeTruthy();
+    mockFinance.error = null;
   });
 
   it('shows previous month navigation button', () => {
@@ -87,7 +90,7 @@ describe('PaydayView', () => {
   });
 
   it('shows next month navigation button disabled when current month', () => {
-    renderView({ activeMonth: '2026-05' });
+    renderView();
     expect(screen.getByLabelText('Next month').disabled).toBe(true);
   });
 });

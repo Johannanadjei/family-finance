@@ -1,5 +1,6 @@
 /**
  * views/HomeView.test.jsx
+ * Reads financeValues from FinanceContext — no props.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -12,7 +13,7 @@ vi.mock('../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt }),
 }));
 
-const baseValues = {
+const mockFinance = {
   loading:       false,
   totalReceived: 30000,
   monthlyIncome: 45000,
@@ -32,17 +33,18 @@ const baseValues = {
   ],
 };
 
-const renderHome = (values = {}) =>
-  render(
-    <MemoryRouter>
-      <HomeView financeValues={{ ...baseValues, ...values }} />
-    </MemoryRouter>
-  );
+vi.mock('../context/FinanceContext', () => ({
+  useFinanceContext: () => mockFinance,
+}));
+
+const renderHome = () => render(<MemoryRouter><HomeView /></MemoryRouter>);
 
 describe('HomeView', () => {
   it('renders skeleton when loading', () => {
-    const { container } = renderHome({ loading: true });
+    mockFinance.loading = true;
+    const { container } = renderHome();
     expect(container.firstChild).toBeTruthy();
+    mockFinance.loading = false;
   });
 
   it('renders income received amount in income card', () => {
@@ -51,8 +53,10 @@ describe('HomeView', () => {
   });
 
   it('shows confirm income message when nothing received', () => {
-    renderHome({ totalReceived: 0 });
+    mockFinance.totalReceived = 0;
+    renderHome();
     expect(screen.getByText('Confirm income in Payday screen')).toBeTruthy();
+    mockFinance.totalReceived = 30000;
   });
 
   it('renders budget health bar', () => {
@@ -67,8 +71,14 @@ describe('HomeView', () => {
   });
 
   it('shows all received when all income confirmed', () => {
-    renderHome({ totalReceived: 45000, totalExpected: 45000, nextUnpaid: null });
+    mockFinance.totalReceived = 45000;
+    mockFinance.totalExpected = 45000;
+    mockFinance.nextUnpaid    = null;
+    renderHome();
     expect(screen.getByText('All income received ✓')).toBeTruthy();
+    mockFinance.totalReceived = 30000;
+    mockFinance.totalExpected = 45000;
+    mockFinance.nextUnpaid    = { id: 'inc-2', label: 'Dita Salary', expected_amount: 15000, daysUntil: 7 };
   });
 
   it('renders all 4 stat card labels', () => {
@@ -86,13 +96,19 @@ describe('HomeView', () => {
   });
 
   it('surplus shows dash and subtitle when no income received', () => {
-    renderHome({ totalReceived: 0, surplusLeft: 19600 });
+    mockFinance.totalReceived = 0;
+    mockFinance.surplusLeft   = 19600;
+    renderHome();
     expect(screen.getByText('—')).toBeTruthy();
     expect(screen.getByText('Confirm income first')).toBeTruthy();
+    mockFinance.totalReceived = 30000;
+    mockFinance.surplusLeft   = 2253;
   });
 
   it('surplus shows formatted value when income received', () => {
-    renderHome({ totalReceived: 30000, surplusLeft: 2253 });
+    mockFinance.totalReceived = 30000;
+    mockFinance.surplusLeft   = 2253;
+    renderHome();
     expect(screen.getByText('GHS 2,253')).toBeTruthy();
   });
 
@@ -103,7 +119,11 @@ describe('HomeView', () => {
   });
 
   it('shows empty state when no transactions', () => {
-    renderHome({ txs: [] });
+    mockFinance.txs = [];
+    renderHome();
     expect(screen.getByText(/No transactions yet/)).toBeTruthy();
+    mockFinance.txs = [
+      { id: 'tx-1', type: 'expense', amount: 200, category_name: 'Groceries', date: '2026-05-19', logged_by_name: 'Johannan' },
+    ];
   });
 });
