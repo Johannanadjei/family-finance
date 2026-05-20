@@ -56,7 +56,7 @@ export function PaydayView() {
 
   const {
     incomes, error, totalReceived, totalExpected, totalPending,
-    activeMonth, loadMonth, markReceived, markPending,
+    activeMonth, loadMonth, markReceived, markPending, updateExpectedAmount,
   } = financeValues;
 
   const isCurrentMonth = activeMonth === getCurrentMonth();
@@ -73,6 +73,11 @@ export function PaydayView() {
     if (err) { setMutateError('Could not confirm income. Please try again.'); }
     else     { setSheetOpen(false); setSelectedIncome(null); }
     setMutating(false);
+  };
+
+  const handleUpdateExpected = async (sourceId, newAmount) => {
+    const { error: err } = await updateExpectedAmount(sourceId, newAmount);
+    if (err) setMutateError('Could not update expected amount. Please try again.');
   };
 
   const handleMarkPending = async (sourceId) => {
@@ -154,6 +159,7 @@ export function PaydayView() {
             fmt={fmt}
             onConfirm={handleOpenSheet}
             onMarkPending={handleMarkPending}
+            onUpdateExpected={handleUpdateExpected}
             disabled={mutating}
           />
         ))

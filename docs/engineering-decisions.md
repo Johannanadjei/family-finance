@@ -505,3 +505,26 @@ until MSW tests are added.
 
 **When to add:**
 Before any public launch or when the team grows beyond one developer.
+
+---
+
+## [2026-05-20] Income expected amount — edit UI and monthly reset
+
+**Phase 1 (current):**
+Edit pencil on IncomeCard expected amount — calls updateExpectedAmount.
+When confirming received with a different amount — records actual received only.
+No prompt about updating expected for next month.
+
+**Phase 2:**
+After confirming a different received amount, prompt user:
+"You received X instead of Y. Update your expected amount for next month?"
+Yes → updateExpectedAmount. No → keeps existing expected.
+
+Monthly reset of income_sources.received flag — currently stays true after
+confirmation and never resets. Phase 2: Supabase function or app-level check
+on month change to reset received=false, received_amount=0 for the new month.
+
+**Rule derived:**
+Income sources are permanent records — not month-scoped.
+Expected amount edits carry forward to all future months automatically.
+Never lock users into onboarding values — make everything editable from the dashboard.
