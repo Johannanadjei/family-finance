@@ -4,19 +4,19 @@
  * Primary income card on Home screen.
  * Receives all values as props — no calculations inside.
  * fmt read from BudgetCentreContext.
- * Target shows surplusTarget — not a derived calculation.
+ * Spare shows spareMoney = monthlyIncome - fixedTotal.
  */
 
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 
-export function MonthlyIncomeCard({ totalReceived, monthlyIncome, totalSpent, remaining, surplusTarget }) {
+export function MonthlyIncomeCard({ totalReceived, monthlyIncome, totalSpent, remaining, spareMoney }) {
   const { fmt }      = useBudgetCentreContext();
   const noneReceived = totalReceived === 0;
 
   const stats = [
     { label: 'Spent',     value: fmt(totalSpent),    color: '#fca5a5'                              },
     { label: 'Money Left', value: fmt(remaining),     color: remaining >= 0 ? '#6ee7b7' : '#fca5a5' },
-    { label: 'Target',    value: fmt(surplusTarget),  color: 'rgba(255,255,255,.8)'                 },
+    { label: 'Spare',     value: fmt(spareMoney),     color: 'rgba(255,255,255,.8)'                 },
   ];
 
   return (

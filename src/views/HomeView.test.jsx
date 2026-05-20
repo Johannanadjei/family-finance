@@ -27,6 +27,7 @@ const mockFinance = {
   variableSpent: 977,
   surplusLeft:   2253,
   surplusTarget: 4500,
+  spareMoney:    19600,
   txs: [
     { id: 'tx-1', type: 'expense', amount: 200,   category_name: 'Groceries',    date: '2026-05-19', logged_by_name: 'Johannan' },
     { id: 'tx-2', type: 'income',  amount: 30000, category_name: 'Adjei Salary', date: '2026-05-19', logged_by_name: 'Johannan' },
@@ -81,11 +82,12 @@ describe('HomeView', () => {
     mockFinance.nextUnpaid    = { id: 'inc-2', label: 'Dita Salary', expected_amount: 15000, daysUntil: 7 };
   });
 
-  it('renders 3 stat card labels without Surplus Left', () => {
+  it('renders 4 stat card labels', () => {
     renderHome();
     expect(screen.getByText('Fixed Budget')).toBeTruthy();
     expect(screen.getByText('Income In')).toBeTruthy();
     expect(screen.getByText('Variable Spent')).toBeTruthy();
+    expect(screen.getByText('Spare Money')).toBeTruthy();
     expect(screen.queryByText('Surplus Left')).toBeNull();
   });
 

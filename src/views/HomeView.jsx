@@ -56,7 +56,7 @@ export function HomeView() {
   const {
     totalReceived, monthlyIncome, totalSpent, remaining,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
-    fixedTotal, variableSpent, surplusTarget, txs,
+    fixedTotal, variableSpent, spareMoney, surplusTarget, txs,
   } = financeValues;
 
 
@@ -67,7 +67,7 @@ export function HomeView() {
         monthlyIncome={monthlyIncome}
         totalSpent={totalSpent}
         remaining={remaining}
-        surplusTarget={surplusTarget}
+        spareMoney={spareMoney}
       />
       <BudgetHealthBar healthPct={healthPct} budgetStatus={budgetStatus} totalSpent={totalSpent} />
       <PaydaySummaryCard
@@ -98,6 +98,14 @@ export function HomeView() {
           activeInfo={activeInfo}
           onInfo={setActiveInfo}
           color={variableSpent > 0 ? 'var(--c-danger,#dc2626)' : undefined}
+        />
+        <StatCard
+          label="Spare Money"
+          value={fmt(spareMoney)}
+          infoKey="spare"
+          activeInfo={activeInfo}
+          onInfo={setActiveInfo}
+          color="var(--c-success,#059669)"
         />
 
       </div>

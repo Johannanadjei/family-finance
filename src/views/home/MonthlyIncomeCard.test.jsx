@@ -21,7 +21,7 @@ const renderCard = (props = {}) =>
         monthlyIncome={45000}
         totalSpent={5000}
         remaining={40000}
-        surplusTarget={4500}
+        spareMoney={4500}
         {...props}
       />
     </MemoryRouter>
@@ -53,9 +53,9 @@ describe('MonthlyIncomeCard', () => {
     expect(screen.getByText('GHS 40,000')).toBeTruthy();
   });
 
-  it('shows surplusTarget as Target — not monthlyIncome minus totalSpent', () => {
+  it('shows spareMoney as Spare — not monthlyIncome minus totalSpent', () => {
     renderCard();
     expect(screen.getByText('GHS 4,500')).toBeTruthy();
-    expect(screen.queryByText('GHS 40,000', { selector: '[data-label="Target"]' })).toBeNull();
+    expect(screen.queryByText('GHS 40,000', { selector: '[data-label="Spare"]' })).toBeNull();
   });
 });
