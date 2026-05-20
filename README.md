@@ -70,3 +70,4 @@ npm run test:coverage # run with coverage report
 All pure functions in `src/lib/` have unit tests.
 All validation functions have unit tests.
 Tests must pass before any commit.
+staging deploy trigger
