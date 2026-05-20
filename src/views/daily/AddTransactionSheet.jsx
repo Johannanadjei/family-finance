@@ -25,9 +25,9 @@ const inputStyle = {
   fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
 };
 
-export function AddTransactionSheet({ isOpen, onClose }) {
+export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null }) {
   const { centre, categories, getCatIcon } = useBudgetCentreContext();
-  const { addTransaction }                 = useFinanceContext();
+  const { addTransaction, updateTransaction } = useFinanceContext();
 
   const [type,         setType]         = useState('expense');
   const [amount,       setAmount]       = useState('');
@@ -40,15 +40,15 @@ export function AddTransactionSheet({ isOpen, onClose }) {
 
   useEffect(() => {
     if (isOpen) {
-      setType('expense');
-      setAmount('');
-      setCategoryName('');
-      setCategoryId(null);
-      setDescription('');
-      setDate(new Date().toISOString().split('T')[0]);
+      setType(editTx?.type || 'expense');
+      setAmount(editTx ? String(editTx.amount) : '');
+      setCategoryName(editTx?.category_name || '');
+      setCategoryId(editTx?.category_id || null);
+      setDescription(editTx?.description || '');
+      setDate(editTx?.date || new Date().toISOString().split('T')[0]);
       setError(null);
     }
-  }, [isOpen]);
+  }, [isOpen, editTx?.id]);
 
   if (!isOpen) return null;
 
@@ -63,19 +63,38 @@ export function AddTransactionSheet({ isOpen, onClose }) {
     if (!categoryName.trim()) { setError('Please select or enter a category'); return; }
     if (!date)                { setError('Please select a date'); return; }
     setLoading(true);
-    const { error: err } = await addTransaction({
-      type,
-      amount:        n,
-      category_name: categoryName.trim(),
-      category_id:   categoryId,
-      description:   description.trim(),
-      date,
-      week:          getWeekForDate(date),
-      currency:      centre.currency,
-      source:        'main_app',
-    });
+    let savedTx = null;
+    let err     = null;
+
+    if (editTx) {
+      const result = await updateTransaction(editTx.id, {
+        amount:        n,
+        category_name: categoryName.trim(),
+        category_id:   categoryId,
+        description:   description.trim(),
+        date,
+        week:          getWeekForDate(date),
+      });
+      err     = result.error;
+      savedTx = result.data;
+    } else {
+      const result = await addTransaction({
+        type,
+        amount:        n,
+        category_name: categoryName.trim(),
+        category_id:   categoryId,
+        description:   description.trim(),
+        date,
+        week:          getWeekForDate(date),
+        currency:      centre.currency,
+        source:        'main_app',
+      });
+      err     = result.error;
+      savedTx = result.data;
+    }
+
     if (err) { setError('Could not save transaction. Please try again.'); }
-    else     { onClose(); }
+    else     { if (onSaved) onSaved(savedTx || { type, category_name: categoryName.trim() }); onClose(); }
     setLoading(false);
   };
 
@@ -83,7 +102,8 @@ export function AddTransactionSheet({ isOpen, onClose }) {
     <>
       <div onClick={onClose} aria-hidden="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 340 }} />
       <div role="dialog" aria-label="Add transaction" style={{ position: 'fixed', bottom: 0, left: 'max(0px, calc(50vw - 220px))', width: '100%', maxWidth: 440, background: 'var(--c-card, #fff)', borderRadius: '20px 20px 0 0', padding: '20px 20px calc(20px + env(safe-area-inset-bottom))', zIndex: 350, boxShadow: '0 -8px 32px rgba(0,0,0,.12)', maxHeight: '85vh', overflowY: 'auto' }}>
-        <div style={{ width: 40, height: 4, background: 'var(--c-border, #e5e7eb)', borderRadius: 2, margin: '0 auto 20px' }} />
+        <div style={{ width: 40, height: 4, background: 'var(--c-border, #e5e7eb)', borderRadius: 2, margin: '0 auto 16px' }} />
+        {editTx && <p style={{ fontSize: 17, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 16px', textAlign: 'center' }}>Edit Transaction</p>}
 
         {/* Type toggle */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
@@ -137,7 +157,7 @@ export function AddTransactionSheet({ isOpen, onClose }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
             <button onClick={onClose} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-muted, #6b7280)', fontFamily: "'Nunito', sans-serif" }}>Cancel</button>
-            <button onClick={handleSubmit} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: 'none', background: loading ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: loading ? 'var(--c-muted, #9ca3af)' : '#fff', fontSize: 14, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>{loading ? 'Saving...' : 'Save'}</button>
+            <button onClick={handleSubmit} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: 'none', background: loading ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: loading ? 'var(--c-muted, #9ca3af)' : '#fff', fontSize: 14, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>{loading ? 'Saving...' : editTx ? 'Save Changes' : 'Save'}</button>
           </div>
         </div>
       </div>

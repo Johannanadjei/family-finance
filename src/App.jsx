@@ -35,6 +35,8 @@ import { DailyView }                  from './views/DailyView';
 import { BudgetView }                 from './views/BudgetView';
 import { LogView }                    from './views/LogView';
 import { AddTransactionSheet }         from './views/daily/AddTransactionSheet';
+import { Toast }                        from './components/ui/Toast';
+import { isKnownCategory }              from './lib/finance';
 
 function LoadingScreen({ message }) {
   return (
@@ -63,6 +65,17 @@ export default function App() {
   const financeValues                           = useFinance({ centre, categories });
   const [panelOpen,    setPanelOpen]              = useState(false);
   const [addSheetOpen, setAddSheetOpen]           = useState(false);
+  const [toast,         setToast]                  = useState(null);
+  const [editTx,        setEditTx]                 = useState(null);
+
+  const handleSaved = (savedTx) => {
+    if (
+      savedTx?.type === 'expense' &&
+      !isKnownCategory(savedTx.category_name, categories)
+    ) {
+      setToast(savedTx);
+    }
+  };
 
   // Apply theme whenever skin preference changes
   useEffect(() => {
@@ -112,8 +125,17 @@ export default function App() {
           <BottomNav />
           <AddTransactionSheet
             isOpen={addSheetOpen}
-            onClose={() => setAddSheetOpen(false)}
+            onClose={() => { setAddSheetOpen(false); setEditTx(null); }}
+            onSaved={handleSaved}
+            editTx={editTx}
           />
+          {toast && (
+            <Toast
+              message="Logged ✓ — counted as Spare Money"
+              onEdit={() => { setEditTx(toast); setAddSheetOpen(true); setToast(null); }}
+              onDismiss={() => setToast(null)}
+            />
+          )}
           <SidePanel
             isOpen={panelOpen}
             onClose={() => setPanelOpen(false)}

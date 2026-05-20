@@ -110,10 +110,39 @@ describe('AddTransactionSheet', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('calls onSaved with transaction when save succeeds', async () => {
+    const onSaved = vi.fn();
+    renderSheet({ onSaved });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '200' } });
+    });
+    await act(async () => { screen.getByText(/Groceries/).click(); });
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(onSaved).toHaveBeenCalled();
+  });
+
   it('calls onClose when cancel tapped', () => {
     const onClose = vi.fn();
     renderSheet({ onClose });
     screen.getByText('Cancel').click();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('shows Edit Transaction title when editTx provided', () => {
+    const editTx = { id:'tx-1', type:'expense', amount:200, category_name:'Other', category_id:null, description:'test', date:'2026-05-20' };
+    renderSheet({ editTx });
+    expect(screen.getByText('Edit Transaction')).toBeTruthy();
+  });
+
+  it('pre-fills amount when editTx provided', () => {
+    const editTx = { id:'tx-1', type:'expense', amount:200, category_name:'Other', category_id:null, description:'test', date:'2026-05-20' };
+    renderSheet({ editTx });
+    expect(screen.getByTestId('add-amount-input').value).toBe('200');
+  });
+
+  it('shows Save Changes button when editing', () => {
+    const editTx = { id:'tx-1', type:'expense', amount:200, category_name:'Other', category_id:null, description:'test', date:'2026-05-20' };
+    renderSheet({ editTx });
+    expect(screen.getByText('Save Changes')).toBeTruthy();
   });
 });
