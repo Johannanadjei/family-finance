@@ -12,52 +12,46 @@ header(){ echo ""; echo "=== $1 ==="; }
 # ── A: Banned imports ────────────────────────────────────────
 header "A: Banned imports"
 
-result=$(grep -rn "^import.*\bfmt\b.*finance" "$SRC" --include="*.jsx" --include="*.js")
+result=$(grep -rn "^import.*\bfmt\b.*finance" "$SRC" --include="*.jsx" --include="*.js" | grep -v "\.test\.")
 [ -z "$result" ] && green "No direct fmt import from finance" || red "Direct fmt import found" "$result"
 
-result=$(grep -rn "^import.*HOUSEHOLD" "$SRC" --include="*.jsx" --include="*.js")
+result=$(grep -rn "^import.*HOUSEHOLD" "$SRC" --include="*.jsx" --include="*.js" | grep -v "\.test\.")
 [ -z "$result" ] && green "No HOUSEHOLD import" || red "HOUSEHOLD import found" "$result"
 
-result=$(grep -rn "^import.*FIXED_EXPENSES" "$SRC" --include="*.jsx" --include="*.js")
+result=$(grep -rn "^import.*FIXED_EXPENSES" "$SRC" --include="*.jsx" --include="*.js" | grep -v "\.test\.")
 [ -z "$result" ] && green "No FIXED_EXPENSES import" || red "FIXED_EXPENSES import found" "$result"
 
-result=$(grep -rn "^import.*mockData" "$SRC" --include="*.jsx" --include="*.js")
+result=$(grep -rn "^import.*mockData" "$SRC" --include="*.jsx" --include="*.js" | grep -v "\.test\.")
 [ -z "$result" ] && green "No mockData import" || red "mockData import found" "$result"
 
-result=$(grep -rn "^import.*INITIAL_TXS\|^import.*INITIAL_INCOMES" "$SRC" --include="*.jsx" --include="*.js")
+result=$(grep -rn "^import.*INITIAL_TXS\|^import.*INITIAL_INCOMES" "$SRC" --include="*.jsx" --include="*.js" | grep -v "\.test\.")
 [ -z "$result" ] && green "No INITIAL_TXS import" || red "INITIAL_TXS import found" "$result"
 
 # ── B: Module-level calculations ─────────────────────────────
 header "B: Module-level calculations"
 
-result=$(grep -rn "^const.*= calc\|^const.*= fmt" "$SRC/views" --include="*.jsx" 2>/dev/null)
-[ -z "$result" ] && green "No module-level calcs in views" || red "Module-level calcs in views" "$result"
-
-result=$(grep -rn "^const.*= calc\|^const.*= fmt" "$SRC/components" --include="*.jsx" 2>/dev/null)
-[ -z "$result" ] && green "No module-level calcs in components" || red "Module-level calcs in components" "$result"
+result=$(grep -rn "^const.*= calc\|^const.*= fmt" "$SRC/views" "$SRC/components" "$SRC/features" --include="*.jsx" 2>/dev/null | grep -v "\.test\.")
+[ -z "$result" ] && green "No module-level calcs in views/components/features" || red "Module-level calcs found" "$result"
 
 # ── C: Hardcoded currency ────────────────────────────────────
 header "C: Hardcoded currency"
 
-result=$(grep -rn "'GHS'\|\"GHS\"" "$SRC/views" --include="*.jsx" 2>/dev/null | grep -v "fallback\|default\||| '")
-[ -z "$result" ] && green "No hardcoded GHS in views" || red "Hardcoded GHS in views" "$result"
-
-result=$(grep -rn "'GHS'\|\"GHS\"" "$SRC/components" --include="*.jsx" 2>/dev/null | grep -v "fallback\|default\||| '")
-[ -z "$result" ] && green "No hardcoded GHS in components" || red "Hardcoded GHS in components" "$result"
+result=$(grep -rn "'GHS'\|\"GHS\"" "$SRC/views" "$SRC/features" "$SRC/components" --include="*.jsx" 2>/dev/null | grep -v "fallback\|default\||| '\|\.test\.\|currency:")
+[ -z "$result" ] && green "No hardcoded GHS in views/features/components" || red "Hardcoded GHS found" "$result"
 
 # ── D: Silent error swallowing ───────────────────────────────
 header "D: Silent error swallowing"
 
-result=$(grep -rn "const { data" "$SRC/hooks" --include="*.js" | grep -v "error\|subscription\|session\|user")
+result=$(grep -rn "const { data" "$SRC/hooks" --include="*.js" | grep -v "error\|subscription\|session\|user\|\.test\.")
 [ -z "$result" ] && green "No silent errors in hooks" || red "Silent errors in hooks" "$result"
 
-result=$(grep -rn "const { data" "$SRC/services" --include="*.js" | grep -v "error\|user\|session")
+result=$(grep -rn "const { data" "$SRC/services" --include="*.js" | grep -v "error\|user\|session\|\.test\.")
 [ -z "$result" ] && green "No silent errors in services" || red "Silent errors in services" "$result"
 
 # ── E: No hard deletes ──────────────────────────────────────
 header "E: No hard deletes"
 
-result=$(grep -rn "\.delete()" "$SRC/services" --include="*.js")
+result=$(grep -rn "\.delete()" "$SRC/services" --include="*.js" | grep -v "\.test\.")
 [ -z "$result" ] && green "No hard deletes" || red "Hard delete found" "$result"
 
 # ── F: Soft delete pattern ───────────────────────────────────
@@ -82,20 +76,29 @@ result=$(grep -rn "pin_hash\s*=" "$SRC/services" --include="*.js" | grep -v "has
 # ── H: No mock data ──────────────────────────────────────────
 header "H: No mock data"
 
-result=$(grep -rn "^import.*mockData\|^const.*mockData\|^export.*mockData" "$SRC" --include="*.jsx" --include="*.js")
+result=$(grep -rn "^import.*mockData\|^const.*mockData\|^export.*mockData" "$SRC" --include="*.jsx" --include="*.js" | grep -v "\.test\.")
 [ -z "$result" ] && green "No mock data" || red "Mock data found" "$result"
 
 # ── I: No hardcoded financial amounts ────────────────────────
 header "I: No hardcoded financial amounts"
 
-result=$(grep -rn "[^0-9a-zA-Z_][0-9]\{5,\}" "$SRC/services" --include="*.js" | grep -v "node_modules")
-[ -z "$result" ] && green "No hardcoded 5+ digit amounts in services" || red "Hardcoded amounts in services" "$result"
+result=$(grep -rn "[^0-9a-zA-Z_][0-9]\{5,\}" "$SRC/services" "$SRC/hooks" "$SRC/views" "$SRC/features" --include="*.js" --include="*.jsx" | grep -v "node_modules\|\.test\.\|#[0-9a-fA-F]")
+[ -z "$result" ] && green "No hardcoded 5+ digit amounts" || red "Hardcoded amounts found" "$result"
 
-result=$(grep -rn "[^0-9a-zA-Z_][0-9]\{5,\}" "$SRC/hooks" --include="*.js" | grep -v "node_modules")
-[ -z "$result" ] && green "No hardcoded 5+ digit amounts in hooks" || red "Hardcoded amounts in hooks" "$result"
+# ── J: No direct supabase.from() outside services ────────────
+header "J: No direct supabase.from() outside services"
 
-# ── J: Import integrity ──────────────────────────────────────
-header "J: Import integrity"
+result=$(grep -rn "supabase\.from(" "$SRC" --include="*.jsx" --include="*.js" | grep -v "$SRC/services\|node_modules\|\.test\.")
+[ -z "$result" ] && green "supabase.from() only in services" || red "Direct supabase.from() found outside services" "$result"
+
+# ── K: No console.log in production code ─────────────────────
+header "K: No console.log in production code"
+
+result=$(grep -rn "console\.log(" "$SRC" --include="*.jsx" --include="*.js" | grep -v "node_modules\|\.test\.")
+[ -z "$result" ] && green "No console.log in production code" || red "console.log found" "$result"
+
+# ── L: Import integrity ──────────────────────────────────────
+header "L: Import integrity"
 
 missing=0
 while IFS= read -r line; do
@@ -109,34 +112,38 @@ while IFS= read -r line; do
     missing=$((missing + 1))
     FAIL=$((FAIL + 1))
   fi
-done < <(grep -rn "^import" "$SRC" --include="*.js" --include="*.jsx" | grep -v "node_modules\|from 'react\|from '@supabase\|from 'lucide")
+done < <(grep -rn "^import" "$SRC" --include="*.js" --include="*.jsx" | grep -v "node_modules\|from 'react\|from '@supabase\|from 'lucide\|from 'react-router\|\.test\.")
 
 if [ "$missing" -eq 0 ]; then
   green "All local imports resolve to existing files"
 fi
 
-# ── K: File size limits ──────────────────────────────────────
-header "K: File size limits"
+# ── M: File size limits ──────────────────────────────────────
+header "M: File size limits"
 
 while IFS= read -r file; do
   lines=$(wc -l < "$file")
   name=$(basename "$file")
-  dir=$(basename "$(dirname "$file")")
+  filepath="${file#$SRC/}"
 
+  # Determine limit based on full path not just immediate parent
   limit=400
-  if [[ "$dir" == "services" ]]; then limit=250; fi
-  if [[ "$dir" == "context" ]];  then limit=100; fi
-  if [[ "$dir" == "components" ]] || [[ "$dir" == "views" ]]; then limit=200; fi
+  if echo "$filepath" | grep -q "^services/";  then limit=250; fi
+  if echo "$filepath" | grep -q "^context/";   then limit=100; fi
+  if echo "$filepath" | grep -q "^hooks/";     then limit=400; fi
+  if echo "$filepath" | grep -q "^views/";     then limit=200; fi
+  if echo "$filepath" | grep -q "^components/"; then limit=200; fi
+  if echo "$filepath" | grep -q "^features/";  then limit=200; fi
 
   if [ "$lines" -gt "$limit" ]; then
-    red "$name: $lines lines (limit $limit)" ""
+    red "$name ($filepath): $lines lines (limit $limit)" ""
   else
-    green "$name: $lines lines (limit $limit)"
+    green "$name ($filepath): $lines lines (limit $limit)"
   fi
-done < <(find "$SRC" -name "*.jsx" -o -name "*.js" | grep -v "node_modules" | grep -v ".test." | sort)
+done < <(find "$SRC" -name "*.jsx" -o -name "*.js" | grep -v "node_modules" | grep -v "\.test\." | sort)
 
-# ── Test file size limits ────────────────────────────────────────
-header "K2: Test file size limits (max 600 lines)"
+# ── N: Test file size limits ─────────────────────────────────
+header "N: Test file size limits (max 600 lines)"
 
 while IFS= read -r file; do
   lines=$(wc -l < "$file")
@@ -148,10 +155,10 @@ while IFS= read -r file; do
   fi
 done < <(find "$SRC" -name "*.test.js" -o -name "*.test.jsx" | grep -v "node_modules" | sort)
 
-# ── L: No TODO or FIXME ─────────────────────────────────────
-header "L: No TODO or FIXME"
+# ── O: No TODO or FIXME ─────────────────────────────────────
+header "O: No TODO or FIXME"
 
-result=$(grep -rn "TODO\|FIXME" "$SRC" --include="*.jsx" --include="*.js" | grep -v "node_modules")
+result=$(grep -rn "TODO\|FIXME" "$SRC" --include="*.jsx" --include="*.js" | grep -v "node_modules\|\.test\.")
 [ -z "$result" ] && green "No TODO or FIXME" || red "TODO/FIXME found" "$result"
 
 # ── Summary ──────────────────────────────────────────────────

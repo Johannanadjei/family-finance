@@ -101,7 +101,7 @@ export default function App() {
             <main style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
               <Routes>
                 <Route path="/"        element={<HomeView financeValues={financeValues} />} />
-                <Route path="/payday"  element={<PaydayView />} />
+                <Route path="/payday"  element={<PaydayView financeValues={financeValues} />} />
                 <Route path="/daily"   element={<DailyView />} />
                 <Route path="/budget"  element={<BudgetView />} />
                 <Route path="/log"     element={<LogView />} />
