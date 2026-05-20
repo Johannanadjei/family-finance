@@ -347,9 +347,10 @@ describe('calcSurplusLeft', () => {
 });
 
 // ── calcSurplusRemaining ──────────────────────────────────────────────────────
-// surplusRemaining = incomeBase - totalSpent
-// Used in useFinance — totalReceived when confirmed, monthlyIncome as projection.
-// Replaces the budget-model calcSurplusLeft in the hook.
+// surplusLeft = totalReceived - max(fixedTotal, totalSpent)
+// Surplus = income minus budget allocation.
+// Protected while spending within budget.
+// Reduces only once total spending exceeds the fixed budget total.
 
 describe('calcRemaining (used as surplusLeft in hook)', () => {
   it('surplus = income - all spending regardless of category', () =>
