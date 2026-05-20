@@ -56,10 +56,9 @@ export function HomeView() {
   const {
     totalReceived, monthlyIncome, totalSpent, remaining,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
-    fixedTotal, variableSpent, surplusLeft, surplusTarget, txs,
+    fixedTotal, variableSpent, surplusTarget, txs,
   } = financeValues;
 
-  const surplusKnown = totalReceived > 0;
 
   return (
     <div style={{ padding: '16px 16px 0' }}>
@@ -100,15 +99,7 @@ export function HomeView() {
           onInfo={setActiveInfo}
           color={variableSpent > 0 ? 'var(--c-danger,#dc2626)' : undefined}
         />
-        <StatCard
-          label="Surplus Left"
-          value={surplusKnown ? fmt(surplusLeft) : '—'}
-          subtitle={surplusKnown ? null : 'Confirm income first'}
-          infoKey="surplus"
-          activeInfo={activeInfo}
-          onInfo={setActiveInfo}
-          color="var(--c-warning,#d97706)"
-        />
+
       </div>
       <RecentActivity txs={txs} />
     </div>

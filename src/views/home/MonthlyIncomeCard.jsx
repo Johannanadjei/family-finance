@@ -15,7 +15,7 @@ export function MonthlyIncomeCard({ totalReceived, monthlyIncome, totalSpent, re
 
   const stats = [
     { label: 'Spent',     value: fmt(totalSpent),    color: '#fca5a5'                              },
-    { label: 'Remaining', value: fmt(remaining),     color: remaining >= 0 ? '#6ee7b7' : '#fca5a5' },
+    { label: 'Money Left', value: fmt(remaining),     color: remaining >= 0 ? '#6ee7b7' : '#fca5a5' },
     { label: 'Target',    value: fmt(surplusTarget),  color: 'rgba(255,255,255,.8)'                 },
   ];
 

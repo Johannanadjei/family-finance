@@ -81,12 +81,12 @@ describe('HomeView', () => {
     mockFinance.nextUnpaid    = { id: 'inc-2', label: 'Dita Salary', expected_amount: 15000, daysUntil: 7 };
   });
 
-  it('renders all 4 stat card labels', () => {
+  it('renders 3 stat card labels without Surplus Left', () => {
     renderHome();
     expect(screen.getByText('Fixed Budget')).toBeTruthy();
     expect(screen.getByText('Income In')).toBeTruthy();
     expect(screen.getByText('Variable Spent')).toBeTruthy();
-    expect(screen.getByText('Surplus Left')).toBeTruthy();
+    expect(screen.queryByText('Surplus Left')).toBeNull();
   });
 
   it('stat cards show formatted values', () => {
@@ -95,22 +95,7 @@ describe('HomeView', () => {
     expect(screen.getByText('GHS 977')).toBeTruthy();
   });
 
-  it('surplus shows dash and subtitle when no income received', () => {
-    mockFinance.totalReceived = 0;
-    mockFinance.surplusLeft   = 19600;
-    renderHome();
-    expect(screen.getByText('—')).toBeTruthy();
-    expect(screen.getByText('Confirm income first')).toBeTruthy();
-    mockFinance.totalReceived = 30000;
-    mockFinance.surplusLeft   = 2253;
-  });
 
-  it('surplus shows formatted value when income received', () => {
-    mockFinance.totalReceived = 30000;
-    mockFinance.surplusLeft   = 2253;
-    renderHome();
-    expect(screen.getByText('GHS 2,253')).toBeTruthy();
-  });
 
   it('renders recent activity', () => {
     renderHome();
