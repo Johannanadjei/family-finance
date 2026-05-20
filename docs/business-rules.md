@@ -18,10 +18,15 @@ The total income confirmed received this month.
 Formula: totalReceived = sum(income_sources.received_amount where received = true)
 Shows: Amount, "of X expected", Spent, Money Left, Target
 
+### All Income
+Every income the user has entered — salary confirmed in Payday AND ad-hoc income logged via FAB.
+Formula: allIncome = totalReceived + totalIncome
+Rule: if the user entered it, it counts. No distinction between salary and ad-hoc.
+
 ### Money Left (was "Remaining")
-Cash remaining after all spending. Simple cash flow.
-Formula: remaining = monthlyIncome - totalSpent
-Note: uses monthlyIncome (expected) not totalReceived — stable reference regardless of when income arrives.
+Cash remaining after all income and spending.
+Formula: remaining = allIncome - totalSpent
+Uses allIncome — counts both salary and ad-hoc income.
 
 ### Spent
 All expense transactions this month regardless of category.
@@ -44,9 +49,16 @@ Formula: variableSpent = sum(expense transactions where category_name NOT IN bud
 Example: "other" category = 15,000 (not a budget category)
 Note: Water IS a budget category so Water spending is fixed, not variable.
 
+### Spare Money
+Money left to spend freely after fixed budget and variable spending.
+Formula: spareMoney = allIncome - fixedTotal - variableSpent
+Uses allIncome — ad-hoc income increases spare money.
+Rule: if the user entered income, they want it counted everywhere.
+
 ### Budget Health
-Percentage of monthly income remaining after all spending.
-Formula: healthPct = max(0, min(100, round((remaining / monthlyIncome) * 100)))
+Percentage of all income remaining after all spending.
+Formula: healthPct = max(0, min(100, round((remaining / allIncome) * 100)))
+Uses allIncome — ad-hoc income improves budget health percentage.
 Status thresholds:
   remaining > surplusTarget  → On Track (green)
   remaining > 0              → Watch Out (amber)

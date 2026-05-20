@@ -54,7 +54,7 @@ export function HomeView() {
   if (financeValues.loading) return <HomeViewSkeleton />;
 
   const {
-    totalReceived, monthlyIncome, totalSpent, remaining,
+    totalReceived, monthlyIncome, totalSpent, remaining, allIncome,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
     fixedTotal, variableSpent, spareMoney, surplusTarget, txs,
   } = financeValues;
@@ -84,8 +84,8 @@ export function HomeView() {
           onInfo={setActiveInfo}
         />
         <StatCard
-          label="Income In"
-          value={fmt(totalReceived)}
+          label="Money In"
+          value={fmt(allIncome)}
           infoKey="income"
           activeInfo={activeInfo}
           onInfo={setActiveInfo}

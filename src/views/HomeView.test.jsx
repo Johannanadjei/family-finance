@@ -85,7 +85,7 @@ describe('HomeView', () => {
   it('renders 4 stat card labels', () => {
     renderHome();
     expect(screen.getByText('Fixed Budget')).toBeTruthy();
-    expect(screen.getByText('Income In')).toBeTruthy();
+    expect(screen.getByText('Money In')).toBeTruthy();
     expect(screen.getByText('Variable Spent')).toBeTruthy();
     expect(screen.getByText('Spare Money')).toBeTruthy();
     expect(screen.queryByText('Surplus Left')).toBeNull();
