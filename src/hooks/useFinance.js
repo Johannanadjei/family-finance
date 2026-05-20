@@ -104,7 +104,7 @@ export function useFinance({ centre, categories }) {
   const fixedSpent     = useMemo(() => calcFixedSpent(txs, categories),                        [txs, categories]);
   const variableSpent  = useMemo(() => calcVariableSpent(txs, categories),                     [txs, categories]);
   const surplusBase  = useMemo(() => totalReceived > 0 ? totalReceived : monthlyIncome, [totalReceived, monthlyIncome]);
-  const surplusLeft  = useMemo(() => calcSurplusLeft(surplusBase, fixedTotal, variableSpent), [surplusBase, fixedTotal, variableSpent]);
+  const surplusLeft  = useMemo(() => calcRemaining(surplusBase, totalSpent), [surplusBase, totalSpent]);
   const remaining      = useMemo(() => calcRemaining(monthlyIncome, totalSpent),                [monthlyIncome, totalSpent]);
   const healthPct      = useMemo(() => calcHealthPct(remaining, monthlyIncome),                 [remaining, monthlyIncome]);
   const budgetStatus   = useMemo(() => getBudgetStatus(remaining, surplusTarget),               [remaining, surplusTarget]);

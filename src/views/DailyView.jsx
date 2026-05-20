@@ -105,8 +105,8 @@ export function DailyView() {
       {dates.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
           <p style={{ fontSize: 32, margin: '0 0 8px' }}>📭</p>
-          <p style={{ fontSize: 14, color: 'var(--c-muted, #9ca3af)', fontWeight: 700 }}>No transactions yet this month.</p>
-          <p style={{ fontSize: 12, color: 'var(--c-muted, #9ca3af)', margin: 0 }}>Tap + to log your first one.</p>
+          <p style={{ fontSize: 14, color: 'var(--c-muted, #9ca3af)', fontWeight: 700 }}>No transactions this month.</p>
+          {isCurrentMonth && <p style={{ fontSize: 12, color: 'var(--c-muted, #9ca3af)', margin: 0 }}>Tap + to log your first one.</p>}
         </div>
       ) : (
         dates.map(date => (

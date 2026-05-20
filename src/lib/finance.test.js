@@ -340,12 +340,32 @@ describe('calcSurplusLeft', () => {
     expect(calcSurplusLeft(5000, 0, 0)).toBe(5000));
 
   it('uses received amount when income received — reflects reality not projection', () =>
-    // received 28000 of expected 30000 — surplus based on actual received
     expect(calcSurplusLeft(28000, 6000, 1000)).toBe(21000));
 
   it('uses expected amount as projection when nothing received yet', () =>
-    // nothing received — surplus is a projection based on expected
     expect(calcSurplusLeft(30000, 6000, 0)).toBe(24000));
+});
+
+// ── calcSurplusRemaining ──────────────────────────────────────────────────────
+// surplusRemaining = incomeBase - totalSpent
+// Used in useFinance — totalReceived when confirmed, monthlyIncome as projection.
+// Replaces the budget-model calcSurplusLeft in the hook.
+
+describe('calcRemaining (used as surplusLeft in hook)', () => {
+  it('surplus = income - all spending regardless of category', () =>
+    expect(calcRemaining(45000, 200)).toBe(44800));
+
+  it('surplus decreases when known category expense added', () =>
+    expect(calcRemaining(45000, 700)).toBe(44300));
+
+  it('surplus decreases when variable expense added', () =>
+    expect(calcRemaining(45000, 1200)).toBe(43800));
+
+  it('surplus is zero when all income spent', () =>
+    expect(calcRemaining(45000, 45000)).toBe(0));
+
+  it('surplus is negative when overspent', () =>
+    expect(calcRemaining(45000, 50000)).toBe(-5000));
 });
 
 // ── calcTotalExpected / calcTotalReceived ─────────────────────────────────────

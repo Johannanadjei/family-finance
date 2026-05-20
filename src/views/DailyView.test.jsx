@@ -62,7 +62,7 @@ describe('DailyView', () => {
   it('shows empty state when no transactions', () => {
     mockFinance.txs = [];
     renderView();
-    expect(screen.getByText(/No transactions yet/)).toBeTruthy();
+    expect(screen.getByText(/No transactions this month/)).toBeTruthy();
     mockFinance.txs = mockTxs;
   });
 

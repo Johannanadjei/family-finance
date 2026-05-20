@@ -1,0 +1,28 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { useFinance } from './useFinance';
+vi.mock('../services/transactions.service', () => ({ getTransactionsByMonth: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn() }));
+vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn() }));
+vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
+import { getTransactionsByMonth } from '../services/transactions.service';
+import { getIncomeSources } from '../services/income.service';
+const C = { id:'centre-1', currency:'GHS', surplus_target:4500 };
+const CATS = [{ id:'cat-1', name:'Groceries', icon:'🛒', budget_amount:500, is_fixed:true },{ id:'cat-2', name:'Transport', icon:'🚗', budget_amount:200, is_fixed:true }];
+const INC = [{ id:'inc-1', label:'Adjei Salary', expected_amount:30000, received:true, received_amount:30000, pay_day:31, pay_day_type:'last_working_day', currency:'GHS' },{ id:'inc-2', label:'Dita Salary', expected_amount:15000, received:false, received_amount:0, pay_day:25, pay_day_type:'fixed_date', currency:'GHS' }];
+const TXS = [{ id:'tx-1', type:'expense', amount:200, category_name:'Groceries', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false },{ id:'tx-2', type:'income', amount:30000, category_name:'Adjei Salary', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false }];
+const go = (txs=TXS, inc=INC) => { getTransactionsByMonth.mockResolvedValue({data:txs,error:null}); getIncomeSources.mockResolvedValue({data:inc,error:null}); return renderHook(()=>useFinance({centre:C,categories:CATS})); };
+describe('useFinance — derived values', () => {
+  beforeEach(()=>{ vi.clearAllMocks(); });
+  it('loads txs and incomes on mount', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.txs).toHaveLength(2); expect(result.current.incomes).toHaveLength(2); });
+  it('totalReceived = sum of received_amount', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.totalReceived).toBe(30000); });
+  it('totalSpent = sum of all expense txs', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.totalSpent).toBe(200); });
+  it('surplusLeft = totalReceived minus totalSpent when income received', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.surplusLeft).toBe(29800); });
+  it('surplusLeft decreases when known category expense added', async()=>{ const extra=[...TXS,{id:'tx-3',type:'expense',amount:500,category_name:'Groceries',date:'2026-05-20',week:'Week 3',currency:'GHS',source:'main_app',_optimistic:false}]; const{result}=go(extra); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.surplusLeft).toBe(29300); });
+  it('surplusLeft uses monthlyIncome as projection when nothing received', async()=>{ const none=INC.map(i=>({...i,received:false,received_amount:0})); const{result}=go(TXS,none); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.surplusLeft).toBe(44800); });
+  it('monthlyIncome = sum of expected amounts', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.monthlyIncome).toBe(45000); });
+  it('totalPending = totalExpected minus totalReceived', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.totalPending).toBe(15000); });
+  it('availableNow = totalReceived minus expenses', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.availableNow).toBe(29800); });
+  it('nextUnpaid returns first unpaid income', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.nextUnpaid.label).toBe('Dita Salary'); });
+  it('returns empty arrays when no centreId', async()=>{ getTransactionsByMonth.mockResolvedValue({data:[],error:null}); getIncomeSources.mockResolvedValue({data:[],error:null}); const{result}=renderHook(()=>useFinance({centre:null,categories:[]})); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.txs).toEqual([]); });
+  it('sets error when tx load fails', async()=>{ getTransactionsByMonth.mockResolvedValue({data:[],error:{message:'DB error'}}); getIncomeSources.mockResolvedValue({data:[],error:null}); const{result}=renderHook(()=>useFinance({centre:C,categories:CATS})); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.error).toBe('DB error'); });
+});
