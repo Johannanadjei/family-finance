@@ -478,3 +478,30 @@ Phase 2: Add monthly income snapshots to track historical received state.
 **Rule derived:**
 Never show data that could mislead the user without a clear caveat.
 Honest UI beats silent inaccuracy.
+
+---
+
+## [2026-05-20] Integration tests — deferred to Phase 2
+
+**Context:**
+Current test suite (347 tests) covers unit tests only:
+- Component rendering tests with mocked context
+- Pure function tests for all finance.js calculations
+- No real Supabase calls — all services mocked at the hook level
+
+**Gap:**
+Integration tests would verify the full stack:
+useFinance + services + optimistic updates + rollback on failure.
+A bug in the service layer would not be caught by current tests.
+
+**Decision:**
+Phase 2 — add MSW (Mock Service Worker) integration tests.
+MSW intercepts real HTTP calls to Supabase and returns mock responses.
+This tests the full React + hook + service stack without a real database.
+
+E2E tests with Playwright also deferred to Phase 2.
+Live app verification after each session covers integration confidence
+until MSW tests are added.
+
+**When to add:**
+Before any public launch or when the team grows beyond one developer.

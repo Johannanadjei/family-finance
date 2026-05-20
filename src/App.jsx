@@ -34,6 +34,7 @@ import { PaydayView }                 from './views/PaydayView';
 import { DailyView }                  from './views/DailyView';
 import { BudgetView }                 from './views/BudgetView';
 import { LogView }                    from './views/LogView';
+import { AddTransactionSheet }         from './views/daily/AddTransactionSheet';
 
 function LoadingScreen({ message }) {
   return (
@@ -60,7 +61,8 @@ export default function App() {
           error, onOnboardingComplete }          = useBudgetCentre(user);
   const { centres }                             = useCentres(user);
   const financeValues                           = useFinance({ centre, categories });
-  const [panelOpen, setPanelOpen]               = useState(false);
+  const [panelOpen,    setPanelOpen]              = useState(false);
+  const [addSheetOpen, setAddSheetOpen]           = useState(false);
 
   // Apply theme whenever skin preference changes
   useEffect(() => {
@@ -106,8 +108,12 @@ export default function App() {
               </Routes>
             </main>
           </ErrorBoundary>
-          <FAB onClick={() => {}} />
+          <FAB onClick={() => setAddSheetOpen(true)} />
           <BottomNav />
+          <AddTransactionSheet
+            isOpen={addSheetOpen}
+            onClose={() => setAddSheetOpen(false)}
+          />
           <SidePanel
             isOpen={panelOpen}
             onClose={() => setPanelOpen(false)}

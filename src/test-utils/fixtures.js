@@ -32,6 +32,38 @@ export const mockIncomes = [
 ];
 
 export const mockTxs = [
-  { id: 'tx-1', type: 'expense', amount: 200,   category_name: 'Groceries',    date: '2026-05-19', week: 'Week 3', currency: 'GHS', source: 'main_app' },
-  { id: 'tx-2', type: 'income',  amount: 30000, category_name: 'Adjei Salary', date: '2026-05-19', week: 'Week 3', currency: 'GHS', source: 'main_app' },
+  {
+    id:              'tx-1',
+    type:            'expense',
+    amount:          200,
+    category_name:   'Groceries',
+    date:            '2026-05-19',
+    week:            'Week 3',
+    currency:        'GHS',
+    source:          'main_app',
+    logged_by_name:  'Johannan',
+    description:     'Weekly shop',
+    _optimistic:     false,
+  },
+  {
+    id:              'tx-2',
+    type:            'income',
+    amount:          30000,
+    category_name:   'Adjei Salary',
+    date:            '2026-05-19',
+    week:            'Week 3',
+    currency:        'GHS',
+    source:          'main_app',
+    logged_by_name:  'Johannan',
+    description:     '',
+    _optimistic:     false,
+  },
+];
+
+export const mockWeeklyData = [
+  { week: 'Week 1', plannedIncome: 9000, actualIncome: 0,     fixedExpenses: 5080, variableSpending: 0,   net: -5080 },
+  { week: 'Week 2', plannedIncome: 9000, actualIncome: 0,     fixedExpenses: 5080, variableSpending: 0,   net: -5080 },
+  { week: 'Week 3', plannedIncome: 9000, actualIncome: 30000, fixedExpenses: 5080, variableSpending: 200, net: 24720 },
+  { week: 'Week 4', plannedIncome: 9000, actualIncome: 0,     fixedExpenses: 5080, variableSpending: 0,   net: -5080 },
+  { week: 'Week 5', plannedIncome: 9000, actualIncome: 0,     fixedExpenses: 5080, variableSpending: 0,   net: -5080 },
 ];

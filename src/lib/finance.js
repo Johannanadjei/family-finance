@@ -47,6 +47,13 @@ export const getWeekForDate = (dateStr) => {
 
 export const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
+export const offsetMonth = (ym, delta) => {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+
 export const calcTotalIncome = (txs) =>
   txs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
 

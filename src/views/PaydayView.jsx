@@ -14,16 +14,10 @@
 import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
-import { getCurrentMonth }        from '../lib/finance';
+import { getCurrentMonth, offsetMonth } from '../lib/finance';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { IncomeCard }             from './payday/IncomeCard';
 import { ConfirmSheet }           from './payday/ConfirmSheet';
-
-const offsetMonth = (ym, delta) => {
-  const [y, m] = ym.split('-').map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-};
 
 const formatMonth = (ym) =>
   new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });

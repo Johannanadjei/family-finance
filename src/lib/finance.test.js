@@ -11,6 +11,7 @@ import {
   fmtDate,
   getWeekForDate,
   getCurrentMonth,
+  offsetMonth,
   calcTotalIncome,
   calcTotalSpent,
   calcRemaining,
@@ -103,6 +104,25 @@ describe('makeFmt', () => {
     const fmt = makeFmt('XYZ');
     expect(fmt(1000)).toBe('GHS 1,000');
   });
+});
+
+// ── offsetMonth ──────────────────────────────────────────────────────────────
+
+describe('offsetMonth', () => {
+  it('adds one month', () =>
+    expect(offsetMonth('2026-05', 1)).toBe('2026-06'));
+
+  it('subtracts one month', () =>
+    expect(offsetMonth('2026-05', -1)).toBe('2026-04'));
+
+  it('rolls over year forward', () =>
+    expect(offsetMonth('2026-12', 1)).toBe('2027-01'));
+
+  it('rolls over year backward', () =>
+    expect(offsetMonth('2026-01', -1)).toBe('2025-12'));
+
+  it('pads month with leading zero', () =>
+    expect(offsetMonth('2026-09', 1)).toBe('2026-10'));
 });
 
 // ── getWeekForDate ────────────────────────────────────────────────────────────
