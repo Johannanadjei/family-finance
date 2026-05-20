@@ -11,22 +11,13 @@
 import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
-import { getCurrentMonth, offsetMonth } from '../lib/finance';
+import { getCurrentMonth, offsetMonth, groupByDate } from '../lib/finance';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { TransactionRow }         from './daily/TransactionRow';
 import { WeeklySummaryBar }       from './daily/WeeklySummaryBar';
 
 const formatMonth = (ym) =>
   new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-
-const groupByDate = (txs) => {
-  const groups = {};
-  txs.forEach(tx => {
-    if (!groups[tx.date]) groups[tx.date] = [];
-    groups[tx.date].push(tx);
-  });
-  return groups;
-};
 
 const formatDate = (dateStr) =>
   new Date(dateStr).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });

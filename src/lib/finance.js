@@ -189,6 +189,15 @@ export const calcWeekSummary = (txs, week) => {
   return { expenses, income, net: income - expenses, count: scoped.length };
 };
 
+export const groupByDate = (txs) => {
+  const groups = {};
+  txs.forEach(tx => {
+    if (!groups[tx.date]) groups[tx.date] = [];
+    groups[tx.date].push(tx);
+  });
+  return groups;
+};
+
 export const calcTopCategories = (txs, limit = 5) => {
   const expenses = txs.filter(t => t.type === 'expense');
   const total    = expenses.reduce((s, t) => s + Number(t.amount), 0);

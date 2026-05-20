@@ -1,0 +1,85 @@
+/**
+ * views/LogView.test.jsx
+ * Written before LogView.jsx — TDD.
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen }           from '@testing-library/react';
+import { MemoryRouter }             from 'react-router-dom';
+import { LogView }                  from './LogView';
+import { mockCentre, mockFmt, mockTxs } from '../test-utils/fixtures';
+
+vi.mock('../context/BudgetCentreContext', () => ({
+  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt }),
+}));
+
+const mockFinance = {
+  loading:           false,
+  error:             null,
+  txs:               mockTxs,
+  activeMonth:       '2026-05',
+  loadMonth:         vi.fn(),
+  deleteTransaction: vi.fn().mockResolvedValue({ error: null }),
+  updateTransaction: vi.fn().mockResolvedValue({ error: null }),
+};
+
+vi.mock('../context/FinanceContext', () => ({
+  useFinanceContext: () => mockFinance,
+}));
+
+const renderView = (props = {}) =>
+  render(<MemoryRouter><LogView onEditTx={vi.fn()} {...props} /></MemoryRouter>);
+
+describe('LogView', () => {
+  it('shows skeleton when loading', () => {
+    mockFinance.loading = true;
+    const { container } = renderView();
+    expect(container.firstChild).toBeTruthy();
+    mockFinance.loading = false;
+  });
+
+  it('shows month label', () => {
+    renderView();
+    expect(screen.getByTestId('log-month-label').textContent).toContain('2026');
+  });
+
+  it('shows filter bar', () => {
+    renderView();
+    expect(screen.getByTestId('log-filter-all')).toBeTruthy();
+  });
+
+  it('shows search input', () => {
+    renderView();
+    expect(screen.getByTestId('log-search-input')).toBeTruthy();
+  });
+
+  it('shows all transactions by default', () => {
+    renderView();
+    expect(screen.getByText('Groceries')).toBeTruthy();
+    expect(screen.getByText('Adjei Salary')).toBeTruthy();
+  });
+
+  it('shows empty state when no transactions', () => {
+    mockFinance.txs = [];
+    renderView();
+    expect(screen.getByText(/No transactions/)).toBeTruthy();
+    mockFinance.txs = mockTxs;
+  });
+
+  it('shows error state when error set', () => {
+    mockFinance.error = 'Failed to load';
+    renderView();
+    expect(screen.getByText(/Failed to load/)).toBeTruthy();
+    mockFinance.error = null;
+  });
+
+  it('shows previous month button', () => {
+    renderView();
+    expect(screen.getByLabelText('Previous month')).toBeTruthy();
+  });
+
+  it('next month button disabled on current month', () => {
+    renderView();
+    expect(screen.getByLabelText('Next month').disabled).toBe(true);
+  });
+});

@@ -29,6 +29,7 @@ import {
   getIncomeStatus,
   calcWeekSummary,
   calcTopCategories,
+  groupByDate,
   isKnownCategory,
   getCategoryIcon,
 } from './finance';
@@ -485,6 +486,35 @@ describe('calcWeekSummary', () => {
     expect(result.income).toBe(0);
     expect(result.net).toBe(0);
     expect(result.count).toBe(0);
+  });
+});
+
+// ── groupByDate ──────────────────────────────────────────────────────────────
+
+describe('groupByDate', () => {
+  it('groups transactions by date', () => {
+    const txs = [
+      { id: '1', date: '2026-05-19', amount: 100 },
+      { id: '2', date: '2026-05-19', amount: 200 },
+      { id: '3', date: '2026-05-20', amount: 300 },
+    ];
+    const result = groupByDate(txs);
+    expect(result['2026-05-19']).toHaveLength(2);
+    expect(result['2026-05-20']).toHaveLength(1);
+  });
+
+  it('returns empty object for empty array', () => {
+    expect(groupByDate([])).toEqual({});
+  });
+
+  it('preserves transaction order within each date group', () => {
+    const txs = [
+      { id: '1', date: '2026-05-19', amount: 100 },
+      { id: '2', date: '2026-05-19', amount: 200 },
+    ];
+    const result = groupByDate(txs);
+    expect(result['2026-05-19'][0].id).toBe('1');
+    expect(result['2026-05-19'][1].id).toBe('2');
   });
 });
 

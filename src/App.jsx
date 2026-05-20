@@ -117,7 +117,7 @@ export default function App() {
                 <Route path="/payday"  element={<PaydayView />} />
                 <Route path="/daily"   element={<DailyView />} />
                 <Route path="/budget"  element={<BudgetView />} />
-                <Route path="/log"     element={<LogView />} />
+                <Route path="/log"     element={<LogView onEditTx={(tx) => { setEditTx(tx); setAddSheetOpen(true); }} />} />
               </Routes>
             </main>
           </ErrorBoundary>
