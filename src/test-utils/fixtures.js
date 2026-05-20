@@ -67,3 +67,8 @@ export const mockWeeklyData = [
   { week: 'Week 4', plannedIncome: 9000, actualIncome: 0,     fixedExpenses: 5080, variableSpending: 0,   net: -5080 },
   { week: 'Week 5', plannedIncome: 9000, actualIncome: 0,     fixedExpenses: 5080, variableSpending: 0,   net: -5080 },
 ];
+
+export const mockCategorySpend = {
+  'Groceries': 200,
+  'Transport': 0,
+};
