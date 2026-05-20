@@ -140,28 +140,40 @@ export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
       )}
 
       {/* Navigation */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <button
-          onClick={onBack}
+          onClick={() => onNext([])}
           style={{
-            padding: '14px', borderRadius: 12, border: '1.5px solid #e5e7eb',
-            background: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
-            color: '#6b7280', fontFamily: "'Nunito', sans-serif",
+            padding: '10px', borderRadius: 12, border: '1.5px solid #e5e7eb',
+            background: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+            color: '#6b7280', fontFamily: "'Nunito', sans-serif", textAlign: 'center',
           }}
         >
-          ← Back
+          Skip for now
         </button>
-        <button
-          onClick={handleNext}
-          style={{
-            padding: '14px', borderRadius: 12, border: 'none',
-            background: 'linear-gradient(135deg, #064e3b, #0d7060)',
-            color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
-            fontFamily: "'Nunito', sans-serif",
-          }}
-        >
-          Continue →
-        </button>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
+          <button
+            onClick={onBack}
+            style={{
+              padding: '14px', borderRadius: 12, border: '1.5px solid #e5e7eb',
+              background: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+              color: '#6b7280', fontFamily: "'Nunito', sans-serif",
+            }}
+          >
+            ← Back
+          </button>
+          <button
+            onClick={handleNext}
+            style={{
+              padding: '14px', borderRadius: 12, border: 'none',
+              background: 'linear-gradient(135deg, #064e3b, #0d7060)',
+              color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+              fontFamily: "'Nunito', sans-serif",
+            }}
+          >
+            Continue →
+          </button>
+        </div>
       </div>
     </div>
   );

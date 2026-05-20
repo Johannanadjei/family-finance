@@ -83,4 +83,16 @@ describe('StepIncome', () => {
     screen.getByText('← Back').click();
     expect(onBack).toHaveBeenCalled();
   });
+
+  it('shows Skip button', () => {
+    renderStep();
+    expect(screen.getByText('Skip for now')).toBeTruthy();
+  });
+
+  it('calls onNext with empty array when skip tapped', () => {
+    const onNext = vi.fn();
+    renderStep({ onNext });
+    screen.getByText('Skip for now').click();
+    expect(onNext).toHaveBeenCalledWith([]);
+  });
 });
