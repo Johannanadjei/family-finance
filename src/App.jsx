@@ -4,39 +4,37 @@
  * Root component — auth gate + onboarding gate + dashboard.
  * Applies theme CSS variables on mount and when prefs change.
  * Provides routing via BrowserRouter.
- * Passes financial values as props to layout components.
  *
- * Sessions:
- *   5  — AuthScreen
- *   6  — OnboardingFlow
- *   7  — Dashboard shell + routing (this session)
- *   8+ — Views filled in one at a time
+ * DashboardShell lives inside BrowserRouter so it has access to useNavigate.
+ * All UI state (panel, sheet, toast) is owned by DashboardShell.
  */
 
-import { useState, useEffect }        from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { useAuth }                    from './hooks/useAuth';
-import { useBudgetCentre }            from './hooks/useBudgetCentre';
-import { useCentres }                 from './hooks/useCentres';
-import { useFinance }                 from './hooks/useFinance';
-import { BudgetCentreProvider }       from './context/BudgetCentreContext';
-import { FinanceProvider }           from './context/FinanceContext';
-import { applyTheme }                 from './lib/themes';
-import { AuthScreen }                 from './views/AuthScreen';
-import { OnboardingFlow }             from './features/onboarding/OnboardingFlow';
-import { Header }                     from './components/layout/Header';
-import { BottomNav }                  from './components/layout/BottomNav';
-import { FAB }                        from './components/layout/FAB';
-import { SidePanel }                  from './components/layout/SidePanel';
-import { ErrorBoundary }              from './components/ui/ErrorBoundary';
-import { HomeView }                   from './views/HomeView';
-import { PaydayView }                 from './views/PaydayView';
-import { DailyView }                  from './views/DailyView';
-import { BudgetView }                 from './views/BudgetView';
-import { LogView }                    from './views/LogView';
-import { AddTransactionSheet }         from './views/daily/AddTransactionSheet';
-import { Toast }                        from './components/ui/Toast';
-import { isKnownCategory }              from './lib/finance';
+import { useState, useEffect }              from 'react';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { useAuth }                          from './hooks/useAuth';
+import { useBudgetCentre }                  from './hooks/useBudgetCentre';
+import { useCentres }                       from './hooks/useCentres';
+import { useFinance }                       from './hooks/useFinance';
+import { BudgetCentreProvider }             from './context/BudgetCentreContext';
+import { FinanceProvider }                  from './context/FinanceContext';
+import { useBudgetCentreContext }           from './context/BudgetCentreContext';
+import { useFinanceContext }                from './context/FinanceContext';
+import { applyTheme }                       from './lib/themes';
+import { AuthScreen }                       from './views/AuthScreen';
+import { OnboardingFlow }                   from './features/onboarding/OnboardingFlow';
+import { Header }                           from './components/layout/Header';
+import { BottomNav }                        from './components/layout/BottomNav';
+import { FAB }                              from './components/layout/FAB';
+import { SidePanel }                        from './components/layout/SidePanel';
+import { ErrorBoundary }                    from './components/ui/ErrorBoundary';
+import { HomeView }                         from './views/HomeView';
+import { PaydayView }                       from './views/PaydayView';
+import { DailyView }                        from './views/DailyView';
+import { BudgetView }                       from './views/BudgetView';
+import { LogView }                          from './views/LogView';
+import { AddTransactionSheet }              from './views/daily/AddTransactionSheet';
+import { Toast }                            from './components/ui/Toast';
+import { isKnownCategory }                  from './lib/finance';
 
 function LoadingScreen({ message }) {
   return (
@@ -56,6 +54,80 @@ function ErrorScreen({ message }) {
   );
 }
 
+function DashboardShell({ centres, activeCentreId }) {
+  const navigate                        = useNavigate();
+  const { categories }                  = useBudgetCentreContext();
+  const { incomes }                     = useFinanceContext();
+  const [panelOpen,    setPanelOpen]    = useState(false);
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [toast,        setToast]        = useState(null);
+  const [editTx,       setEditTx]       = useState(null);
+
+  const handleSaved = (savedTx) => {
+    if (savedTx?.type === 'expense' && !isKnownCategory(savedTx.category_name, categories)) {
+      setToast({ tx: savedTx, kind: 'expense' });
+    } else if (
+      savedTx?.type === 'income' &&
+      !incomes.some(src => src.label?.toLowerCase() === savedTx.category_name?.toLowerCase())
+    ) {
+      setToast({ tx: savedTx, kind: 'income' });
+    }
+  };
+
+  return (
+    <div style={{
+      maxWidth:   440,
+      margin:     '0 auto',
+      minHeight:  '100vh',
+      background: 'var(--c-bg, #f3f4f6)',
+      fontFamily: "'Nunito', sans-serif",
+      position:   'relative',
+    }}>
+      <Header onOpenPanel={() => setPanelOpen(true)} />
+      <ErrorBoundary>
+        <main style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+          <Routes>
+            <Route path="/"        element={<HomeView />} />
+            <Route path="/payday"  element={<PaydayView />} />
+            <Route path="/daily"   element={<DailyView />} />
+            <Route path="/budget"  element={<BudgetView />} />
+            <Route path="/log"     element={<LogView onEditTx={(tx) => { setEditTx(tx); setAddSheetOpen(true); }} />} />
+          </Routes>
+        </main>
+      </ErrorBoundary>
+      <FAB onClick={() => setAddSheetOpen(true)} />
+      <BottomNav />
+      <AddTransactionSheet
+        isOpen={addSheetOpen}
+        onClose={() => { setAddSheetOpen(false); setEditTx(null); }}
+        onSaved={handleSaved}
+        editTx={editTx}
+      />
+      {toast?.kind === 'expense' && (
+        <Toast
+          message="This will come from your Spare Money"
+          onEdit={() => { setEditTx(toast.tx); setAddSheetOpen(true); setToast(null); }}
+          onDismiss={() => setToast(null)}
+        />
+      )}
+      {toast?.kind === 'income' && (
+        <Toast
+          message="Income logged. Want to add this as a regular source?"
+          actionLabel="Set up"
+          onEdit={() => { navigate('/payday'); setToast(null); }}
+          onDismiss={() => setToast(null)}
+        />
+      )}
+      <SidePanel
+        isOpen={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        centres={centres}
+        activeCentreId={activeCentreId}
+      />
+    </div>
+  );
+}
+
 export default function App() {
   const { user, loading: authLoading }          = useAuth();
   const { centre, categories, members, addCategory,
@@ -63,21 +135,7 @@ export default function App() {
           error, onOnboardingComplete }          = useBudgetCentre(user);
   const { centres }                             = useCentres(user);
   const financeValues                           = useFinance({ centre, categories });
-  const [panelOpen,    setPanelOpen]              = useState(false);
-  const [addSheetOpen, setAddSheetOpen]           = useState(false);
-  const [toast,         setToast]                  = useState(null);
-  const [editTx,        setEditTx]                 = useState(null);
 
-  const handleSaved = (savedTx) => {
-    if (
-      savedTx?.type === 'expense' &&
-      !isKnownCategory(savedTx.category_name, categories)
-    ) {
-      setToast(savedTx);
-    }
-  };
-
-  // Apply theme whenever skin preference changes
   useEffect(() => {
     applyTheme(financeValues.prefs?.themeSkin || 'family_warmth');
   }, [financeValues.prefs?.themeSkin]);
@@ -100,50 +158,12 @@ export default function App() {
   return (
     <BudgetCentreProvider centre={centre} categories={categories} members={members} addCategory={addCategory}>
       <FinanceProvider value={financeValues}>
-      <BrowserRouter>
-        <div style={{
-          maxWidth:   440,
-          margin:     '0 auto',
-          minHeight:  '100vh',
-          background: 'var(--c-bg, #f3f4f6)',
-          fontFamily: "'Nunito', sans-serif",
-          position:   'relative',
-        }}>
-          <Header onOpenPanel={() => setPanelOpen(true)} />
-          <ErrorBoundary>
-            <main style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
-              <Routes>
-                <Route path="/"        element={<HomeView />} />
-                <Route path="/payday"  element={<PaydayView />} />
-                <Route path="/daily"   element={<DailyView />} />
-                <Route path="/budget"  element={<BudgetView />} />
-                <Route path="/log"     element={<LogView onEditTx={(tx) => { setEditTx(tx); setAddSheetOpen(true); }} />} />
-              </Routes>
-            </main>
-          </ErrorBoundary>
-          <FAB onClick={() => setAddSheetOpen(true)} />
-          <BottomNav />
-          <AddTransactionSheet
-            isOpen={addSheetOpen}
-            onClose={() => { setAddSheetOpen(false); setEditTx(null); }}
-            onSaved={handleSaved}
-            editTx={editTx}
-          />
-          {toast && (
-            <Toast
-              message="This will come from your Spare Money"
-              onEdit={() => { setEditTx(toast); setAddSheetOpen(true); setToast(null); }}
-              onDismiss={() => setToast(null)}
-            />
-          )}
-          <SidePanel
-            isOpen={panelOpen}
-            onClose={() => setPanelOpen(false)}
+        <BrowserRouter>
+          <DashboardShell
             centres={centres}
             activeCentreId={centre?.id || null}
           />
-        </div>
-      </BrowserRouter>
+        </BrowserRouter>
       </FinanceProvider>
     </BudgetCentreProvider>
   );

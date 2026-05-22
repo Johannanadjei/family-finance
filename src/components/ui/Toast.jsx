@@ -14,7 +14,7 @@
 
 import { useEffect } from 'react';
 
-export function Toast({ message, onEdit, onDismiss }) {
+export function Toast({ message, onEdit, actionLabel = 'Edit', onDismiss }) {
   useEffect(() => {
     const timer = setTimeout(onDismiss, 4000);
     return () => clearTimeout(timer);
@@ -56,7 +56,7 @@ export function Toast({ message, onEdit, onDismiss }) {
               fontFamily: "'Nunito', sans-serif",
             }}
           >
-            Edit
+            {actionLabel}
           </button>
           <button
             onClick={onDismiss}

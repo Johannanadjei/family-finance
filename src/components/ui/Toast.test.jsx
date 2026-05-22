@@ -42,6 +42,11 @@ describe('Toast', () => {
     expect(onDismiss).toHaveBeenCalled();
   });
 
+  it('renders custom actionLabel when provided', () => {
+    renderToast({ actionLabel: 'Set up' });
+    expect(screen.getByText('Set up')).toBeTruthy();
+  });
+
   it('auto-dismisses after 4 seconds', async () => {
     vi.useFakeTimers();
     const onDismiss = vi.fn();

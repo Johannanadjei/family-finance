@@ -44,7 +44,7 @@ describe('Header', () => {
     mockFinance.totalReceived = 0;
     mockFinance.availableNow  = -500;
     renderHeader();
-    expect(screen.getByLabelText('No income confirmed yet')).toBeTruthy();
+    expect(screen.getByLabelText('No income confirmed — tap to go to Payday')).toBeTruthy();
     mockFinance.totalReceived = 5000;
     mockFinance.availableNow  = 1000;
   });
@@ -52,7 +52,7 @@ describe('Header', () => {
   it('hides info icon when income received', () => {
     mockFinance.totalReceived = 5000;
     renderHeader();
-    expect(screen.queryByLabelText('No income confirmed yet')).toBeNull();
+    expect(screen.queryByLabelText('No income confirmed — tap to go to Payday')).toBeNull();
   });
 
   it('calls onOpenPanel when centre name tapped', () => {

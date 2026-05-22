@@ -68,19 +68,19 @@ export function Header({ onOpenPanel }) {
           </p>
         </div>
 
-        {/* Info icon — shown when no income confirmed */}
+        {/* Info icon — tapping navigates to Payday to confirm income */}
         {noIncome && (
-          <div
-            title="Confirm income received in the Payday screen to see it reflected here"
-            aria-label="No income confirmed yet"
-            style={{ color: 'rgba(255,255,255,.6)', cursor: 'help', display: 'flex', alignItems: 'center' }}
+          <button
+            onClick={() => navigate('/payday')}
+            aria-label="No income confirmed — tap to go to Payday"
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/>
               <rect x="6.25" y="6" width="1.5" height="4" rx=".75" fill="currentColor"/>
               <circle cx="7" cy="4.5" r=".75" fill="currentColor"/>
             </svg>
-          </div>
+          </button>
         )}
 
         {/* Settings */}
