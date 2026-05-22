@@ -5,15 +5,18 @@
  * Lists all control centres; tapping one switches the active hub.
  */
 
-import { useState } from 'react';
+import { useState }      from 'react';
+import { useNavigate }   from 'react-router-dom';
 
 export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, onCreateHub, userPlan }) {
   const [hoveredRow, setHoveredRow] = useState(null);
+  const navigate                    = useNavigate();
 
   const handleSwitch = (centreId) => {
     if (centreId === activeCentreId) { onClose(); return; }
     onSwitch(centreId);
     onClose();
+    navigate('/');
   };
 
   const atProLimit = userPlan === 'pro' && centres.length >= 10;

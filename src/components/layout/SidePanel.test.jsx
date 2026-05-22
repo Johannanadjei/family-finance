@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen }           from '@testing-library/react';
+import { MemoryRouter }             from 'react-router-dom';
 import { SidePanel }                from './SidePanel';
 
 const mockCentres = [
@@ -13,16 +14,18 @@ const mockCentres = [
 
 const renderPanel = (props = {}) =>
   render(
-    <SidePanel
-      isOpen={true}
-      onClose={vi.fn()}
-      centres={mockCentres}
-      activeCentreId="c-1"
-      onSwitch={vi.fn()}
-      onCreateHub={vi.fn()}
-      userPlan="free"
-      {...props}
-    />
+    <MemoryRouter>
+      <SidePanel
+        isOpen={true}
+        onClose={vi.fn()}
+        centres={mockCentres}
+        activeCentreId="c-1"
+        onSwitch={vi.fn()}
+        onCreateHub={vi.fn()}
+        userPlan="free"
+        {...props}
+      />
+    </MemoryRouter>
   );
 
 describe('SidePanel', () => {
