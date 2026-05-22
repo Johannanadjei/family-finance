@@ -34,21 +34,26 @@ export function Header({ onOpenPanel }) {
       <button
         onClick={onOpenPanel}
         aria-label="Open budget centres panel"
-        style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: 0 }}
+        style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0 }}
       >
-        <span style={{ fontSize: 22 }}>{centre?.icon || '🏠'}</span>
-        <div style={{ textAlign: 'left' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+        <div style={{
+          display:      'flex',
+          alignItems:   'center',
+          gap:          8,
+          background:   'rgba(255,255,255,0.12)',
+          borderRadius: 20,
+          padding:      '5px 12px',
+          border:       '1px solid rgba(255,255,255,0.18)',
+        }}>
+          <span style={{ fontSize: 22 }}>{centre?.icon || '🏠'}</span>
+          <div style={{ textAlign: 'left' }}>
             <p style={{ fontSize: 14, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.2 }}>
               {centre?.name || 'My Budget'}
             </p>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true" style={{ opacity: 0.7, marginTop: 1 }}>
-              <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: 0, fontWeight: 600 }}>
+              {centre?.currency || 'GHS'}
+            </p>
           </div>
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: 0, fontWeight: 600 }}>
-            {centre?.currency || 'GHS'}
-          </p>
         </div>
       </button>
 
