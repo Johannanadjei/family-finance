@@ -3,14 +3,10 @@
  *
  * Top navigation bar.
  * Left: centre icon + name — tap opens SidePanel
- * Right: available now amount + info icon + settings icon
+ * Right: available now amount + settings icon
  *
  * Reads fmt and centre from BudgetCentreContext.
- * Receives availableNow, totalReceived as props from App.jsx.
- *
- * @param {number}   availableNow
- * @param {number}   totalReceived
- * @param {function} onOpenPanel
+ * Reads availableNow from FinanceContext.
  */
 
 import { useNavigate } from 'react-router-dom';
@@ -19,10 +15,9 @@ import { useFinanceContext }      from '../../context/FinanceContext';
 
 export function Header({ onOpenPanel }) {
   const { centre, fmt }            = useBudgetCentreContext();
-  const { availableNow, totalReceived, incomes, loading } = useFinanceContext();
-  const navigate                   = useNavigate();
-  const noIncome                   = !loading && incomes.length > 0 && totalReceived === 0;
-  const isNegative                 = availableNow < 0;
+  const { availableNow } = useFinanceContext();
+  const navigate         = useNavigate();
+  const isNegative       = availableNow < 0;
 
   return (
     <header style={{
@@ -62,26 +57,11 @@ export function Header({ onOpenPanel }) {
             fontSize:   16,
             fontWeight: 900,
             margin:     0,
-            color:      noIncome ? 'rgba(255,255,255,.5)' : isNegative ? 'var(--c-danger-light, #fca5a5)' : 'var(--c-success-light, #6ee7b7)',
+            color:      isNegative ? 'var(--c-danger-light, #fca5a5)' : 'var(--c-success-light, #6ee7b7)',
           }}>
             {fmt(availableNow)}
           </p>
         </div>
-
-        {/* Info icon — tapping navigates to Payday to confirm income */}
-        {noIncome && (
-          <button
-            onClick={() => navigate('/payday')}
-            aria-label="No income confirmed — tap to go to Payday"
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0 }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/>
-              <rect x="6.25" y="6" width="1.5" height="4" rx=".75" fill="currentColor"/>
-              <circle cx="7" cy="4.5" r=".75" fill="currentColor"/>
-            </svg>
-          </button>
-        )}
 
         {/* Settings */}
         <button

@@ -1,6 +1,6 @@
 /**
  * components/layout/Header.test.jsx
- * Reads availableNow and totalReceived from FinanceContext.
+ * Reads availableNow from FinanceContext.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -14,10 +14,7 @@ vi.mock('../../context/BudgetCentreContext', () => ({
 }));
 
 const mockFinance = {
-  availableNow:  1000,
-  totalReceived: 5000,
-  incomes:       [],
-  loading:       false,
+  availableNow: 1000,
 };
 
 vi.mock('../../context/FinanceContext', () => ({
@@ -40,23 +37,6 @@ describe('Header', () => {
   it('renders available amount', () => {
     renderHeader();
     expect(screen.getByText('GHS 1,000')).toBeTruthy();
-  });
-
-  it('shows info icon when no income received', () => {
-    mockFinance.totalReceived = 0;
-    mockFinance.availableNow  = -500;
-    mockFinance.incomes       = [{ id: 'inc-1', label: 'Adjei Salary' }];
-    renderHeader();
-    expect(screen.getByLabelText('No income confirmed — tap to go to Payday')).toBeTruthy();
-    mockFinance.totalReceived = 5000;
-    mockFinance.availableNow  = 1000;
-    mockFinance.incomes       = [];
-  });
-
-  it('hides info icon when income received', () => {
-    mockFinance.totalReceived = 5000;
-    renderHeader();
-    expect(screen.queryByLabelText('No income confirmed — tap to go to Payday')).toBeNull();
   });
 
   it('calls onOpenPanel when centre name tapped', () => {
