@@ -207,7 +207,7 @@ export default function App() {
       updateCategory={updateCategory}
       deleteCategory={deleteCategory}
     >
-      <FinanceProvider value={financeValues}>
+      <FinanceProvider value={{ ...financeValues, userPlan }}>
         <BrowserRouter>
           <DashboardShell
             centres={centres}

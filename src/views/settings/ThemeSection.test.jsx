@@ -8,11 +8,13 @@ import { render, screen, act }                   from '@testing-library/react';
 import { ThemeSection }                          from './ThemeSection';
 
 const mockSaveThemeSkin = vi.fn();
+let   mockUserPlan      = 'free';
 
 vi.mock('../../context/FinanceContext', () => ({
   useFinanceContext: () => ({
     prefs:         { themeSkin: 'family_warmth' },
     saveThemeSkin: mockSaveThemeSkin,
+    userPlan:      mockUserPlan,
   }),
 }));
 
@@ -21,7 +23,7 @@ vi.mock('../../lib/themes', () => ({
 }));
 
 describe('ThemeSection', () => {
-  beforeEach(() => { mockSaveThemeSkin.mockClear(); });
+  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUserPlan = 'free'; });
 
   it('renders free theme option', () => {
     render(<ThemeSection />);
@@ -40,7 +42,7 @@ describe('ThemeSection', () => {
     expect(screen.getByTestId('theme-royal_luxury')).toBeTruthy();
   });
 
-  it('disables pro themes', () => {
+  it('disables pro themes for free users', () => {
     render(<ThemeSection />);
     expect(screen.getByTestId('theme-global_international').disabled).toBe(true);
     expect(screen.getByTestId('theme-neon_futuristic').disabled).toBe(true);
@@ -57,9 +59,23 @@ describe('ThemeSection', () => {
     expect(mockSaveThemeSkin).toHaveBeenCalledWith('family_warmth');
   });
 
-  it('does not call saveThemeSkin for pro themes', async () => {
+  it('does not call saveThemeSkin for pro themes on free plan', async () => {
     render(<ThemeSection />);
     await act(async () => { screen.getByTestId('theme-corporate_professional').click(); });
     expect(mockSaveThemeSkin).not.toHaveBeenCalled();
+  });
+
+  it('pro users can select pro skins', async () => {
+    mockUserPlan = 'pro';
+    render(<ThemeSection />);
+    expect(screen.getByTestId('theme-corporate_professional').disabled).toBe(false);
+    await act(async () => { screen.getByTestId('theme-corporate_professional').click(); });
+    expect(mockSaveThemeSkin).toHaveBeenCalledWith('corporate_professional');
+  });
+
+  it('pro users see no PRO badge on pro skins', () => {
+    mockUserPlan = 'pro';
+    render(<ThemeSection />);
+    expect(screen.queryByText('PRO')).toBeNull();
   });
 });
