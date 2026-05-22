@@ -32,7 +32,7 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
 
   const handleEditSave = async () => {
     const n = Math.round(parseFloat(editAmount) || 0);
-    if (!n || n <= 0) { setEditing(false); return; }
+    if (isNaN(n) || n < 0) { setEditing(false); return; }
     setSaving(true);
     await onUpdateExpected(income.id, n);
     setSaving(false);

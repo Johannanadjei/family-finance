@@ -104,4 +104,13 @@ describe('IncomeCard', () => {
     await act(async () => { screen.getByLabelText('Save expected amount').click(); });
     expect(onUpdateExpected).toHaveBeenCalledWith('inc-2', 20000);
   });
+
+  it('allows saving zero as expected amount', async () => {
+    const onUpdateExpected = vi.fn().mockResolvedValue({ error: null });
+    renderCard({ onUpdateExpected });
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    fireEvent.change(screen.getByTestId('edit-expected-input-inc-2'), { target: { value: '0' } });
+    await act(async () => { screen.getByLabelText('Save expected amount').click(); });
+    expect(onUpdateExpected).toHaveBeenCalledWith('inc-2', 0);
+  });
 });
