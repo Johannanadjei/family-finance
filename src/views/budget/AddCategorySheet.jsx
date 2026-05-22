@@ -12,6 +12,7 @@
 
 import { useState, useEffect }    from 'react';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
+import { getCurrentMonth }         from '../../lib/finance';
 
 const inputStyle = {
   width: '100%', padding: '12px 14px', borderRadius: 10,
@@ -38,7 +39,7 @@ export function AddCategorySheet({ isOpen, onClose, onAdd }) {
     if (!name.trim()) { setError('Please enter a category name'); return; }
     const n = Math.round(parseFloat(amount) || 0);
     setSaving(true);
-    const { error: err } = await onAdd({ name: name.trim(), icon, budget_amount: n, is_fixed: true });
+    const { error: err } = await onAdd({ name: name.trim(), icon, budget_amount: n, is_fixed: true, month: getCurrentMonth(), sort_order: 0 });
     if (err) { setError('Could not save category. Please try again.'); }
     else     { onClose(); }
     setSaving(false);
