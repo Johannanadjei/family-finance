@@ -17,6 +17,7 @@ const renderCard = (props = {}) =>
   render(
     <MemoryRouter>
       <MonthlyIncomeCard
+        allIncome={48000}
         totalReceived={30000}
         monthlyIncome={45000}
         totalSpent={5000}
@@ -28,19 +29,19 @@ const renderCard = (props = {}) =>
   );
 
 describe('MonthlyIncomeCard', () => {
-  it('shows received amount', () => {
+  it('shows allIncome as hero number', () => {
     renderCard();
-    expect(screen.getByTestId('income-received-amount').textContent).toBe('GHS 30,000');
+    expect(screen.getByTestId('income-received-amount').textContent).toBe('GHS 48,000');
   });
 
-  it('shows expected income context when received', () => {
+  it('shows expected income context when income exists', () => {
     renderCard();
     expect(screen.getByText('of GHS 45,000 expected')).toBeTruthy();
   });
 
-  it('shows confirm message when nothing received', () => {
-    renderCard({ totalReceived: 0 });
-    expect(screen.getByText('Confirm income in Payday screen')).toBeTruthy();
+  it('shows confirm message when no income at all', () => {
+    renderCard({ allIncome: 0, totalReceived: 0 });
+    expect(screen.getByText('Log income in Payday or via + button')).toBeTruthy();
   });
 
   it('shows spent amount', () => {

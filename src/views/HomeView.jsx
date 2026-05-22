@@ -63,6 +63,7 @@ export function HomeView() {
   return (
     <div style={{ padding: '16px 16px 0' }}>
       <MonthlyIncomeCard
+        allIncome={allIncome}
         totalReceived={totalReceived}
         monthlyIncome={monthlyIncome}
         totalSpent={totalSpent}

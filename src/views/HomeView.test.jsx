@@ -16,6 +16,7 @@ vi.mock('../context/BudgetCentreContext', () => ({
 const mockFinance = {
   loading:       false,
   totalReceived: 30000,
+  allIncome:      45000,
   monthlyIncome: 45000,
   totalSpent:    5000,
   remaining:     40000,
@@ -50,14 +51,16 @@ describe('HomeView', () => {
 
   it('renders income received amount in income card', () => {
     renderHome();
-    expect(screen.getByTestId('income-received-amount').textContent).toBe('GHS 30,000');
+    expect(screen.getByTestId('income-received-amount').textContent).toBe('GHS 45,000');
   });
 
   it('shows confirm income message when nothing received', () => {
     mockFinance.totalReceived = 0;
+    mockFinance.allIncome = 0;
     renderHome();
-    expect(screen.getByText('Confirm income in Payday screen')).toBeTruthy();
+    expect(screen.getByText('Log income in Payday or via + button')).toBeTruthy();
     mockFinance.totalReceived = 30000;
+    mockFinance.allIncome = 45000;
   });
 
   it('renders budget health bar', () => {

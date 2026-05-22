@@ -4,14 +4,14 @@
  * Primary income card on Home screen.
  * Receives all values as props — no calculations inside.
  * fmt read from BudgetCentreContext.
- * Spare shows spareMoney = monthlyIncome - fixedTotal.
+ * Spare shows spareMoney = allIncome - fixedTotal - variableSpent.
  */
 
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 
-export function MonthlyIncomeCard({ totalReceived, monthlyIncome, totalSpent, remaining, spareMoney }) {
-  const { fmt }      = useBudgetCentreContext();
-  const noneReceived = totalReceived === 0;
+export function MonthlyIncomeCard({ allIncome, totalReceived, monthlyIncome, totalSpent, remaining, spareMoney }) {
+  const { fmt }   = useBudgetCentreContext();
+  const noIncome  = allIncome === 0;
 
   const stats = [
     { label: 'Spent',     value: fmt(totalSpent),    color: '#fca5a5'                              },
@@ -24,11 +24,11 @@ export function MonthlyIncomeCard({ totalReceived, monthlyIncome, totalSpent, re
       <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: 2, color: 'rgba(255,255,255,.7)', margin: '0 0 6px', textTransform: 'uppercase' }}>
         Income Received
       </p>
-      <p data-testid="income-received-amount" style={{ fontSize: 36, fontWeight: 900, margin: '0 0 4px', lineHeight: 1, color: noneReceived ? 'rgba(255,255,255,.4)' : '#fff' }}>
-        {fmt(totalReceived)}
+      <p data-testid="income-received-amount" style={{ fontSize: 36, fontWeight: 900, margin: '0 0 4px', lineHeight: 1, color: noIncome ? 'rgba(255,255,255,.4)' : '#fff' }}>
+        {fmt(allIncome)}
       </p>
       <p style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', margin: '0 0 16px' }}>
-        {noneReceived ? 'Confirm income in Payday screen' : `of ${fmt(monthlyIncome)} expected`}
+        {noIncome ? 'Log income in Payday or via + button' : `of ${fmt(monthlyIncome)} expected`}
       </p>
       <div style={{ display: 'flex', gap: 0, borderTop: '1px solid rgba(255,255,255,.15)', paddingTop: 14 }}>
         {stats.map(({ label, value, color }) => (
