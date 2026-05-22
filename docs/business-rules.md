@@ -20,7 +20,9 @@ Shows: Amount, "of X expected", Spent, Money Left, Target
 
 ### All Income
 Every income the user has entered — salary confirmed in Payday AND ad-hoc income logged via FAB.
-Formula: allIncome = totalReceived + totalIncome
+Formula: allIncome = totalIncome
+Note: totalIncome = sum of ALL income transactions (type='income') including salary confirmations from PaydayView and ad-hoc income from FAB.
+totalReceived is used only for the PaydayView salary tracker — not for dashboard calculations.
 Rule: if the user entered it, it counts. No distinction between salary and ad-hoc.
 
 ### Money Left (was "Remaining")
