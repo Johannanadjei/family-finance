@@ -1,8 +1,8 @@
 /**
  * services/centres.service.js
  *
- * All Supabase read/write operations for budget_centres
- * and budget_centre_members.
+ * All Supabase read/write operations for budget_centres.
+ * Member operations live in members.service.js.
  *
  * RULES:
  * - Every select filters deleted_at is null
@@ -48,12 +48,11 @@ export const getCentreById = async (centreId) => {
 };
 
 /**
- * Create a new budget centre.
- * Also creates the owner member row in budget_centre_members.
+ * Create a new budget centre and its owner member row.
  *
- * @param {{ name, currency, surplus_target, icon }} opts
+ * @param {{ name, currency, surplus_target, icon, type, skin_id }} opts
  */
-export const createCentre = async ({ name, currency, surplus_target = 0, icon = '🏠' }) => {
+export const createCentre = async ({ name, currency, surplus_target = 0, icon = '🏠', type = 'family_home', skin_id = null }) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: null, error: new Error('Not authenticated') };
 
@@ -67,15 +66,19 @@ export const createCentre = async ({ name, currency, surplus_target = 0, icon = 
   }
 
   // Insert centre
+  const payload = {
+    name:           name.trim(),
+    currency,
+    surplus_target: Math.round(Math.max(0, Number(surplus_target) || 0)),
+    icon:           icon || '🏠',
+    owner_id:       user.id,
+    type:           type || 'family_home',
+  };
+  if (skin_id) payload.skin_id = skin_id;
+
   const { data: centre, error: centreErr } = await supabase
     .from('budget_centres')
-    .insert({
-      name:           name.trim(),
-      currency,
-      surplus_target: Math.round(Math.max(0, Number(surplus_target) || 0)),
-      icon:           icon || '🏠',
-      owner_id:       user.id,
-    })
+    .insert(payload)
     .select()
     .single();
 
@@ -114,6 +117,8 @@ export const updateCentre = async (centreId, updates) => {
     if (updates.currency !== undefined) cleaned.currency       = validateCurrency(updates.currency);
     if (updates.surplus_target !== undefined) cleaned.surplus_target = Math.round(Math.max(0, Number(updates.surplus_target) || 0));
     if (updates.icon     !== undefined) cleaned.icon           = updates.icon || '🏠';
+    if (updates.skin_id  !== undefined) cleaned.skin_id        = updates.skin_id;
+    if (updates.type     !== undefined) cleaned.type           = updates.type;
   } catch (e) {
     console.error('[centres.service] updateCentre validation error:', e.message);
     return { data: null, error: e };
@@ -145,6 +150,19 @@ export const deleteCentre = async (centreId) => {
 };
 
 /**
+ * Archive a budget centre — sets is_archived and soft-deletes.
+ */
+export const archiveCentre = async (centreId) => {
+  const { error } = await supabase
+    .from('budget_centres')
+    .update({ is_archived: true, deleted_at: new Date().toISOString() })
+    .eq('id', centreId);
+
+  if (error) console.error('[centres.service] archiveCentre error:', error.message);
+  return { error };
+};
+
+/**
  * Fetch the current user's plan tier.
  * Returns 'free' as a safe default on any error.
  */
@@ -165,51 +183,3 @@ export const getUserPlan = async () => {
   return { data: data?.plan || 'free', error: null };
 };
 
-// ── Budget Centre Members ─────────────────────────────────────────────────────
-
-/**
- * Fetch all active members of a budget centre.
- * Includes user profile data.
- */
-export const getMembers = async (centreId) => {
-  const { data, error } = await supabase
-    .from('budget_centre_members')
-    .select('*, users(id, name, email, avatar_url)')
-    .eq('budget_centre_id', centreId)
-    .is('deleted_at', null);
-
-  if (error) console.error('[centres.service] getMembers error:', error.message);
-  return { data: data || [], error };
-};
-
-/**
- * Invite a user to a budget centre by user ID.
- * The inviting user must be the owner.
- */
-export const addMember = async (centreId, userId) => {
-  const { data, error } = await supabase
-    .from('budget_centre_members')
-    .insert({
-      budget_centre_id: centreId,
-      user_id:          userId,
-      role:             'member',
-    })
-    .select()
-    .single();
-
-  if (error) console.error('[centres.service] addMember error:', error.message);
-  return { data, error };
-};
-
-/**
- * Remove a member from a budget centre (soft delete).
- */
-export const removeMember = async (memberId) => {
-  const { error } = await supabase
-    .from('budget_centre_members')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', memberId);
-
-  if (error) console.error('[centres.service] removeMember error:', error.message);
-  return { error };
-};

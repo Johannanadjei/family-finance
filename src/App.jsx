@@ -32,6 +32,7 @@ import { Header }                                from './components/layout/Heade
 import { BottomNav }                             from './components/layout/BottomNav';
 import { FAB }                                   from './components/layout/FAB';
 import { SidePanel }                             from './components/layout/SidePanel';
+import { CreateHubSheet }                        from './features/hubs/CreateHubSheet';
 import { ErrorBoundary }                         from './components/ui/ErrorBoundary';
 import { HomeView }                              from './views/HomeView';
 import { PaydayView }                            from './views/PaydayView';
@@ -61,14 +62,15 @@ function ErrorScreen({ message }) {
   );
 }
 
-function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre }) {
-  const navigate                        = useNavigate();
-  const { categories }                  = useBudgetCentreContext();
-  const { incomes, loading }            = useFinanceContext();
-  const [panelOpen,    setPanelOpen]    = useState(false);
-  const [addSheetOpen, setAddSheetOpen] = useState(false);
-  const [toast,        setToast]        = useState(null);
-  const [editTx,       setEditTx]       = useState(null);
+function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre, onHubCreated }) {
+  const navigate                           = useNavigate();
+  const { categories }                     = useBudgetCentreContext();
+  const { incomes, loading }               = useFinanceContext();
+  const [panelOpen,       setPanelOpen]    = useState(false);
+  const [addSheetOpen,    setAddSheetOpen] = useState(false);
+  const [createHubOpen,   setCreateHubOpen] = useState(false);
+  const [toast,           setToast]        = useState(null);
+  const [editTx,          setEditTx]       = useState(null);
 
   const handleSaved = (savedTx) => {
     if (!savedTx) return;
@@ -134,8 +136,13 @@ function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre }) {
         centres={centres}
         activeCentreId={activeCentreId}
         onSwitch={onSwitchCentre}
-        onCreateHub={() => {}}
+        onCreateHub={() => { setPanelOpen(false); setCreateHubOpen(true); }}
         userPlan={userPlan}
+      />
+      <CreateHubSheet
+        isOpen={createHubOpen}
+        onClose={() => setCreateHubOpen(false)}
+        onComplete={onHubCreated}
       />
     </div>
   );
@@ -144,7 +151,7 @@ function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre }) {
 export default function App() {
   const { user, loading: authLoading }                    = useAuth();
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
-  const { centres, plan: userPlan }                       = useCentres(user);
+  const { centres, plan: userPlan, reload: reloadCentres } = useCentres(user);
   const { centre, categories, members, addCategory,
           updateCentre, updateCategory, deleteCategory,
           loading: centreLoading, needsOnboarding,
@@ -168,6 +175,11 @@ export default function App() {
     saveActiveCentreId(id);
     setActiveCentreId(id);
   }, []);
+
+  const handleHubCreated = useCallback(async (id) => {
+    await reloadCentres();
+    handleSwitchCentre(id);
+  }, [reloadCentres, handleSwitchCentre]);
 
   // ── Auth gate ─────────────────────────────────────────────────────────────
   if (authLoading)     return <LoadingScreen message="Loading..." />;
@@ -201,6 +213,7 @@ export default function App() {
             activeCentreId={centre?.id || null}
             userPlan={userPlan}
             onSwitchCentre={handleSwitchCentre}
+            onHubCreated={handleHubCreated}
           />
         </BrowserRouter>
       </FinanceProvider>
