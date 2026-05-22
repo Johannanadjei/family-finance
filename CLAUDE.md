@@ -1,0 +1,375 @@
+# Family Finance — Claude Code Rules
+
+This is the source of truth for all development on this project. Every rule here reflects
+a deliberate architectural decision already in the codebase. Follow them exactly.
+Where `ENGINEERING.md` conflicts with this file, this file wins — it's the current state.
+
+---
+
+## 1. Project overview
+
+Family Finance is a household budget tracker for multi-member families. Families log income
+and expenses, track spending against monthly category budgets, and confirm payday income each
+month. The app is multi-currency, multi-member, and Supabase-backed. It runs as a mobile-first
+PWA optimised for phones at 390px.
+
+**Who uses it:** Households with multiple earners managing a shared budget. Members can be added
+to a Budget Centre (the shared financial entity) and log transactions individually.
+
+**Tech stack:** React + Vite, inline styles (no Tailwind), Supabase (Postgres + Auth + RLS),
+Vitest + Testing Library, Vercel. Never suggest alternatives to any of these.
+
+---
+
+## 2. Architecture — data flow
+
+```
+Supabase
+  └── services/          ← all DB calls live here, return { data, error }
+        └── hooks/        ← useFinance, useBudgetCentre own all state + mutations
+              └── context/ ← BudgetCentreContext, FinanceContext expose state app-wide
+                    └── views/ ← read from context, pass derived values to sub-components
+                          └── components/ ← pure display, receive props only
+```
+
+### Three-gate startup (App.jsx)
+
+1. **Auth gate** — `useAuth()` returns no user → render `<AuthScreen />`
+2. **Centre gate** — user exists but `needsOnboarding === true` → render `<OnboardingFlow />`
+3. **Dashboard** — `<BrowserRouter>` with five routes, wrapped in both context providers
+
+Never move gate logic out of `App.jsx`.
+
+### Context split
+
+**`BudgetCentreContext`** — static centre config:
+- `centre` — Supabase centre row
+- `categories` — current month's budget categories
+- `members` — centre members with joined user rows
+- `addCategory(category)` — mutation
+- `fmt` — memoized currency formatter from `makeFmt(centre.currency)`
+- `getCatIcon(name)` — emoji lookup for a category name
+
+**`FinanceContext`** — live financial state. Exposes everything returned by
+`useFinance({ centre, categories })`. App.jsx calls `useFinance()` once and passes the
+result as the provider value — the hook is never called inside any view or component.
+
+Read both contexts via `useBudgetCentreContext()` and `useFinanceContext()`.
+
+---
+
+## 3. Styling rules
+
+### CSS variable tokens — the only source of colour
+
+Never hardcode a hex value in a component. Always use `var(--c-token, fallback)`.
+
+When a new colour is needed:
+1. Add it to `THEMES.family_warmth` in `src/lib/themes.js` first
+2. Reference it as `var(--c-new-token, hex-fallback)` in the component
+
+Current tokens in `family_warmth`:
+
+| Token | Value |
+|---|---|
+| `--c-primary` | `#064e3b` |
+| `--c-primary-2` | `#0d7060` |
+| `--c-accent` | `#059669` |
+| `--c-accent-light` | `#f0fdf4` |
+| `--c-header-from` | `#064e3b` |
+| `--c-header-to` | `#0d7060` |
+| `--c-text` | `#1c1917` |
+| `--c-muted` | `#6b7280` |
+| `--c-bg` | `#f3f4f6` |
+| `--c-card` | `#ffffff` |
+| `--c-border` | `#e5e7eb` |
+| `--c-input-bg` | `#f9fafb` |
+| `--c-input-border` | `#e5e7eb` |
+| `--c-danger` | `#dc2626` |
+| `--c-danger-bg` | `#fef2f2` |
+| `--c-danger-light` | `#fca5a5` |
+| `--c-success` | `#059669` |
+| `--c-success-light` | `#6ee7b7` |
+| `--c-warning` | `#d97706` |
+| `--c-shadow` | `0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)` |
+
+Acceptable non-token values: `rgba(255,255,255,0.x)` overlays on gradient backgrounds,
+`rgba(0,0,0,0.x)` for backdrop/shadow opacity.
+
+### Layout constants (already established — stay consistent)
+
+- View padding: `'16px'` on all four sides. Never `'16px 16px 0'`.
+- Card border-radius: `16` (standard), `20` (hero/header cards)
+- Card padding: `'16px 18px'`
+- Card shadow: `boxShadow: 'var(--c-shadow)'` on every card surface
+- Grid gap between stat cards: `12px`
+- All styles are inline objects — no `<style>` JSX tags, no CSS-in-JS
+
+### Hover states
+
+Use `onMouseEnter`/`onMouseLeave` + local `useState` — `:hover` is not available in inline styles.
+
+```jsx
+const [hovered, setHovered] = useState(false);
+<button
+  onMouseEnter={() => setHovered(true)}
+  onMouseLeave={() => setHovered(false)}
+  style={{ background: hovered ? 'var(--c-accent-light)' : 'none', transition: 'background .15s' }}
+/>
+```
+
+### Icons
+
+Never use emoji as interactive UI elements. All buttons and controls use inline SVGs
+with `aria-hidden="true"`. The `aria-label` goes on the button element, not the SVG.
+Use `stroke="currentColor"` so icons inherit the button's colour token.
+
+Established icons (reuse, don't reinvent):
+- Info: 14×14 circle-i (`StatCard`, `Header`)
+- Pencil/edit: 13×13 stroke path (`IncomeCard`)
+- Trash: 14×14 stroke path (`TransactionRow`)
+- Close/×: 16×16 two-stroke path (`SidePanel`)
+- Settings gear: 18×18 circle + 8-spoke path (`Header`)
+- Calendar: 18×18 rect + horizontal line + two date posts (`AddTransactionSheet`)
+
+Emoji are acceptable in: empty-state decorations, user-generated content (income icons,
+centre icons), and inline text labels (e.g. "💜 Payday Tracker").
+
+---
+
+## 4. Component rules
+
+### Pure display components — the strict rule
+
+Sub-components (`StatCard`, `CategoryBudgetRow`, `IncomeCard`, `TransactionRow`,
+`BudgetHealthBar`, `MonthlyIncomeCard`, `RecentActivity`, etc.) **must not call `fmt()`**.
+
+They receive pre-formatted strings as props from the view that owns them, or they call
+`useBudgetCentreContext()` to get `fmt` if they need to format multiple values internally.
+They never calculate — all derived values come in as props.
+
+```jsx
+// ✅ Correct — view formats, sub-component displays
+// In HomeView.jsx:
+<StatCard value={fmt(fixedTotal)} ... />
+
+// In StatCard.jsx:
+<p>{value}</p>   // receives a string, displays it
+
+// ❌ Wrong — sub-component calculating or formatting
+// In StatCard.jsx:
+<p>{fmt(fixedTotal)}</p>  // StatCard has no business knowing about fixedTotal
+```
+
+### View orchestrators
+
+Views (`HomeView`, `PaydayView`, `BudgetView`, `DailyView`, `LogView`) read from context,
+own local UI state (sheet open, hover, mutating, error message), and pass derived values
+down to sub-components. No Supabase calls or service imports in views.
+
+### Skeleton pattern
+
+Every async view must export a `*Skeleton` function defined just above the component export.
+Skeletons render the same layout with `<Skeleton>` placeholders — no content.
+Return the skeleton when `loading === true` before any other rendering.
+
+```jsx
+function BudgetViewSkeleton() { ... }
+
+export function BudgetView() {
+  const { loading } = useFinanceContext();
+  if (loading) return <BudgetViewSkeleton />;
+  ...
+}
+```
+
+---
+
+## 5. Mutation rules — optimistic update + rollback
+
+Every write follows this pattern without exception:
+
+```js
+const mutate = useCallback(async (payload) => {
+  // 1. Capture previous state for rollback
+  const prev = state;
+
+  // 2. Apply optimistic update immediately
+  setState(optimisticValue);
+
+  // 3. Write to Supabase
+  const { data, error } = await dbMutation(payload);
+
+  // 4a. Rollback on failure
+  if (error) {
+    setState(prev);
+    return { error };
+  }
+
+  // 4b. Replace optimistic value with server row
+  setState(serverValue);
+  return { data, error: null };
+}, [deps]);
+```
+
+Two-phase mutations (e.g. `markReceived`, `markPending`) roll back **both phases** if
+either fails. See `useFinance.js` for the reference implementation.
+
+Optimistic rows carry `_optimistic: true`. Components check this flag to apply reduced
+opacity (0.6) and disable interactions.
+
+---
+
+## 6. Service layer rules
+
+All Supabase queries live in `src/services/`. One file per table. Never import
+`supabase` directly in hooks, views, or components.
+
+Non-negotiable rules for every service function:
+- Filter `deleted_at IS NULL` on every select
+- Filter `budget_centre_id` on every select where applicable
+- Soft delete only: set `deleted_at = new Date().toISOString()`
+- Return `{ data, error }` — never throw
+- Validate inputs with `lib/validation.js` before insert/update
+- Use `.maybeSingle()` (not `.single()`) for single-row queries
+- Month queries use date range (`date >= from AND date <= to`), not string matching
+
+---
+
+## 7. lib/finance.js rules
+
+Pure functions only. No React, no imports from the app, no side effects, no async.
+These functions are the only place financial calculations are performed.
+
+Any new calculation must:
+1. Be added to `lib/finance.js` as a named export
+2. Be unit-tested in `lib/finance.test.js`
+3. Be wired into `useFinance.js` as a `useMemo`
+4. Never be duplicated in a component or view
+
+Key functions: `calcTotalIncome`, `calcTotalSpent`, `calcTotalExpected`, `calcTotalReceived`,
+`calcRemaining`, `calcHealthPct`, `getBudgetStatus`, `calcTotalFixed`, `calcFixedSpent`,
+`calcVariableSpent`, `calcWeeklyData`, `calcCategorySpend`, `calcTopCategories`,
+`calcDaysUntil`, `groupByDate`, `getIncomeStatus`, `makeFmt`, `getWeekForDate`,
+`getCurrentMonth`, `offsetMonth`.
+
+---
+
+## 8. Test rules
+
+- Every new component needs a test file next to it (`ComponentName.test.jsx`)
+- Every new service function needs at least one test covering success + error paths
+- All shared mock data lives in `src/test-utils/fixtures.js` — never define mock objects inside test files
+- Never commit with failing tests
+- Run `npm test -- --run` before every commit and verify the count matches
+
+Available fixtures: `mockCentre`, `mockFmt`, `mockCategories`, `mockMembers`,
+`mockIncomes`, `mockTxs`, `mockWeeklyData`, `mockCategorySpend`.
+
+### What to test
+
+- Rendered output from props (text content, `data-testid` values)
+- Conditional rendering (tooltip shown/hidden, error state, empty state)
+- Event handlers called with correct arguments and types
+- Disabled states (button.disabled === true)
+
+### What not to test
+
+- Inline style values or CSS properties
+- Hover state behaviour (mouse events)
+- Supabase internals — mock at the service layer boundary
+
+---
+
+## 9. Commit rules
+
+```
+type(scope): short description, N tests
+```
+
+- `type`: `feat`, `fix`, `polish`, `refactor`, `test`, `chore`
+- `scope`: always `v2` for this codebase version
+- Always include the test count at the end
+- Co-author line: `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`
+
+```
+feat(v2): add income source management, 423 tests
+fix(v2): totalPending sums unreceived sources only, 423 tests
+polish(v2): card shadows and token consistency, 423 tests
+```
+
+---
+
+## 10. File structure
+
+```
+src/
+  components/
+    layout/         Header, BottomNav, FAB, SidePanel
+    ui/             Skeleton, Toast, ErrorBoundary
+  context/          BudgetCentreContext.jsx, FinanceContext.jsx
+  features/
+    onboarding/     OnboardingFlow, OnboardingProgress, steps/
+  hooks/            useBudgetCentre.js, useFinance.js, useAuth.js, useCentres.js
+  lib/              finance.js, themes.js, storage.js, supabase.js, validation.js, crypto.js
+  services/         transactions.service.js, income.service.js, categories.service.js,
+                    centres.service.js, guests.service.js
+  test-utils/       fixtures.js  ← only file in here, never add more
+  views/
+    home/           StatCard, MonthlyIncomeCard, PaydaySummaryCard, BudgetHealthBar, RecentActivity
+    daily/          TransactionRow, WeeklySummaryBar, AddTransactionSheet
+    payday/         IncomeCard, ConfirmSheet
+    budget/         CategoryBudgetRow, AddCategorySheet
+    log/            LogFilterBar
+    HomeView.jsx, DailyView.jsx, PaydayView.jsx, BudgetView.jsx, LogView.jsx, AuthScreen.jsx
+  App.jsx           routing + three-gate logic only
+  main.jsx          React root mount + PWA service worker registration
+  index.css         resets, font, @keyframes fadeIn, :focus-visible, ::selection,
+                    input[type="date"]::-webkit-calendar-picker-indicator
+```
+
+---
+
+## 11. Key architectural decisions already made
+
+These are the decisions that shaped the codebase. Don't revisit them without a strong reason.
+
+**`useFinance` is called once in `App.jsx` and passed into `FinanceContext`.** Components
+never call `useFinance` directly. This prevents multiple subscription instances and ensures
+all views see the same state.
+
+**All financial state resets when the month changes.** `loadMonth(ym)` calls `setActiveMonth`
+and re-fetches from Supabase. There is no client-side caching of previous months.
+
+**`totalPending` is computed from unreceived income sources directly**, not from
+`totalExpected - totalReceived`. This ensures partial receipts don't create phantom pending
+amounts.
+
+**Soft deletes everywhere.** No row is ever physically deleted. `deleted_at` is set on
+delete; all queries filter `deleted_at IS NULL`. This preserves audit history.
+
+**Optimistic updates use `crypto.randomUUID()` for temp IDs**, replaced by the Supabase-
+assigned UUID once the write confirms. The `_optimistic: true` flag gates interactions.
+
+**`markReceived` is a two-phase write.** Phase 1 updates `income_sources.received`.
+Phase 2 inserts an income transaction so it appears in `totalIncome` and `availableNow`.
+Both phases must succeed; failure rolls back both.
+
+**`fmt()` is a memoized factory result, not a hook.** `makeFmt(currency)` in `lib/finance.js`
+returns a formatter function. `BudgetCentreContext` calls it once when currency changes and
+memoizes the result as `fmt`. Sub-components either receive pre-formatted strings as props
+or call `useBudgetCentreContext()` to access `fmt`.
+
+**localStorage stores UI preferences only** — theme skin, accent, notification toggles.
+Keys are prefixed `ffc_`. Financial data lives exclusively in Supabase.
+
+**The 440px max-width container.** All views are constrained to `maxWidth: 440` centred
+in the viewport. This means the app looks good on both phone screens and desktop browsers
+without any responsive breakpoints.
+
+**Inline styles only.** No Tailwind, no CSS modules, no CSS-in-JS. This was chosen for
+simplicity and co-location — every component's styles are readable without leaving the file.
+
+**RLS at the database level.** Row-level security is the primary access control mechanism.
+The frontend anon key + user JWT enforce data isolation. The frontend never implements
+its own access checks — it trusts Supabase RLS.
