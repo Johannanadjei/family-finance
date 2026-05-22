@@ -48,7 +48,9 @@ export function Header({ onOpenPanel }) {
           <span style={{ fontSize: 22 }}>{centre?.icon || '🏠'}</span>
           <div style={{ textAlign: 'left' }}>
             <p style={{ fontSize: 14, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.2 }}>
-              {centre?.name || 'My Budget'}
+              {(centre?.name || 'My Budget').length > 20
+                ? (centre?.name || 'My Budget').slice(0, 20) + '…'
+                : (centre?.name || 'My Budget')}
             </p>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: 0, fontWeight: 600 }}>
               {centre?.currency || 'GHS'}
