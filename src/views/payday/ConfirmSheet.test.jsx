@@ -72,13 +72,14 @@ describe('ConfirmSheet', () => {
     expect(onConfirm).toHaveBeenCalledWith('inc-1', 30000, expect.any(String));
   });
 
-  it('shows validation error when amount is zero', async () => {
-    renderSheet();
+  it('allows confirming zero amount', async () => {
+    const onConfirm = vi.fn().mockResolvedValue({ error: null });
+    renderSheet({ onConfirm });
     await act(async () => {
       fireEvent.change(screen.getByTestId('confirm-amount-input'), { target: { value: '0' } });
     });
     await act(async () => { screen.getByText('Confirm Receipt').click(); });
-    expect(screen.getByText(/Amount must be greater than zero/)).toBeTruthy();
+    expect(onConfirm).toHaveBeenCalledWith('inc-1', 0, expect.any(String));
   });
 
   it('shows loading state on confirm button', () => {

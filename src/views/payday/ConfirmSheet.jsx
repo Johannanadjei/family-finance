@@ -40,8 +40,8 @@ export function ConfirmSheet({ income, isOpen, onClose, onConfirm, loading, erro
   if (!isOpen || !income) return null;
 
   const handleConfirm = () => {
-    const n = Math.round(parseFloat(amount) || 0);
-    if (!n || n <= 0) { setLocalError('Amount must be greater than zero'); return; }
+    const n = amount === '' ? NaN : Math.round(parseFloat(amount));
+    if (isNaN(n) || n < 0) { setLocalError('Amount must be zero or greater'); return; }
     setLocalError(null);
     onConfirm(income.id, n, date);
   };
