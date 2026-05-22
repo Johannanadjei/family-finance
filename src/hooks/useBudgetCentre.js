@@ -28,15 +28,6 @@ const fetchCentre = async () => {
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
-  const addCategory = async (category) => {
-    const centreId = centre?.id;
-    if (!centreId) return { error: new Error('No active centre') };
-    const { data, error } = await addCategoryService(centreId, category);
-    if (error) return { error };
-    setCategories(prev => [...prev, data]);
-    return { data, error: null };
-  };
-
   return { data, error };
 };
 
@@ -48,15 +39,6 @@ const fetchCategories = async (centreId) => {
     .eq('month', getCurrentMonth())
     .is('deleted_at', null)
     .order('sort_order', { ascending: true });
-  const addCategory = async (category) => {
-    const centreId = centre?.id;
-    if (!centreId) return { error: new Error('No active centre') };
-    const { data, error } = await addCategoryService(centreId, category);
-    if (error) return { error };
-    setCategories(prev => [...prev, data]);
-    return { data, error: null };
-  };
-
   return { data: data || [], error };
 };
 
@@ -66,15 +48,6 @@ const fetchMembers = async (centreId) => {
     .select('*, users(id, name, email, avatar_url)')
     .eq('budget_centre_id', centreId)
     .is('deleted_at', null);
-  const addCategory = async (category) => {
-    const centreId = centre?.id;
-    if (!centreId) return { error: new Error('No active centre') };
-    const { data, error } = await addCategoryService(centreId, category);
-    if (error) return { error };
-    setCategories(prev => [...prev, data]);
-    return { data, error: null };
-  };
-
   return { data: data || [], error };
 };
 
@@ -159,9 +132,9 @@ export function useBudgetCentre(user) {
   }, [load]);
 
   const addCategory = async (category) => {
-    const centreId = centre?.id;
-    if (!centreId) return { error: new Error('No active centre') };
-    const { data, error } = await addCategoryService(centreId, category);
+    const id = centre?.id;
+    if (!id) return { error: new Error('No active centre') };
+    const { data, error } = await addCategoryService(id, category);
     if (error) return { error };
     setCategories(prev => [...prev, data]);
     return { data, error: null };
@@ -171,11 +144,11 @@ export function useBudgetCentre(user) {
     centre,
     centreId:       centre?.id   || null,
     categories,
-    addCategory,
     members,
     loading,
     needsOnboarding,
     error,
+    addCategory,
     onOnboardingComplete,
     reload: load,
   };
