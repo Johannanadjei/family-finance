@@ -148,7 +148,16 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
           <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)" style={inputStyle} />
 
           {/* Date */}
-          <input data-testid="add-date-input" type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
+          <div style={{ position: 'relative' }}>
+            <input data-testid="add-date-input" type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, paddingRight: 44 }} />
+            <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--c-muted, #9ca3af)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                <path d="M3 9h18" stroke="currentColor" strokeWidth="1.8"/>
+                <path d="M8 2v4M16 2v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+            </span>
+          </div>
 
           {error && (
             <div style={{ background: '#fef2f2', borderRadius: 10, padding: '10px 14px' }}>

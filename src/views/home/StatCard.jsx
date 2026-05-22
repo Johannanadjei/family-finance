@@ -19,7 +19,7 @@ const STAT_INFO = {
   fixed:    'Your total planned monthly budget across all categories.',
   income:   'Total income from all sources — salary and ad-hoc combined.',
   variable: 'Spending outside your planned budget categories. This comes from your Spare Money.',
-  spare:    'Money left to spend freely after your fixed budget and unplanned spending. Starts at income minus your budget total.',
+  spare:    "What's left after your bills and extra spending. Yours to use however you like.",
 };
 
 export function StatCard({ label, value, subtitle, infoKey, color, activeInfo, onInfo }) {

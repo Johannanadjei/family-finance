@@ -5,3 +5,4 @@ button { cursor: pointer; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
 :focus-visible { outline: 2px solid var(--c-accent, #059669); outline-offset: 2px; border-radius: 4px; }
 ::selection { background: var(--c-accent, #059669); color: #fff; }
+input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; right: 0; width: 44px; height: 100%; cursor: pointer; }

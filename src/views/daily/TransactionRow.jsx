@@ -11,7 +11,10 @@
  * @param {boolean}     disabled
  */
 
+import { useState } from 'react';
+
 export function TransactionRow({ tx, fmt, onDelete, disabled, isLast }) {
+  const [hoveredDelete, setHoveredDelete] = useState(false);
   const isIncome   = tx.type === 'income';
   const isDisabled = disabled || tx._optimistic === true;
 
@@ -56,18 +59,24 @@ export function TransactionRow({ tx, fmt, onDelete, disabled, isLast }) {
           onClick={() => onDelete(tx.id)}
           disabled={isDisabled}
           aria-label="Delete transaction"
+          onMouseEnter={() => !isDisabled && setHoveredDelete(true)}
+          onMouseLeave={() => setHoveredDelete(false)}
           style={{
-            background: 'var(--c-danger-light, #fef2f2)',
-            border:     'none',
+            background:   'none',
+            border:       'none',
             borderRadius: 8,
-            padding:    '6px 8px',
-            fontSize:   13,
-            cursor:     isDisabled ? 'not-allowed' : 'pointer',
-            opacity:    isDisabled ? 0.5 : 1,
-            color:      'var(--c-danger, #dc2626)',
+            padding:      '6px 8px',
+            cursor:       isDisabled ? 'not-allowed' : 'pointer',
+            opacity:      isDisabled ? 0.5 : 1,
+            color:        hoveredDelete ? 'var(--c-danger, #dc2626)' : 'var(--c-muted, #9ca3af)',
+            display:      'flex',
+            alignItems:   'center',
+            transition:   'color .15s',
           }}
         >
-          🗑
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
       </div>
     </div>
