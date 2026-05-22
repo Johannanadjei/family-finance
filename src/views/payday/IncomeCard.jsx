@@ -46,6 +46,7 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
       padding:      '16px 18px',
       marginBottom: 12,
       border:       `1.5px solid ${config.border}`,
+      boxShadow:    'var(--c-shadow)',
     }}>
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -100,8 +101,12 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
                 aria-label="Edit expected amount"
                 onClick={handleEditOpen}
                 disabled={disabled}
-                style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: 'var(--c-muted, #9ca3af)', padding: '2px 4px' }}
-              >✏️</button>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted, #9ca3af)', padding: '2px 4px', display: 'flex', alignItems: 'center' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                  <path d="M9 1.5 11.5 4 4.5 11H2v-2.5L9 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"/>
+                </svg>
+              </button>
             </div>
           )}
         </div>

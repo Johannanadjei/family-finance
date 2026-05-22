@@ -56,7 +56,7 @@ export function BudgetView() {
     <div style={{ padding: '16px 16px 0' }}>
 
       {/* Summary header */}
-      <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff' }}>
+      <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff', boxShadow: 'var(--c-shadow)' }}>
         <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: 2, color: 'rgba(255,255,255,.7)', margin: '0 0 12px', textTransform: 'uppercase' }}>
           Budget Overview
         </p>
@@ -86,7 +86,7 @@ export function BudgetView() {
           <p style={{ fontSize: 14, color: 'var(--c-muted, #9ca3af)', fontWeight: 700 }}>No budget categories set up yet.</p>
         </div>
       ) : (
-        <div style={{ background: 'var(--c-card, #fff)', borderRadius: 16, padding: '0 16px' }}>
+        <div style={{ background: 'var(--c-card, #fff)', borderRadius: 16, padding: '0 16px', boxShadow: 'var(--c-shadow)' }}>
           {rows.map((row, idx) => (
             <CategoryBudgetRow
               key={row.id}

@@ -6,7 +6,7 @@ export function PaydaySummaryCard({ nextUnpaid, totalReceived, totalExpected }) 
   const navigate    = useNavigate();
   const allReceived = totalReceived >= totalExpected && totalExpected > 0;
   return (
-    <div style={{ background: 'var(--c-accent-light,#f0fdf4)', borderRadius: 16, padding: '16px 18px', marginBottom: 12, cursor: 'pointer' }} onClick={() => navigate('/payday')}>
+    <div style={{ background: 'var(--c-accent-light,#f0fdf4)', borderRadius: 16, padding: '16px 18px', marginBottom: 12, cursor: 'pointer', boxShadow: 'var(--c-shadow)' }} onClick={() => navigate('/payday')}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <p style={{ fontSize: 10, fontWeight: 800, color: 'var(--c-accent,#059669)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 1 }}>💜 Payday Tracker</p>

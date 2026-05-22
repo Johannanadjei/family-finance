@@ -27,6 +27,7 @@ export const THEMES = {
     '--c-danger':       '#dc2626',
     '--c-success':      '#059669',
     '--c-warning':      '#d97706',
+    '--c-shadow':       '0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
   },
   midnight_pro: {},
   ocean_pro:    {},

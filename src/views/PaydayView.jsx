@@ -113,7 +113,7 @@ export function PaydayView() {
       </div>
 
       {/* Summary card */}
-      <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff' }}>
+      <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff', boxShadow: 'var(--c-shadow)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <div>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Received</p>
@@ -121,7 +121,7 @@ export function PaydayView() {
           </div>
           <div style={{ textAlign: 'right' }}>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Pending</p>
-            <p data-testid="payday-total-pending" style={{ fontSize: 24, fontWeight: 900, margin: 0, color: totalPending > 0 ? '#fca5a5' : '#6ee7b7' }}>{fmt(totalPending)}</p>
+            <p data-testid="payday-total-pending" style={{ fontSize: 24, fontWeight: 900, margin: 0, color: totalPending > 0 ? '#fbbf24' : '#6ee7b7' }}>{fmt(totalPending)}</p>
           </div>
         </div>
       </div>
