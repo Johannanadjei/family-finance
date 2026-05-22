@@ -1,25 +1,14 @@
 /**
  * components/layout/SidePanel.jsx
  *
- * Slides in from left when the centre name is tapped in Header.
- * Lists all control centres the user belongs to.
- * Tapping a centre switches the active hub.
- * Count in header is always accurate — never shows 0 while loading.
- *
- * @param {boolean}        isOpen
- * @param {function}       onClose
- * @param {BudgetCentre[]} centres
- * @param {string|null}    activeCentreId
- * @param {function}       onSwitch(centreId)  — called on hub tap
- * @param {function}       onCreateHub         — called when + New tapped (Phase 3)
- * @param {'free'|'pro'}   userPlan
+ * Hub switcher panel — slides in from left when the centre name is tapped.
+ * Lists all control centres; tapping one switches the active hub.
  */
 
 import { useState } from 'react';
 
 export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, onCreateHub, userPlan }) {
-  const [hoveredClose, setHoveredClose] = useState(false);
-  const [hoveredRow,   setHoveredRow]   = useState(null);
+  const [hoveredRow, setHoveredRow] = useState(null);
 
   const handleSwitch = (centreId) => {
     if (centreId === activeCentreId) { onClose(); return; }
@@ -28,30 +17,19 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
   };
 
   const atProLimit = userPlan === 'pro' && centres.length >= 10;
-  const canCreate  = userPlan === 'pro' && !atProLimit;
-
-  const countLabel = centres.length === 0
-    ? 'Control Centres'
-    : centres.length === 1
-      ? '1 Control Centre'
-      : `${centres.length} Control Centres`;
+  const n          = centres.length;
+  const countLabel = n === 0 ? 'Control Centres' : n === 1 ? '1 Control Centre' : `${n} Control Centres`;
 
   return (
     <>
-      {/* Backdrop */}
       {isOpen && (
         <div
           onClick={onClose}
           aria-hidden="true"
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,.4)',
-            zIndex: 300,
-          }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 300 }}
         />
       )}
 
-      {/* Panel */}
       <aside
         aria-label="Control centres"
         style={{
@@ -59,54 +37,51 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
           top:           0,
           left:          isOpen
             ? 'max(0px, calc(50vw - 220px))'
-            : 'calc(max(0px, calc(50vw - 220px)) - 280px)',
-          width:         280,
+            : 'calc(max(0px, calc(50vw - 220px)) - 290px)',
+          width:         290,
           height:        '100vh',
           background:    'var(--c-card, #fff)',
           zIndex:        400,
           transition:    'left .25s ease',
           overflowY:     'auto',
-          boxShadow:     isOpen ? '4px 0 24px rgba(0,0,0,.15)' : 'none',
+          boxShadow:     isOpen ? '6px 0 32px rgba(0,0,0,.18)' : 'none',
           display:       'flex',
           flexDirection: 'column',
         }}
       >
         {/* Header */}
         <div style={{
-          padding:         '20px 20px 12px',
-          background:      'linear-gradient(135deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))',
-          display:         'flex',
-          justifyContent:  'space-between',
-          alignItems:      'center',
+          padding:    '22px 20px 16px',
+          background: 'linear-gradient(135deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))',
+          display:    'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
         }}>
-          <p style={{ fontSize: 14, fontWeight: 900, color: '#fff', margin: 0 }}>
-            {countLabel}
-          </p>
+          <div>
+            <p style={{ fontSize: 15, fontWeight: 900, color: '#fff', margin: '0 0 2px' }}>
+              {countLabel}
+            </p>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', margin: 0, fontWeight: 600 }}>
+              Tap a hub to switch
+            </p>
+          </div>
           <button
             onClick={onClose}
             aria-label="Close panel"
-            onMouseEnter={() => setHoveredClose(true)}
-            onMouseLeave={() => setHoveredClose(false)}
             style={{
-              background:  hoveredClose ? 'rgba(255,255,255,.15)' : 'none',
-              border:      'none',
-              borderRadius: 8,
-              color:       'rgba(255,255,255,.8)',
-              cursor:      'pointer',
-              padding:     '4px 6px',
-              display:     'flex',
-              alignItems:  'center',
-              transition:  'background .15s',
+              background: 'rgba(255,255,255,.12)', border: 'none', borderRadius: 8,
+              color: 'rgba(255,255,255,.9)', cursor: 'pointer', padding: '6px 8px',
+              display: 'flex', alignItems: 'center', marginTop: 2,
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </button>
         </div>
 
         {/* Centre list */}
-        <div style={{ flex: 1, padding: '12px 0' }}>
+        <div style={{ flex: 1, padding: '10px 0' }}>
           {centres.map(c => {
             const active  = c.id === activeCentreId;
             const hovered = hoveredRow === c.id && !active;
@@ -118,36 +93,55 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                 onMouseEnter={() => setHoveredRow(c.id)}
                 onMouseLeave={() => setHoveredRow(null)}
                 style={{
-                  width:         '100%',
-                  padding:       '14px 20px',
-                  textAlign:     'left',
-                  background:    active  ? 'var(--c-accent-light, #f0fdf4)'
-                               : hovered ? 'var(--c-bg, #f3f4f6)'
-                               : 'transparent',
-                  borderTop:    'none',
-                  borderRight:  'none',
-                  borderBottom: 'none',
-                  borderLeft:   `3px solid ${active ? 'var(--c-accent, #059669)' : 'transparent'}`,
-                  cursor:       'pointer',
-                  display:      'block',
-                  transition:   'background .15s',
-                  fontFamily:   "'Nunito', sans-serif",
+                  width:      '100%',
+                  padding:    '12px 16px 12px 14px',
+                  textAlign:  'left',
+                  background: active  ? 'var(--c-accent-light, #f0fdf4)'
+                             : hovered ? 'var(--c-bg, #f3f4f6)'
+                             : 'transparent',
+                  borderTop:    'none', borderRight: 'none', borderBottom: 'none',
+                  borderLeft:   `4px solid ${active ? 'var(--c-accent, #059669)' : 'transparent'}`,
+                  cursor:     'pointer',
+                  display:    'block',
+                  transition: 'background .15s',
+                  fontFamily: "'Nunito', sans-serif",
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 22 }}>{c.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 13, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {/* Icon container — green when active */}
+                  <div style={{
+                    width: 42, height: 42, borderRadius: 11, flexShrink: 0,
+                    background: active ? 'var(--c-accent, #059669)' : 'var(--c-bg, #f3f4f6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 20,
+                  }}>
+                    {c.icon}
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{
+                      fontSize: 13, fontWeight: 900, margin: '0 0 2px',
+                      color: active ? 'var(--c-accent, #059669)' : 'var(--c-text, #1c1917)',
+                    }}>
                       {c.name}
                     </p>
                     <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
                       {c.currency}
                     </p>
                   </div>
-                  {active && (
-                    <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--c-accent, #059669)' }}>
+
+                  {active ? (
+                    <span style={{
+                      fontSize: 10, fontWeight: 800, color: '#fff',
+                      background: 'var(--c-accent, #059669)',
+                      padding: '3px 8px', borderRadius: 20, flexShrink: 0,
+                    }}>
                       Active
                     </span>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+                      <path d="M5 3l4 4-4 4" stroke="var(--c-muted, #9ca3af)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   )}
                 </div>
               </button>
@@ -156,16 +150,16 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
         </div>
 
         {/* Footer — create / upgrade */}
-        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--c-border, #e5e7eb)' }}>
+        <div style={{ padding: '14px 16px 20px', borderTop: '1px solid var(--c-border, #e5e7eb)' }}>
           {userPlan === 'free' ? (
-            <>
-              <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', fontWeight: 600 }}>
-                Free plan · 1 control centre
+            <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 12, padding: '12px 14px' }}>
+              <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', fontWeight: 700 }}>
+                Free plan · 1 hub included
               </p>
               <button
                 disabled
                 style={{
-                  width: '100%', padding: '12px', borderRadius: 10,
+                  width: '100%', padding: '11px', borderRadius: 10,
                   border: '1.5px dashed var(--c-border, #e5e7eb)',
                   background: 'transparent', color: 'var(--c-muted, #9ca3af)',
                   fontSize: 13, fontWeight: 700, cursor: 'not-allowed',
@@ -174,7 +168,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
               >
                 Upgrade to add more hubs
               </button>
-            </>
+            </div>
           ) : atProLimit ? (
             <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0, fontWeight: 600, textAlign: 'center' }}>
               Maximum 10 hubs reached
@@ -183,11 +177,13 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
             <button
               onClick={onCreateHub}
               style={{
-                width: '100%', padding: '12px', borderRadius: 10,
-                border: '1.5px dashed var(--c-primary, #064e3b)',
-                background: 'transparent', color: 'var(--c-primary, #064e3b)',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                width: '100%', padding: '14px', borderRadius: 12,
+                border: 'none',
+                background: 'var(--c-primary, #064e3b)',
+                color: '#fff',
+                fontSize: 14, fontWeight: 800, cursor: 'pointer',
                 fontFamily: "'Nunito', sans-serif",
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               }}
             >
               + New Control Centre
