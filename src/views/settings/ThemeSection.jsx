@@ -1,0 +1,64 @@
+/**
+ * views/settings/ThemeSection.jsx
+ *
+ * Theme skin selector.
+ * family_warmth is the free skin — all others require Pro.
+ * Reads prefs and saveThemeSkin from FinanceContext.
+ */
+
+import { useFinanceContext } from '../../context/FinanceContext';
+import { applyTheme }        from '../../lib/themes';
+
+const SKINS = [
+  { key: 'family_warmth', label: 'Family Warmth', emoji: '🌿', pro: false },
+  { key: 'midnight_pro',  label: 'Midnight',      emoji: '🌙', pro: true  },
+  { key: 'ocean_pro',     label: 'Ocean',         emoji: '🌊', pro: true  },
+  { key: 'gold_pro',      label: 'Gold',          emoji: '✨', pro: true  },
+  { key: 'rose_pro',      label: 'Rose',          emoji: '🌸', pro: true  },
+];
+
+export function ThemeSection() {
+  const { prefs, saveThemeSkin } = useFinanceContext();
+  const current = prefs?.themeSkin || 'family_warmth';
+
+  const handleSelect = (skin, isPro) => {
+    if (isPro) return;
+    saveThemeSkin(skin);
+    applyTheme(skin);
+  };
+
+  return (
+    <div style={{ background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 }}>
+      <p style={{ fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: 0.8 }}>Theme</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {SKINS.map(s => (
+          <button
+            key={s.key}
+            data-testid={`theme-${s.key}`}
+            onClick={() => handleSelect(s.key, s.pro)}
+            disabled={s.pro}
+            aria-label={s.label + (s.pro ? ' (Pro)' : '')}
+            style={{
+              padding:      '8px 12px',
+              borderRadius: 10,
+              border:       `1.5px solid ${current === s.key ? 'var(--c-primary, #064e3b)' : 'var(--c-border, #e5e7eb)'}`,
+              background:   current === s.key ? 'var(--c-accent-light, #f0fdf4)' : '#fff',
+              fontSize:     13,
+              fontWeight:   700,
+              cursor:       s.pro ? 'default' : 'pointer',
+              color:        s.pro ? 'var(--c-muted, #9ca3af)' : 'var(--c-text, #1c1917)',
+              fontFamily:   "'Nunito', sans-serif",
+              opacity:      s.pro ? 0.7 : 1,
+              display:      'flex',
+              alignItems:   'center',
+              gap:          4,
+            }}
+          >
+            {s.emoji} {s.label}
+            {s.pro && <span style={{ fontSize: 10, background: 'var(--c-border, #e5e7eb)', borderRadius: 4, padding: '1px 5px', fontWeight: 800 }}>PRO</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

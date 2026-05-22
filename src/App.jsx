@@ -33,6 +33,7 @@ import { DailyView }                        from './views/DailyView';
 import { BudgetView }                       from './views/BudgetView';
 import { LogView }                          from './views/LogView';
 import { AddTransactionSheet }              from './views/daily/AddTransactionSheet';
+import { SettingsView }                     from './views/SettingsView';
 import { Toast }                            from './components/ui/Toast';
 import { isKnownCategory }                  from './lib/finance';
 
@@ -93,7 +94,8 @@ function DashboardShell({ centres, activeCentreId }) {
             <Route path="/payday"  element={<PaydayView />} />
             <Route path="/daily"   element={<DailyView />} />
             <Route path="/budget"  element={<BudgetView />} />
-            <Route path="/log"     element={<LogView onEditTx={(tx) => { setEditTx(tx); setAddSheetOpen(true); }} />} />
+            <Route path="/log"      element={<LogView onEditTx={(tx) => { setEditTx(tx); setAddSheetOpen(true); }} />} />
+            <Route path="/settings" element={<SettingsView />} />
           </Routes>
         </main>
       </ErrorBoundary>
@@ -133,6 +135,7 @@ function DashboardShell({ centres, activeCentreId }) {
 export default function App() {
   const { user, loading: authLoading }          = useAuth();
   const { centre, categories, members, addCategory,
+          updateCentre, updateCategory, deleteCategory,
           loading: centreLoading, needsOnboarding,
           error, onOnboardingComplete }          = useBudgetCentre(user);
   const { centres }                             = useCentres(user);
@@ -158,7 +161,7 @@ export default function App() {
 
   // ── Dashboard ─────────────────────────────────────────────────────────
   return (
-    <BudgetCentreProvider centre={centre} categories={categories} members={members} addCategory={addCategory}>
+    <BudgetCentreProvider centre={centre} categories={categories} members={members} addCategory={addCategory} updateCentre={updateCentre} updateCategory={updateCategory} deleteCategory={deleteCategory}>
       <FinanceProvider value={financeValues}>
         <BrowserRouter>
           <DashboardShell

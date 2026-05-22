@@ -20,7 +20,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getTransactionsByMonth, addTransaction as dbAddTransaction, updateTransaction as dbUpdateTransaction, deleteTransaction as dbDeleteTransaction } from '../services/transactions.service';
-import { getIncomeSources, markReceived as dbMarkReceived, markPending as dbMarkPending, updateExpectedAmount as dbUpdateExpectedAmount } from '../services/income.service';
+import { getIncomeSources, markReceived as dbMarkReceived, markPending as dbMarkPending, updateExpectedAmount as dbUpdateExpectedAmount, addIncomeSource as dbAddIncomeSource, deleteIncomeSource as dbDeleteIncomeSource } from '../services/income.service';
 import {
   calcTotalIncome, calcTotalSpent, calcRemaining, calcHealthPct,
   getBudgetStatus, calcTotalFixed, calcFixedSpent, calcVariableSpent,
@@ -316,6 +316,35 @@ export function useFinance({ centre, categories }) {
     return { error: null };
   }, [incomes]);
 
+  const addIncomeSource = useCallback(async (source) => {
+    if (!centreId) return { data: null, error: new Error('No active budget centre') };
+    const tempId     = crypto.randomUUID();
+    const optimistic = { ...source, id: tempId, budget_centre_id: centreId, received: false, received_amount: 0, _optimistic: true };
+    setIncomes(prev => [...prev, optimistic]);
+    const { data, error } = await dbAddIncomeSource(centreId, source);
+    if (error) {
+      setIncomes(prev => prev.filter(i => i.id !== tempId));
+      console.error('[useFinance] addIncomeSource rollback:', error.message);
+      return { data: null, error };
+    }
+    setIncomes(prev => prev.map(i => i.id === tempId ? { ...data, _optimistic: false } : i));
+    return { data, error: null };
+  }, [centreId]);
+
+  const deleteIncomeSource = useCallback(async (sourceId) => {
+    const prev = incomes.find(i => i.id === sourceId);
+    if (!prev) return { error: new Error('Income source not found') };
+    const prevIncomes = incomes;
+    setIncomes(prevList => prevList.filter(i => i.id !== sourceId));
+    const { error } = await dbDeleteIncomeSource(sourceId);
+    if (error) {
+      setIncomes(prevIncomes);
+      console.error('[useFinance] deleteIncomeSource rollback:', error.message);
+      return { error };
+    }
+    return { error: null };
+  }, [incomes]);
+
   // ── Month navigation ──────────────────────────────────────────────────────
 
   const loadMonth = useCallback(async (month) => {
@@ -383,6 +412,8 @@ export function useFinance({ centre, categories }) {
     markReceived,
     markPending,
     updateExpectedAmount,
+    addIncomeSource,
+    deleteIncomeSource,
 
     // Navigation
     loadMonth,

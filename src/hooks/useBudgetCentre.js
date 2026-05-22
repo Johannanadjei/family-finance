@@ -17,8 +17,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase }                                                          from '../lib/supabase';
-import { addCategory as addCategoryService }                                  from '../services/categories.service';
+import { supabase }                          from '../lib/supabase';
+import { addCategory as addCategoryService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
+import { updateCentre as updateCentreService } from '../services/centres.service';
 import { getCurrentMonth } from '../lib/finance';
 
 const fetchCentre = async () => {
@@ -141,6 +142,46 @@ export function useBudgetCentre(user) {
     return { data, error: null };
   };
 
+  const updateCentre = useCallback(async (updates) => {
+    const id = centre?.id;
+    if (!id) return { error: new Error('No active centre') };
+    const prev = centre;
+    setCentre(c => ({ ...c, ...updates }));
+    const { data, error } = await updateCentreService(id, updates);
+    if (error) {
+      setCentre(prev);
+      console.error('[useBudgetCentre] updateCentre rollback:', error.message);
+      return { error };
+    }
+    setCentre(data);
+    return { data, error: null };
+  }, [centre]);
+
+  const updateCategory = useCallback(async (categoryId, updates) => {
+    const prevCategories = categories;
+    setCategories(cats => cats.map(c => c.id === categoryId ? { ...c, ...updates } : c));
+    const { data, error } = await updateCategoryService(categoryId, updates);
+    if (error) {
+      setCategories(prevCategories);
+      console.error('[useBudgetCentre] updateCategory rollback:', error.message);
+      return { error };
+    }
+    setCategories(cats => cats.map(c => c.id === categoryId ? data : c));
+    return { data, error: null };
+  }, [categories]);
+
+  const deleteCategory = useCallback(async (categoryId) => {
+    const prevCategories = categories;
+    setCategories(cats => cats.filter(c => c.id !== categoryId));
+    const { error } = await deleteCategoryService(categoryId);
+    if (error) {
+      setCategories(prevCategories);
+      console.error('[useBudgetCentre] deleteCategory rollback:', error.message);
+      return { error };
+    }
+    return { error: null };
+  }, [categories]);
+
   return {
     centre,
     centreId:       centre?.id   || null,
@@ -150,6 +191,9 @@ export function useBudgetCentre(user) {
     needsOnboarding,
     error,
     addCategory,
+    updateCentre,
+    updateCategory,
+    deleteCategory,
     onOnboardingComplete,
     reload: load,
   };
