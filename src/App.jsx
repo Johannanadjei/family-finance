@@ -57,17 +57,19 @@ function ErrorScreen({ message }) {
 function DashboardShell({ centres, activeCentreId }) {
   const navigate                        = useNavigate();
   const { categories }                  = useBudgetCentreContext();
-  const { incomes }                     = useFinanceContext();
+  const { incomes, loading }            = useFinanceContext();
   const [panelOpen,    setPanelOpen]    = useState(false);
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [toast,        setToast]        = useState(null);
   const [editTx,       setEditTx]       = useState(null);
 
   const handleSaved = (savedTx) => {
-    if (savedTx?.type === 'expense' && !isKnownCategory(savedTx.category_name, categories)) {
+    if (!savedTx) return;
+    if (savedTx.type === 'expense' && !isKnownCategory(savedTx.category_name, categories)) {
       setToast({ tx: savedTx, kind: 'expense' });
     } else if (
-      savedTx?.type === 'income' &&
+      savedTx.type === 'income' &&
+      !loading &&
       !incomes.some(src => src.label?.toLowerCase() === savedTx.category_name?.toLowerCase())
     ) {
       setToast({ tx: savedTx, kind: 'income' });

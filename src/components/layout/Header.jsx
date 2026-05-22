@@ -19,9 +19,9 @@ import { useFinanceContext }      from '../../context/FinanceContext';
 
 export function Header({ onOpenPanel }) {
   const { centre, fmt }            = useBudgetCentreContext();
-  const { availableNow, totalReceived } = useFinanceContext();
+  const { availableNow, totalReceived, incomes, loading } = useFinanceContext();
   const navigate                   = useNavigate();
-  const noIncome                   = totalReceived === 0;
+  const noIncome                   = !loading && incomes.length > 0 && totalReceived === 0;
   const isNegative                 = availableNow < 0;
 
   return (

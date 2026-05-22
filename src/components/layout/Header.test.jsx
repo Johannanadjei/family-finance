@@ -16,6 +16,8 @@ vi.mock('../../context/BudgetCentreContext', () => ({
 const mockFinance = {
   availableNow:  1000,
   totalReceived: 5000,
+  incomes:       [],
+  loading:       false,
 };
 
 vi.mock('../../context/FinanceContext', () => ({
@@ -43,10 +45,12 @@ describe('Header', () => {
   it('shows info icon when no income received', () => {
     mockFinance.totalReceived = 0;
     mockFinance.availableNow  = -500;
+    mockFinance.incomes       = [{ id: 'inc-1', label: 'Adjei Salary' }];
     renderHeader();
     expect(screen.getByLabelText('No income confirmed — tap to go to Payday')).toBeTruthy();
     mockFinance.totalReceived = 5000;
     mockFinance.availableNow  = 1000;
+    mockFinance.incomes       = [];
   });
 
   it('hides info icon when income received', () => {
