@@ -51,6 +51,7 @@ export function PaydayView() {
   const [sheetOpen,      setSheetOpen]      = useState(false);
   const [mutating,       setMutating]       = useState(false);
   const [mutateError,    setMutateError]    = useState(null);
+  const [hoveredNav,     setHoveredNav]     = useState(null);
 
   if (financeValues.loading) return <PaydayViewSkeleton />;
 
@@ -95,7 +96,9 @@ export function PaydayView() {
         <button
           onClick={() => loadMonth(offsetMonth(activeMonth, -1))}
           aria-label="Previous month"
-          style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--c-primary, #064e3b)', padding: '4px 8px' }}
+          onMouseEnter={() => setHoveredNav('prev')}
+          onMouseLeave={() => setHoveredNav(null)}
+          style={{ background: hoveredNav === 'prev' ? 'var(--c-accent-light, #f0fdf4)' : 'none', border: 'none', borderRadius: 8, fontSize: 20, cursor: 'pointer', color: 'var(--c-primary, #064e3b)', padding: '4px 8px', transition: 'background .15s' }}
         >
           &#8592;
         </button>
@@ -106,7 +109,9 @@ export function PaydayView() {
           onClick={() => loadMonth(offsetMonth(activeMonth, 1))}
           aria-label="Next month"
           disabled={isCurrentMonth}
-          style={{ background: 'none', border: 'none', fontSize: 20, cursor: isCurrentMonth ? 'not-allowed' : 'pointer', color: isCurrentMonth ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)', padding: '4px 8px' }}
+          onMouseEnter={() => !isCurrentMonth && setHoveredNav('next')}
+          onMouseLeave={() => setHoveredNav(null)}
+          style={{ background: hoveredNav === 'next' ? 'var(--c-accent-light, #f0fdf4)' : 'none', border: 'none', borderRadius: 8, fontSize: 20, cursor: isCurrentMonth ? 'not-allowed' : 'pointer', color: isCurrentMonth ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)', padding: '4px 8px', transition: 'background .15s' }}
         >
           &#8594;
         </button>

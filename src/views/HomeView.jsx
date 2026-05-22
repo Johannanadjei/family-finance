@@ -20,7 +20,7 @@ import { RecentActivity }         from './home/RecentActivity';
 function HomeViewSkeleton() {
   const card = { background: 'var(--c-card,#fff)', borderRadius: 16, padding: '16px 18px', marginBottom: 12 };
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '16px' }}>
       <div style={{ ...card, marginBottom: 12 }}>
         <Skeleton width="40%" height={12} borderRadius={6} />
         <div style={{ marginTop: 10 }}><Skeleton width="60%" height={32} borderRadius={8} /></div>
@@ -35,7 +35,7 @@ function HomeViewSkeleton() {
         <Skeleton width="50%" height={12} borderRadius={6} />
         <div style={{ marginTop: 10 }}><Skeleton width="40%" height={28} borderRadius={8} /></div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
         {[0,1,2,3].map(i => <div key={i} style={{ ...card, margin: 0 }}><Skeleton width="60%" height={10} borderRadius={5} /><div style={{ marginTop: 8 }}><Skeleton width="80%" height={20} borderRadius={6} /></div></div>)}
       </div>
       <div style={{ ...card }}>
@@ -56,12 +56,12 @@ export function HomeView() {
   const {
     totalReceived, monthlyIncome, totalSpent, remaining, allIncome,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
-    fixedTotal, variableSpent, spareMoney, surplusTarget, txs,
+    fixedTotal, variableSpent, spareMoney, txs,
   } = financeValues;
 
 
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '16px' }}>
       <MonthlyIncomeCard
         allIncome={allIncome}
         totalReceived={totalReceived}
@@ -76,7 +76,7 @@ export function HomeView() {
         totalReceived={totalReceived}
         totalExpected={totalExpected}
       />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
         <StatCard
           label="Fixed Budget"
           value={fmt(fixedTotal)}

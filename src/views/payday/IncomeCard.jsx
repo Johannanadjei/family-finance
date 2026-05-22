@@ -21,9 +21,10 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
   const config    = INCOME_STATUS_CONFIG[status];
   const daysUntil = income.pay_day ? calcDaysUntil(income.pay_day) : null;
 
-  const [editing,    setEditing]    = useState(false);
-  const [editAmount, setEditAmount] = useState('');
-  const [saving,     setSaving]     = useState(false);
+  const [editing,        setEditing]        = useState(false);
+  const [editAmount,     setEditAmount]     = useState('');
+  const [saving,         setSaving]         = useState(false);
+  const [hoveredPending, setHoveredPending] = useState(false);
 
   const handleEditOpen = () => {
     setEditAmount(String(income.expected_amount));
@@ -129,8 +130,13 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
 
       {/* Action button */}
       {income.received ? (
-        <button onClick={() => onMarkPending(income.id)} disabled={disabled}
-          style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: '#fff', color: 'var(--c-muted, #6b7280)', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1, fontFamily: "'Nunito', sans-serif" }}>
+        <button
+          onClick={() => onMarkPending(income.id)}
+          disabled={disabled}
+          onMouseEnter={() => !disabled && setHoveredPending(true)}
+          onMouseLeave={() => setHoveredPending(false)}
+          style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: hoveredPending && !disabled ? 'var(--c-input-bg, #f9fafb)' : '#fff', color: 'var(--c-muted, #6b7280)', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1, fontFamily: "'Nunito', sans-serif", transition: 'background .15s' }}
+        >
           Mark as Pending
         </button>
       ) : (
