@@ -8,8 +8,10 @@
 
 export const STEPS = ['Centre', 'Income', 'Categories', 'Target', 'Complete'];
 
-export const MAX_FREE_INCOMES = 2;
-export const MAX_FREE_MEMBERS = 2;
+export const MAX_FREE_INCOMES  = 2;
+export const MAX_FREE_MEMBERS  = 2;
+export const MAX_FREE_CENTRES  = 1;
+export const MAX_PRO_CENTRES   = 10;
 
 export const CURRENCIES = [
   { code: 'GHS', label: 'GHS — Ghanaian Cedi'       },
