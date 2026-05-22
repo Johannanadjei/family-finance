@@ -49,7 +49,7 @@ export function ThemeSection() {
                 padding:      '8px 12px',
                 borderRadius: 10,
                 border:       `1.5px solid ${current === s.key ? 'var(--c-primary, #064e3b)' : 'var(--c-border, #e5e7eb)'}`,
-                background:   current === s.key ? 'var(--c-accent-light, #f0fdf4)' : '#fff',
+                background:   current === s.key ? 'var(--c-chip-selected-bg, #f0fdf4)' : 'var(--c-chip-bg, #f3f4f6)',
                 fontSize:     13,
                 fontWeight:   700,
                 cursor:       locked ? 'default' : 'pointer',
