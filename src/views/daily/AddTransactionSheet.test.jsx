@@ -89,15 +89,26 @@ describe('AddTransactionSheet', () => {
     expect(screen.getByText(/Amount must be greater than zero/)).toBeTruthy();
   });
 
-  it('saves as Other when no category selected', async () => {
-    const onSaved = vi.fn();
-    renderSheet({ onSaved });
+  it('saves as Other when no category selected for expense', async () => {
+    renderSheet();
     await act(async () => {
       fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '100' } });
     });
     await act(async () => { screen.getByText('Save').click(); });
     expect(mockAddTransaction).toHaveBeenCalledWith(
       expect.objectContaining({ category_name: 'Other' })
+    );
+  });
+
+  it('saves as Other Income when no source selected for income', async () => {
+    renderSheet();
+    await act(async () => { screen.getByText('Income').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '500' } });
+    });
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(mockAddTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'income', category_name: 'Other Income' })
     );
   });
 

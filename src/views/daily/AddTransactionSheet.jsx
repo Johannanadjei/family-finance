@@ -63,7 +63,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
     const n = Math.round(parseFloat(amount) || 0);
     if (!n || n <= 0) { setError('Amount must be greater than zero'); return; }
     if (!date)          { setError('Please select a date'); return; }
-    const finalCategory = categoryName.trim() || 'Other';
+    const finalCategory   = categoryName.trim() || (type === 'income' ? 'Other Income' : 'Other');
     const finalCategoryId = categoryName.trim() ? categoryId : null;
     setLoading(true);
     let savedTx = null;
