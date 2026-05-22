@@ -71,8 +71,8 @@ export function DailyView() {
 
       {/* Past month warning */}
       {!isCurrentMonth && (
-        <div style={{ background: '#fef3c7', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: '#92400e', margin: 0 }}>Viewing a past month — deleting transactions is disabled.</p>
+        <div style={{ background: 'var(--c-warning-bg, #fef3c7)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-warning-text, #92400e)', margin: 0 }}>Viewing a past month — deleting transactions is disabled.</p>
         </div>
       )}
 
@@ -87,7 +87,7 @@ export function DailyView() {
 
       {/* Error state */}
       {(error || deleteError) && (
-        <div style={{ background: '#fef2f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
+        <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{deleteError || error}</p>
         </div>
       )}

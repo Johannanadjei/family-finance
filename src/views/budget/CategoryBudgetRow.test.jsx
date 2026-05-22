@@ -63,19 +63,19 @@ describe('CategoryBudgetRow', () => {
   it('progress bar is green when under 70%', () => {
     renderRow({ pctUsed: 40 });
     const bar = screen.getByTestId('budget-bar-cat-1');
-    expect(bar.style.background).toContain('rgb(5, 150, 105)');
+    expect(bar.style.background).toContain('--c-accent');
   });
 
   it('progress bar is amber when 71-90%', () => {
     renderRow({ pctUsed: 80 });
     const bar = screen.getByTestId('budget-bar-cat-1');
-    expect(bar.style.background).toContain('rgb(217, 119, 6)');
+    expect(bar.style.background).toContain('--c-warning');
   });
 
   it('progress bar is red when over 90%', () => {
     renderRow({ pctUsed: 95 });
     const bar = screen.getByTestId('budget-bar-cat-1');
-    expect(bar.style.background).toContain('rgb(220, 38, 38)');
+    expect(bar.style.background).toContain('--c-danger');
   });
 
   it('shows zero spent when nothing spent', () => {

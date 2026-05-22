@@ -14,9 +14,9 @@ export function MonthlyIncomeCard({ allIncome, totalReceived, monthlyIncome, tot
   const noIncome  = allIncome === 0;
 
   const stats = [
-    { label: 'Spent',     value: fmt(totalSpent),    color: '#fca5a5'                              },
-    { label: 'Money Left', value: fmt(remaining),     color: remaining >= 0 ? '#6ee7b7' : '#fca5a5' },
-    { label: 'Spare',     value: fmt(spareMoney),     color: 'rgba(255,255,255,.8)'                 },
+    { label: 'Spent',      value: fmt(totalSpent), color: 'var(--c-danger-light, #fca5a5)',  testId: 'stat-spent'      },
+    { label: 'Money Left', value: fmt(remaining),  color: remaining >= 0 ? 'var(--c-success-light, #6ee7b7)' : 'var(--c-danger-light, #fca5a5)', testId: 'stat-money-left' },
+    { label: 'Spare',      value: fmt(spareMoney), color: 'rgba(255,255,255,.8)',             testId: 'stat-spare'      },
   ];
 
   return (
@@ -31,10 +31,10 @@ export function MonthlyIncomeCard({ allIncome, totalReceived, monthlyIncome, tot
         {noIncome ? 'Log income in Payday or via + button' : `of ${fmt(monthlyIncome)} expected`}
       </p>
       <div style={{ display: 'flex', gap: 0, borderTop: '1px solid rgba(255,255,255,.15)', paddingTop: 14 }}>
-        {stats.map(({ label, value, color }) => (
+        {stats.map(({ label, value, color, testId }) => (
           <div key={label} style={{ flex: 1 }}>
             <p style={{ fontSize: 10, color: 'rgba(255,255,255,.6)', margin: '0 0 2px', fontWeight: 600 }}>{label}</p>
-            <p style={{ fontSize: 13, fontWeight: 900, color, margin: 0 }}>{value}</p>
+            <p data-testid={testId} style={{ fontSize: 13, fontWeight: 900, color, margin: 0 }}>{value}</p>
           </div>
         ))}
       </div>

@@ -115,7 +115,7 @@ export function ConfirmSheet({ income, isOpen, onClose, onConfirm, loading, erro
           </div>
 
           {(localError || error) && (
-            <div style={{ background: '#fef2f2', borderRadius: 10, padding: '10px 14px' }}>
+            <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '10px 14px' }}>
               <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>
                 {localError || error}
               </p>

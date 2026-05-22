@@ -30,6 +30,8 @@ export const THEMES = {
     '--c-danger-bg':     '#fef2f2',
     '--c-danger-light':  '#fca5a5',
     '--c-success-light': '#6ee7b7',
+    '--c-warning-bg':    '#fef3c7',
+    '--c-warning-text':  '#92400e',
     '--c-shadow':        '0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05)',
   },
   midnight_pro: {},

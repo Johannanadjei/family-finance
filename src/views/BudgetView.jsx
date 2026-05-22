@@ -67,14 +67,14 @@ export function BudgetView() {
           </div>
           <div style={{ textAlign: 'right' }}>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', margin: '0 0 2px' }}>Spent</p>
-            <p data-testid="budget-total-spent" style={{ fontSize: 22, fontWeight: 900, margin: 0, color: fixedSpent > fixedTotal ? '#fca5a5' : '#6ee7b7' }}>{fmt(fixedSpent)}</p>
+            <p data-testid="budget-total-spent" style={{ fontSize: 22, fontWeight: 900, margin: 0, color: fixedSpent > fixedTotal ? 'var(--c-danger-light, #fca5a5)' : 'var(--c-success-light, #6ee7b7)' }}>{fmt(fixedSpent)}</p>
           </div>
         </div>
       </div>
 
       {/* Error state */}
       {error && (
-        <div style={{ background: '#fef2f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
+        <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{error}</p>
         </div>
       )}

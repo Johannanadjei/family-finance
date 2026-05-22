@@ -15,9 +15,9 @@
 
 export function CategoryBudgetRow({ category, spent, remaining, pctUsed, overBudget, fmt }) {
   const barColor =
-    pctUsed > 90 ? '#dc2626' :
-    pctUsed > 70 ? '#d97706' :
-    '#059669';
+    pctUsed > 90 ? 'var(--c-danger, #dc2626)' :
+    pctUsed > 70 ? 'var(--c-warning, #d97706)' :
+    'var(--c-accent, #059669)';
 
   return (
     <div style={{ padding: '14px 0', borderBottom: '1px solid var(--c-border, #e5e7eb)' }}>
@@ -31,7 +31,7 @@ export function CategoryBudgetRow({ category, spent, remaining, pctUsed, overBud
         </div>
         <div style={{ textAlign: 'right' }}>
           <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
-            <span data-testid={`budget-spent-${category.id}`} style={{ fontWeight: 800, color: overBudget ? '#dc2626' : 'var(--c-text, #1c1917)' }}>
+            <span data-testid={`budget-spent-${category.id}`} style={{ fontWeight: 800, color: overBudget ? 'var(--c-danger, #dc2626)' : 'var(--c-text, #1c1917)' }}>
               {fmt(spent)}
             </span>
             {' / '}{fmt(category.budget_amount)}
@@ -56,7 +56,7 @@ export function CategoryBudgetRow({ category, spent, remaining, pctUsed, overBud
       {/* Remaining / over budget */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {overBudget ? (
-          <p style={{ fontSize: 11, fontWeight: 800, color: '#dc2626', margin: 0 }}>
+          <p style={{ fontSize: 11, fontWeight: 800, color: 'var(--c-danger, #dc2626)', margin: 0 }}>
             Over budget by <span data-testid={`budget-remaining-${category.id}`}>{fmt(Math.abs(remaining))}</span>
           </p>
         ) : (

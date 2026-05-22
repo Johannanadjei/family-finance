@@ -69,7 +69,7 @@ export function AddCategorySheet({ isOpen, onClose, onAdd }) {
           <input data-testid="add-cat-amount-input" type="number" value={amount} onChange={e => { setAmount(e.target.value); setError(null); }} placeholder="Monthly budget (0 if flexible)" min="0" style={inputStyle} />
 
           {error && (
-            <div style={{ background: '#fef2f2', borderRadius: 10, padding: '10px 14px' }}>
+            <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '10px 14px' }}>
               <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{error}</p>
             </div>
           )}
