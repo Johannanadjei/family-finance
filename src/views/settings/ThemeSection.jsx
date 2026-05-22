@@ -11,10 +11,13 @@ import { applyTheme }        from '../../lib/themes';
 
 const SKINS = [
   { key: 'family_warmth', label: 'Family Warmth', emoji: '🌿', pro: false },
-  { key: 'midnight_pro',  label: 'Midnight',      emoji: '🌙', pro: true  },
-  { key: 'ocean_pro',     label: 'Ocean',         emoji: '🌊', pro: true  },
-  { key: 'gold_pro',      label: 'Gold',          emoji: '✨', pro: true  },
-  { key: 'rose_pro',      label: 'Rose',          emoji: '🌸', pro: true  },
+  { key: 'corporate',     label: 'Corporate',     emoji: '🏢', pro: true  },
+  { key: 'international', label: 'International', emoji: '✈️', pro: true  },
+  { key: 'neon',          label: 'Neon',          emoji: '⚡', pro: true  },
+  { key: 'dark',          label: 'Dark',          emoji: '🌑', pro: true  },
+  { key: 'minimalist',    label: 'Minimalist',    emoji: '⬜', pro: true  },
+  { key: 'busy',          label: 'Busy',          emoji: '🎨', pro: true  },
+  { key: 'cold',          label: 'Cold',          emoji: '❄️', pro: true  },
 ];
 
 export function ThemeSection() {

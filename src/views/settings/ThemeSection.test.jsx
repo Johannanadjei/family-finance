@@ -30,14 +30,14 @@ describe('ThemeSection', () => {
 
   it('renders pro theme options', () => {
     render(<ThemeSection />);
-    expect(screen.getByTestId('theme-midnight_pro')).toBeTruthy();
-    expect(screen.getByTestId('theme-ocean_pro')).toBeTruthy();
+    expect(screen.getByTestId('theme-corporate')).toBeTruthy();
+    expect(screen.getByTestId('theme-international')).toBeTruthy();
   });
 
   it('disables pro themes', () => {
     render(<ThemeSection />);
-    expect(screen.getByTestId('theme-midnight_pro').disabled).toBe(true);
-    expect(screen.getByTestId('theme-gold_pro').disabled).toBe(true);
+    expect(screen.getByTestId('theme-corporate').disabled).toBe(true);
+    expect(screen.getByTestId('theme-neon').disabled).toBe(true);
   });
 
   it('free theme is not disabled', () => {
@@ -53,7 +53,7 @@ describe('ThemeSection', () => {
 
   it('does not call saveThemeSkin for pro themes', async () => {
     render(<ThemeSection />);
-    await act(async () => { screen.getByTestId('theme-midnight_pro').click(); });
+    await act(async () => { screen.getByTestId('theme-corporate').click(); });
     expect(mockSaveThemeSkin).not.toHaveBeenCalled();
   });
 });

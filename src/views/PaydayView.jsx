@@ -1,17 +1,10 @@
 /**
- * views/PaydayView.jsx
- *
- * Income confirmation screen — primary data entry point.
- * Users confirm income received each month here.
- * All financial recalculations happen automatically via useFinance.
- *
- * Shows past month warning — income sources are not month-scoped.
- * Month navigation via financeValues.loadMonth.
- *
- * @param {{ financeValues }} props
+ * views/PaydayView.jsx — Income confirmation screen.
+ * Shows past month warning. Month nav via financeValues.loadMonth.
  */
 
 import { useState }               from 'react';
+import { useNavigate }            from 'react-router-dom';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { getCurrentMonth, offsetMonth } from '../lib/finance';
@@ -47,6 +40,7 @@ function PaydayViewSkeleton() {
 export function PaydayView() {
   const { fmt }                             = useBudgetCentreContext();
   const financeValues                       = useFinanceContext();
+  const navigate                            = useNavigate();
   const [selectedIncome, setSelectedIncome] = useState(null);
   const [sheetOpen,      setSheetOpen]      = useState(false);
   const [mutating,       setMutating]       = useState(false);
@@ -102,7 +96,7 @@ export function PaydayView() {
         >
           &#8592;
         </button>
-        <p data-testid="payday-month-label" style={{ fontSize: 15, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
+        <p data-testid="payday-month-label" style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
           {formatMonth(activeMonth)}
         </p>
         <button
@@ -121,11 +115,11 @@ export function PaydayView() {
       <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff', boxShadow: 'var(--c-shadow)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <div>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Received</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Received</p>
             <p data-testid="payday-total-received" style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>{fmt(totalReceived)}</p>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Pending</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Pending</p>
             <p data-testid="payday-total-pending" style={{ fontSize: 24, fontWeight: 900, margin: 0, color: totalPending > 0 ? '#fbbf24' : '#6ee7b7' }}>{fmt(totalPending)}</p>
           </div>
         </div>
@@ -134,7 +128,7 @@ export function PaydayView() {
       {/* Past month warning */}
       {!isCurrentMonth && (
         <div style={{ background: 'var(--c-warning-bg, #fef3c7)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-warning-text, #92400e)', margin: 0 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-warning-text, #92400e)', margin: 0 }}>
             Income status shown reflects current state, not historical data.
           </p>
         </div>
@@ -143,7 +137,7 @@ export function PaydayView() {
       {/* Error state */}
       {(error || mutateError) && (
         <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>
             {mutateError || error}
           </p>
         </div>
@@ -151,10 +145,25 @@ export function PaydayView() {
 
       {/* Income list */}
       {incomes.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <p style={{ fontSize: 14, color: 'var(--c-muted, #9ca3af)', fontWeight: 700 }}>
+        <div style={{ textAlign: 'center', padding: '48px 16px' }}>
+          <p style={{ fontSize: 36, margin: '0 0 12px' }}>💜</p>
+          <p style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 6px' }}>
             No income sources set up yet.
           </p>
+          <p style={{ fontSize: 15, color: 'var(--c-muted, #6b7280)', margin: '0 0 20px', lineHeight: 1.5 }}>
+            Go to Settings to add your salary or income sources.
+          </p>
+          <button
+            onClick={() => navigate('/settings')}
+            style={{
+              padding: '12px 24px', borderRadius: 12, border: 'none',
+              background: 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))',
+              color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer',
+              fontFamily: "'Nunito', sans-serif",
+            }}
+          >
+            Go to Settings
+          </button>
         </div>
       ) : (
         incomes.map(income => (

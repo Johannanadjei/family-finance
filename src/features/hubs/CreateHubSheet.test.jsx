@@ -12,6 +12,9 @@ vi.mock('../../services/centres.service', () => ({
 vi.mock('../../services/categories.service', () => ({
   bulkAddCategories: vi.fn().mockResolvedValue({ error: null }),
 }));
+vi.mock('../../services/income.service', () => ({
+  bulkAddIncomeSources: vi.fn().mockResolvedValue({ error: null }),
+}));
 
 const renderSheet = (props = {}) =>
   render(
@@ -28,7 +31,8 @@ const selectHub   = () => fireEvent.click(screen.getByLabelText('Select Family H
 const goToStep1   = () => { selectHub(); fireEvent.click(screen.getByText('Continue →')); };
 const fillName    = (name = 'Test Hub') => fireEvent.change(screen.getByPlaceholderText('e.g. Our Family Home'), { target: { value: name } });
 const goToStep2   = () => { goToStep1(); fillName(); fireEvent.click(screen.getByText('Continue →')); };
-const goToConfirm = () => { goToStep2(); fireEvent.click(screen.getByText('Continue →')); };
+const goToStep3   = () => { goToStep2(); fireEvent.click(screen.getByText('Continue →')); };
+const goToConfirm = () => { goToStep3(); fireEvent.click(screen.getByText('Skip for now')); };
 
 describe('CreateHubSheet', () => {
   it('renders when isOpen is true', () => {
@@ -58,15 +62,15 @@ describe('CreateHubSheet', () => {
     expect(screen.getByText('Name your hub')).toBeTruthy();
   });
 
-  it('shows progress as Step 1 of 4 on mount', () => {
+  it('shows progress as Step 1 of 5 on mount', () => {
     renderSheet();
-    expect(screen.getByText('Step 1 of 4')).toBeTruthy();
+    expect(screen.getByText('Step 1 of 5')).toBeTruthy();
   });
 
-  it('progress advances to Step 2 of 4 on name step', () => {
+  it('progress advances to Step 2 of 5 on name step', () => {
     renderSheet();
     goToStep1();
-    expect(screen.getByText('Step 2 of 4')).toBeTruthy();
+    expect(screen.getByText('Step 2 of 5')).toBeTruthy();
   });
 
   it('Back on name step returns to hub type step', () => {
@@ -121,6 +125,31 @@ describe('CreateHubSheet', () => {
     renderSheet();
     goToConfirm();
     expect(screen.getByText(/Test Hub/)).toBeTruthy();
+  });
+
+  it('shows income step after categories continued', () => {
+    renderSheet();
+    goToStep3();
+    expect(screen.getByText('Add your income streams')).toBeTruthy();
+  });
+
+  it('income step has Skip for now button', () => {
+    renderSheet();
+    goToStep3();
+    expect(screen.getByText('Skip for now')).toBeTruthy();
+  });
+
+  it('Back on income step returns to categories', () => {
+    renderSheet();
+    goToStep3();
+    fireEvent.click(screen.getByText('← Back'));
+    expect(screen.getByText('Set your budget categories')).toBeTruthy();
+  });
+
+  it('shows confirm step after skipping income', () => {
+    renderSheet();
+    goToConfirm();
+    expect(screen.getByText('Ready to create?')).toBeTruthy();
   });
 
   it('calls onComplete with new centre id after successful creation', async () => {

@@ -38,10 +38,15 @@ export function Header({ onOpenPanel }) {
       >
         <span style={{ fontSize: 22 }}>{centre?.icon || '🏠'}</span>
         <div style={{ textAlign: 'left' }}>
-          <p style={{ fontSize: 13, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.2 }}>
-            {centre?.name || 'My Budget'}
-          </p>
-          <p style={{ fontSize: 10, color: 'rgba(255,255,255,.7)', margin: 0, fontWeight: 600 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <p style={{ fontSize: 14, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.2 }}>
+              {centre?.name || 'My Budget'}
+            </p>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true" style={{ opacity: 0.7, marginTop: 1 }}>
+              <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: 0, fontWeight: 600 }}>
             {centre?.currency || 'GHS'}
           </p>
         </div>
@@ -50,7 +55,7 @@ export function Header({ onOpenPanel }) {
       {/* Right — available now */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: 10, color: 'rgba(255,255,255,.7)', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
             Available
           </p>
           <p style={{
@@ -70,8 +75,12 @@ export function Header({ onOpenPanel }) {
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.8)', padding: 0, display: 'flex', alignItems: 'center' }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/>
-            <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M19.07 4.93l-1.77 1.77M6.7 17.3l-1.77 1.77" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="3" y1="6"  x2="21" y2="6"  stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            <circle cx="8"  cy="6"  r="2.5" fill="currentColor"/>
+            <circle cx="16" cy="12" r="2.5" fill="currentColor"/>
+            <circle cx="10" cy="18" r="2.5" fill="currentColor"/>
           </svg>
         </button>
       </div>

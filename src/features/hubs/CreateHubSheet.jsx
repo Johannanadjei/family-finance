@@ -8,15 +8,17 @@
  */
 
 import { useState, useMemo } from 'react';
-import { createCentre }       from '../../services/centres.service';
-import { bulkAddCategories }  from '../../services/categories.service';
+import { createCentre }          from '../../services/centres.service';
+import { bulkAddCategories }     from '../../services/categories.service';
+import { bulkAddIncomeSources }  from '../../services/income.service';
+import { StepIncome }            from '../onboarding/steps/StepIncome';
 import { getDefaultCategories, getHubType } from '../../lib/hubTypes';
 import { makeFmt, getCurrentMonth }          from '../../lib/finance';
 import { CURRENCIES }        from '../onboarding/onboarding.constants';
 import { StepHubType }       from '../onboarding/steps/StepHubType';
 import { StepCategories }    from '../onboarding/steps/StepCategories';
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 const inputStyle = {
   width: '100%', padding: '13px 15px', borderRadius: 12,
@@ -33,6 +35,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
   const [currency,   setCurrency]   = useState(CURRENCIES[0].code);
   const [icon,       setIcon]       = useState('🏠');
   const [categories, setCategories] = useState([]);
+  const [incomes,    setIncomes]    = useState([]);
   const [nameErr,    setNameErr]    = useState(null);
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState(null);
@@ -41,7 +44,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
 
   const reset = () => {
     setStep(0); setHubType(null); setHubName(''); setCurrency(CURRENCIES[0].code);
-    setIcon('🏠'); setCategories([]); setNameErr(null);
+    setIcon('🏠'); setCategories([]); setIncomes([]); setNameErr(null);
     setLoading(false); setError(null);
   };
 
@@ -60,7 +63,8 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
     setStep(2);
   };
 
-  const handleCatsNext = (data) => { setCategories(data); setStep(3); };
+  const handleCatsNext   = (data) => { setCategories(data); setStep(3); };
+  const handleIncomeNext = (data) => { setIncomes(data);   setStep(4); };
 
   const handleConfirm = async () => {
     setLoading(true); setError(null);
@@ -74,6 +78,12 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
     const catRows = categories.map(({ id: _id, ...c }) => ({ ...c, month: getCurrentMonth() }));
     const { error: catErr } = await bulkAddCategories(data.id, catRows);
     if (catErr) { setError('Could not save categories. Please try again.'); setLoading(false); return; }
+
+    if (incomes.length > 0) {
+      const srcRows = incomes.map(({ id: _id, ...src }) => src);
+      const { error: incErr } = await bulkAddIncomeSources(data.id, srcRows);
+      if (incErr) { setError('Could not save income sources. Please try again.'); setLoading(false); return; }
+    }
 
     setLoading(false);
     reset();
@@ -129,18 +139,28 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
           {step === 2 && <StepCategories data={categories} fmt={fmt} onNext={handleCatsNext} onBack={() => setStep(1)} />}
 
           {step === 3 && (
+            <StepIncome
+              data={incomes}
+              centreCurrency={currency}
+              plan="free"
+              onNext={handleIncomeNext}
+              onBack={() => setStep(2)}
+            />
+          )}
+
+          {step === 4 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <p style={{ fontSize: 22, fontWeight: 900, color: 'var(--c-primary, #064e3b)', margin: 0 }}>Ready to create?</p>
               <div style={{ background: 'var(--c-accent-light, #f0fdf4)', borderRadius: 14, padding: '14px 16px' }}>
                 <p style={{ fontSize: 20, fontWeight: 900, color: 'var(--c-primary, #064e3b)', margin: '0 0 4px' }}>{icon} {hubName}</p>
-                <p style={{ fontSize: 13, color: 'var(--c-accent, #059669)', margin: 0 }}>{currency} · {categories.length} categories</p>
+                <p style={{ fontSize: 13, color: 'var(--c-accent, #059669)', margin: 0 }}>{currency} · {categories.length} categories{incomes.length > 0 ? ` · ${incomes.length} income source${incomes.length === 1 ? '' : 's'}` : ''}</p>
               </div>
               <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
                 Add income sources from the Payday screen after setup.
               </p>
               {error && <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{error}</p>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-                <button onClick={() => setStep(2)} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-muted, #6b7280)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
+                <button onClick={() => setStep(3)} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-muted, #6b7280)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
                 <button onClick={handleConfirm} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: 'none', background: loading ? 'var(--c-border)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: loading ? 'var(--c-muted)' : '#fff', fontSize: 14, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
                   {loading ? 'Creating...' : 'Create Hub 🎉'}
                 </button>

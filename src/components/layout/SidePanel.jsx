@@ -43,7 +43,6 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
           background:    'var(--c-card, #fff)',
           zIndex:        400,
           transition:    'left .25s ease',
-          overflowY:     'auto',
           boxShadow:     isOpen ? '6px 0 32px rgba(0,0,0,.18)' : 'none',
           display:       'flex',
           flexDirection: 'column',
@@ -58,10 +57,10 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
           alignItems: 'flex-start',
         }}>
           <div>
-            <p style={{ fontSize: 15, fontWeight: 900, color: '#fff', margin: '0 0 2px' }}>
+            <p style={{ fontSize: 16, fontWeight: 900, color: '#fff', margin: '0 0 2px' }}>
               {countLabel}
             </p>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', margin: 0, fontWeight: 600 }}>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,.65)', margin: 0, fontWeight: 600 }}>
               Tap a hub to switch
             </p>
           </div>
@@ -81,7 +80,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
         </div>
 
         {/* Centre list */}
-        <div style={{ flex: 1, padding: '10px 0' }}>
+        <div style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
           {centres.map(c => {
             const active  = c.id === activeCentreId;
             const hovered = hoveredRow === c.id && !active;
@@ -120,12 +119,12 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{
-                      fontSize: 13, fontWeight: 900, margin: '0 0 2px',
+                      fontSize: 14, fontWeight: 900, margin: '0 0 2px',
                       color: active ? 'var(--c-accent, #059669)' : 'var(--c-text, #1c1917)',
                     }}>
                       {c.name}
                     </p>
-                    <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
+                    <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
                       {c.currency}
                     </p>
                   </div>
@@ -150,10 +149,10 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
         </div>
 
         {/* Footer — create / upgrade */}
-        <div style={{ padding: '14px 16px 20px', borderTop: '1px solid var(--c-border, #e5e7eb)' }}>
+        <div style={{ padding: '14px 16px', paddingBottom: 'calc(20px + env(safe-area-inset-bottom))', borderTop: '1px solid var(--c-border, #e5e7eb)', flexShrink: 0 }}>
           {userPlan === 'free' ? (
             <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 12, padding: '12px 14px' }}>
-              <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', fontWeight: 700 }}>
+              <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', fontWeight: 700 }}>
                 Free plan · 1 hub included
               </p>
               <button
@@ -162,7 +161,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                   width: '100%', padding: '11px', borderRadius: 10,
                   border: '1.5px dashed var(--c-border, #e5e7eb)',
                   background: 'transparent', color: 'var(--c-muted, #9ca3af)',
-                  fontSize: 13, fontWeight: 700, cursor: 'not-allowed',
+                  fontSize: 14, fontWeight: 700, cursor: 'not-allowed',
                   fontFamily: "'Nunito', sans-serif",
                 }}
               >
@@ -170,7 +169,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
               </button>
             </div>
           ) : atProLimit ? (
-            <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0, fontWeight: 600, textAlign: 'center' }}>
+            <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0, fontWeight: 600, textAlign: 'center' }}>
               Maximum 10 hubs reached
             </p>
           ) : (
@@ -181,7 +180,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                 border: 'none',
                 background: 'var(--c-primary, #064e3b)',
                 color: '#fff',
-                fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                fontSize: 15, fontWeight: 800, cursor: 'pointer',
                 fontFamily: "'Nunito', sans-serif",
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               }}
