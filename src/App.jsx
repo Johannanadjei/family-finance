@@ -58,7 +58,7 @@ function ErrorScreen({ message }) {
 
 export default function App() {
   const { user, loading: authLoading }          = useAuth();
-  const { centre, categories, members,
+  const { centre, categories, members, addCategory,
           loading: centreLoading, needsOnboarding,
           error, onOnboardingComplete }          = useBudgetCentre(user);
   const { centres }                             = useCentres(user);
@@ -98,7 +98,7 @@ export default function App() {
 
   // ── Dashboard ─────────────────────────────────────────────────────────
   return (
-    <BudgetCentreProvider centre={centre} categories={categories} members={members}>
+    <BudgetCentreProvider centre={centre} categories={categories} members={members} addCategory={addCategory}>
       <FinanceProvider value={financeValues}>
       <BrowserRouter>
         <div style={{

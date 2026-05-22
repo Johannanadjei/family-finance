@@ -23,7 +23,7 @@ import { makeFmt, getCategoryIcon } from '../lib/finance';
 
 const BudgetCentreContext = createContext(null);
 
-export function BudgetCentreProvider({ centre, categories, members, children }) {
+export function BudgetCentreProvider({ centre, categories, members, addCategory, children }) {
   const fmt = useMemo(
     () => makeFmt(centre?.currency || 'GHS'),
     [centre?.currency]
@@ -38,9 +38,10 @@ export function BudgetCentreProvider({ centre, categories, members, children }) 
     centre,
     categories,
     members,
+    addCategory,
     fmt,
     getCatIcon,
-  }), [centre, categories, members, fmt, getCatIcon]);
+  }), [centre, categories, members, addCategory, fmt, getCatIcon]);
 
   return (
     <BudgetCentreContext.Provider value={value}>

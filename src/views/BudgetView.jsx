@@ -6,10 +6,12 @@
  * All data from FinanceContext and BudgetCentreContext — no new services.
  */
 
+import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { CategoryBudgetRow }      from './budget/CategoryBudgetRow';
+import { AddCategorySheet }       from './budget/AddCategorySheet';
 
 function BudgetViewSkeleton() {
   return (
@@ -33,7 +35,8 @@ function BudgetViewSkeleton() {
 }
 
 export function BudgetView() {
-  const { categories, fmt } = useBudgetCentreContext();
+  const { categories, fmt, addCategory } = useBudgetCentreContext();
+  const [sheetOpen, setSheetOpen] = useState(false);
   const { categorySpend, fixedTotal, fixedSpent, loading, error } = useFinanceContext();
 
   if (loading) return <BudgetViewSkeleton />;
@@ -97,6 +100,19 @@ export function BudgetView() {
           ))}
         </div>
       )}
+      {/* Add category button */}
+      <button
+        onClick={() => setSheetOpen(true)}
+        style={{ width: '100%', padding: '14px', borderRadius: 12, border: '2px dashed var(--c-primary, #064e3b)', background: 'transparent', color: 'var(--c-primary, #064e3b)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginBottom: 16 }}
+      >
+        + Add budget category
+      </button>
+
+      <AddCategorySheet
+        isOpen={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onAdd={addCategory}
+      />
     </div>
   );
 }
