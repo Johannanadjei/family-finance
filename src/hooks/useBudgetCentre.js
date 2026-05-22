@@ -17,7 +17,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase }                                                          from '../lib/supabase';
+import { addCategory as addCategoryService }                                  from '../services/categories.service';
 import { getCurrentMonth } from '../lib/finance';
 
 const fetchCentre = async () => {

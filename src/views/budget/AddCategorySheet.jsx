@@ -12,7 +12,6 @@
 
 import { useState, useEffect }    from 'react';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
-import { CATEGORY_ICONS }         from '../../features/onboarding/onboarding.constants';
 
 const inputStyle = {
   width: '100%', padding: '12px 14px', borderRadius: 10,
