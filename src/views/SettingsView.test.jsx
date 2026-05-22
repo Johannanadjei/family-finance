@@ -12,14 +12,21 @@ import { mockCentre, mockFmt, mockCategories, mockIncomes } from '../test-utils/
 const mockUpdateCentre       = vi.fn().mockResolvedValue({ error: null });
 const mockUpdateCategory     = vi.fn().mockResolvedValue({ error: null });
 const mockDeleteCategory     = vi.fn().mockResolvedValue({ error: null });
+const mockAddCategory        = vi.fn().mockResolvedValue({ error: null });
 const mockAddIncomeSource    = vi.fn().mockResolvedValue({ error: null });
 const mockDeleteIncomeSource = vi.fn().mockResolvedValue({ error: null });
+const mockSignOut            = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('../hooks/useAuth', () => ({
+  useAuth: () => ({ user: null, loading: false, signOut: mockSignOut }),
+}));
 
 vi.mock('../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({
     centre:         mockCentre,
     fmt:            mockFmt,
     categories:     mockCategories,
+    addCategory:    mockAddCategory,
     updateCentre:   mockUpdateCentre,
     updateCategory: mockUpdateCategory,
     deleteCategory: mockDeleteCategory,

@@ -1,29 +1,33 @@
 /**
  * views/SettingsView.jsx
  *
- * Settings screen — centre config, categories, income sources, theme.
- * Orchestrates sub-components; reads mutations from both contexts.
- * No Supabase calls here — all writes delegate to hooks via context.
+ * Settings screen — centre config, categories, income sources, theme, sign out.
+ * No Supabase calls — all writes delegate to hooks via context.
  */
 
-import { useState }                     from 'react';
-import { useNavigate }                  from 'react-router-dom';
-import { useBudgetCentreContext }        from '../context/BudgetCentreContext';
-import { useFinanceContext }             from '../context/FinanceContext';
-import { CentreSettingsSection }         from './settings/CentreSettingsSection';
-import { CategorySettingsRow }           from './settings/CategorySettingsRow';
-import { IncomeSourceRow }               from './settings/IncomeSourceRow';
-import { ThemeSection }                  from './settings/ThemeSection';
+import { useState }                   from 'react';
+import { useNavigate }                from 'react-router-dom';
+import { useBudgetCentreContext }      from '../context/BudgetCentreContext';
+import { useFinanceContext }           from '../context/FinanceContext';
+import { useAuth }                    from '../hooks/useAuth';
+import { getCurrentMonth }            from '../lib/finance';
+import { CentreSettingsSection }      from './settings/CentreSettingsSection';
+import { CategorySettingsRow }        from './settings/CategorySettingsRow';
+import { IncomeSourceRow }            from './settings/IncomeSourceRow';
+import { ThemeSection }               from './settings/ThemeSection';
+import { AddCategorySheet }           from './budget/AddCategorySheet';
 
-const card        = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
+const card         = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
 const sectionLabel = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 0.8 };
-const inputStyle  = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 14, fontWeight: 700, marginBottom: 6, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
+const inputStyle   = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 14, fontWeight: 700, marginBottom: 6, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
 
 export function SettingsView() {
   const navigate  = useNavigate();
-  const { categories, fmt, updateCategory, deleteCategory, centre } = useBudgetCentreContext();
-  const { incomes, loading, addIncomeSource, deleteIncomeSource }   = useFinanceContext();
+  const { signOut }                                                            = useAuth();
+  const { categories, fmt, addCategory, updateCategory, deleteCategory, centre } = useBudgetCentreContext();
+  const { incomes, loading, addIncomeSource, deleteIncomeSource }             = useFinanceContext();
 
+  const [addCatOpen,   setAddCatOpen]   = useState(false);
   const [addingSource, setAddingSource] = useState(false);
   const [newLabel,     setNewLabel]     = useState('');
   const [newAmount,    setNewAmount]    = useState('');
@@ -36,8 +40,11 @@ export function SettingsView() {
     const { error } = await addIncomeSource({
       label:           newLabel.trim(),
       expected_amount: Math.round(parseFloat(newAmount) || 0),
+      icon:            '💰',
       currency:        centre?.currency || 'GHS',
       pay_day_type:    'flexible',
+      pay_day:         null,
+      month:           getCurrentMonth(),
     });
     setSavingSource(false);
     if (error) { setAddError('Could not save. Please try again.'); return; }
@@ -66,18 +73,19 @@ export function SettingsView() {
 
       {/* Budget Categories */}
       <div style={card}>
-        <p style={sectionLabel}>Budget Categories</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <p style={{ ...sectionLabel, margin: 0 }}>Budget Categories</p>
+          <button onClick={() => setAddCatOpen(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}>
+            + Add
+          </button>
+        </div>
         {categories.length === 0
           ? <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0 }}>No categories this month</p>
           : categories.map((cat, i) => (
-              <CategorySettingsRow
-                key={cat.id}
-                cat={cat}
-                fmt={fmt}
-                onUpdate={updateCategory}
-                onDelete={deleteCategory}
-                isLast={i === categories.length - 1}
-              />
+              <CategorySettingsRow key={cat.id} cat={cat} fmt={fmt}
+                onUpdate={updateCategory} onDelete={deleteCategory}
+                isLast={i === categories.length - 1} />
             ))
         }
       </div>
@@ -86,20 +94,20 @@ export function SettingsView() {
       <div style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <p style={{ ...sectionLabel, margin: 0 }}>Income Sources</p>
-          <button
-            data-testid="add-income-source-btn"
+          <button data-testid="add-income-source-btn"
             onClick={() => { setAddingSource(v => !v); setAddError(null); }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}
-          >
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}>
             {addingSource ? 'Cancel' : '+ Add'}
           </button>
         </div>
 
         {addingSource && (
           <div style={{ marginBottom: 12 }}>
-            <input data-testid="new-source-label" value={newLabel} onChange={e => { setNewLabel(e.target.value); setAddError(null); }}
+            <input data-testid="new-source-label" value={newLabel}
+              onChange={e => { setNewLabel(e.target.value); setAddError(null); }}
               placeholder="e.g. Freelance, Side Business" style={inputStyle} />
-            <input data-testid="new-source-amount" type="number" value={newAmount} onChange={e => setNewAmount(e.target.value)}
+            <input data-testid="new-source-amount" type="number" value={newAmount}
+              onChange={e => setNewAmount(e.target.value)}
               placeholder="Expected amount (optional)" style={inputStyle} />
             {addError && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 6px', fontWeight: 700 }}>{addError}</p>}
             <button data-testid="save-income-source-btn" onClick={handleAddSource} disabled={savingSource}
@@ -114,13 +122,8 @@ export function SettingsView() {
           : incomes.length === 0
             ? <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0 }}>No income sources yet</p>
             : incomes.map((src, i) => (
-                <IncomeSourceRow
-                  key={src.id}
-                  source={src}
-                  fmt={fmt}
-                  onDelete={deleteIncomeSource}
-                  isLast={i === incomes.length - 1}
-                />
+                <IncomeSourceRow key={src.id} source={src} fmt={fmt}
+                  onDelete={deleteIncomeSource} isLast={i === incomes.length - 1} />
               ))
         }
       </div>
@@ -128,6 +131,15 @@ export function SettingsView() {
       {/* Theme */}
       <ThemeSection />
 
+      {/* Sign Out */}
+      <div style={card}>
+        <button onClick={signOut}
+          style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--c-danger, #dc2626)', background: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-danger, #dc2626)', fontFamily: "'Nunito', sans-serif" }}>
+          Sign Out
+        </button>
+      </div>
+
+      <AddCategorySheet isOpen={addCatOpen} onClose={() => setAddCatOpen(false)} onAdd={addCategory} />
     </div>
   );
 }
