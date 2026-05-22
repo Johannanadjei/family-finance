@@ -36,6 +36,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
   const [description,  setDescription]  = useState('');
   const [date,         setDate]         = useState('');
   const [loading,      setLoading]      = useState(false);
+  const [saved,        setSaved]        = useState(false);
   const [error,        setError]        = useState(null);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
       setDescription(editTx?.description || '');
       setDate(editTx?.date || new Date().toISOString().split('T')[0]);
       setError(null);
+      setSaved(false);
     }
   }, [isOpen, editTx?.id]);
 
@@ -94,9 +96,15 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
       savedTx = result.data;
     }
 
-    if (err) { setError('Could not save transaction. Please try again.'); }
-    else     { if (onSaved) onSaved(savedTx || { type, category_name: finalCategory }); onClose(); }
-    setLoading(false);
+    if (err) {
+      setError('Could not save transaction. Please try again.');
+      setLoading(false);
+    } else {
+      setSaved(true);
+      setLoading(false);
+      if (onSaved) onSaved(savedTx || { type, category_name: finalCategory });
+      setTimeout(onClose, 600);
+    }
   };
 
   return (
@@ -167,7 +175,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
             <button onClick={onClose} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-muted, #6b7280)', fontFamily: "'Nunito', sans-serif" }}>Cancel</button>
-            <button onClick={handleSubmit} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: 'none', background: loading ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: loading ? 'var(--c-muted, #9ca3af)' : '#fff', fontSize: 14, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>{loading ? 'Saving...' : editTx ? 'Save Changes' : 'Save'}</button>
+            <button onClick={handleSubmit} disabled={loading || saved} style={{ padding: '14px', borderRadius: 12, border: 'none', background: loading ? 'var(--c-border, #e5e7eb)' : saved ? 'var(--c-success, #059669)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: loading ? 'var(--c-muted, #9ca3af)' : '#fff', fontSize: 14, fontWeight: 800, cursor: loading || saved ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif", transition: 'background .2s' }}>{loading ? 'Saving...' : saved ? '✓ Saved' : editTx ? 'Save Changes' : 'Save'}</button>
           </div>
         </div>
       </div>

@@ -62,7 +62,7 @@ describe('LogView', () => {
   it('shows empty state when no transactions', () => {
     mockFinance.txs = [];
     renderView();
-    expect(screen.getByText(/No transactions/)).toBeTruthy();
+    expect(screen.getByText(/Nothing logged yet/)).toBeTruthy();
     mockFinance.txs = mockTxs;
   });
 

@@ -102,6 +102,7 @@ describe('AddTransactionSheet', () => {
   });
 
   it('calls addTransaction and closes on valid submit', async () => {
+    vi.useFakeTimers();
     const onClose = vi.fn();
     renderSheet({ onClose });
     await act(async () => {
@@ -110,7 +111,9 @@ describe('AddTransactionSheet', () => {
     await act(async () => { screen.getByText(/Groceries/).click(); });
     await act(async () => { screen.getByText('Save').click(); });
     expect(mockAddTransaction).toHaveBeenCalled();
+    await act(async () => { vi.runAllTimers(); });
     expect(onClose).toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('calls onSaved with transaction when save succeeds', async () => {

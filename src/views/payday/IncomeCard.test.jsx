@@ -82,7 +82,7 @@ describe('IncomeCard', () => {
 
   it('disables buttons when disabled prop is true', () => {
     renderCard({ disabled: true });
-    expect(screen.getByText('Confirm Received').disabled).toBe(true);
+    expect(screen.getByText('Confirming…').disabled).toBe(true);
   });
 
   it('shows edit pencil button on expected amount', () => {

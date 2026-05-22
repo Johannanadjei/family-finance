@@ -94,21 +94,28 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
               >✕</button>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <p data-testid={`income-expected-${income.id}`} style={{ fontSize: 18, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
-                {fmt(income.expected_amount)}
-              </p>
-              <button
-                aria-label="Edit expected amount"
-                onClick={handleEditOpen}
-                disabled={disabled}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted, #9ca3af)', padding: '2px 4px', display: 'flex', alignItems: 'center' }}
-              >
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                  <path d="M9 1.5 11.5 4 4.5 11H2v-2.5L9 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <p data-testid={`income-expected-${income.id}`} style={{ fontSize: 18, fontWeight: 900, color: income.expected_amount === 0 ? 'var(--c-muted, #9ca3af)' : 'var(--c-text, #1c1917)', margin: 0 }}>
+                  {fmt(income.expected_amount)}
+                </p>
+                <button
+                  aria-label="Edit expected amount"
+                  onClick={handleEditOpen}
+                  disabled={disabled}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: income.expected_amount === 0 ? 'var(--c-warning, #d97706)' : 'var(--c-muted, #9ca3af)', padding: '2px 4px', display: 'flex', alignItems: 'center', animation: income.expected_amount === 0 ? 'pulse 1.6s ease-in-out infinite' : 'none' }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                    <path d="M9 1.5 11.5 4 4.5 11H2v-2.5L9 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+              {income.expected_amount === 0 && (
+                <p style={{ fontSize: 11, color: 'var(--c-warning, #d97706)', margin: '4px 0 0', fontWeight: 600 }}>
+                  Tap ✏ to set your expected amount
+                </p>
+              )}
+            </>
           )}
         </div>
         {income.received && (
@@ -137,12 +144,12 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
           onMouseLeave={() => setHoveredPending(false)}
           style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: hoveredPending && !disabled ? 'var(--c-input-bg, #f9fafb)' : '#fff', color: 'var(--c-muted, #6b7280)', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1, fontFamily: "'Nunito', sans-serif", transition: 'background .15s' }}
         >
-          Mark as Pending
+          {disabled ? 'Updating…' : 'Mark as Pending'}
         </button>
       ) : (
         <button onClick={() => onConfirm(income)} disabled={disabled}
           style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: disabled ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: disabled ? 'var(--c-muted, #9ca3af)' : '#fff', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
-          Confirm Received
+          {disabled ? 'Confirming…' : 'Confirm Received'}
         </button>
       )}
     </div>

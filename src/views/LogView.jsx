@@ -104,11 +104,31 @@ export function LogView({ onEditTx }) {
 
       {/* Transaction list */}
       {dates.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-          <p style={{ fontSize: 32, margin: '0 0 8px' }}>📭</p>
-          <p style={{ fontSize: 14, color: 'var(--c-muted, #9ca3af)', fontWeight: 700 }}>
-            {search ? `No transactions matching "${search}"` : 'No transactions this month.'}
-          </p>
+        <div style={{ textAlign: 'center', padding: '56px 24px 48px' }}>
+          {txs.length === 0 ? (
+            <>
+              <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true" style={{ margin: '0 auto 16px', display: 'block', opacity: 0.3 }}>
+                <rect x="12" y="8" width="40" height="50" rx="4" stroke="var(--c-primary, #064e3b)" strokeWidth="2.5"/>
+                <path d="M20 22h24M20 30h24M20 38h16" stroke="var(--c-primary, #064e3b)" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              <p style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 6px' }}>Nothing logged yet</p>
+              {isCurrentMonth && (
+                <p style={{ fontSize: 13, color: 'var(--c-muted, #9ca3af)', margin: 0, fontWeight: 600 }}>Tap + to log your first transaction</p>
+              )}
+            </>
+          ) : (
+            <>
+              <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true" style={{ margin: '0 auto 16px', display: 'block', opacity: 0.3 }}>
+                <circle cx="28" cy="28" r="16" stroke="var(--c-primary, #064e3b)" strokeWidth="2.5"/>
+                <path d="M40 40l10 10" stroke="var(--c-primary, #064e3b)" strokeWidth="2.5" strokeLinecap="round"/>
+                <path d="M22 28h12M28 22v12" stroke="var(--c-primary, #064e3b)" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
+              </svg>
+              <p style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 6px' }}>No results found</p>
+              <p style={{ fontSize: 13, color: 'var(--c-muted, #9ca3af)', margin: 0, fontWeight: 600 }}>
+                {search ? `No transactions matching "${search}"` : `No ${filter} transactions this month`}
+              </p>
+            </>
+          )}
         </div>
       ) : (
         dates.map(date => (
@@ -124,6 +144,7 @@ export function LogView({ onEditTx }) {
                   fmt={fmt}
                   onDelete={handleDelete}
                   disabled={deletingId === tx.id || !isCurrentMonth}
+                  deleting={deletingId === tx.id}
                   isLast={idx === grouped[date].length - 1}
                 />
               ))}

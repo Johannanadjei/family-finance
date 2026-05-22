@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 
-export function TransactionRow({ tx, fmt, onDelete, disabled, isLast }) {
+export function TransactionRow({ tx, fmt, onDelete, disabled, deleting, isLast }) {
   const [hoveredDelete, setHoveredDelete] = useState(false);
   const isIncome   = tx.type === 'income';
   const isDisabled = disabled || tx._optimistic === true;
@@ -25,7 +25,8 @@ export function TransactionRow({ tx, fmt, onDelete, disabled, isLast }) {
       justifyContent: 'space-between',
       padding:        '12px 0',
       borderBottom:   isLast ? 'none' : '1px solid var(--c-border, #e5e7eb)',
-      opacity:        tx._optimistic ? 0.6 : 1,
+      opacity:        deleting ? 0.4 : tx._optimistic ? 0.6 : 1,
+      transition:     'opacity .2s',
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--c-text, #1c1917)', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -74,9 +75,15 @@ export function TransactionRow({ tx, fmt, onDelete, disabled, isLast }) {
             transition:   'color .15s',
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          {deleting ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ animation: 'spin 0.7s linear infinite' }}>
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="40 20" strokeLinecap="round"/>
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          )}
         </button>
       </div>
     </div>
