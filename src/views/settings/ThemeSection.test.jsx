@@ -18,9 +18,6 @@ vi.mock('../../context/FinanceContext', () => ({
   }),
 }));
 
-vi.mock('../../lib/themes', () => ({
-  applyTheme: vi.fn(),
-}));
 
 describe('ThemeSection', () => {
   beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUserPlan = 'free'; });
