@@ -39,7 +39,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
             ? 'max(0px, calc(50vw - 220px))'
             : 'calc(max(0px, calc(50vw - 220px)) - 290px)',
           width:         290,
-          height:        '100vh',
+          height:        '100dvh',
           background:    'var(--c-card, #fff)',
           zIndex:        400,
           transition:    'left .25s ease',
@@ -149,7 +149,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
         </div>
 
         {/* Footer — create / upgrade */}
-        <div style={{ padding: '14px 16px', paddingBottom: 'calc(20px + env(safe-area-inset-bottom))', borderTop: '1px solid var(--c-border, #e5e7eb)', flexShrink: 0 }}>
+        <div style={{ padding: '16px 16px calc(16px + env(safe-area-inset-bottom, 20px))', borderTop: '1px solid var(--c-border, #e5e7eb)', flexShrink: 0 }}>
           {userPlan === 'free' ? (
             <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 12, padding: '12px 14px' }}>
               <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', fontWeight: 700 }}>
