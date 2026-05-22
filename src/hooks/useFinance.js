@@ -73,6 +73,10 @@ export function useFinance({ centre, categories }) {
 
     setLoading(true);
     setError(null);
+    // Clear stale data immediately — prevents previous hub's data bleeding in
+    // during the async fetch when the user switches control centres.
+    setTxs([]);
+    setIncomes([]);
 
     const [txResult, incomeResult] = await Promise.all([
       loadTxs(month),

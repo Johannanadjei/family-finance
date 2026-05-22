@@ -14,9 +14,10 @@
  */
 
 const KEYS = {
-  THEME_SKIN:    'ffc_theme_skin',
-  THEME_ACCENT:  'ffc_theme_accent',
-  NOTIFICATIONS: 'ffc_notifications',
+  THEME_SKIN:       'ffc_theme_skin',
+  THEME_ACCENT:     'ffc_theme_accent',
+  NOTIFICATIONS:    'ffc_notifications',
+  ACTIVE_CENTRE_ID: 'ffc_active_centre_id',
 };
 
 const DEFAULT_PREFS = {
@@ -75,11 +76,17 @@ export const saveThemeAccent = (accent) => persist(KEYS.THEME_ACCENT, accent);
 /** Save notification preferences */
 export const saveNotifications = (notifs) => persist(KEYS.NOTIFICATIONS, notifs);
 
+/** Save / load / clear the active budget centre ID */
+export const saveActiveCentreId = (id) => persist(KEYS.ACTIVE_CENTRE_ID, id);
+export const loadActiveCentreId = ()   => load(KEYS.ACTIVE_CENTRE_ID);
+export const clearActiveCentreId = ()  => remove(KEYS.ACTIVE_CENTRE_ID);
+
 /** Clear all UI preferences — used on sign out */
 export const clearPrefs = () => {
   remove(KEYS.THEME_SKIN);
   remove(KEYS.THEME_ACCENT);
   remove(KEYS.NOTIFICATIONS);
+  remove(KEYS.ACTIVE_CENTRE_ID);
 };
 
 export { DEFAULT_PREFS };

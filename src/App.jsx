@@ -2,40 +2,46 @@
  * App.jsx
  *
  * Root component — auth gate + onboarding gate + dashboard.
- * Applies theme CSS variables on mount and when prefs change.
+ * Applies theme CSS variables on mount and when prefs or active centre change.
  * Provides routing via BrowserRouter.
  *
  * DashboardShell lives inside BrowserRouter so it has access to useNavigate.
  * All UI state (panel, sheet, toast) is owned by DashboardShell.
+ *
+ * MULTI-CENTRE:
+ *   activeCentreId is stored in localStorage (ffc_active_centre_id).
+ *   handleSwitchCentre updates state + storage, which re-drives useBudgetCentre.
+ *   Theme applies centre.skin_id first, falling back to global pref.
  */
 
-import { useState, useEffect }              from 'react';
+import { useState, useEffect, useCallback }      from 'react';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
-import { useAuth }                          from './hooks/useAuth';
-import { useBudgetCentre }                  from './hooks/useBudgetCentre';
-import { useCentres }                       from './hooks/useCentres';
-import { useFinance }                       from './hooks/useFinance';
-import { BudgetCentreProvider }             from './context/BudgetCentreContext';
-import { FinanceProvider }                  from './context/FinanceContext';
-import { useBudgetCentreContext }           from './context/BudgetCentreContext';
-import { useFinanceContext }                from './context/FinanceContext';
-import { applyTheme }                       from './lib/themes';
-import { AuthScreen }                       from './views/AuthScreen';
-import { OnboardingFlow }                   from './features/onboarding/OnboardingFlow';
-import { Header }                           from './components/layout/Header';
-import { BottomNav }                        from './components/layout/BottomNav';
-import { FAB }                              from './components/layout/FAB';
-import { SidePanel }                        from './components/layout/SidePanel';
-import { ErrorBoundary }                    from './components/ui/ErrorBoundary';
-import { HomeView }                         from './views/HomeView';
-import { PaydayView }                       from './views/PaydayView';
-import { DailyView }                        from './views/DailyView';
-import { BudgetView }                       from './views/BudgetView';
-import { LogView }                          from './views/LogView';
-import { AddTransactionSheet }              from './views/daily/AddTransactionSheet';
-import { SettingsView }                     from './views/SettingsView';
-import { Toast }                            from './components/ui/Toast';
-import { isKnownCategory }                  from './lib/finance';
+import { useAuth }                               from './hooks/useAuth';
+import { useBudgetCentre }                       from './hooks/useBudgetCentre';
+import { useCentres }                            from './hooks/useCentres';
+import { useFinance }                            from './hooks/useFinance';
+import { BudgetCentreProvider }                  from './context/BudgetCentreContext';
+import { FinanceProvider }                       from './context/FinanceContext';
+import { useBudgetCentreContext }                from './context/BudgetCentreContext';
+import { useFinanceContext }                     from './context/FinanceContext';
+import { applyTheme }                            from './lib/themes';
+import { loadActiveCentreId, saveActiveCentreId } from './lib/storage';
+import { AuthScreen }                            from './views/AuthScreen';
+import { OnboardingFlow }                        from './features/onboarding/OnboardingFlow';
+import { Header }                                from './components/layout/Header';
+import { BottomNav }                             from './components/layout/BottomNav';
+import { FAB }                                   from './components/layout/FAB';
+import { SidePanel }                             from './components/layout/SidePanel';
+import { ErrorBoundary }                         from './components/ui/ErrorBoundary';
+import { HomeView }                              from './views/HomeView';
+import { PaydayView }                            from './views/PaydayView';
+import { DailyView }                             from './views/DailyView';
+import { BudgetView }                            from './views/BudgetView';
+import { LogView }                               from './views/LogView';
+import { AddTransactionSheet }                   from './views/daily/AddTransactionSheet';
+import { SettingsView }                          from './views/SettingsView';
+import { Toast }                                 from './components/ui/Toast';
+import { isKnownCategory }                       from './lib/finance';
 
 function LoadingScreen({ message }) {
   return (
@@ -55,7 +61,7 @@ function ErrorScreen({ message }) {
   );
 }
 
-function DashboardShell({ centres, activeCentreId }) {
+function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre }) {
   const navigate                        = useNavigate();
   const { categories }                  = useBudgetCentreContext();
   const { incomes, loading }            = useFinanceContext();
@@ -90,10 +96,10 @@ function DashboardShell({ centres, activeCentreId }) {
       <ErrorBoundary>
         <main style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
           <Routes>
-            <Route path="/"        element={<HomeView />} />
-            <Route path="/payday"  element={<PaydayView />} />
-            <Route path="/daily"   element={<DailyView />} />
-            <Route path="/budget"  element={<BudgetView />} />
+            <Route path="/"         element={<HomeView />} />
+            <Route path="/payday"   element={<PaydayView />} />
+            <Route path="/daily"    element={<DailyView />} />
+            <Route path="/budget"   element={<BudgetView />} />
             <Route path="/log"      element={<LogView onEditTx={(tx) => { setEditTx(tx); setAddSheetOpen(true); }} />} />
             <Route path="/settings" element={<SettingsView />} />
           </Routes>
@@ -127,29 +133,47 @@ function DashboardShell({ centres, activeCentreId }) {
         onClose={() => setPanelOpen(false)}
         centres={centres}
         activeCentreId={activeCentreId}
+        onSwitch={onSwitchCentre}
+        onCreateHub={() => {}}
+        userPlan={userPlan}
       />
     </div>
   );
 }
 
 export default function App() {
-  const { user, loading: authLoading }          = useAuth();
+  const { user, loading: authLoading }                    = useAuth();
+  const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
+  const { centres, plan: userPlan }                       = useCentres(user);
   const { centre, categories, members, addCategory,
           updateCentre, updateCategory, deleteCategory,
           loading: centreLoading, needsOnboarding,
-          error, onOnboardingComplete }          = useBudgetCentre(user);
-  const { centres }                             = useCentres(user);
-  const financeValues                           = useFinance({ centre, categories });
+          error, onOnboardingComplete }                   = useBudgetCentre(user, activeCentreId);
+  const financeValues                                     = useFinance({ centre, categories });
 
+  // Persist the active centre ID once the first centre resolves
   useEffect(() => {
-    applyTheme(financeValues.prefs?.themeSkin || 'family_warmth');
-  }, [financeValues.prefs?.themeSkin]);
+    if (centre?.id && !activeCentreId) {
+      saveActiveCentreId(centre.id);
+      setActiveCentreId(centre.id);
+    }
+  }, [centre?.id, activeCentreId]);
 
-  // ── Auth gate ─────────────────────────────────────────────────────────
+  // Apply theme — per-centre skin takes priority over global pref
+  useEffect(() => {
+    applyTheme(centre?.skin_id || financeValues.prefs?.themeSkin || 'family_warmth');
+  }, [centre?.skin_id, financeValues.prefs?.themeSkin]);
+
+  const handleSwitchCentre = useCallback((id) => {
+    saveActiveCentreId(id);
+    setActiveCentreId(id);
+  }, []);
+
+  // ── Auth gate ─────────────────────────────────────────────────────────────
   if (authLoading)     return <LoadingScreen message="Loading..." />;
   if (!user)           return <AuthScreen />;
 
-  // ── Centre gate ───────────────────────────────────────────────────────
+  // ── Centre gate ───────────────────────────────────────────────────────────
   if (centreLoading)   return <LoadingScreen message="Setting up your dashboard..." />;
   if (error)           return <ErrorScreen message={error} />;
   if (needsOnboarding) return (
@@ -159,14 +183,24 @@ export default function App() {
     />
   );
 
-  // ── Dashboard ─────────────────────────────────────────────────────────
+  // ── Dashboard ─────────────────────────────────────────────────────────────
   return (
-    <BudgetCentreProvider centre={centre} categories={categories} members={members} addCategory={addCategory} updateCentre={updateCentre} updateCategory={updateCategory} deleteCategory={deleteCategory}>
+    <BudgetCentreProvider
+      centre={centre}
+      categories={categories}
+      members={members}
+      addCategory={addCategory}
+      updateCentre={updateCentre}
+      updateCategory={updateCategory}
+      deleteCategory={deleteCategory}
+    >
       <FinanceProvider value={financeValues}>
         <BrowserRouter>
           <DashboardShell
             centres={centres}
             activeCentreId={centre?.id || null}
+            userPlan={userPlan}
+            onSwitchCentre={handleSwitchCentre}
           />
         </BrowserRouter>
       </FinanceProvider>

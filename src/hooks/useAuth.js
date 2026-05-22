@@ -10,7 +10,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase }            from '../lib/supabase';
+import { clearPrefs }          from '../lib/storage';
 
 export function useAuth() {
   const [user,    setUser]    = useState(null);
@@ -35,6 +36,7 @@ export function useAuth() {
   }, []);
 
   const signOut = async () => {
+    clearPrefs();
     await supabase.auth.signOut();
   };
 

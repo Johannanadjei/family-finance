@@ -1,28 +1,34 @@
 /**
- * useBudgetCentre.js
+ * hooks/useBudgetCentre.js
  *
  * Loads the active budget centre, its categories, and its members from Supabase.
- * This is the entry point for all centre-specific data.
+ * Accepts an explicit centreId for hub switching; falls back to first centre if absent.
  *
  * STATE MACHINE:
  *   loading         → fetching from Supabase
- *   needsOnboarding → user has no budget centres yet
+ *   needsOnboarding → user has no budget centres at all (first-time user)
  *   ready           → centre + categories + members loaded
  *   error           → fetch failed
  *
- * ARCHITECTURE:
- *   - centre + categories + members passed to BudgetCentreProvider in App.jsx
- *   - useFinance receives the full centre object
- *   - Supabase is the only source — no localStorage, no constants
+ * CENTRE RESOLUTION:
+ *   centreId provided → getCentreById(centreId); if null, falls back to first
+ *   centreId absent   → first centre (existing behaviour, resume detection active)
+ *
+ * needsOnboarding fires ONLY when no centre is found at all.
+ * An empty hub (centre with no categories) shows an empty state — NOT onboarding.
+ * Resume detection (partial first-write recovery) applies only on initial load
+ * when no centreId is provided.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase }                          from '../lib/supabase';
+import { getCentreById, updateCentre as updateCentreService } from '../services/centres.service';
 import { addCategory as addCategoryService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
-import { updateCentre as updateCentreService } from '../services/centres.service';
 import { getCurrentMonth } from '../lib/finance';
 
-const fetchCentre = async () => {
+// ── Local Supabase helpers ────────────────────────────────────────────────────
+
+const fetchFirstCentre = async () => {
   const { data, error } = await supabase
     .from('budget_centres')
     .select('*')
@@ -53,7 +59,9 @@ const fetchMembers = async (centreId) => {
   return { data: data || [], error };
 };
 
-export function useBudgetCentre(user) {
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
+export function useBudgetCentre(user, centreId) {
   const [centre,          setCentre]          = useState(null);
   const [categories,      setCategories]      = useState([]);
   const [members,         setMembers]         = useState([]);
@@ -74,7 +82,30 @@ export function useBudgetCentre(user) {
     setLoading(true);
     setError(null);
 
-    const { data: centreData, error: centreErr } = await fetchCentre();
+    // Resolve the centre to load
+    let centreData, centreErr;
+
+    if (centreId) {
+      // Explicit hub switch — load by ID, fall back to first if stale/deleted
+      const result = await getCentreById(centreId);
+      if (result.error) {
+        centreData = null;
+        centreErr  = result.error;
+      } else if (!result.data) {
+        // Saved ID no longer valid — fall back gracefully
+        const fallback = await fetchFirstCentre();
+        centreData = fallback.data;
+        centreErr  = fallback.error;
+      } else {
+        centreData = result.data;
+        centreErr  = null;
+      }
+    } else {
+      // Initial load — first available centre
+      const result = await fetchFirstCentre();
+      centreData = result.data;
+      centreErr  = result.error;
+    }
 
     if (centreErr) {
       console.error('[useBudgetCentre] centre fetch error:', centreErr.message);
@@ -84,6 +115,7 @@ export function useBudgetCentre(user) {
     }
 
     if (!centreData) {
+      // No centres exist — first-time user needs onboarding
       setNeedsOnboarding(true);
       setCentre(null);
       setCategories([]);
@@ -92,22 +124,17 @@ export function useBudgetCentre(user) {
       return;
     }
 
-    // Resume detection — centre exists but has no categories for current month
-    // This happens if a previous onboarding write partially failed
     const [catResult, memberResult] = await Promise.all([
       fetchCategories(centreData.id),
       fetchMembers(centreData.id),
     ]);
 
-    if (catResult.error) {
-      console.error('[useBudgetCentre] categories fetch error:', catResult.error.message);
-    }
-    if (memberResult.error) {
-      console.error('[useBudgetCentre] members fetch error:', memberResult.error.message);
-    }
+    if (catResult.error)    console.error('[useBudgetCentre] categories fetch error:', catResult.error.message);
+    if (memberResult.error) console.error('[useBudgetCentre] members fetch error:', memberResult.error.message);
 
-    if (catResult.data.length === 0) {
-      // Centre exists but no categories — resume onboarding
+    // Resume detection: only on initial load (no centreId).
+    // First centre has no categories → partial onboarding write — resume.
+    if (!centreId && catResult.data.length === 0) {
       setNeedsOnboarding(true);
       setCentre(centreData);
       setCategories([]);
@@ -121,9 +148,7 @@ export function useBudgetCentre(user) {
     setMembers(memberResult.data);
     setNeedsOnboarding(false);
     setLoading(false);
-  }, [user]);
-
-
+  }, [user, centreId]);
 
   useEffect(() => {
     load();
@@ -132,6 +157,8 @@ export function useBudgetCentre(user) {
   const onOnboardingComplete = useCallback(() => {
     load();
   }, [load]);
+
+  // ── Mutations ─────────────────────────────────────────────────────────────
 
   const addCategory = async (category) => {
     const id = centre?.id;
@@ -184,7 +211,7 @@ export function useBudgetCentre(user) {
 
   return {
     centre,
-    centreId:       centre?.id   || null,
+    centreId:       centre?.id || null,
     categories,
     members,
     loading,

@@ -144,6 +144,27 @@ export const deleteCentre = async (centreId) => {
   return { error };
 };
 
+/**
+ * Fetch the current user's plan tier.
+ * Returns 'free' as a safe default on any error.
+ */
+export const getUserPlan = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: 'free', error: null };
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('plan')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[centres.service] getUserPlan error:', error.message);
+    return { data: 'free', error };
+  }
+  return { data: data?.plan || 'free', error: null };
+};
+
 // ── Budget Centre Members ─────────────────────────────────────────────────────
 
 /**
