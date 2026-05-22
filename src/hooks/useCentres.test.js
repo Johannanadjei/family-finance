@@ -38,10 +38,11 @@ describe('useCentres', () => {
     expect(result.current.error).toBe('fetch failed');
   });
 
-  it('starts in loading state', () => {
+  it('starts in loading state', async () => {
     getCentres.mockResolvedValue({ data: [], error: null });
     const { result } = renderHook(() => useCentres(mockUser));
     expect(result.current.loading).toBe(true);
+    await waitFor(() => expect(result.current.loading).toBe(false));
   });
 
   it('exposes reload function', async () => {
