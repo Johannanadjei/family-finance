@@ -15,9 +15,10 @@ const VALID_TYPES      = ['income', 'expense'];
  * Must be a positive finite number.
  */
 export const validateAmount = (amount) => {
+  if (amount === null || amount === undefined) throw new Error('Amount must be a number');
   const n = Number(amount);
   if (!Number.isFinite(n)) throw new Error('Amount must be a number');
-  if (n <= 0)              throw new Error('Amount must be greater than zero');
+  if (n < 0)               throw new Error('Amount must be zero or greater');
   return Math.round(n);
 };
 

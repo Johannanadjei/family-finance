@@ -34,16 +34,16 @@ describe('validateAmount', () => {
     expect(validateAmount('250')).toBe(250));
 
   it('throws for zero', () =>
-    expect(() => validateAmount(0)).toThrow('greater than zero'));
+    expect(validateAmount(0)).toBe(0));
 
   it('throws for negative', () =>
-    expect(() => validateAmount(-100)).toThrow('greater than zero'));
+    expect(() => validateAmount(-100)).toThrow('zero or greater'));
 
   it('throws for NaN', () =>
     expect(() => validateAmount('abc')).toThrow('must be a number'));
 
   it('throws for null', () =>
-    expect(() => validateAmount(null)).toThrow('greater than zero'));
+    expect(() => validateAmount(null)).toThrow('Amount must be a number'));
 
   it('throws for undefined', () =>
     expect(() => validateAmount(undefined)).toThrow('must be a number'));
@@ -205,8 +205,8 @@ describe('validateTransaction', () => {
   it('throws for invalid week', () =>
     expect(() => validateTransaction({ ...validTx, week: 'Week 6' })).toThrow());
 
-  it('throws for zero amount', () =>
-    expect(() => validateTransaction({ ...validTx, amount: 0 })).toThrow());
+  it('accepts zero amount', () =>
+    expect(() => validateTransaction({ ...validTx, amount: 0 })).not.toThrow());
 
   it('throws for invalid currency', () =>
     expect(() => validateTransaction({ ...validTx, currency: 'XYZ' })).toThrow());
