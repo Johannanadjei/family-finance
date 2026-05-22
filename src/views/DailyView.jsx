@@ -24,7 +24,7 @@ const formatDate = (dateStr) =>
 
 function DailyViewSkeleton() {
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '16px' }}>
       <Skeleton width="50%" height={14} borderRadius={6} />
       <div style={{ marginTop: 12 }}><Skeleton width="100%" height={48} borderRadius={10} /></div>
       {[0, 1, 2].map(i => (
@@ -60,7 +60,7 @@ export function DailyView() {
   };
 
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '16px' }}>
 
       {/* Month navigation */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>

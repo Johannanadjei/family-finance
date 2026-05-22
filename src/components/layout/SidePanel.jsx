@@ -11,10 +11,12 @@
  * @param {string|null}   activeCentreId
  */
 
+import { useState }               from 'react';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 
 export function SidePanel({ isOpen, onClose, centres, activeCentreId }) {
   const { fmt } = useBudgetCentreContext();
+  const [hoveredClose, setHoveredClose] = useState(false);
 
   return (
     <>
@@ -53,7 +55,17 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId }) {
         {/* Header */}
         <div style={{ padding: '20px 20px 12px', background: 'linear-gradient(135deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ fontSize: 14, fontWeight: 900, color: '#fff', margin: 0 }}>Budget Centres</p>
-          <button onClick={onClose} aria-label="Close panel" style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.8)', fontSize: 20, cursor: 'pointer', padding: 0 }}>✕</button>
+          <button
+            onClick={onClose}
+            aria-label="Close panel"
+            onMouseEnter={() => setHoveredClose(true)}
+            onMouseLeave={() => setHoveredClose(false)}
+            style={{ background: hoveredClose ? 'rgba(255,255,255,.15)' : 'none', border: 'none', borderRadius: 8, color: 'rgba(255,255,255,.8)', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center', transition: 'background .15s' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+          </button>
         </div>
 
         {/* Centre list */}

@@ -62,7 +62,7 @@ export function Header({ onOpenPanel }) {
             fontSize:   16,
             fontWeight: 900,
             margin:     0,
-            color:      noIncome ? 'rgba(255,255,255,.5)' : isNegative ? '#fca5a5' : '#6ee7b7',
+            color:      noIncome ? 'rgba(255,255,255,.5)' : isNegative ? 'var(--c-danger-light, #fca5a5)' : 'var(--c-success-light, #6ee7b7)',
           }}>
             {fmt(availableNow)}
           </p>
@@ -73,9 +73,13 @@ export function Header({ onOpenPanel }) {
           <div
             title="Confirm income received in the Payday screen to see it reflected here"
             aria-label="No income confirmed yet"
-            style={{ fontSize: 14, color: 'rgba(255,255,255,.6)', cursor: 'help' }}
+            style={{ color: 'rgba(255,255,255,.6)', cursor: 'help', display: 'flex', alignItems: 'center' }}
           >
-            ℹ️
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/>
+              <rect x="6.25" y="6" width="1.5" height="4" rx=".75" fill="currentColor"/>
+              <circle cx="7" cy="4.5" r=".75" fill="currentColor"/>
+            </svg>
           </div>
         )}
 
@@ -83,9 +87,12 @@ export function Header({ onOpenPanel }) {
         <button
           onClick={() => navigate('/settings')}
           aria-label="Open settings"
-          style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'rgba(255,255,255,.8)', padding: 0 }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.8)', padding: 0, display: 'flex', alignItems: 'center' }}
         >
-          ⚙️
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/>
+            <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M19.07 4.93l-1.77 1.77M6.7 17.3l-1.77 1.77" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+          </svg>
         </button>
       </div>
     </header>

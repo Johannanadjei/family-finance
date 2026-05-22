@@ -15,7 +15,7 @@ import { AddCategorySheet }       from './budget/AddCategorySheet';
 
 function BudgetViewSkeleton() {
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '16px' }}>
       <div style={{ background: 'var(--c-card,#fff)', borderRadius: 16, padding: '16px 18px', marginBottom: 16 }}>
         <Skeleton width="40%" height={12} borderRadius={6} />
         <div style={{ marginTop: 10, display: 'flex', gap: 16 }}>
@@ -53,7 +53,7 @@ export function BudgetView() {
     .sort((a, b) => b.pctUsed - a.pctUsed);
 
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '16px' }}>
 
       {/* Summary header */}
       <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff', boxShadow: 'var(--c-shadow)' }}>

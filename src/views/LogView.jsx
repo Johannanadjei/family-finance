@@ -25,7 +25,7 @@ const formatDate = (dateStr) =>
 
 function LogViewSkeleton() {
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '16px' }}>
       <Skeleton width="50%" height={14} borderRadius={6} />
       <div style={{ marginTop: 12 }}><Skeleton width="100%" height={40} borderRadius={10} /></div>
       <div style={{ marginTop: 8 }}><Skeleton width="100%" height={36} borderRadius={10} /></div>
@@ -69,7 +69,7 @@ export function LogView({ onEditTx }) {
   };
 
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '16px' }}>
 
       {/* Month navigation */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -97,7 +97,7 @@ export function LogView({ onEditTx }) {
 
       {/* Error state */}
       {(error || deleteError) && (
-        <div style={{ background: '#fef2f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
+        <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{deleteError || error}</p>
         </div>
       )}
