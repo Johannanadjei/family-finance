@@ -10,14 +10,15 @@ import { useFinanceContext } from '../../context/FinanceContext';
 import { applyTheme }        from '../../lib/themes';
 
 const SKINS = [
-  { key: 'family_warmth', label: 'Family Warmth', emoji: '🌿', pro: false },
-  { key: 'corporate',     label: 'Corporate',     emoji: '🏢', pro: true  },
-  { key: 'international', label: 'International', emoji: '✈️', pro: true  },
-  { key: 'neon',          label: 'Neon',          emoji: '⚡', pro: true  },
-  { key: 'dark',          label: 'Dark',          emoji: '🌑', pro: true  },
-  { key: 'minimalist',    label: 'Minimalist',    emoji: '⬜', pro: true  },
-  { key: 'busy',          label: 'Busy',          emoji: '🎨', pro: true  },
-  { key: 'cold',          label: 'Cold',          emoji: '❄️', pro: true  },
+  { key: 'family_warmth',         label: 'Family Warmth', emoji: '🌿', pro: false },
+  { key: 'global_international',  label: 'Global',        emoji: '🌐', pro: true  },
+  { key: 'corporate_professional',label: 'Corporate',     emoji: '💼', pro: true  },
+  { key: 'nature_fresh',          label: 'Nature',        emoji: '🌿', pro: true  },
+  { key: 'sunset_warm',           label: 'Sunset',        emoji: '🌅', pro: true  },
+  { key: 'neon_futuristic',       label: 'Neon',          emoji: '⚡', pro: true  },
+  { key: 'dark_executive',        label: 'Dark',          emoji: '🌙', pro: true  },
+  { key: 'minimal_light',         label: 'Minimal',       emoji: '◻️', pro: true  },
+  { key: 'royal_luxury',          label: 'Royal',         emoji: '👑', pro: true  },
 ];
 
 export function ThemeSection() {
