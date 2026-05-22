@@ -6,7 +6,8 @@
  * Reads prefs and saveThemeSkin from FinanceContext.
  */
 
-import { useFinanceContext } from '../../context/FinanceContext';
+import { useFinanceContext }      from '../../context/FinanceContext';
+import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 
 const SKINS = [
   { key: 'family_warmth',         label: 'Family Warmth', emoji: '🌿', pro: false },
@@ -22,11 +23,13 @@ const SKINS = [
 
 export function ThemeSection() {
   const { prefs, saveThemeSkin, userPlan } = useFinanceContext();
+  const { updateCentre }                   = useBudgetCentreContext();
   const current = prefs?.themeSkin || 'family_warmth';
 
   const handleSelect = (skin, locked) => {
     if (locked) return;
     saveThemeSkin(skin);
+    updateCentre({ skin_id: skin });
   };
 
   return (

@@ -8,6 +8,7 @@ import { render, screen, act }                   from '@testing-library/react';
 import { ThemeSection }                          from './ThemeSection';
 
 const mockSaveThemeSkin = vi.fn();
+const mockUpdateCentre  = vi.fn();
 let   mockUserPlan      = 'free';
 
 vi.mock('../../context/FinanceContext', () => ({
@@ -18,9 +19,13 @@ vi.mock('../../context/FinanceContext', () => ({
   }),
 }));
 
+vi.mock('../../context/BudgetCentreContext', () => ({
+  useBudgetCentreContext: () => ({ updateCentre: mockUpdateCentre }),
+}));
+
 
 describe('ThemeSection', () => {
-  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUserPlan = 'free'; });
+  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUpdateCentre.mockClear(); mockUserPlan = 'free'; });
 
   it('renders free theme option', () => {
     render(<ThemeSection />);
@@ -54,6 +59,12 @@ describe('ThemeSection', () => {
     render(<ThemeSection />);
     await act(async () => { screen.getByTestId('theme-family_warmth').click(); });
     expect(mockSaveThemeSkin).toHaveBeenCalledWith('family_warmth');
+  });
+
+  it('calls updateCentre with skin_id when skin selected', async () => {
+    render(<ThemeSection />);
+    await act(async () => { screen.getByTestId('theme-family_warmth').click(); });
+    expect(mockUpdateCentre).toHaveBeenCalledWith({ skin_id: 'family_warmth' });
   });
 
   it('does not call saveThemeSkin for pro themes on free plan', async () => {

@@ -24,8 +24,11 @@ import { BudgetCentreProvider }                  from './context/BudgetCentreCon
 import { FinanceProvider }                       from './context/FinanceContext';
 import { useBudgetCentreContext }                from './context/BudgetCentreContext';
 import { useFinanceContext }                     from './context/FinanceContext';
-import { applyTheme }                            from './lib/themes';
-import { loadActiveCentreId, saveActiveCentreId } from './lib/storage';
+import { applyTheme }                                        from './lib/themes';
+import { loadActiveCentreId, saveActiveCentreId, loadPrefs } from './lib/storage';
+
+// Apply saved skin immediately so there's no flash of default theme on reload
+applyTheme(loadPrefs().themeSkin);
 import { AuthScreen }                            from './views/AuthScreen';
 import { OnboardingFlow }                        from './features/onboarding/OnboardingFlow';
 import { Header }                                from './components/layout/Header';
