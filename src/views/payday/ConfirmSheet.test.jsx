@@ -101,25 +101,25 @@ describe('ConfirmSheet', () => {
 
   // ── Date field validation ───────────────────────────────────────────────────
 
-  it('clamps day to 31 on blur when value exceeds max', async () => {
+  it('shows error for day > 31 on confirm', async () => {
     renderSheet();
     await act(async () => { fireEvent.change(screen.getByTestId('confirm-date-day'), { target: { value: '50' } }); });
-    await act(async () => { fireEvent.blur(screen.getByTestId('confirm-date-day')); });
-    expect(screen.getByTestId('confirm-date-day').value).toBe('31');
+    await act(async () => { screen.getByText('Confirm Receipt').click(); });
+    expect(screen.getByText('Please enter a valid day (1-31)')).toBeTruthy();
   });
 
-  it('clamps month to 12 on blur when value exceeds max', async () => {
+  it('shows error for month > 12 on confirm', async () => {
     renderSheet();
     await act(async () => { fireEvent.change(screen.getByTestId('confirm-date-month'), { target: { value: '15' } }); });
-    await act(async () => { fireEvent.blur(screen.getByTestId('confirm-date-month')); });
-    expect(screen.getByTestId('confirm-date-month').value).toBe('12');
+    await act(async () => { screen.getByText('Confirm Receipt').click(); });
+    expect(screen.getByText('Please enter a valid month (1-12)')).toBeTruthy();
   });
 
-  it('clamps year to 2030 on blur when value exceeds max', async () => {
+  it('shows error for year out of range on confirm', async () => {
     renderSheet();
     await act(async () => { fireEvent.change(screen.getByTestId('confirm-date-year'), { target: { value: '2035' } }); });
-    await act(async () => { fireEvent.blur(screen.getByTestId('confirm-date-year')); });
-    expect(screen.getByTestId('confirm-date-year').value).toBe('2030');
+    await act(async () => { screen.getByText('Confirm Receipt').click(); });
+    expect(screen.getByText('Please enter a valid year (2020-2030)')).toBeTruthy();
   });
 
   it('shows error for empty day on confirm', async () => {

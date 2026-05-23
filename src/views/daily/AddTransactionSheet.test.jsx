@@ -167,39 +167,28 @@ describe('AddTransactionSheet', () => {
 
   // ── Date field validation ───────────────────────────────────────────────────
 
-  it('clamps day to 31 on blur when value exceeds max', async () => {
+  it('shows error for day > 31 on submit', async () => {
     renderSheet();
+    await act(async () => { fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '100' } }); });
     await act(async () => { fireEvent.change(screen.getByTestId('add-date-input'), { target: { value: '50' } }); });
-    await act(async () => { fireEvent.blur(screen.getByTestId('add-date-input')); });
-    expect(screen.getByTestId('add-date-input').value).toBe('31');
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(screen.getByText('Please enter a valid day (1-31)')).toBeTruthy();
   });
 
-  it('clamps day to 1 on blur when value is below min', async () => {
+  it('shows error for month > 12 on submit', async () => {
     renderSheet();
-    await act(async () => { fireEvent.change(screen.getByTestId('add-date-input'), { target: { value: '0' } }); });
-    await act(async () => { fireEvent.blur(screen.getByTestId('add-date-input')); });
-    expect(screen.getByTestId('add-date-input').value).toBe('1');
-  });
-
-  it('clamps month to 12 on blur when value exceeds max', async () => {
-    renderSheet();
+    await act(async () => { fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '100' } }); });
     await act(async () => { fireEvent.change(screen.getByTestId('add-month-input'), { target: { value: '15' } }); });
-    await act(async () => { fireEvent.blur(screen.getByTestId('add-month-input')); });
-    expect(screen.getByTestId('add-month-input').value).toBe('12');
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(screen.getByText('Please enter a valid month (1-12)')).toBeTruthy();
   });
 
-  it('clamps year to 2030 on blur when value exceeds max', async () => {
+  it('shows error for year out of range on submit', async () => {
     renderSheet();
+    await act(async () => { fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '100' } }); });
     await act(async () => { fireEvent.change(screen.getByTestId('add-year-input'), { target: { value: '2035' } }); });
-    await act(async () => { fireEvent.blur(screen.getByTestId('add-year-input')); });
-    expect(screen.getByTestId('add-year-input').value).toBe('2030');
-  });
-
-  it('clamps year to 2020 on blur when value is below min', async () => {
-    renderSheet();
-    await act(async () => { fireEvent.change(screen.getByTestId('add-year-input'), { target: { value: '2018' } }); });
-    await act(async () => { fireEvent.blur(screen.getByTestId('add-year-input')); });
-    expect(screen.getByTestId('add-year-input').value).toBe('2020');
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(screen.getByText('Please enter a valid year (2020-2030)')).toBeTruthy();
   });
 
   it('shows error for empty day on submit', async () => {

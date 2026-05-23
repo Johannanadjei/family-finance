@@ -25,8 +25,6 @@ const inputStyle = {
   fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
 };
 
-const computeDate = (d, m, y) => { const [dd, mm, yy] = [+d, +m, +y]; return (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12 && yy >= 2020 && yy <= 2030) ? `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}` : ''; };
-
 export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null }) {
   const { centre, categories, getCatIcon } = useBudgetCentreContext();
   const { addTransaction, updateTransaction } = useFinanceContext();
@@ -36,7 +34,6 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
   const [categoryName, setCategoryName] = useState('');
   const [categoryId,   setCategoryId]   = useState(null);
   const [description,  setDescription]  = useState('');
-  const [date,         setDate]         = useState(() => new Date().toISOString().split('T')[0]);
   const [day,          setDay]          = useState(() => String(new Date().getDate()));
   const [month,        setMonth]        = useState(() => String(new Date().getMonth() + 1));
   const [year,         setYear]         = useState(() => String(new Date().getFullYear()));
@@ -52,7 +49,6 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
       setCategoryId(editTx?.category_id || null);
       setDescription(editTx?.description || '');
       const d = editTx?.date || new Date().toISOString().split('T')[0];
-      setDate(d);
       const [y, m, dd] = d.split('-');
       setYear(y);
       setMonth(String(parseInt(m)));
@@ -72,10 +68,12 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
   const handleSubmit = async () => {
     const n = Math.round(parseFloat(amount) || 0);
     if (!n || n <= 0) { setError('Amount must be greater than zero'); return; }
-    if (!day)   { setError('Please enter a valid day (1-31)'); return; }
-    if (!month) { setError('Please enter a valid month (1-12)'); return; }
-    if (new Date(+year, +month - 1, +day).getDate() !== +day) { setError('Please enter a valid date'); return; }
-    if (!date)  { setError('Please select a date'); return; }
+    const dayNum = parseInt(day), monthNum = parseInt(month), yearNum = parseInt(year);
+    if (!day   || isNaN(dayNum)   || dayNum < 1   || dayNum > 31)    { setError('Please enter a valid day (1-31)'); return; }
+    if (!month || isNaN(monthNum) || monthNum < 1  || monthNum > 12)  { setError('Please enter a valid month (1-12)'); return; }
+    if (!year  || isNaN(yearNum)  || yearNum < 2020 || yearNum > 2030) { setError('Please enter a valid year (2020-2030)'); return; }
+    if (new Date(yearNum, monthNum - 1, dayNum).getDate() !== dayNum)  { setError('Please enter a valid date'); return; }
+    const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
     const finalCategory   = categoryName.trim() || 'Other';
     const finalCategoryId = categoryName.trim() ? categoryId : null;
     setLoading(true);
@@ -88,8 +86,8 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
         category_name: finalCategory,
         category_id:   finalCategoryId,
         description:   description.trim(),
-        date,
-        week:          getWeekForDate(date),
+        date:          dateStr,
+        week:          getWeekForDate(dateStr),
       });
       err     = result.error;
       savedTx = result.data;
@@ -100,8 +98,8 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
         category_name: finalCategory,
         category_id:   finalCategoryId,
         description:   description.trim(),
-        date,
-        week:          getWeekForDate(date),
+        date:          dateStr,
+        week:          getWeekForDate(dateStr),
         currency:      centre?.currency || 'GHS',
         source:        'main_app',
       });
@@ -120,10 +118,6 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
       setTimeout(onClose, 600);
     }
   };
-
-  const clampDay   = () => { if (day)   { const n = String(Math.max(1, Math.min(31,   +day)));   setDay(n);   setDate(computeDate(n, month, year)); } };
-  const clampMonth = () => { if (month) { const n = String(Math.max(1, Math.min(12,   +month))); setMonth(n); setDate(computeDate(day, n, year)); } };
-  const clampYear  = () => { if (year)  { const n = String(Math.max(2020, Math.min(2030, +year))); setYear(n); setDate(computeDate(day, month, n)); } };
 
   return (
     <>
@@ -175,11 +169,11 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
 
           {/* Date — DD / MM / YYYY */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input data-testid="add-date-input" type="number" min="1" max="31" placeholder="DD" value={day} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setDay(v); setDate(computeDate(v, month, year)); setError(null); }} onBlur={clampDay} style={{ ...inputStyle, width: 60, padding: '12px 8px', textAlign: 'center' }} />
+            <input data-testid="add-date-input" type="number" min="1" max="31" placeholder="DD" value={day} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setDay(v); setError(null); }} style={{ ...inputStyle, width: 60, padding: '12px 8px', textAlign: 'center' }} />
             <span style={{ color: 'var(--c-muted, #6b7280)', fontWeight: 800, fontSize: 18, flexShrink: 0 }}>/</span>
-            <input data-testid="add-month-input" type="number" min="1" max="12" placeholder="MM" value={month} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setMonth(v); setDate(computeDate(day, v, year)); setError(null); }} onBlur={clampMonth} style={{ ...inputStyle, width: 60, padding: '12px 8px', textAlign: 'center' }} />
+            <input data-testid="add-month-input" type="number" min="1" max="12" placeholder="MM" value={month} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setMonth(v); setError(null); }} style={{ ...inputStyle, width: 60, padding: '12px 8px', textAlign: 'center' }} />
             <span style={{ color: 'var(--c-muted, #6b7280)', fontWeight: 800, fontSize: 18, flexShrink: 0 }}>/</span>
-            <input data-testid="add-year-input" type="number" min="2020" max="2030" placeholder="YYYY" value={year} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setYear(v); setDate(computeDate(day, month, v)); setError(null); }} onBlur={clampYear} style={{ ...inputStyle, width: 80, padding: '12px 8px', textAlign: 'center' }} />
+            <input data-testid="add-year-input" type="number" min="2020" max="2030" placeholder="YYYY" value={year} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setYear(v); setError(null); }} style={{ ...inputStyle, width: 80, padding: '12px 8px', textAlign: 'center' }} />
           </div>
 
           {error && (
