@@ -7,7 +7,8 @@
  *
  * Free skin:  family_warmth
  * Pro skins:  global_international, corporate_professional, sunset_warm,
- *             neon_futuristic, dark_executive, minimal_light, royal_luxury
+ *             neon_futuristic, dark_executive, minimal_light, royal_luxury,
+ *             monochrome
  */
 
 const SHARED = {
@@ -197,6 +198,38 @@ export const THEMES = {
     '--c-chip-selected-bg':   '#fef3c7',
     '--c-chip-selected-text': '#6b21a8',
     ...SHARED,
+  },
+
+  monochrome: {
+    '--c-primary':            '#ffffff',
+    '--c-primary-2':          '#e5e5e5',
+    '--c-accent':             '#ffffff',
+    '--c-accent-light':       '#1a1a1a',
+    '--c-header-from':        '#000000',
+    '--c-header-to':          '#1a1a1a',
+    '--c-text':               '#ffffff',
+    '--c-muted':              '#9ca3af',
+    '--c-bg':                 '#0a0a0a',
+    '--c-card':               '#1a1a1a',
+    '--c-border':             '#2a2a2a',
+    '--c-input-bg':           '#111111',
+    '--c-input-border':       '#2a2a2a',
+    '--c-chip-bg':            '#1a1a1a',
+    '--c-chip-text':          '#ffffff',
+    '--c-chip-selected-bg':   '#ffffff',
+    '--c-chip-selected-text': '#000000',
+    '--c-modal-bg':           '#1a1a1a',
+    '--c-danger':             '#fca5a5',
+    '--c-danger-bg':          '#1a0a0a',
+    '--c-danger-light':       '#991b1b',
+    '--c-success':            '#6ee7b7',
+    '--c-success-light':      '#064e3b',
+    '--c-warning':            '#fbbf24',
+    '--c-warning-bg':         '#1a1500',
+    '--c-warning-text':       '#fef3c7',
+    '--c-shadow':             'none',
+    '--c-success-text':       '#6ee7b7',
+    '--c-danger-text':        '#fca5a5',
   },
 };
 
