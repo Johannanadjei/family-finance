@@ -158,7 +158,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
 
           {/* Date */}
           <div style={{ position: 'relative' }}>
-            <input data-testid="add-date-input" type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, paddingRight: 44, WebkitAppearance: 'none', appearance: 'none' }} />
+            <input data-testid="add-date-input" type="date" lang="en-GB" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, paddingRight: 44, WebkitAppearance: 'none', appearance: 'none' }} />
             <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--c-muted, #9ca3af)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8"/>
