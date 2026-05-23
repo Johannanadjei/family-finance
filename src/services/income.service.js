@@ -205,7 +205,7 @@ export const markPending = async (sourceId) => {
  * @param {string} sourceId
  * @param {number} newAmount
  */
-export const updateExpectedAmount = async (sourceId, newAmount) => {
+export const updateExpectedAmount = async (sourceId, newAmount, extras = {}) => {
   let amount;
   try {
     amount = validateAmount(newAmount);
@@ -214,9 +214,18 @@ export const updateExpectedAmount = async (sourceId, newAmount) => {
     return { data: null, error: e };
   }
 
+  const update = { expected_amount: amount };
+  if (extras.pay_day_type !== undefined) {
+    const VALID = ['fixed_date', 'last_working_day', 'flexible'];
+    update.pay_day_type = VALID.includes(extras.pay_day_type) ? extras.pay_day_type : 'flexible';
+  }
+  if (extras.pay_day !== undefined) {
+    update.pay_day = extras.pay_day ? Math.min(31, Math.max(1, parseInt(extras.pay_day))) : null;
+  }
+
   const { data, error } = await supabase
     .from('income_sources')
-    .update({ expected_amount: amount })
+    .update(update)
     .eq('id', sourceId)
     .is('deleted_at', null)
     .select()

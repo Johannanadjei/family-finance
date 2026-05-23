@@ -69,8 +69,8 @@ export function PaydayView() {
     setMutating(false);
   };
 
-  const handleUpdateExpected = async (sourceId, newAmount) => {
-    const { error: err } = await updateExpectedAmount(sourceId, newAmount);
+  const handleUpdateExpected = async (sourceId, newAmount, extras) => {
+    const { error: err } = await updateExpectedAmount(sourceId, newAmount, extras);
     if (err) setMutateError('Could not update expected amount. Please try again.');
   };
 

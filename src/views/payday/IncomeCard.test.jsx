@@ -96,13 +96,13 @@ describe('IncomeCard', () => {
     expect(screen.getByTestId('edit-expected-input-inc-2')).toBeTruthy();
   });
 
-  it('calls onUpdateExpected with sourceId and new amount when saved', async () => {
+  it('calls onUpdateExpected with sourceId, amount and extras when saved', async () => {
     const onUpdateExpected = vi.fn().mockResolvedValue({ error: null });
     renderCard({ onUpdateExpected });
     await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
     fireEvent.change(screen.getByTestId('edit-expected-input-inc-2'), { target: { value: '20000' } });
     await act(async () => { screen.getByLabelText('Save expected amount').click(); });
-    expect(onUpdateExpected).toHaveBeenCalledWith('inc-2', 20000);
+    expect(onUpdateExpected).toHaveBeenCalledWith('inc-2', 20000, { pay_day_type: 'fixed_date', pay_day: 25 });
   });
 
   it('allows saving zero as expected amount', async () => {
@@ -111,6 +111,39 @@ describe('IncomeCard', () => {
     await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
     fireEvent.change(screen.getByTestId('edit-expected-input-inc-2'), { target: { value: '0' } });
     await act(async () => { screen.getByLabelText('Save expected amount').click(); });
-    expect(onUpdateExpected).toHaveBeenCalledWith('inc-2', 0);
+    expect(onUpdateExpected).toHaveBeenCalledWith('inc-2', 0, { pay_day_type: 'fixed_date', pay_day: 25 });
+  });
+
+  it('shows pay day type select when editing', async () => {
+    renderCard();
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    expect(screen.getByTestId('edit-pay-day-type-inc-2')).toBeTruthy();
+  });
+
+  it('pre-fills pay day type select with income pay_day_type', async () => {
+    renderCard();
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    expect(screen.getByTestId('edit-pay-day-type-inc-2').value).toBe('fixed_date');
+  });
+
+  it('shows pay day input when pay_day_type is fixed_date', async () => {
+    renderCard();
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    expect(screen.getByTestId('edit-pay-day-inc-2')).toBeTruthy();
+  });
+
+  it('hides pay day input when pay_day_type changed to flexible', async () => {
+    renderCard();
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('edit-pay-day-type-inc-2'), { target: { value: 'flexible' } });
+    });
+    expect(screen.queryByTestId('edit-pay-day-inc-2')).toBeNull();
+  });
+
+  it('pre-fills pay day input with income pay_day', async () => {
+    renderCard();
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    expect(screen.getByTestId('edit-pay-day-inc-2').value).toBe('25');
   });
 });

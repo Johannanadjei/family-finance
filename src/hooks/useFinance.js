@@ -306,16 +306,16 @@ export function useFinance({ centre, categories }) {
     return { error: null };
   }, [incomes, txs]);
 
-  const updateExpectedAmount = useCallback(async (sourceId, newAmount) => {
+  const updateExpectedAmount = useCallback(async (sourceId, newAmount, extras = {}) => {
     const prev = incomes.find(i => i.id === sourceId);
     if (!prev) return { error: new Error('Income source not found') };
 
     const prevIncomes = incomes;
     setIncomes(p => p.map(i =>
-      i.id === sourceId ? { ...i, expected_amount: newAmount } : i
+      i.id === sourceId ? { ...i, expected_amount: newAmount, ...extras } : i
     ));
 
-    const { error } = await dbUpdateExpectedAmount(sourceId, newAmount);
+    const { error } = await dbUpdateExpectedAmount(sourceId, newAmount, extras);
 
     if (error) {
       setIncomes(prevIncomes);
