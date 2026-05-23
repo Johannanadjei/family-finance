@@ -74,16 +74,16 @@ export function LogView({ onEditTx }) {
       {/* Month navigation */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <button onClick={() => loadMonth(offsetMonth(activeMonth, -1))} aria-label="Previous month"
-          style={{ background: 'var(--c-card, #fff)', border: 'none', padding: '8px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, boxShadow: '0 1px 4px rgba(0,0,0,0.10)', color: 'var(--c-primary, #064e3b)', fontSize: 18, fontWeight: 900, transition: 'box-shadow 0.15s' }}>
-          &#8592;
+          style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-primary, #064e3b)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <p data-testid="log-month-label" style={{ fontSize: 15, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
           {formatMonth(activeMonth)}
         </p>
         <button onClick={() => loadMonth(offsetMonth(activeMonth, 1))} aria-label="Next month"
           disabled={isCurrentMonth}
-          style={{ background: isCurrentMonth ? 'var(--c-bg, #f3f4f6)' : 'var(--c-card, #fff)', border: 'none', padding: '8px', borderRadius: '50%', cursor: isCurrentMonth ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, boxShadow: isCurrentMonth ? 'none' : '0 1px 4px rgba(0,0,0,0.10)', color: 'var(--c-primary, #064e3b)', fontSize: 18, fontWeight: 900, transition: 'box-shadow 0.15s', opacity: isCurrentMonth ? 0.35 : 1 }}>
-          &#8594;
+          style={{ background: 'none', border: 'none', padding: '8px', cursor: isCurrentMonth ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isCurrentMonth ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
 
