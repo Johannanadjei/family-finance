@@ -34,7 +34,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
   const [categoryName, setCategoryName] = useState('');
   const [categoryId,   setCategoryId]   = useState(null);
   const [description,  setDescription]  = useState('');
-  const [date,         setDate]         = useState('');
+  const [date,         setDate]         = useState(() => new Date().toISOString().split('T')[0]);
   const [loading,      setLoading]      = useState(false);
   const [saved,        setSaved]        = useState(false);
   const [error,        setError]        = useState(null);
@@ -117,7 +117,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
         {/* Type toggle */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
           {['expense', 'income'].map(t => (
-            <button key={t} onClick={() => { setType(t); setCategoryName(''); setCategoryId(null); }}
+            <button key={t} onClick={() => { setType(t); setCategoryName(''); setCategoryId(null); setError(null); }}
               style={{ padding: '10px', borderRadius: 10, border: 'none', fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 800, cursor: 'pointer', background: type === t ? 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))' : 'var(--c-bg, #f3f4f6)', color: type === t ? '#fff' : 'var(--c-muted, #6b7280)' }}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
