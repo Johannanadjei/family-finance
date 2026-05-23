@@ -20,8 +20,9 @@ const fieldStyle = {
 };
 
 export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
-  const [deleting,      setDeleting]      = useState(false);
-  const [editing,       setEditing]       = useState(false);
+  const [deleting,       setDeleting]       = useState(false);
+  const [confirmDelete,  setConfirmDelete]  = useState(false);
+  const [editing,        setEditing]        = useState(false);
   const [editLabel,     setEditLabel]     = useState('');
   const [editAmount,    setEditAmount]    = useState('');
   const [editPayDayType, setEditPayDayType] = useState('');
@@ -48,7 +49,8 @@ export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
     setEditing(false);
   };
 
-  const handleDelete = async () => {
+  const handleDeleteConfirm = async () => {
+    setConfirmDelete(false);
     setDeleting(true);
     await onDelete(source.id);
   };
@@ -134,24 +136,42 @@ export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
               data-testid={`income-edit-${source.id}`}
               onClick={handleEditOpen}
               aria-label={`Edit ${source.label}`}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted, #9ca3af)', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted, #6b7280)', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
             >
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                <path d="M9 1.5 11.5 4 4.5 11H2v-2.5L9 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"/>
-              </svg>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
             </button>
-            <button
-              data-testid={`income-delete-${source.id}`}
-              onClick={handleDelete}
-              disabled={deleting}
-              aria-label={`Delete ${source.label}`}
-              style={{ background: 'none', border: 'none', cursor: deleting ? 'not-allowed' : 'pointer', color: 'var(--c-muted, #9ca3af)', padding: '6px 8px', display: 'flex', alignItems: 'center', opacity: deleting ? 0.4 : 1 }}
-            >
-              {deleting
-                ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ animation: 'spin 0.7s linear infinite' }}><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="40 20" strokeLinecap="round"/></svg>
-                : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              }
-            </button>
+            {confirmDelete ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-muted, #6b7280)', whiteSpace: 'nowrap' }}>Are you sure?</span>
+                <button
+                  data-testid={`income-delete-confirm-${source.id}`}
+                  onClick={handleDeleteConfirm}
+                  style={{ background: 'var(--c-danger, #dc2626)', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
+                >
+                  Delete
+                </button>
+                <button
+                  data-testid={`income-delete-cancel-${source.id}`}
+                  onClick={() => setConfirmDelete(false)}
+                  style={{ background: 'var(--c-border, #e5e7eb)', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                data-testid={`income-delete-${source.id}`}
+                onClick={() => setConfirmDelete(true)}
+                disabled={deleting}
+                aria-label={`Delete ${source.label}`}
+                style={{ background: 'none', border: 'none', cursor: deleting ? 'not-allowed' : 'pointer', color: 'var(--c-muted, #9ca3af)', padding: '6px 8px', display: 'flex', alignItems: 'center', opacity: deleting ? 0.4 : 1 }}
+              >
+                {deleting
+                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ animation: 'spin 0.7s linear infinite' }}><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="40 20" strokeLinecap="round"/></svg>
+                  : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                }
+              </button>
+            )}
           </div>
         </div>
       )}

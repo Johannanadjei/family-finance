@@ -43,18 +43,43 @@ describe('IncomeSourceRow', () => {
     expect(screen.getByTestId('income-edit-inc-1')).toBeTruthy();
   });
 
-  it('calls onDelete with source id when delete tapped', async () => {
+  it('shows confirmation after delete button tapped', async () => {
+    renderRow();
+    await act(async () => { screen.getByTestId('income-delete-inc-1').click(); });
+    expect(screen.getByText('Are you sure?')).toBeTruthy();
+    expect(screen.getByTestId('income-delete-confirm-inc-1')).toBeTruthy();
+    expect(screen.getByTestId('income-delete-cancel-inc-1')).toBeTruthy();
+  });
+
+  it('does not call onDelete on first tap — only shows confirmation', async () => {
     const onDelete = vi.fn().mockResolvedValue({ error: null });
     renderRow({ onDelete });
     await act(async () => { screen.getByTestId('income-delete-inc-1').click(); });
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it('calls onDelete after confirm delete tapped', async () => {
+    const onDelete = vi.fn().mockResolvedValue({ error: null });
+    renderRow({ onDelete });
+    await act(async () => { screen.getByTestId('income-delete-inc-1').click(); });
+    await act(async () => { screen.getByTestId('income-delete-confirm-inc-1').click(); });
     expect(onDelete).toHaveBeenCalledWith('inc-1');
   });
 
-  it('disables delete button while deleting', () => {
-    const onDelete = vi.fn().mockReturnValue(new Promise(() => {}));
+  it('returns to normal state when cancel confirmation tapped', async () => {
+    renderRow();
+    await act(async () => { screen.getByTestId('income-delete-inc-1').click(); });
+    await act(async () => { screen.getByTestId('income-delete-cancel-inc-1').click(); });
+    expect(screen.queryByText('Are you sure?')).toBeNull();
+    expect(screen.getByTestId('income-delete-inc-1')).toBeTruthy();
+  });
+
+  it('does not call onDelete when cancel confirmation tapped', async () => {
+    const onDelete = vi.fn();
     renderRow({ onDelete });
-    act(() => { screen.getByTestId('income-delete-inc-1').click(); });
-    expect(screen.getByTestId('income-delete-inc-1').disabled).toBe(true);
+    await act(async () => { screen.getByTestId('income-delete-inc-1').click(); });
+    await act(async () => { screen.getByTestId('income-delete-cancel-inc-1').click(); });
+    expect(onDelete).not.toHaveBeenCalled();
   });
 
   it('shows edit form when edit button tapped', async () => {
