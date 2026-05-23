@@ -53,6 +53,13 @@ describe('AddTransactionSheet', () => {
     expect(screen.getByTestId('add-date-input').value).toBe(today);
   });
 
+  it('shows formatted date in DD/MM/YYYY below date input', () => {
+    renderSheet();
+    const today = new Date().toISOString().split('T')[0];
+    const expected = new Date(today + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    expect(screen.getByTestId('add-date-display').textContent).toBe(expected);
+  });
+
   it('shows expense and income type toggle', () => {
     renderSheet();
     expect(screen.getByText('Expense')).toBeTruthy();

@@ -157,15 +157,22 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
           <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)" style={inputStyle} />
 
           {/* Date */}
-          <div style={{ position: 'relative' }}>
-            <input data-testid="add-date-input" type="date" lang="en-GB" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, paddingRight: 44, WebkitAppearance: 'none', appearance: 'none' }} />
-            <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--c-muted, #9ca3af)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8"/>
-                <path d="M3 9h18" stroke="currentColor" strokeWidth="1.8"/>
-                <path d="M8 2v4M16 2v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-              </svg>
-            </span>
+          <div>
+            <div style={{ position: 'relative' }}>
+              <input data-testid="add-date-input" type="date" lang="en-GB" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, paddingRight: 44, WebkitAppearance: 'none', appearance: 'none' }} />
+              <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--c-muted, #9ca3af)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                  <path d="M3 9h18" stroke="currentColor" strokeWidth="1.8"/>
+                  <path d="M8 2v4M16 2v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+              </span>
+            </div>
+            {date && (
+              <p data-testid="add-date-display" style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted, #6b7280)', margin: '4px 0 0' }}>
+                {new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              </p>
+            )}
           </div>
 
           {error && (
