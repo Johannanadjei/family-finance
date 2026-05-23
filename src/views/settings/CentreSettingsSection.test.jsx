@@ -1,6 +1,5 @@
 /**
  * views/settings/CentreSettingsSection.test.jsx
- * Written before CentreSettingsSection.jsx — TDD.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -26,23 +25,23 @@ describe('CentreSettingsSection', () => {
     expect(screen.getByTestId('centre-name-display').textContent).toBe("The Adjei's");
   });
 
-  it('renders formatted surplus target', () => {
+  it('renders currency display', () => {
     render(<CentreSettingsSection />);
-    expect(screen.getByTestId('centre-surplus-display').textContent).toBe('GHS 4,500');
+    expect(screen.getByTestId('centre-currency-display').textContent).toBe('GHS');
   });
 
   it('shows edit inputs when edit button clicked', async () => {
     render(<CentreSettingsSection />);
     await act(async () => { screen.getByTestId('centre-edit-btn').click(); });
     expect(screen.getByTestId('centre-name-input')).toBeTruthy();
-    expect(screen.getByTestId('centre-surplus-input')).toBeTruthy();
+    expect(screen.getByTestId('centre-currency-select')).toBeTruthy();
   });
 
   it('pre-fills inputs with current centre values', async () => {
     render(<CentreSettingsSection />);
     await act(async () => { screen.getByTestId('centre-edit-btn').click(); });
     expect(screen.getByTestId('centre-name-input').value).toBe("The Adjei's");
-    expect(screen.getByTestId('centre-surplus-input').value).toBe('4500');
+    expect(screen.getByTestId('centre-currency-select').value).toBe('GHS');
   });
 
   it('calls updateCentre with updated name on save', async () => {
@@ -54,6 +53,18 @@ describe('CentreSettingsSection', () => {
     await act(async () => { screen.getByTestId('centre-save-btn').click(); });
     expect(mockUpdateCentre).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'New Name' })
+    );
+  });
+
+  it('calls updateCentre with selected currency on save', async () => {
+    render(<CentreSettingsSection />);
+    await act(async () => { screen.getByTestId('centre-edit-btn').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('centre-currency-select'), { target: { value: 'USD' } });
+    });
+    await act(async () => { screen.getByTestId('centre-save-btn').click(); });
+    expect(mockUpdateCentre).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: 'USD' })
     );
   });
 
