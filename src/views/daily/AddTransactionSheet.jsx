@@ -89,7 +89,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
         description:   description.trim(),
         date,
         week:          getWeekForDate(date),
-        currency:      centre.currency,
+        currency:      centre?.currency || 'GHS',
         source:        'main_app',
       });
       err     = result.error;
