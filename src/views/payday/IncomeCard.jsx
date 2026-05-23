@@ -1,16 +1,7 @@
 /**
- * views/payday/IncomeCard.jsx
- *
- * Single income source card for PaydayView.
- * Uses getIncomeStatus and INCOME_STATUS_CONFIG from finance.js.
- * Inline edit for expected amount — calls onUpdateExpected.
- *
- * @param {IncomeStream} income
- * @param {function}     fmt
- * @param {function}     onConfirm          — (income) => void
- * @param {function}     onMarkPending      — (sourceId) => void
- * @param {function}     onUpdateExpected   — (sourceId, newAmount) => void
- * @param {boolean}      disabled
+ * views/payday/IncomeCard.jsx — Single income source card for PaydayView.
+ * Inline edit for expected amount + pay day type. Shows received-amount update
+ * prompt when editing a confirmed income to a different amount.
  */
 
 import { useState }                                                from 'react';
@@ -21,12 +12,14 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
   const config    = INCOME_STATUS_CONFIG[status];
   const daysUntil = income.pay_day ? calcDaysUntil(income.pay_day) : null;
 
-  const [editing,        setEditing]        = useState(false);
-  const [editAmount,     setEditAmount]     = useState('');
-  const [payDayType,     setPayDayType]     = useState('');
-  const [payDay,         setPayDay]         = useState('');
-  const [saving,         setSaving]         = useState(false);
-  const [hoveredPending, setHoveredPending] = useState(false);
+  const [editing,            setEditing]            = useState(false);
+  const [editAmount,         setEditAmount]         = useState('');
+  const [payDayType,         setPayDayType]         = useState('');
+  const [payDay,             setPayDay]             = useState('');
+  const [saving,             setSaving]             = useState(false);
+  const [showReceivedPrompt, setShowReceivedPrompt] = useState(false);
+  const [pendingAmount,      setPendingAmount]      = useState(null);
+  const [hoveredPending,     setHoveredPending]     = useState(false);
 
   const handleEditOpen = () => {
     setEditAmount(String(income.expected_amount));
@@ -44,34 +37,38 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
       pay_day:      payDayType === 'fixed_date' ? Number(payDay) || null : null,
     });
     setSaving(false);
-    setEditing(false);
+    if (income.received && n !== income.received_amount) {
+      setPendingAmount(n);
+      setShowReceivedPrompt(true);
+    } else {
+      setEditing(false);
+    }
   };
 
+  const handleUpdateReceived = async () => {
+    setShowReceivedPrompt(false); setEditing(false);
+    await onMarkPending(income.id);
+    onConfirm(income);
+  };
+
+  const handleKeepReceived = () => { setShowReceivedPrompt(false); setEditing(false); };
+
+  const btnStyle = (primary) => ({ background: primary ? 'var(--c-primary, #064e3b)' : 'var(--c-border, #e5e7eb)', border: 'none', borderRadius: 8, padding: '6px 10px', color: primary ? '#fff' : 'inherit', fontSize: 14, cursor: 'pointer' });
+
   return (
-    <div style={{
-      background:   'var(--c-card, #fff)',
-      borderRadius: 16,
-      padding:      '16px 18px',
-      marginBottom: 12,
-      border:       `1.5px solid ${config.border}`,
-      boxShadow:    'var(--c-shadow)',
-    }}>
-      {/* Header row */}
+    <div style={{ background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', marginBottom: 12, border: `1.5px solid ${config.border}`, boxShadow: 'var(--c-shadow)' }}>
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 24 }}>{income.icon}</span>
           <div>
-            <p style={{ fontSize: 15, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 2px' }}>
-              {income.label}
-            </p>
+            <p style={{ fontSize: 15, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 2px' }}>{income.label}</p>
             <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
               {income.currency} · {income.pay_day_type === 'flexible' ? 'Flexible' : income.pay_day_type === 'last_working_day' ? 'Last working day' : `Day ${income.pay_day}`}
             </p>
           </div>
         </div>
-        <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 20, background: config.bg, color: config.color, whiteSpace: 'nowrap' }}>
-          {config.label}
-        </span>
+        <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 20, background: config.bg, color: config.color, whiteSpace: 'nowrap' }}>{config.label}</span>
       </div>
 
       {/* Amounts */}
@@ -79,102 +76,62 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
         <div>
           <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: '0 0 4px' }}>Expected</p>
           {editing ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input
-                  data-testid={`edit-expected-input-${income.id}`}
-                  type="number"
-                  value={editAmount}
-                  onChange={e => setEditAmount(e.target.value)}
-                  autoFocus
-                  style={{ width: 120, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-primary, #064e3b)', fontSize: 16, fontWeight: 800, outline: 'none', fontFamily: "'Nunito', sans-serif" }}
-                />
-                <button
-                  aria-label="Save expected amount"
-                  onClick={handleEditSave}
-                  disabled={saving}
-                  style={{ background: 'var(--c-primary, #064e3b)', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 14, cursor: 'pointer' }}
-                >✓</button>
-                <button
-                  aria-label="Cancel edit"
-                  onClick={() => setEditing(false)}
-                  style={{ background: 'var(--c-border, #e5e7eb)', border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: 14, cursor: 'pointer' }}
-                >✕</button>
+            showReceivedPrompt ? (
+              <div data-testid={`received-update-prompt-${income.id}`} style={{ background: 'var(--c-accent-light, #f0fdf4)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-text, #1c1917)', margin: 0, lineHeight: 1.5 }}>
+                  You confirmed receiving {fmt(income.received_amount)} this month. Did you actually receive {fmt(pendingAmount)}?
+                </p>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button data-testid={`received-update-confirm-${income.id}`} onClick={handleUpdateReceived} style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none', background: 'var(--c-primary, #064e3b)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Yes, update received</button>
+                  <button data-testid={`received-update-keep-${income.id}`} onClick={handleKeepReceived} style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', background: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", color: 'var(--c-muted, #6b7280)' }}>Keep as {fmt(income.received_amount)}</button>
+                </div>
               </div>
-              <select
-                data-testid={`edit-pay-day-type-${income.id}`}
-                value={payDayType}
-                onChange={e => setPayDayType(e.target.value)}
-                style={{ padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 13, fontWeight: 700, outline: 'none', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' }}
-              >
-                <option value="flexible">Flexible / Ad-hoc</option>
-                <option value="fixed_date">Fixed date each month</option>
-                <option value="last_working_day">Last working day</option>
-              </select>
-              {payDayType === 'fixed_date' && (
-                <input
-                  data-testid={`edit-pay-day-${income.id}`}
-                  type="number"
-                  min="1"
-                  max="31"
-                  placeholder="Day of month"
-                  value={payDay}
-                  onChange={e => setPayDay(e.target.value)}
-                  style={{ width: 120, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: "'Nunito', sans-serif" }}
-                />
-              )}
-            </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input data-testid={`edit-expected-input-${income.id}`} type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} autoFocus style={{ width: 120, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-primary, #064e3b)', fontSize: 16, fontWeight: 800, outline: 'none', fontFamily: "'Nunito', sans-serif" }} />
+                  <button aria-label="Save expected amount" onClick={handleEditSave} disabled={saving} style={btnStyle(true)}>✓</button>
+                  <button aria-label="Cancel edit" onClick={() => setEditing(false)} style={btnStyle(false)}>✕</button>
+                </div>
+                <select data-testid={`edit-pay-day-type-${income.id}`} value={payDayType} onChange={e => setPayDayType(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 13, fontWeight: 700, outline: 'none', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' }}>
+                  <option value="flexible">Flexible / Ad-hoc</option>
+                  <option value="fixed_date">Fixed date each month</option>
+                  <option value="last_working_day">Last working day</option>
+                </select>
+                {payDayType === 'fixed_date' && (
+                  <input data-testid={`edit-pay-day-${income.id}`} type="number" min="1" max="31" placeholder="Day of month" value={payDay} onChange={e => setPayDay(e.target.value)} style={{ width: 120, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: "'Nunito', sans-serif" }} />
+                )}
+              </div>
+            )
           ) : (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <p data-testid={`income-expected-${income.id}`} style={{ fontSize: 18, fontWeight: 900, color: income.expected_amount === 0 ? 'var(--c-muted, #9ca3af)' : 'var(--c-text, #1c1917)', margin: 0 }}>
-                  {fmt(income.expected_amount)}
-                </p>
-                <button
-                  aria-label="Edit expected amount"
-                  onClick={handleEditOpen}
-                  disabled={disabled}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: income.expected_amount === 0 ? 'var(--c-warning, #d97706)' : 'var(--c-muted, #9ca3af)', padding: '2px 4px', display: 'flex', alignItems: 'center', animation: income.expected_amount === 0 ? 'pulse 1.6s ease-in-out infinite' : 'none' }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                    <path d="M9 1.5 11.5 4 4.5 11H2v-2.5L9 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"/>
-                  </svg>
+                <p data-testid={`income-expected-${income.id}`} style={{ fontSize: 18, fontWeight: 900, color: income.expected_amount === 0 ? 'var(--c-muted, #9ca3af)' : 'var(--c-text, #1c1917)', margin: 0 }}>{fmt(income.expected_amount)}</p>
+                <button aria-label="Edit expected amount" onClick={handleEditOpen} disabled={disabled} style={{ background: 'none', border: 'none', cursor: 'pointer', color: income.expected_amount === 0 ? 'var(--c-warning, #d97706)' : 'var(--c-muted, #9ca3af)', padding: '2px 4px', display: 'flex', alignItems: 'center', animation: income.expected_amount === 0 ? 'pulse 1.6s ease-in-out infinite' : 'none' }}>
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M9 1.5 11.5 4 4.5 11H2v-2.5L9 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"/></svg>
                 </button>
               </div>
-              {income.expected_amount === 0 && (
-                <p style={{ fontSize: 11, color: 'var(--c-warning, #d97706)', margin: '4px 0 0', fontWeight: 600 }}>
-                  Tap ✏ to set your expected amount
-                </p>
-              )}
+              {income.expected_amount === 0 && <p style={{ fontSize: 11, color: 'var(--c-warning, #d97706)', margin: '4px 0 0', fontWeight: 600 }}>Tap ✏ to set your expected amount</p>}
             </>
           )}
         </div>
         {income.received && (
           <div style={{ textAlign: 'right' }}>
             <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: '0 0 2px' }}>Received</p>
-            <p data-testid={`income-received-${income.id}`} style={{ fontSize: 22, fontWeight: 900, color: 'var(--c-success, #059669)', margin: 0 }}>
-              {fmt(income.received_amount)}
-            </p>
+            <p data-testid={`income-received-${income.id}`} style={{ fontSize: 22, fontWeight: 900, color: 'var(--c-success, #059669)', margin: 0 }}>{fmt(income.received_amount)}</p>
           </div>
         )}
         {!income.received && daysUntil !== null && (
           <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: '0 0 2px' }}>
-              {daysUntil === 0 ? 'Due today' : `${daysUntil} days away`}
-            </p>
+            <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: '0 0 2px' }}>{daysUntil === 0 ? 'Due today' : `${daysUntil} days away`}</p>
           </div>
         )}
       </div>
 
       {/* Action button */}
       {income.received ? (
-        <button
-          onClick={() => onMarkPending(income.id)}
-          disabled={disabled}
-          onMouseEnter={() => !disabled && setHoveredPending(true)}
-          onMouseLeave={() => setHoveredPending(false)}
-          style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: hoveredPending && !disabled ? 'var(--c-input-bg, #f9fafb)' : '#fff', color: 'var(--c-muted, #6b7280)', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1, fontFamily: "'Nunito', sans-serif", transition: 'background .15s' }}
-        >
+        <button onClick={() => onMarkPending(income.id)} disabled={disabled} onMouseEnter={() => !disabled && setHoveredPending(true)} onMouseLeave={() => setHoveredPending(false)}
+          style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: hoveredPending && !disabled ? 'var(--c-input-bg, #f9fafb)' : '#fff', color: 'var(--c-muted, #6b7280)', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1, fontFamily: "'Nunito', sans-serif", transition: 'background .15s' }}>
           {disabled ? 'Updating…' : 'Mark as Pending'}
         </button>
       ) : (

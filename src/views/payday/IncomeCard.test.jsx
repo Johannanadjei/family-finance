@@ -146,4 +146,57 @@ describe('IncomeCard', () => {
     await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
     expect(screen.getByTestId('edit-pay-day-inc-2').value).toBe('25');
   });
+
+  // ── Received amount update prompt ─────────────────────────────────────────
+
+  it('shows received update prompt when editing received income and saving a different amount', async () => {
+    const onUpdateExpected = vi.fn().mockResolvedValue({ error: null });
+    renderCard({ income: receivedIncome, onUpdateExpected });
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    fireEvent.change(screen.getByTestId('edit-expected-input-inc-1'), { target: { value: '25000' } });
+    await act(async () => { screen.getByLabelText('Save expected amount').click(); });
+    expect(screen.getByTestId('received-update-prompt-inc-1')).toBeTruthy();
+  });
+
+  it('does not show prompt when saving same amount as received', async () => {
+    const onUpdateExpected = vi.fn().mockResolvedValue({ error: null });
+    renderCard({ income: receivedIncome, onUpdateExpected });
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    fireEvent.change(screen.getByTestId('edit-expected-input-inc-1'), { target: { value: '30000' } });
+    await act(async () => { screen.getByLabelText('Save expected amount').click(); });
+    expect(screen.queryByTestId('received-update-prompt-inc-1')).toBeNull();
+  });
+
+  it('does not show prompt when editing a pending (not received) income', async () => {
+    const onUpdateExpected = vi.fn().mockResolvedValue({ error: null });
+    renderCard({ onUpdateExpected });
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    fireEvent.change(screen.getByTestId('edit-expected-input-inc-2'), { target: { value: '20000' } });
+    await act(async () => { screen.getByLabelText('Save expected amount').click(); });
+    expect(screen.queryByTestId('received-update-prompt-inc-2')).toBeNull();
+  });
+
+  it('calls onMarkPending and onConfirm when yes update received tapped', async () => {
+    const onUpdateExpected = vi.fn().mockResolvedValue({ error: null });
+    const onMarkPending    = vi.fn().mockResolvedValue({ error: null });
+    const onConfirm        = vi.fn();
+    renderCard({ income: receivedIncome, onUpdateExpected, onMarkPending, onConfirm });
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    fireEvent.change(screen.getByTestId('edit-expected-input-inc-1'), { target: { value: '25000' } });
+    await act(async () => { screen.getByLabelText('Save expected amount').click(); });
+    await act(async () => { screen.getByTestId('received-update-confirm-inc-1').click(); });
+    expect(onMarkPending).toHaveBeenCalledWith('inc-1');
+    expect(onConfirm).toHaveBeenCalledWith(receivedIncome);
+  });
+
+  it('hides prompt and closes edit when keep as tapped', async () => {
+    const onUpdateExpected = vi.fn().mockResolvedValue({ error: null });
+    renderCard({ income: receivedIncome, onUpdateExpected });
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    fireEvent.change(screen.getByTestId('edit-expected-input-inc-1'), { target: { value: '25000' } });
+    await act(async () => { screen.getByLabelText('Save expected amount').click(); });
+    await act(async () => { screen.getByTestId('received-update-keep-inc-1').click(); });
+    expect(screen.queryByTestId('received-update-prompt-inc-1')).toBeNull();
+    expect(screen.queryByTestId('edit-expected-input-inc-1')).toBeNull();
+  });
 });
