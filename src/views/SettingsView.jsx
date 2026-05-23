@@ -31,6 +31,8 @@ export function SettingsView() {
   const [addingSource,    setAddingSource]    = useState(false);
   const [newLabel,        setNewLabel]        = useState('');
   const [newAmount,       setNewAmount]       = useState('');
+  const [newPayDayType,   setNewPayDayType]   = useState('flexible');
+  const [newPayDay,       setNewPayDay]       = useState('');
   const [addError,        setAddError]        = useState(null);
   const [savingSource,    setSavingSource]    = useState(false);
   const [showIncomeInfo,  setShowIncomeInfo]  = useState(false);
@@ -43,14 +45,16 @@ export function SettingsView() {
       expected_amount: Math.round(parseFloat(newAmount) || 0),
       icon:            '💰',
       currency:        centre?.currency || 'GHS',
-      pay_day_type:    'flexible',
-      pay_day:         null,
+      pay_day_type:    newPayDayType,
+      pay_day:         newPayDayType === 'fixed_date' ? (parseInt(newPayDay) || null) : null,
       month:           getCurrentMonth(),
     });
     setSavingSource(false);
     if (error) { setAddError('Could not save. Please try again.'); return; }
     setNewLabel('');
     setNewAmount('');
+    setNewPayDayType('flexible');
+    setNewPayDay('');
     setAddError(null);
     setAddingSource(false);
   };
@@ -110,6 +114,18 @@ export function SettingsView() {
             <input data-testid="new-source-amount" type="number" value={newAmount}
               onChange={e => setNewAmount(e.target.value)}
               placeholder="Expected amount (optional)" style={inputStyle} />
+            <select data-testid="new-source-pay-day-type" value={newPayDayType}
+              onChange={e => { setNewPayDayType(e.target.value); setNewPayDay(''); }}
+              style={{ ...inputStyle, appearance: 'none', WebkitAppearance: 'none' }}>
+              <option value="flexible">Flexible / Ad-hoc</option>
+              <option value="fixed_date">Fixed date each month</option>
+              <option value="last_working_day">Last working day</option>
+            </select>
+            {newPayDayType === 'fixed_date' && (
+              <input data-testid="new-source-pay-day" type="number" value={newPayDay}
+                onChange={e => setNewPayDay(e.target.value)}
+                placeholder="Day of month (1–31)" min="1" max="31" style={inputStyle} />
+            )}
             {addError && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 6px', fontWeight: 700 }}>{addError}</p>}
             <button data-testid="save-income-source-btn" onClick={handleAddSource} disabled={savingSource}
               style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: '#fff', fontSize: 14, fontWeight: 800, cursor: savingSource ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>

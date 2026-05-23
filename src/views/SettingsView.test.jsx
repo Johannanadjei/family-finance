@@ -87,6 +87,30 @@ describe('SettingsView', () => {
     await act(async () => { screen.getByTestId('add-income-source-btn').click(); });
     expect(screen.getByTestId('new-source-label')).toBeTruthy();
     expect(screen.getByTestId('new-source-amount')).toBeTruthy();
+    expect(screen.getByTestId('new-source-pay-day-type')).toBeTruthy();
+  });
+
+  it('shows pay day input only when fixed_date selected', async () => {
+    renderSettings();
+    await act(async () => { screen.getByTestId('add-income-source-btn').click(); });
+    expect(screen.queryByTestId('new-source-pay-day')).toBeNull();
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('new-source-pay-day-type'), { target: { value: 'fixed_date' } });
+    });
+    expect(screen.getByTestId('new-source-pay-day')).toBeTruthy();
+  });
+
+  it('calls addIncomeSource with pay_day_type on save', async () => {
+    renderSettings();
+    await act(async () => { screen.getByTestId('add-income-source-btn').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('new-source-label'), { target: { value: 'Salary' } });
+      fireEvent.change(screen.getByTestId('new-source-pay-day-type'), { target: { value: 'last_working_day' } });
+    });
+    await act(async () => { screen.getByTestId('save-income-source-btn').click(); });
+    expect(mockAddIncomeSource).toHaveBeenCalledWith(
+      expect.objectContaining({ label: 'Salary', pay_day_type: 'last_working_day', pay_day: null })
+    );
   });
 
   it('calls addIncomeSource with label when new source saved', async () => {
