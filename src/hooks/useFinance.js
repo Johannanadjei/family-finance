@@ -159,7 +159,13 @@ export function useFinance({ centre, categories }) {
       return { data: null, error };
     }
 
-    setTxs(prev => prev.map(t => t.id === tempId ? { ...data, _optimistic: false } : t));
+    if (data) {
+      setTxs(prev => prev.map(t => t.id === tempId ? { ...data, _optimistic: false } : t));
+    } else {
+      // Insert succeeded but RLS blocked read-back — keep all optimistic field values,
+      // just clear the flag so the row is no longer dimmed/disabled.
+      setTxs(prev => prev.map(t => t.id === tempId ? { ...t, _optimistic: false } : t));
+    }
     return { data, error: null };
   }, [centreId]);
 
@@ -242,8 +248,8 @@ export function useFinance({ centre, categories }) {
       return { error: txErr };
     }
 
-    // Both phases succeeded — add transaction to local state
-    setTxs(prev => [{ ...txData, _optimistic: false }, ...prev]);
+    // Both phases succeeded — add transaction to local state if read-back succeeded
+    if (txData) setTxs(prev => [{ ...txData, _optimistic: false }, ...prev]);
     return { error: null };
   }, [centreId, incomes, currency]);
 

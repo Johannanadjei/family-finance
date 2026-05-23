@@ -98,7 +98,10 @@ export const addTransaction = async (centreId, tx) => {
     return { data: null, error: e };
   }
 
-  const { data, error } = await supabase
+  // Use .select() without .single() so a successful insert that RLS blocks
+  // from reading back returns { data: [], error: null } rather than a PGRST116
+  // error that would incorrectly trigger a rollback in the caller.
+  const { data: rows, error } = await supabase
     .from('transactions')
     .insert({
       budget_centre_id:      centreId,
@@ -108,11 +111,10 @@ export const addTransaction = async (centreId, tx) => {
       submitted_by_guest_id: tx.submitted_by_guest_id || null,
       submitted_by_name:     tx.submitted_by_name     || '',
     })
-    .select()
-    .single();
+    .select();
 
   if (error) console.error('[transactions.service] addTransaction error:', error);
-  return { data, error };
+  return { data: rows?.[0] || null, error };
 };
 
 /**
