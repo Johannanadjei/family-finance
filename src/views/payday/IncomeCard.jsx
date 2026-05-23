@@ -6,6 +6,7 @@
 
 import { useState }                                                from 'react';
 import { getIncomeStatus, INCOME_STATUS_CONFIG, calcDaysUntil }   from '../../lib/finance';
+import { UpdateReceivedSheet }                                     from './UpdateReceivedSheet';
 
 export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpected, disabled }) {
   const status    = getIncomeStatus(income);
@@ -39,6 +40,7 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
     setSaving(false);
     if (income.received && n !== income.received_amount) {
       setPendingAmount(n);
+      setEditing(false);
       setShowReceivedPrompt(true);
     } else {
       setEditing(false);
@@ -76,17 +78,6 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
         <div>
           <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: '0 0 4px' }}>Expected</p>
           {editing ? (
-            showReceivedPrompt ? (
-              <div data-testid={`received-update-prompt-${income.id}`} style={{ background: 'var(--c-accent-light, #f0fdf4)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-text, #1c1917)', margin: 0, lineHeight: 1.5 }}>
-                  You confirmed receiving {fmt(income.received_amount)} this month. Did you actually receive {fmt(pendingAmount)}?
-                </p>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button data-testid={`received-update-confirm-${income.id}`} onClick={handleUpdateReceived} style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none', background: 'var(--c-primary, #064e3b)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Yes, update received</button>
-                  <button data-testid={`received-update-keep-${income.id}`} onClick={handleKeepReceived} style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', background: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", color: 'var(--c-muted, #6b7280)' }}>Keep as {fmt(income.received_amount)}</button>
-                </div>
-              </div>
-            ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input data-testid={`edit-expected-input-${income.id}`} type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} autoFocus style={{ width: 120, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-primary, #064e3b)', fontSize: 16, fontWeight: 800, outline: 'none', fontFamily: "'Nunito', sans-serif" }} />
@@ -102,7 +93,6 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
                   <input data-testid={`edit-pay-day-${income.id}`} type="number" min="1" max="31" placeholder="Day of month" value={payDay} onChange={e => setPayDay(e.target.value)} style={{ width: 120, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: "'Nunito', sans-serif" }} />
                 )}
               </div>
-            )
           ) : (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -140,6 +130,15 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
           {disabled ? 'Confirming…' : 'Confirm Received'}
         </button>
       )}
+      <UpdateReceivedSheet
+        isOpen={showReceivedPrompt}
+        sourceId={income.id}
+        receivedAmount={income.received_amount}
+        pendingAmount={pendingAmount}
+        fmt={fmt}
+        onConfirm={handleUpdateReceived}
+        onDismiss={handleKeepReceived}
+      />
     </div>
   );
 }
