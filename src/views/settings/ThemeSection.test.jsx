@@ -36,7 +36,6 @@ describe('ThemeSection', () => {
     render(<ThemeSection />);
     expect(screen.getByTestId('theme-global_international')).toBeTruthy();
     expect(screen.getByTestId('theme-corporate_professional')).toBeTruthy();
-    expect(screen.getByTestId('theme-nature_fresh')).toBeTruthy();
     expect(screen.getByTestId('theme-sunset_warm')).toBeTruthy();
     expect(screen.getByTestId('theme-neon_futuristic')).toBeTruthy();
     expect(screen.getByTestId('theme-dark_executive')).toBeTruthy();

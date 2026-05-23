@@ -13,7 +13,6 @@ const SKINS = [
   { key: 'family_warmth',         label: 'Family Warmth', emoji: '🌿', pro: false },
   { key: 'global_international',  label: 'Global',        emoji: '🌐', pro: true  },
   { key: 'corporate_professional',label: 'Corporate',     emoji: '💼', pro: true  },
-  { key: 'nature_fresh',          label: 'Nature',        emoji: '🌿', pro: true  },
   { key: 'sunset_warm',           label: 'Sunset',        emoji: '🌅', pro: true  },
   { key: 'neon_futuristic',       label: 'Neon',          emoji: '⚡', pro: true  },
   { key: 'dark_executive',        label: 'Dark',          emoji: '🌙', pro: true  },

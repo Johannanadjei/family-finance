@@ -6,9 +6,8 @@
  * Never hardcode hex values in components — always use var(--c-*)
  *
  * Free skin:  family_warmth
- * Pro skins:  global_international, corporate_professional, nature_fresh,
- *             sunset_warm, neon_futuristic, dark_executive, minimal_light,
- *             royal_luxury
+ * Pro skins:  global_international, corporate_professional, sunset_warm,
+ *             neon_futuristic, dark_executive, minimal_light, royal_luxury
  */
 
 const SHARED = {
@@ -99,25 +98,6 @@ export const THEMES = {
     '--c-input-border':       '#e2e8f0',
     '--c-chip-selected-bg':   '#d1fae5',
     '--c-chip-selected-text': '#0f172a',
-    ...SHARED,
-  },
-
-  nature_fresh: {
-    '--c-primary':            '#166534',
-    '--c-primary-2':          '#15803d',
-    '--c-accent':             '#eab308',
-    '--c-accent-light':       '#fef9c3',
-    '--c-header-from':        '#166534',
-    '--c-header-to':          '#15803d',
-    '--c-text':               '#14532d',
-    '--c-muted':              '#6b7280',
-    '--c-bg':                 '#f0fdf4',
-    '--c-card':               '#ffffff',
-    '--c-border':             '#bbf7d0',
-    '--c-input-bg':           '#f0fdf4',
-    '--c-input-border':       '#bbf7d0',
-    '--c-chip-selected-bg':   '#fef9c3',
-    '--c-chip-selected-text': '#166534',
     ...SHARED,
   },
 
