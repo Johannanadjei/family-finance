@@ -48,6 +48,13 @@ describe('ConfirmSheet', () => {
     expect(screen.getByTestId('confirm-date-input').value).toBe(today);
   });
 
+  it('shows formatted date in DD/MM/YYYY next to date input', () => {
+    renderSheet();
+    const today = new Date().toISOString().split('T')[0];
+    const expected = new Date(today + 'T00:00:00').toLocaleDateString('en-GB');
+    expect(screen.getByTestId('confirm-date-display').textContent).toBe(expected);
+  });
+
   it('shows income label in heading', () => {
     renderSheet();
     expect(screen.getByText(/Adjei Salary/)).toBeTruthy();

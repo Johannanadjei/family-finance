@@ -108,10 +108,16 @@ export function ConfirmSheet({ income, isOpen, onClose, onConfirm, loading, erro
             <input
               data-testid="confirm-date-input"
               type="date"
+              lang="en-GB"
               value={date}
               onChange={e => setDate(e.target.value)}
               style={inputStyle}
             />
+            {date && (
+              <p data-testid="confirm-date-display" style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted, #6b7280)', margin: '4px 0 0' }}>
+                {new Date(date + 'T00:00:00').toLocaleDateString('en-GB')}
+              </p>
+            )}
           </div>
 
           {(localError || error) && (
