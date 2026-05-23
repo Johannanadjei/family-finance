@@ -18,6 +18,7 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
   const [payDayType,         setPayDayType]         = useState('');
   const [payDay,             setPayDay]             = useState('');
   const [saving,             setSaving]             = useState(false);
+  const [editError,          setEditError]          = useState(null);
   const [showReceivedPrompt, setShowReceivedPrompt] = useState(false);
   const [pendingAmount,      setPendingAmount]      = useState(null);
   const [hoveredPending,     setHoveredPending]     = useState(false);
@@ -26,12 +27,18 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
     setEditAmount(String(income.expected_amount));
     setPayDayType(income.pay_day_type || 'flexible');
     setPayDay(String(income.pay_day || ''));
+    setEditError(null);
     setEditing(true);
   };
 
   const handleEditSave = async () => {
     const n = Math.round(parseFloat(editAmount) || 0);
-    if (isNaN(n) || n < 0) { setEditing(false); return; }
+    if (n < 0) { setEditError('Please enter a valid amount'); return; }
+    if (payDayType === 'fixed_date') {
+      const pd = parseInt(payDay);
+      if (!payDay || isNaN(pd) || pd < 1 || pd > 31) { setEditError('Please enter a day between 1 and 31'); return; }
+    }
+    setEditError(null);
     setSaving(true);
     await onUpdateExpected(income.id, n, {
       pay_day_type: payDayType,
@@ -90,8 +97,9 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
                   <option value="last_working_day">Last working day</option>
                 </select>
                 {payDayType === 'fixed_date' && (
-                  <input data-testid={`edit-pay-day-${income.id}`} type="number" min="1" max="31" placeholder="Day of month" value={payDay} onChange={e => setPayDay(e.target.value)} style={{ width: 120, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: "'Nunito', sans-serif" }} />
+                  <input data-testid={`edit-pay-day-${income.id}`} type="number" min="1" max="31" placeholder="Day of month" value={payDay} onChange={e => { setPayDay(e.target.value); setEditError(null); }} style={{ width: 120, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: "'Nunito', sans-serif" }} />
                 )}
+                {editError && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: 0, fontWeight: 700 }}>{editError}</p>}
               </div>
           ) : (
             <>

@@ -28,19 +28,27 @@ export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
   const [editPayDayType, setEditPayDayType] = useState('');
   const [editPayDay,    setEditPayDay]    = useState('');
   const [saving,        setSaving]        = useState(false);
+  const [editError,     setEditError]     = useState('');
 
   const handleEditOpen = () => {
     setEditLabel(source.label);
     setEditAmount(String(source.expected_amount));
     setEditPayDayType(source.pay_day_type || 'flexible');
     setEditPayDay(String(source.pay_day || ''));
+    setEditError('');
     setEditing(true);
   };
 
   const handleEditSave = async () => {
+    if (!editLabel.trim()) { setEditError('Please enter a name'); return; }
+    if (editPayDayType === 'fixed_date') {
+      const pd = parseInt(editPayDay);
+      if (!editPayDay || isNaN(pd) || pd < 1 || pd > 31) { setEditError('Please enter a day between 1 and 31'); return; }
+    }
+    setEditError('');
     setSaving(true);
     await onUpdate(source.id, {
-      label:           editLabel.trim() || source.label,
+      label:           editLabel.trim(),
       expected_amount: Math.round(parseFloat(editAmount) || 0),
       pay_day_type:    editPayDayType,
       pay_day:         editPayDayType === 'fixed_date' ? Number(editPayDay) || null : null,
@@ -100,10 +108,11 @@ export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
               max="31"
               placeholder="Day of month (1–31)"
               value={editPayDay}
-              onChange={e => setEditPayDay(e.target.value)}
+              onChange={e => { setEditPayDay(e.target.value); setEditError(''); }}
               style={fieldStyle}
             />
           )}
+          {editError && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 2px', fontWeight: 700 }}>{editError}</p>}
           <div style={{ display: 'flex', gap: 6 }}>
             <button
               aria-label="Save income source"

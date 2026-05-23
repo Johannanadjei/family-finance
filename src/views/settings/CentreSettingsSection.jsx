@@ -34,6 +34,7 @@ export function CentreSettingsSection() {
   };
 
   const handleSave = async () => {
+    if (!name.trim()) { setError('Please enter a name'); return; }
     setSaving(true);
     const { error: err } = await updateCentre({ name: name.trim(), currency });
     setSaving(false);

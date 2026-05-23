@@ -39,6 +39,10 @@ export function SettingsView() {
 
   const handleAddSource = async () => {
     if (!newLabel.trim()) { setAddError('Please enter a source name'); return; }
+    if (newPayDayType === 'fixed_date') {
+      const pd = parseInt(newPayDay);
+      if (!newPayDay || isNaN(pd) || pd < 1 || pd > 31) { setAddError('Please enter a day between 1 and 31'); return; }
+    }
     setSavingSource(true);
     const { error } = await addIncomeSource({
       label:           newLabel.trim(),

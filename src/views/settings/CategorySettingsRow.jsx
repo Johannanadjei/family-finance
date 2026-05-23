@@ -28,10 +28,13 @@ export function CategorySettingsRow({ cat, fmt, onUpdate, onDelete, isLast }) {
   const [budget,   setBudget]   = useState('');
   const [saving,   setSaving]   = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [error,    setError]    = useState(null);
 
-  const openEdit = () => { setName(cat.name); setBudget(String(cat.budget_amount || 0)); setEditing(true); };
+  const openEdit = () => { setName(cat.name); setBudget(String(cat.budget_amount || 0)); setError(null); setEditing(true); };
 
   const handleSave = async () => {
+    if (!name.trim()) { setError('Please enter a name'); return; }
+    if (isNaN(parseFloat(budget)) || parseFloat(budget) < 0) { setError('Please enter a valid amount'); return; }
     setSaving(true);
     await onUpdate(cat.id, { name: name.trim(), budget_amount: Math.round(parseFloat(budget) || 0) });
     setSaving(false);
@@ -70,8 +73,9 @@ export function CategorySettingsRow({ cat, fmt, onUpdate, onDelete, isLast }) {
         </div>
       ) : (
         <div>
-          <input data-testid={`cat-name-input-${cat.id}`} value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
-          <input data-testid={`cat-budget-input-${cat.id}`} type="number" value={budget} onChange={e => setBudget(e.target.value)} style={inputStyle} />
+          <input data-testid={`cat-name-input-${cat.id}`} value={name} onChange={e => { setName(e.target.value); setError(null); }} style={inputStyle} />
+          <input data-testid={`cat-budget-input-${cat.id}`} type="number" value={budget} onChange={e => { setBudget(e.target.value); setError(null); }} style={inputStyle} />
+          {error && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 4px', fontWeight: 700 }}>{error}</p>}
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={() => setEditing(false)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', background: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Cancel</button>
             <button data-testid={`cat-save-${cat.id}`} onClick={handleSave} disabled={saving}

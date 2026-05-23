@@ -86,4 +86,28 @@ describe('CategorySettingsRow', () => {
     expect(onUpdate).not.toHaveBeenCalled();
     expect(screen.queryByTestId('cat-name-input-cat-1')).toBeNull();
   });
+
+  it('shows error and does not save when name is empty', async () => {
+    const onUpdate = vi.fn();
+    renderRow({ onUpdate });
+    await act(async () => { screen.getByTestId('cat-edit-cat-1').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('cat-name-input-cat-1'), { target: { value: '' } });
+    });
+    await act(async () => { screen.getByTestId('cat-save-cat-1').click(); });
+    expect(screen.getByText('Please enter a name')).toBeTruthy();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('shows error and does not save when amount is negative', async () => {
+    const onUpdate = vi.fn();
+    renderRow({ onUpdate });
+    await act(async () => { screen.getByTestId('cat-edit-cat-1').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('cat-budget-input-cat-1'), { target: { value: '-100' } });
+    });
+    await act(async () => { screen.getByTestId('cat-save-cat-1').click(); });
+    expect(screen.getByText('Please enter a valid amount')).toBeTruthy();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
 });

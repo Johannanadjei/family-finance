@@ -199,4 +199,24 @@ describe('IncomeCard', () => {
     expect(screen.queryByTestId('received-update-prompt-inc-1')).toBeNull();
     expect(screen.queryByTestId('edit-expected-input-inc-1')).toBeNull();
   });
+
+  it('shows error when amount is negative on save', async () => {
+    renderCard();
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('edit-expected-input-inc-2'), { target: { value: '-100' } });
+    });
+    await act(async () => { screen.getByLabelText('Save expected amount').click(); });
+    expect(screen.getByText('Please enter a valid amount')).toBeTruthy();
+  });
+
+  it('shows error when fixed_date pay day is out of range on save', async () => {
+    renderCard();
+    await act(async () => { screen.getByLabelText('Edit expected amount').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('edit-pay-day-inc-2'), { target: { value: '50' } });
+    });
+    await act(async () => { screen.getByLabelText('Save expected amount').click(); });
+    expect(screen.getByText('Please enter a day between 1 and 31')).toBeTruthy();
+  });
 });

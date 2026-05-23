@@ -141,4 +141,19 @@ describe('SettingsView', () => {
     await act(async () => { screen.getByTestId('save-income-source-btn').click(); });
     expect(screen.queryByTestId('new-source-label')).toBeNull();
   });
+
+  it('shows error when fixed_date pay day is out of range', async () => {
+    renderSettings();
+    await act(async () => { screen.getByTestId('add-income-source-btn').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('new-source-label'), { target: { value: 'Salary' } });
+      fireEvent.change(screen.getByTestId('new-source-pay-day-type'), { target: { value: 'fixed_date' } });
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('new-source-pay-day'), { target: { value: '50' } });
+    });
+    await act(async () => { screen.getByTestId('save-income-source-btn').click(); });
+    expect(screen.getByText('Please enter a day between 1 and 31')).toBeTruthy();
+    expect(mockAddIncomeSource).not.toHaveBeenCalled();
+  });
 });

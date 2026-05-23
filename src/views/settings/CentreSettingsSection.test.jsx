@@ -90,4 +90,15 @@ describe('CentreSettingsSection', () => {
     expect(screen.queryByTestId('centre-name-input')).toBeNull();
     expect(mockUpdateCentre).not.toHaveBeenCalled();
   });
+
+  it('shows error and does not save when name is empty', async () => {
+    render(<CentreSettingsSection />);
+    await act(async () => { screen.getByTestId('centre-edit-btn').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('centre-name-input'), { target: { value: '' } });
+    });
+    await act(async () => { screen.getByTestId('centre-save-btn').click(); });
+    expect(screen.getByText('Please enter a name')).toBeTruthy();
+    expect(mockUpdateCentre).not.toHaveBeenCalled();
+  });
 });

@@ -141,4 +141,29 @@ describe('IncomeSourceRow', () => {
     await act(async () => { screen.getByLabelText('Cancel edit').click(); });
     expect(onUpdate).not.toHaveBeenCalled();
   });
+
+  it('shows error and does not save when label is empty', async () => {
+    const onUpdate = vi.fn();
+    renderRow({ onUpdate });
+    await act(async () => { screen.getByTestId('income-edit-inc-1').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('income-edit-label-inc-1'), { target: { value: '' } });
+    });
+    await act(async () => { screen.getByLabelText('Save income source').click(); });
+    expect(screen.getByText('Please enter a name')).toBeTruthy();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('shows error when fixed_date pay day is out of range on save', async () => {
+    renderRow();
+    await act(async () => { screen.getByTestId('income-edit-inc-1').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('income-edit-pay-day-type-inc-1'), { target: { value: 'fixed_date' } });
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('income-edit-pay-day-inc-1'), { target: { value: '50' } });
+    });
+    await act(async () => { screen.getByLabelText('Save income source').click(); });
+    expect(screen.getByText('Please enter a day between 1 and 31')).toBeTruthy();
+  });
 });
