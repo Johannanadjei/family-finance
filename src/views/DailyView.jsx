@@ -64,9 +64,9 @@ export function DailyView() {
 
       {/* Month navigation */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <button onClick={() => loadMonth(offsetMonth(activeMonth, -1))} aria-label="Previous month" style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--c-primary, #064e3b)', padding: '4px 8px' }}>&#8592;</button>
+        <button onClick={() => loadMonth(offsetMonth(activeMonth, -1))} aria-label="Previous month" style={{ background: 'var(--c-card, #fff)', borderRadius: 20, padding: '6px 14px', border: '1.5px solid var(--c-border, #e5e7eb)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', fontSize: 18, fontWeight: 900, cursor: 'pointer', color: 'var(--c-primary, #064e3b)', lineHeight: 1 }}>&#8592;</button>
         <p data-testid="daily-month-label" style={{ fontSize: 15, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>{formatMonth(activeMonth)}</p>
-        <button onClick={() => loadMonth(offsetMonth(activeMonth, 1))} aria-label="Next month" disabled={isCurrentMonth} style={{ background: 'none', border: 'none', fontSize: 20, cursor: isCurrentMonth ? 'not-allowed' : 'pointer', color: isCurrentMonth ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)', padding: '4px 8px' }}>&#8594;</button>
+        <button onClick={() => loadMonth(offsetMonth(activeMonth, 1))} aria-label="Next month" disabled={isCurrentMonth} style={{ background: 'var(--c-card, #fff)', borderRadius: 20, padding: '6px 14px', border: '1.5px solid var(--c-border, #e5e7eb)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', fontSize: 18, fontWeight: 900, cursor: isCurrentMonth ? 'not-allowed' : 'pointer', color: isCurrentMonth ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)', opacity: isCurrentMonth ? 0.5 : 1, lineHeight: 1 }}>&#8594;</button>
       </div>
 
       {/* Past month warning */}

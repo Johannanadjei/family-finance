@@ -45,7 +45,6 @@ export function PaydayView() {
   const [sheetOpen,      setSheetOpen]      = useState(false);
   const [mutating,       setMutating]       = useState(false);
   const [mutateError,    setMutateError]    = useState(null);
-  const [hoveredNav,     setHoveredNav]     = useState(null);
 
   if (financeValues.loading) return <PaydayViewSkeleton />;
 
@@ -90,9 +89,7 @@ export function PaydayView() {
         <button
           onClick={() => loadMonth(offsetMonth(activeMonth, -1))}
           aria-label="Previous month"
-          onMouseEnter={() => setHoveredNav('prev')}
-          onMouseLeave={() => setHoveredNav(null)}
-          style={{ background: hoveredNav === 'prev' ? 'var(--c-accent-light, #f0fdf4)' : 'none', border: 'none', borderRadius: 8, fontSize: 20, cursor: 'pointer', color: 'var(--c-primary, #064e3b)', padding: '4px 8px', transition: 'background .15s' }}
+          style={{ background: 'var(--c-card, #fff)', borderRadius: 20, padding: '6px 14px', border: '1.5px solid var(--c-border, #e5e7eb)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', fontSize: 18, fontWeight: 900, cursor: 'pointer', color: 'var(--c-primary, #064e3b)', lineHeight: 1 }}
         >
           &#8592;
         </button>
@@ -103,9 +100,7 @@ export function PaydayView() {
           onClick={() => loadMonth(offsetMonth(activeMonth, 1))}
           aria-label="Next month"
           disabled={isCurrentMonth}
-          onMouseEnter={() => !isCurrentMonth && setHoveredNav('next')}
-          onMouseLeave={() => setHoveredNav(null)}
-          style={{ background: hoveredNav === 'next' ? 'var(--c-accent-light, #f0fdf4)' : 'none', border: 'none', borderRadius: 8, fontSize: 20, cursor: isCurrentMonth ? 'not-allowed' : 'pointer', color: isCurrentMonth ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)', padding: '4px 8px', transition: 'background .15s' }}
+          style={{ background: 'var(--c-card, #fff)', borderRadius: 20, padding: '6px 14px', border: '1.5px solid var(--c-border, #e5e7eb)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', fontSize: 18, fontWeight: 900, cursor: isCurrentMonth ? 'not-allowed' : 'pointer', color: isCurrentMonth ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)', opacity: isCurrentMonth ? 0.5 : 1, lineHeight: 1 }}
         >
           &#8594;
         </button>
