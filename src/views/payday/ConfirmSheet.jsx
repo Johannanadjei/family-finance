@@ -24,15 +24,31 @@ const inputStyle = {
   fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
 };
 
+const computeDate = (d, m, y) => {
+  const dd = parseInt(d), mm = parseInt(m), yy = parseInt(y);
+  if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12 && yy >= 2020 && yy <= 2030) {
+    return `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  }
+  return '';
+};
+
 export function ConfirmSheet({ income, isOpen, onClose, onConfirm, loading, error, fmt }) {
   const [amount,     setAmount]     = useState('');
   const [date,       setDate]       = useState('');
+  const [day,        setDay]        = useState('');
+  const [month,      setMonth]      = useState('');
+  const [year,       setYear]       = useState('');
   const [localError, setLocalError] = useState(null);
 
   useEffect(() => {
     if (isOpen && income) {
       setAmount(String(income.expected_amount));
-      setDate(new Date().toISOString().split('T')[0]);
+      const today = new Date().toISOString().split('T')[0];
+      setDate(today);
+      const [y, m, d] = today.split('-');
+      setYear(y);
+      setMonth(String(parseInt(m)));
+      setDay(String(parseInt(d)));
       setLocalError(null);
     }
   }, [isOpen, income?.id]);
@@ -105,19 +121,13 @@ export function ConfirmSheet({ income, isOpen, onClose, onConfirm, loading, erro
             <p style={{ fontSize: 12, fontWeight: 800, color: 'var(--c-muted, #6b7280)', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>
               Date received
             </p>
-            <input
-              data-testid="confirm-date-input"
-              type="date"
-              lang="en-GB"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              style={inputStyle}
-            />
-            {date && (
-              <p data-testid="confirm-date-display" style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted, #6b7280)', margin: '4px 0 0' }}>
-                {new Date(date + 'T00:00:00').toLocaleDateString('en-GB')}
-              </p>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input data-testid="confirm-date-day" type="number" min="1" max="31" placeholder="DD" value={day} onChange={e => { const v = e.target.value; setDay(v); setDate(computeDate(v, month, year)); }} style={{ ...inputStyle, width: 60, padding: '12px 8px', textAlign: 'center' }} />
+              <span style={{ color: 'var(--c-muted, #6b7280)', fontWeight: 800, fontSize: 18, flexShrink: 0 }}>/</span>
+              <input data-testid="confirm-date-month" type="number" min="1" max="12" placeholder="MM" value={month} onChange={e => { const v = e.target.value; setMonth(v); setDate(computeDate(day, v, year)); }} style={{ ...inputStyle, width: 60, padding: '12px 8px', textAlign: 'center' }} />
+              <span style={{ color: 'var(--c-muted, #6b7280)', fontWeight: 800, fontSize: 18, flexShrink: 0 }}>/</span>
+              <input data-testid="confirm-date-year" type="number" min="2020" max="2030" placeholder="YYYY" value={year} onChange={e => { const v = e.target.value; setYear(v); setDate(computeDate(day, month, v)); }} style={{ ...inputStyle, width: 80, padding: '12px 8px', textAlign: 'center' }} />
+            </div>
           </div>
 
           {(localError || error) && (
