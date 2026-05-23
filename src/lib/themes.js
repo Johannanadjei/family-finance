@@ -201,21 +201,21 @@ export const THEMES = {
   },
 
   monochrome: {
-    '--c-primary':            '#ffffff',
-    '--c-primary-2':          '#e5e5e5',
+    '--c-primary':            '#3a3a3a',  // dark — components hardcode #fff text on primary bg
+    '--c-primary-2':          '#2d2d2d',
     '--c-accent':             '#ffffff',
-    '--c-accent-light':       '#1a1a1a',
+    '--c-accent-light':       '#242424',
     '--c-header-from':        '#000000',
     '--c-header-to':          '#1a1a1a',
-    '--c-text':               '#ffffff',
+    '--c-text':               '#e5e5e5',  // near-white — softer than pure #fff
     '--c-muted':              '#9ca3af',
     '--c-bg':                 '#0a0a0a',
-    '--c-card':               '#1a1a1a',
-    '--c-border':             '#2a2a2a',
+    '--c-card':               '#242424',  // lifted from #1a1a1a — distinct against #0a0a0a bg
+    '--c-border':             '#3a3a3a',  // visible border on dark surfaces
     '--c-input-bg':           '#111111',
-    '--c-input-border':       '#2a2a2a',
-    '--c-chip-bg':            '#1a1a1a',
-    '--c-chip-text':          '#ffffff',
+    '--c-input-border':       '#3a3a3a',
+    '--c-chip-bg':            '#242424',
+    '--c-chip-text':          '#e5e5e5',
     '--c-chip-selected-bg':   '#ffffff',
     '--c-chip-selected-text': '#000000',
     '--c-modal-bg':           '#1a1a1a',
