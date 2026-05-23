@@ -71,25 +71,6 @@ export function SettingsView() {
       {/* Centre */}
       <CentreSettingsSection />
 
-      {/* Budget Categories */}
-      <div style={card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <p style={{ ...sectionLabel, margin: 0 }}>Budget Categories</p>
-          <button onClick={() => setAddCatOpen(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}>
-            + Add
-          </button>
-        </div>
-        {categories.length === 0
-          ? <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0 }}>No categories this month</p>
-          : categories.map((cat, i) => (
-              <CategorySettingsRow key={cat.id} cat={cat} fmt={fmt}
-                onUpdate={updateCategory} onDelete={deleteCategory}
-                isLast={i === categories.length - 1} />
-            ))
-        }
-      </div>
-
       {/* Income Sources */}
       <div style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -125,6 +106,25 @@ export function SettingsView() {
                 <IncomeSourceRow key={src.id} source={src} fmt={fmt}
                   onDelete={deleteIncomeSource} isLast={i === incomes.length - 1} />
               ))
+        }
+      </div>
+
+      {/* Budget Categories */}
+      <div style={card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <p style={{ ...sectionLabel, margin: 0 }}>Budget Categories</p>
+          <button onClick={() => setAddCatOpen(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}>
+            + Add
+          </button>
+        </div>
+        {categories.length === 0
+          ? <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0 }}>No categories this month</p>
+          : categories.map((cat, i) => (
+              <CategorySettingsRow key={cat.id} cat={cat} fmt={fmt}
+                onUpdate={updateCategory} onDelete={deleteCategory}
+                isLast={i === categories.length - 1} />
+            ))
         }
       </div>
 
