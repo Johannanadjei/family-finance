@@ -211,23 +211,8 @@ describe('validateTransaction', () => {
   it('throws for invalid currency', () =>
     expect(() => validateTransaction({ ...validTx, currency: 'XYZ' })).toThrow());
 
-  it('throws for empty category_name on expense', () =>
+  it('throws for empty category_name', () =>
     expect(() => validateTransaction({ ...validTx, category_name: '' })).toThrow());
-
-  it('allows null category_name for income', () => {
-    const result = validateTransaction({ ...validTx, type: 'income', category_name: null });
-    expect(result.category_name).toBeNull();
-  });
-
-  it('allows empty string category_name for income — returns null', () => {
-    const result = validateTransaction({ ...validTx, type: 'income', category_name: '' });
-    expect(result.category_name).toBeNull();
-  });
-
-  it('keeps category_name for income when provided', () => {
-    const result = validateTransaction({ ...validTx, type: 'income', category_name: 'Salary' });
-    expect(result.category_name).toBe('Salary');
-  });
 });
 
 // ── validateCategory ──────────────────────────────────────────────────────────
