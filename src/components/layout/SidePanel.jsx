@@ -102,7 +102,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                              : hovered ? 'var(--c-bg, #f3f4f6)'
                              : 'transparent',
                   borderTop:    'none', borderRight: 'none', borderBottom: 'none',
-                  borderLeft:   `4px solid ${active ? 'var(--c-accent, #059669)' : 'transparent'}`,
+                  borderLeft:   `4px solid ${active ? 'var(--c-active-bg, var(--c-accent, #059669))' : 'transparent'}`,
                   cursor:     'pointer',
                   display:    'block',
                   transition: 'background .15s',
@@ -113,7 +113,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                   {/* Icon container — green when active */}
                   <div style={{
                     width: 42, height: 42, borderRadius: 11, flexShrink: 0,
-                    background: active ? 'var(--c-accent, #059669)' : 'var(--c-bg, #f3f4f6)',
+                    background: active ? 'var(--c-active-bg, var(--c-accent, #059669))' : 'var(--c-bg, #f3f4f6)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 20,
                   }}>
@@ -123,7 +123,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{
                       fontSize: 14, fontWeight: 900, margin: '0 0 2px',
-                      color: active ? 'var(--c-accent, #059669)' : 'var(--c-text, #1c1917)',
+                      color: active ? 'var(--c-active-bg, var(--c-accent, #059669))' : 'var(--c-text, #1c1917)',
                     }}>
                       {c.name}
                     </p>
@@ -134,8 +134,9 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
 
                   {active ? (
                     <span style={{
-                      fontSize: 10, fontWeight: 800, color: '#fff',
-                      background: 'var(--c-accent, #059669)',
+                      fontSize: 10, fontWeight: 800,
+                      color: 'var(--c-active-text, #fff)',
+                      background: 'var(--c-active-bg, var(--c-accent, #059669))',
                       padding: '3px 8px', borderRadius: 20, flexShrink: 0,
                     }}>
                       Active

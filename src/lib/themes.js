@@ -216,8 +216,10 @@ export const THEMES = {
     '--c-input-border':       '#3a3a3a',
     '--c-chip-bg':            '#242424',
     '--c-chip-text':          '#e5e5e5',
-    '--c-chip-selected-bg':   '#ffffff',
-    '--c-chip-selected-text': '#000000',
+    '--c-chip-selected-bg':   '#2a2a2a',  // dark pill — white text on dark bg
+    '--c-chip-selected-text': '#ffffff',
+    '--c-active-bg':          '#ffffff',  // active hub highlight — white on dark card
+    '--c-active-text':        '#000000',  // text inside active-bg elements
     '--c-modal-bg':           '#1a1a1a',
     '--c-danger':             '#fca5a5',
     '--c-danger-bg':          '#1a0a0a',
