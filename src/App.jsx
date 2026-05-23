@@ -72,7 +72,8 @@ function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre, onH
   const [panelOpen,       setPanelOpen]    = useState(false);
   const [addSheetOpen,    setAddSheetOpen] = useState(false);
   const [createHubOpen,   setCreateHubOpen] = useState(false);
-  const handleOpenCreateHub = useCallback(() => { setPanelOpen(false); setCreateHubOpen(true); }, []);
+  const handleOpenCreateHub  = useCallback(() => { setPanelOpen(false); setCreateHubOpen(true); }, []);
+  const handleHubCreatedNav  = useCallback(async (id) => { await onHubCreated(id); navigate('/'); }, [onHubCreated, navigate]);
   const [toast,           setToast]        = useState(null);
   const [editTx,          setEditTx]       = useState(null);
 
@@ -146,7 +147,7 @@ function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre, onH
       <CreateHubSheet
         isOpen={createHubOpen}
         onClose={() => setCreateHubOpen(false)}
-        onComplete={onHubCreated}
+        onComplete={handleHubCreatedNav}
       />
     </div>
   );
