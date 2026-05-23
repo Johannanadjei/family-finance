@@ -25,6 +25,14 @@ const inputStyle = {
   fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
 };
 
+const computeDate = (d, m, y) => {
+  const dd = parseInt(d), mm = parseInt(m), yy = parseInt(y);
+  if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12 && yy >= 2020 && yy <= 2030) {
+    return `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  }
+  return '';
+};
+
 export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null }) {
   const { centre, categories, getCatIcon } = useBudgetCentreContext();
   const { addTransaction, updateTransaction } = useFinanceContext();
@@ -35,6 +43,9 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
   const [categoryId,   setCategoryId]   = useState(null);
   const [description,  setDescription]  = useState('');
   const [date,         setDate]         = useState(() => new Date().toISOString().split('T')[0]);
+  const [day,          setDay]          = useState(() => String(new Date().getDate()));
+  const [month,        setMonth]        = useState(() => String(new Date().getMonth() + 1));
+  const [year,         setYear]         = useState(() => String(new Date().getFullYear()));
   const [loading,      setLoading]      = useState(false);
   const [saved,        setSaved]        = useState(false);
   const [error,        setError]        = useState(null);
@@ -46,7 +57,12 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
       setCategoryName(editTx?.category_name || '');
       setCategoryId(editTx?.category_id || null);
       setDescription(editTx?.description || '');
-      setDate(editTx?.date || new Date().toISOString().split('T')[0]);
+      const d = editTx?.date || new Date().toISOString().split('T')[0];
+      setDate(d);
+      const [y, m, dd] = d.split('-');
+      setYear(y);
+      setMonth(String(parseInt(m)));
+      setDay(String(parseInt(dd)));
       setError(null);
       setSaved(false);
     }
@@ -156,23 +172,13 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
           {/* Description */}
           <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)" style={inputStyle} />
 
-          {/* Date */}
-          <div>
-            <div style={{ position: 'relative' }}>
-              <input data-testid="add-date-input" type="date" lang="en-GB" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, paddingRight: 44, WebkitAppearance: 'none', appearance: 'none' }} />
-              <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--c-muted, #9ca3af)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8"/>
-                  <path d="M3 9h18" stroke="currentColor" strokeWidth="1.8"/>
-                  <path d="M8 2v4M16 2v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-              </span>
-            </div>
-            {date && (
-              <p data-testid="add-date-display" style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted, #6b7280)', margin: '4px 0 0' }}>
-                {new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-              </p>
-            )}
+          {/* Date — DD / MM / YYYY */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input data-testid="add-date-input" type="number" min="1" max="31" placeholder="DD" value={day} onChange={e => { const v = e.target.value; setDay(v); setDate(computeDate(v, month, year)); }} style={{ ...inputStyle, width: 60, padding: '12px 8px', textAlign: 'center' }} />
+            <span style={{ color: 'var(--c-muted, #6b7280)', fontWeight: 800, fontSize: 18, flexShrink: 0 }}>/</span>
+            <input data-testid="add-month-input" type="number" min="1" max="12" placeholder="MM" value={month} onChange={e => { const v = e.target.value; setMonth(v); setDate(computeDate(day, v, year)); }} style={{ ...inputStyle, width: 60, padding: '12px 8px', textAlign: 'center' }} />
+            <span style={{ color: 'var(--c-muted, #6b7280)', fontWeight: 800, fontSize: 18, flexShrink: 0 }}>/</span>
+            <input data-testid="add-year-input" type="number" min="2020" max="2030" placeholder="YYYY" value={year} onChange={e => { const v = e.target.value; setYear(v); setDate(computeDate(day, month, v)); }} style={{ ...inputStyle, width: 80, padding: '12px 8px', textAlign: 'center' }} />
           </div>
 
           {error && (

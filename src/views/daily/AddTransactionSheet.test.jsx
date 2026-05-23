@@ -47,17 +47,12 @@ describe('AddTransactionSheet', () => {
     expect(screen.getByTestId('add-amount-input')).toBeTruthy();
   });
 
-  it('renders date input pre-filled with today', () => {
+  it('renders date inputs pre-filled with today', () => {
     renderSheet();
-    const today = new Date().toISOString().split('T')[0];
-    expect(screen.getByTestId('add-date-input').value).toBe(today);
-  });
-
-  it('shows formatted date in DD/MM/YYYY below date input', () => {
-    renderSheet();
-    const today = new Date().toISOString().split('T')[0];
-    const expected = new Date(today + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    expect(screen.getByTestId('add-date-display').textContent).toBe(expected);
+    const today = new Date();
+    expect(screen.getByTestId('add-date-input').value).toBe(String(today.getDate()));
+    expect(screen.getByTestId('add-month-input').value).toBe(String(today.getMonth() + 1));
+    expect(screen.getByTestId('add-year-input').value).toBe(String(today.getFullYear()));
   });
 
   it('shows expense and income type toggle', () => {
