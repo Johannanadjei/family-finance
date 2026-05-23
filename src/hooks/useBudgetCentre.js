@@ -24,6 +24,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase }                          from '../lib/supabase';
 import { getCentreById, updateCentre as updateCentreService } from '../services/centres.service';
 import { addCategory as addCategoryService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
+import { updateIncomeSource as updateIncomeSourceService } from '../services/income.service';
 import { getCurrentMonth } from '../lib/finance';
 
 // ── Local Supabase helpers ────────────────────────────────────────────────────
@@ -209,6 +210,15 @@ export function useBudgetCentre(user, centreId) {
     return { error: null };
   }, [categories]);
 
+  const updateIncomeSource = useCallback(async (sourceId, updates) => {
+    const { data, error } = await updateIncomeSourceService(sourceId, updates);
+    if (error) {
+      console.error('[useBudgetCentre] updateIncomeSource error:', error.message);
+      return { error };
+    }
+    return { data, error: null };
+  }, []);
+
   return {
     centre,
     centreId:       centre?.id || null,
@@ -221,6 +231,7 @@ export function useBudgetCentre(user, centreId) {
     updateCentre,
     updateCategory,
     deleteCategory,
+    updateIncomeSource,
     onOnboardingComplete,
     reload: load,
   };

@@ -24,7 +24,7 @@ const inputStyle   = { width: '100%', padding: '10px 12px', borderRadius: 10, bo
 export function SettingsView() {
   const navigate  = useNavigate();
   const { signOut }                                                            = useAuth();
-  const { categories, fmt, addCategory, updateCategory, deleteCategory, centre } = useBudgetCentreContext();
+  const { categories, fmt, addCategory, updateCategory, deleteCategory, updateIncomeSource, centre } = useBudgetCentreContext();
   const { incomes, loading, addIncomeSource, deleteIncomeSource }             = useFinanceContext();
 
   const [addCatOpen,      setAddCatOpen]      = useState(false);
@@ -140,7 +140,7 @@ export function SettingsView() {
             ? <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0 }}>No income sources yet</p>
             : incomes.map((src, i) => (
                 <IncomeSourceRow key={src.id} source={src} fmt={fmt}
-                  onDelete={deleteIncomeSource} isLast={i === incomes.length - 1} />
+                  onDelete={deleteIncomeSource} onUpdate={updateIncomeSource} isLast={i === incomes.length - 1} />
               ))
         }
       </div>

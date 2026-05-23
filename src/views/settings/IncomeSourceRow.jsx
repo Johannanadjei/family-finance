@@ -1,19 +1,52 @@
 /**
  * views/settings/IncomeSourceRow.jsx
  *
- * Single income source row with delete action.
- * Edit is handled in PaydayView — this row is settings-only delete.
+ * Single income source row with inline edit and delete.
  *
- * @param {{ id, label, icon, expected_amount }} source
+ * @param {{ id, label, icon, expected_amount, pay_day_type, pay_day }} source
  * @param {function} fmt
  * @param {function} onDelete — (id) => Promise<{ error }>
+ * @param {function} onUpdate — (id, updates) => Promise<{ error }>
  * @param {boolean}  isLast
  */
 
 import { useState } from 'react';
 
-export function IncomeSourceRow({ source, fmt, onDelete, isLast }) {
-  const [deleting, setDeleting] = useState(false);
+const fieldStyle = {
+  width: '100%', padding: '6px 10px', borderRadius: 8,
+  border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 13, fontWeight: 700,
+  outline: 'none', background: 'var(--c-input-bg, #f9fafb)', boxSizing: 'border-box',
+  fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
+};
+
+export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
+  const [deleting,      setDeleting]      = useState(false);
+  const [editing,       setEditing]       = useState(false);
+  const [editLabel,     setEditLabel]     = useState('');
+  const [editAmount,    setEditAmount]    = useState('');
+  const [editPayDayType, setEditPayDayType] = useState('');
+  const [editPayDay,    setEditPayDay]    = useState('');
+  const [saving,        setSaving]        = useState(false);
+
+  const handleEditOpen = () => {
+    setEditLabel(source.label);
+    setEditAmount(String(source.expected_amount));
+    setEditPayDayType(source.pay_day_type || 'flexible');
+    setEditPayDay(String(source.pay_day || ''));
+    setEditing(true);
+  };
+
+  const handleEditSave = async () => {
+    setSaving(true);
+    await onUpdate(source.id, {
+      label:           editLabel.trim() || source.label,
+      expected_amount: Math.round(parseFloat(editAmount) || 0),
+      pay_day_type:    editPayDayType,
+      pay_day:         editPayDayType === 'fixed_date' ? Number(editPayDay) || null : null,
+    });
+    setSaving(false);
+    setEditing(false);
+  };
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -22,34 +55,106 @@ export function IncomeSourceRow({ source, fmt, onDelete, isLast }) {
 
   return (
     <div style={{
-      display:        'flex',
-      justifyContent: 'space-between',
-      alignItems:     'center',
-      padding:        '12px 0',
-      borderBottom:   isLast ? 'none' : '1px solid var(--c-border, #e5e7eb)',
-      opacity:        deleting ? 0.4 : 1,
-      transition:     'opacity .2s',
+      padding:      '12px 0',
+      borderBottom: isLast ? 'none' : '1px solid var(--c-border, #e5e7eb)',
+      opacity:      deleting ? 0.4 : 1,
+      transition:   'opacity .2s',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 18 }}>{source.icon || '💰'}</span>
-        <div>
-          <p data-testid={`income-label-${source.id}`} style={{ fontSize: 14, fontWeight: 800, color: 'var(--c-text, #1c1917)', margin: 0 }}>{source.label}</p>
-          <p data-testid={`income-amount-${source.id}`} style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0 }}>{fmt(source.expected_amount)}</p>
+      {editing ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <input
+            data-testid={`income-edit-label-${source.id}`}
+            type="text"
+            value={editLabel}
+            onChange={e => setEditLabel(e.target.value)}
+            placeholder="Source name"
+            autoFocus
+            style={fieldStyle}
+          />
+          <input
+            data-testid={`income-edit-amount-${source.id}`}
+            type="number"
+            value={editAmount}
+            onChange={e => setEditAmount(e.target.value)}
+            placeholder="Expected amount"
+            min="0"
+            style={fieldStyle}
+          />
+          <select
+            data-testid={`income-edit-pay-day-type-${source.id}`}
+            value={editPayDayType}
+            onChange={e => { setEditPayDayType(e.target.value); setEditPayDay(''); }}
+            style={{ ...fieldStyle, appearance: 'none', WebkitAppearance: 'none' }}
+          >
+            <option value="flexible">Flexible / Ad-hoc</option>
+            <option value="fixed_date">Fixed date each month</option>
+            <option value="last_working_day">Last working day</option>
+          </select>
+          {editPayDayType === 'fixed_date' && (
+            <input
+              data-testid={`income-edit-pay-day-${source.id}`}
+              type="number"
+              min="1"
+              max="31"
+              placeholder="Day of month (1–31)"
+              value={editPayDay}
+              onChange={e => setEditPayDay(e.target.value)}
+              style={fieldStyle}
+            />
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              aria-label="Save income source"
+              onClick={handleEditSave}
+              disabled={saving}
+              style={{ background: 'var(--c-primary, #064e3b)', border: 'none', borderRadius: 8, padding: '6px 14px', color: '#fff', fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif", fontWeight: 800 }}
+            >
+              {saving ? '…' : '✓'}
+            </button>
+            <button
+              aria-label="Cancel edit"
+              onClick={() => setEditing(false)}
+              style={{ background: 'var(--c-border, #e5e7eb)', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 14, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", fontWeight: 800 }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
-      </div>
-
-      <button
-        data-testid={`income-delete-${source.id}`}
-        onClick={handleDelete}
-        disabled={deleting}
-        aria-label={`Delete ${source.label}`}
-        style={{ background: 'none', border: 'none', cursor: deleting ? 'not-allowed' : 'pointer', color: 'var(--c-muted, #9ca3af)', padding: '6px 8px', display: 'flex', alignItems: 'center', opacity: deleting ? 0.4 : 1 }}
-      >
-        {deleting
-          ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ animation: 'spin 0.7s linear infinite' }}><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="40 20" strokeLinecap="round"/></svg>
-          : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        }
-      </button>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 18 }}>{source.icon || '💰'}</span>
+            <div>
+              <p data-testid={`income-label-${source.id}`} style={{ fontSize: 14, fontWeight: 800, color: 'var(--c-text, #1c1917)', margin: 0 }}>{source.label}</p>
+              <p data-testid={`income-amount-${source.id}`} style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0 }}>{fmt(source.expected_amount)}</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <button
+              data-testid={`income-edit-${source.id}`}
+              onClick={handleEditOpen}
+              aria-label={`Edit ${source.label}`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted, #9ca3af)', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                <path d="M9 1.5 11.5 4 4.5 11H2v-2.5L9 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <button
+              data-testid={`income-delete-${source.id}`}
+              onClick={handleDelete}
+              disabled={deleting}
+              aria-label={`Delete ${source.label}`}
+              style={{ background: 'none', border: 'none', cursor: deleting ? 'not-allowed' : 'pointer', color: 'var(--c-muted, #9ca3af)', padding: '6px 8px', display: 'flex', alignItems: 'center', opacity: deleting ? 0.4 : 1 }}
+            >
+              {deleting
+                ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ animation: 'spin 0.7s linear infinite' }}><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="40 20" strokeLinecap="round"/></svg>
+                : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              }
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

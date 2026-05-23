@@ -158,7 +158,7 @@ export default function App() {
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
   const { centres, plan: userPlan, reload: reloadCentres } = useCentres(user);
   const { centre, categories, members, addCategory,
-          updateCentre, updateCategory, deleteCategory,
+          updateCentre, updateCategory, deleteCategory, updateIncomeSource,
           loading: centreLoading, needsOnboarding,
           error, onOnboardingComplete }                   = useBudgetCentre(user, activeCentreId);
   const financeValues                                     = useFinance({ centre, categories });
@@ -210,6 +210,7 @@ export default function App() {
       updateCentre={updateCentre}
       updateCategory={updateCategory}
       deleteCategory={deleteCategory}
+      updateIncomeSource={updateIncomeSource}
     >
       <FinanceProvider value={{ ...financeValues, userPlan }}>
         <BrowserRouter>
