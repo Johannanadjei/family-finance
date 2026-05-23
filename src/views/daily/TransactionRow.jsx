@@ -30,7 +30,7 @@ export function TransactionRow({ tx, fmt, onDelete, disabled, deleting, isLast }
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--c-text, #1c1917)', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {tx.category_name}
+          {tx.category_name || 'Other'}
         </p>
         {tx.description ? (
           <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

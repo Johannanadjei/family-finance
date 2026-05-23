@@ -100,7 +100,7 @@ describe('AddTransactionSheet', () => {
     );
   });
 
-  it('saves as Other when no source selected for income', async () => {
+  it('saves with null category_name when no source selected for income', async () => {
     renderSheet();
     await act(async () => { screen.getByText('Income').click(); });
     await act(async () => {
@@ -108,7 +108,7 @@ describe('AddTransactionSheet', () => {
     });
     await act(async () => { screen.getByText('Save').click(); });
     expect(mockAddTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'income', category_name: 'Other' })
+      expect.objectContaining({ type: 'income', category_name: null })
     );
   });
 

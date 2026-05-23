@@ -84,7 +84,9 @@ export const validateTransaction = ({ date, week, type, category_name, amount, c
   date:          validateDate(date),
   week:          validateWeek(week),
   type:          validateType(type),
-  category_name: validateString(category_name, 'category_name'),
+  category_name: type === 'income'
+    ? (typeof category_name === 'string' && category_name.trim() ? category_name.trim() : null)
+    : validateString(category_name, 'category_name'),
   amount:        validateAmount(amount),
   currency:      validateCurrency(currency),
   description:   typeof description === 'string' ? description.trim() : '',

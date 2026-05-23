@@ -111,7 +111,7 @@ export const addTransaction = async (centreId, tx) => {
     .select()
     .single();
 
-  if (error) console.error('[transactions.service] addTransaction error:', error.message);
+  if (error) console.error('[transactions.service] addTransaction error:', error);
   return { data, error };
 };
 
