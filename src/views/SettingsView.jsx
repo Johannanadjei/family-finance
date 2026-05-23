@@ -27,12 +27,13 @@ export function SettingsView() {
   const { categories, fmt, addCategory, updateCategory, deleteCategory, centre } = useBudgetCentreContext();
   const { incomes, loading, addIncomeSource, deleteIncomeSource }             = useFinanceContext();
 
-  const [addCatOpen,   setAddCatOpen]   = useState(false);
-  const [addingSource, setAddingSource] = useState(false);
-  const [newLabel,     setNewLabel]     = useState('');
-  const [newAmount,    setNewAmount]    = useState('');
-  const [addError,     setAddError]     = useState(null);
-  const [savingSource, setSavingSource] = useState(false);
+  const [addCatOpen,      setAddCatOpen]      = useState(false);
+  const [addingSource,    setAddingSource]    = useState(false);
+  const [newLabel,        setNewLabel]        = useState('');
+  const [newAmount,       setNewAmount]       = useState('');
+  const [addError,        setAddError]        = useState(null);
+  const [savingSource,    setSavingSource]    = useState(false);
+  const [showIncomeInfo,  setShowIncomeInfo]  = useState(false);
 
   const handleAddSource = async () => {
     if (!newLabel.trim()) { setAddError('Please enter a source name'); return; }
@@ -73,14 +74,33 @@ export function SettingsView() {
 
       {/* Income Sources */}
       <div style={card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <p style={{ ...sectionLabel, margin: 0 }}>Income Sources</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <p style={{ ...sectionLabel, margin: 0 }}>Income Sources</p>
+            <button
+              onClick={() => setShowIncomeInfo(v => !v)}
+              aria-label="Income sources info"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: 'var(--c-muted, #6b7280)' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                <path d="M12 8v1M12 11v5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
           <button data-testid="add-income-source-btn"
             onClick={() => { setAddingSource(v => !v); setAddError(null); }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}>
             {addingSource ? 'Cancel' : '+ Add'}
           </button>
         </div>
+        {showIncomeInfo && (
+          <div style={{ background: 'var(--c-accent-light, #f0fdf4)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
+            <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0, lineHeight: 1.5 }}>
+              Add a separate income source for each person contributing to this budget — e.g. your salary, your partner's salary, freelance income. Each source is tracked individually in the Payday screen.
+            </p>
+          </div>
+        )}
 
         {addingSource && (
           <div style={{ marginBottom: 12 }}>
