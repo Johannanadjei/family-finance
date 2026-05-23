@@ -129,9 +129,9 @@ function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre, onH
       )}
       {toast?.kind === 'income' && (
         <Toast
-          message="Income logged. Want to add this as a regular source?"
-          actionLabel="Set up"
-          onEdit={() => { navigate('/payday'); setToast(null); }}
+          message="Set up your income sources in Settings for better tracking"
+          actionLabel="Go to Settings"
+          onEdit={() => { navigate('/settings'); setToast(null); }}
           onDismiss={() => setToast(null)}
         />
       )}
