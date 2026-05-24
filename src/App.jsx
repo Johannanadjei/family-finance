@@ -259,7 +259,11 @@ export default function App() {
   if (hasPinSetup && !pinUnlocked)     return (
     <PinScreen
       user={user}
-      verifyPin={verifyPin}
+      verifyPin={async (pin) => {
+        const result = await verifyPin(pin);
+        if (result.success) window.history.replaceState({}, '', '/');
+        return result;
+      }}
       lockedUntil={lockedUntil}
       attempts={attempts}
       onForgotPin={handleForgotPin}
