@@ -14,10 +14,13 @@ export default defineConfig({
         short_name: 'MoneyBOS',
         description: 'Budget Overview System',
         start_url: '/',
+        scope: '/',
         display: 'standalone',
+        display_override: ['standalone', 'minimal-ui'],
         background_color: '#064e3b',
         theme_color: '#064e3b',
         orientation: 'portrait',
+        prefer_related_applications: false,
         categories: ['finance', 'productivity'],
         icons: [
           {
