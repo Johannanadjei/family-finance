@@ -83,7 +83,7 @@ export function GuestSettingsSection() {
             </p>
             <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 10, padding: '10px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
               <p data-testid="portal-link" style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0, flex: 1, wordBreak: 'break-all' }}>{portalLink}</p>
-              <button data-testid="copy-link-btn" onClick={handleCopy} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 8, border: 'none', background: copied ? 'var(--c-success, #059669)' : 'var(--c-primary, #064e3b)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+              <button data-testid="copy-link-btn" onClick={handleCopy} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 8, border: 'none', background: copied ? 'var(--c-success, #059669)' : 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
@@ -112,7 +112,7 @@ export function GuestSettingsSection() {
                 </button>
                 {deleteId === g.id ? (
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <button data-testid={`guest-delete-confirm-${g.id}`} onClick={handleDeleteConfirm} style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--c-danger, #dc2626)', color: '#fff', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Delete</button>
+                    <button data-testid={`guest-delete-confirm-${g.id}`} onClick={handleDeleteConfirm} style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'var(--c-danger, #dc2626)', color: 'var(--c-btn-text, #ffffff)', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Delete</button>
                     <button onClick={() => setDeleteId(null)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' }}>Cancel</button>
                   </div>
                 ) : (

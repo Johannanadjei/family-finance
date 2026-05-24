@@ -97,7 +97,7 @@ export function AddGuestSheet({ isOpen, onClose, onSave, categories = [], editGu
             <button onClick={onClose} disabled={saving} style={{ padding: '13px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-muted, #6b7280)', fontFamily: "'Nunito', sans-serif" }}>
               Cancel
             </button>
-            <button data-testid="add-guest-save-btn" onClick={handleSave} disabled={saving} style={{ padding: '13px', borderRadius: 12, border: 'none', background: saving ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: saving ? 'var(--c-muted, #9ca3af)' : '#fff', fontSize: 14, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+            <button data-testid="add-guest-save-btn" onClick={handleSave} disabled={saving} style={{ padding: '13px', borderRadius: 12, border: 'none', background: saving ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)', color: saving ? 'var(--c-muted, #9ca3af)' : 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
               {saving ? 'Saving…' : isEditing ? 'Save Changes' : 'Save Guest'}
             </button>
           </div>

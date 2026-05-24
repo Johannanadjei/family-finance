@@ -150,7 +150,7 @@ export function ConfirmSheet({ income, isOpen, onClose, onConfirm, loading, erro
               disabled={loading}
               style={{
                 padding: '14px', borderRadius: 12, border: 'none',
-                background: loading ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))',
+                background: loading ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)',
                 color: loading ? 'var(--c-muted, #9ca3af)' : 'var(--c-btn-text, #ffffff)',
                 fontSize: 14, fontWeight: 800,
                 cursor: loading ? 'not-allowed' : 'pointer',

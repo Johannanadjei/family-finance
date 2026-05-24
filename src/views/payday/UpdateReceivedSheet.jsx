@@ -50,14 +50,14 @@ export function UpdateReceivedSheet({ isOpen, sourceId, receivedAmount, pendingA
           <button
             data-testid={`received-update-confirm-${sourceId}`}
             onClick={onConfirm}
-            style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
+            style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
           >
             Yes, update to {fmt(pendingAmount)}
           </button>
           <button
             data-testid={`received-update-keep-${sourceId}`}
             onClick={onDismiss}
-            style={{ width: '100%', padding: '13px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", color: 'var(--c-muted, #6b7280)' }}
+            style={{ width: '100%', padding: '13px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", color: 'var(--c-muted, #6b7280)' }}
           >
             No, keep as {fmt(receivedAmount)}
           </button>

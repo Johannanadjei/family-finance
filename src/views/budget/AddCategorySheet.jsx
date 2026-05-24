@@ -76,7 +76,7 @@ export function AddCategorySheet({ isOpen, onClose, onAdd }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
             <button onClick={onClose} disabled={saving} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-chip-bg, #f3f4f6)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-muted, #6b7280)', fontFamily: "'Nunito', sans-serif" }}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '14px', borderRadius: 12, border: 'none', background: saving ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: saving ? 'var(--c-muted, #9ca3af)' : 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>{saving ? 'Saving...' : 'Save'}</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '14px', borderRadius: 12, border: 'none', background: saving ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)', color: saving ? 'var(--c-muted, #9ca3af)' : 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>{saving ? 'Saving...' : 'Save'}</button>
           </div>
         </div>
       </div>

@@ -110,7 +110,7 @@ export function GuestTransactionForm({ session, currency, onSignOut }) {
           </div>
         )}
 
-        <button data-testid="guest-save-btn" onClick={handleSubmit} disabled={saving} style={{ width: '100%', padding: '15px', borderRadius: 12, border: 'none', background: saving ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: saving ? 'var(--c-muted, #9ca3af)' : '#fff', fontSize: 15, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+        <button data-testid="guest-save-btn" onClick={handleSubmit} disabled={saving} style={{ width: '100%', padding: '15px', borderRadius: 12, border: 'none', background: saving ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)', color: saving ? 'var(--c-muted, #9ca3af)' : 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
           {saving ? 'Saving…' : 'Save Expense'}
         </button>
       </div>

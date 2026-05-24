@@ -80,49 +80,52 @@ export function AuthScreen() {
 
   const inputStyle = {
     width: '100%', padding: '14px 16px', borderRadius: 12,
-    border: '1.5px solid #e5e7eb', fontSize: 15, fontWeight: 600,
-    outline: 'none', background: '#f9fafb', boxSizing: 'border-box',
-    fontFamily: "'Nunito', sans-serif", color: '#1c1917',
+    border: '1.5px solid var(--c-input-border, #e5e7eb)', fontSize: 15, fontWeight: 600,
+    outline: 'none', background: 'var(--c-input-bg, #f9fafb)', boxSizing: 'border-box',
+    fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
   };
 
   const btnStyle = (primary) => ({
     width: '100%', padding: '15px', borderRadius: 12, border: 'none',
     fontSize: 15, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer',
     opacity: loading ? 0.7 : 1,
-    background: primary ? 'linear-gradient(135deg, #064e3b, #0d7060)' : '#fff',
-    color: primary ? '#fff' : '#1c1917',
-    boxShadow: primary ? 'none' : '0 0 0 1.5px #e5e7eb',
+    background: primary ? 'var(--c-primary, #064e3b)' : 'var(--c-card, #ffffff)',
+    color: primary ? 'var(--c-btn-text, #ffffff)' : 'var(--c-text, #1c1917)',
+    boxShadow: primary ? 'none' : '0 0 0 1.5px var(--c-border, #e5e7eb)',
   });
 
   return (
     <div style={{
-      minHeight: '100vh', background: 'linear-gradient(145deg, #064e3b, #0d7060)',
+      minHeight: '100vh',
+      background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px',
     }}>
       <div style={{
-        background: '#fff', borderRadius: 24, padding: '36px 28px',
-        width: '100%', maxWidth: 400, boxShadow: '0 24px 64px rgba(0,0,0,.18)',
+        background: 'var(--c-card, #ffffff)', borderRadius: 24, padding: '36px 28px',
+        width: '100%', maxWidth: 400,
+        boxShadow: '0 24px 64px rgba(0,0,0,.18)',
+        border: '1px solid var(--c-border, transparent)',
       }}>
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontSize: 44, marginBottom: 8 }}>🏠</div>
-          <p style={{ fontSize: 22, fontWeight: 900, color: '#064e3b', margin: '0 0 4px' }}>
+          <p style={{ fontSize: 22, fontWeight: 900, color: 'var(--c-primary, #064e3b)', margin: '0 0 4px' }}>
             Family Finance
           </p>
-          <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
+          <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
             {mode === 'signin' ? 'Welcome back' : 'Create your account'}
           </p>
         </div>
 
         {/* Mode tabs */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 24, background: '#f3f4f6', borderRadius: 12, padding: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 24, background: 'var(--c-chip-bg, #f3f4f6)', borderRadius: 12, padding: 4 }}>
           {['signin', 'signup'].map(m => (
             <button key={m} onClick={() => switchMode(m)} style={{
               padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer',
               fontWeight: 800, fontSize: 13, fontFamily: "'Nunito', sans-serif",
-              background: mode === m ? '#fff' : 'transparent',
-              color: mode === m ? '#064e3b' : '#6b7280',
+              background: mode === m ? 'var(--c-chip-selected-bg, #ffffff)' : 'transparent',
+              color: mode === m ? 'var(--c-chip-selected-text, #064e3b)' : 'var(--c-muted, #6b7280)',
               boxShadow: mode === m ? '0 1px 4px rgba(0,0,0,.1)' : 'none',
               transition: 'all .2s',
             }}>
@@ -167,8 +170,8 @@ export function AuthScreen() {
 
           {/* Error */}
           {error && (
-            <div style={{ background: '#fef2f2', borderRadius: 10, padding: '12px 14px' }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', margin: 0 }}>{error}</p>
+            <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '12px 14px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{error}</p>
             </div>
           )}
 
@@ -179,9 +182,9 @@ export function AuthScreen() {
 
           {/* Divider */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0' }}>
-            <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
-            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, fontWeight: 700 }}>or</p>
-            <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+            <div style={{ flex: 1, height: 1, background: 'var(--c-border, #e5e7eb)' }} />
+            <p style={{ fontSize: 12, color: 'var(--c-muted, #9ca3af)', margin: 0, fontWeight: 700 }}>or</p>
+            <div style={{ flex: 1, height: 1, background: 'var(--c-border, #e5e7eb)' }} />
           </div>
 
           {/* Google */}

@@ -134,7 +134,7 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
         </button>
       ) : (
         <button onClick={() => onConfirm(income)} disabled={disabled}
-          style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: disabled ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: disabled ? 'var(--c-muted, #9ca3af)' : 'var(--c-btn-text, #ffffff)', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+          style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: disabled ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)', color: disabled ? 'var(--c-muted, #9ca3af)' : 'var(--c-btn-text, #ffffff)', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
           {disabled ? 'Confirming…' : 'Confirm Received'}
         </button>
       )}

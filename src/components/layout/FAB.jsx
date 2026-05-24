@@ -20,7 +20,7 @@ export function FAB({ onClick }) {
         width:        56,
         height:       56,
         borderRadius: '50%',
-        background:   'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))',
+        background:   'var(--c-primary, #064e3b)',
         border:       'none',
         color:        'var(--c-btn-text, #ffffff)',
         fontSize:     28,

@@ -133,7 +133,7 @@ export function SettingsView() {
             )}
             {addError && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 6px', fontWeight: 700 }}>{addError}</p>}
             <button data-testid="save-income-source-btn" onClick={handleAddSource} disabled={savingSource}
-              style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: '#fff', fontSize: 14, fontWeight: 800, cursor: savingSource ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+              style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: savingSource ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
               {savingSource ? 'Saving…' : 'Save Source'}
             </button>
           </div>
@@ -178,7 +178,7 @@ export function SettingsView() {
       {/* Sign Out */}
       <div style={card}>
         <button onClick={signOut}
-          style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--c-danger, #dc2626)', background: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-danger, #dc2626)', fontFamily: "'Nunito', sans-serif" }}>
+          style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-text, #1c1917)', fontFamily: "'Nunito', sans-serif" }}>
           Sign Out
         </button>
       </div>

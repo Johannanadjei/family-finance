@@ -25,12 +25,12 @@ export function GuestPortal({ centreId, currency }) {
   if (!centreId) {
     return (
       <div style={{
-        minHeight: '100vh', background: '#fef2f2', display: 'flex',
+        minHeight: '100vh', background: 'var(--c-danger-bg, #fef2f2)', display: 'flex',
         alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
         gap: 12, padding: 24, fontFamily: "'Nunito', sans-serif",
       }}>
         <p style={{ fontSize: 40, margin: 0 }}>⚠️</p>
-        <p style={{ fontSize: 16, fontWeight: 800, color: '#dc2626', margin: 0, textAlign: 'center' }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--c-danger, #dc2626)', margin: 0, textAlign: 'center' }}>
           Invalid guest link. Please ask your household admin to share the correct link.
         </p>
       </div>

@@ -115,7 +115,7 @@ export function PaydayView() {
           </div>
           <div style={{ textAlign: 'right' }}>
             <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Pending</p>
-            <p data-testid="payday-total-pending" style={{ fontSize: 24, fontWeight: 900, margin: 0, color: totalPending > 0 ? '#fbbf24' : '#6ee7b7' }}>{fmt(totalPending)}</p>
+            <p data-testid="payday-total-pending" style={{ fontSize: 24, fontWeight: 900, margin: 0, color: totalPending > 0 ? 'var(--c-warning, #fbbf24)' : 'var(--c-success-light, #6ee7b7)' }}>{fmt(totalPending)}</p>
           </div>
         </div>
       </div>
@@ -152,8 +152,8 @@ export function PaydayView() {
             onClick={() => navigate('/settings')}
             style={{
               padding: '12px 24px', borderRadius: 12, border: 'none',
-              background: 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))',
-              color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer',
+              background: 'var(--c-primary, #064e3b)',
+              color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer',
               fontFamily: "'Nunito', sans-serif",
             }}
           >

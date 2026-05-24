@@ -33,10 +33,8 @@ export function LogFilterBar({ filter, onFilter, search, onSearch }) {
                 padding:      '8px 0',
                 borderRadius: 10,
                 border:       'none',
-                background:   isActive
-                  ? 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))'
-                  : 'var(--c-card, #fff)',
-                color:        isActive ? '#fff' : 'var(--c-muted, #6b7280)',
+                background:   isActive ? 'var(--c-primary, #064e3b)' : 'var(--c-card, #fff)',
+                color:        isActive ? 'var(--c-btn-text, #ffffff)' : 'var(--c-muted, #6b7280)',
                 fontSize:     13,
                 fontWeight:   800,
                 cursor:       'pointer',
