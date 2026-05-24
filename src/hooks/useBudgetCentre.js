@@ -22,7 +22,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase }                          from '../lib/supabase';
-import { getCentreById, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService } from '../services/centres.service';
+import { getCentreById, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
 import { addCategory as addCategoryService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
 import { updateIncomeSource as updateIncomeSourceService } from '../services/income.service';
 import { getCurrentMonth } from '../lib/finance';
@@ -232,6 +232,12 @@ export function useBudgetCentre(user, centreId) {
     return { error: error || null };
   }, []);
 
+  const restoreHub = useCallback(async (centreId) => {
+    const { error } = await unarchiveCentreService(centreId);
+    if (error) console.error('[useBudgetCentre] restoreHub error:', error.message);
+    return { error: error || null };
+  }, []);
+
   return {
     centre,
     centreId:       centre?.id || null,
@@ -247,6 +253,7 @@ export function useBudgetCentre(user, centreId) {
     updateIncomeSource,
     archiveCentre,
     permanentDeleteCentre,
+    restoreHub,
     onOnboardingComplete,
     reload: load,
   };

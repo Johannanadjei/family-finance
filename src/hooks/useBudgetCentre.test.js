@@ -26,10 +26,11 @@ vi.mock('../lib/supabase', () => {
 });
 
 vi.mock('../services/centres.service', () => ({
-  getCentreById:   vi.fn(),
-  updateCentre:    vi.fn(),
-  archiveCentre:   vi.fn(),
-  deleteCentre:    vi.fn(),
+  getCentreById:    vi.fn(),
+  updateCentre:     vi.fn(),
+  archiveCentre:    vi.fn(),
+  deleteCentre:     vi.fn(),
+  unarchiveCentre:  vi.fn(),
 }));
 
 vi.mock('../services/categories.service', () => ({
@@ -42,7 +43,7 @@ vi.mock('../lib/finance', () => ({
   getCurrentMonth: () => '2026-05',
 }));
 
-import { getCentreById, archiveCentre, deleteCentre } from '../services/centres.service';
+import { getCentreById, archiveCentre, deleteCentre, unarchiveCentre } from '../services/centres.service';
 
 const mockUser   = { id: 'user-1' };
 const mockCentre = { id: 'c-1', name: "The Adjei's", currency: 'GHS', skin_id: 'family_warmth' };
@@ -170,5 +171,41 @@ describe('useBudgetCentre', () => {
     let res;
     await act(async () => { res = await result.current.permanentDeleteCentre('c-1'); });
     expect(res.error).toBeNull();
+  });
+
+  it('exposes restoreHub as a function', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(typeof result.current.restoreHub).toBe('function');
+  });
+
+  it('restoreHub calls unarchiveCentre service with the given centreId', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    unarchiveCentre.mockResolvedValue({ error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.restoreHub('a-1'); });
+    expect(unarchiveCentre).toHaveBeenCalledWith('a-1');
+  });
+
+  it('restoreHub returns { error: null } on success', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    unarchiveCentre.mockResolvedValue({ error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let res;
+    await act(async () => { res = await result.current.restoreHub('a-1'); });
+    expect(res.error).toBeNull();
+  });
+
+  it('restoreHub returns { error } on failure', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    unarchiveCentre.mockResolvedValue({ error: new Error('db error') });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let res;
+    await act(async () => { res = await result.current.restoreHub('a-1'); });
+    expect(res.error).toBeTruthy();
   });
 });

@@ -151,6 +151,34 @@ export const deleteCentre = async (centreId) => {
 };
 
 /**
+ * Fetch all archived (but not deleted) budget centres for the current user.
+ */
+export const getArchivedCentres = async () => {
+  const { data, error } = await supabase
+    .from('budget_centres')
+    .select('*')
+    .is('deleted_at', null)
+    .eq('is_archived', true)
+    .order('created_at', { ascending: true });
+
+  if (error) console.error('[centres.service] getArchivedCentres error:', error.message);
+  return { data: data || [], error };
+};
+
+/**
+ * Restore an archived budget centre — sets is_archived = false.
+ */
+export const unarchiveCentre = async (centreId) => {
+  const { error } = await supabase
+    .from('budget_centres')
+    .update({ is_archived: false })
+    .eq('id', centreId);
+
+  if (error) console.error('[centres.service] unarchiveCentre error:', error.message);
+  return { error };
+};
+
+/**
  * Archive a budget centre — sets is_archived and soft-deletes.
  */
 export const archiveCentre = async (centreId) => {

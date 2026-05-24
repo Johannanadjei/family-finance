@@ -65,7 +65,7 @@ function ErrorScreen({ message }) {
   );
 }
 
-function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre, onHubCreated }) {
+function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, onSwitchCentre, onHubCreated, onRestoreHub }) {
   const navigate                           = useNavigate();
   const { categories }                     = useBudgetCentreContext();
   const { incomes, loading }               = useFinanceContext();
@@ -139,9 +139,11 @@ function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre, onH
         isOpen={panelOpen}
         onClose={() => setPanelOpen(false)}
         centres={centres}
+        archivedCentres={archivedCentres}
         activeCentreId={activeCentreId}
         onSwitch={onSwitchCentre}
         onCreateHub={handleOpenCreateHub}
+        onRestore={onRestoreHub}
         userPlan={userPlan}
       />
       <CreateHubSheet
@@ -156,10 +158,10 @@ function DashboardShell({ centres, activeCentreId, userPlan, onSwitchCentre, onH
 export default function App() {
   const { user, loading: authLoading }                    = useAuth();
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
-  const { centres, plan: userPlan, reload: reloadCentres } = useCentres(user);
+  const { centres, archivedCentres, plan: userPlan, reload: reloadCentres } = useCentres(user);
   const { centre, categories, members, addCategory,
           updateCentre, updateCategory, deleteCategory, updateIncomeSource,
-          archiveCentre, permanentDeleteCentre,
+          archiveCentre, permanentDeleteCentre, restoreHub,
           loading: centreLoading, needsOnboarding,
           error, onOnboardingComplete }                   = useBudgetCentre(user, activeCentreId);
   const financeValues                                     = useFinance({ centre, categories });
@@ -215,6 +217,14 @@ export default function App() {
     return { error: null };
   }, [centre?.id, centres, permanentDeleteCentre, reloadCentres, handleSwitchCentre]);
 
+  const handleRestoreHub = useCallback(async (centreId) => {
+    const { error: err } = await restoreHub(centreId);
+    if (err) return { error: err };
+    await reloadCentres();
+    handleSwitchCentre(centreId);
+    return { error: null };
+  }, [restoreHub, reloadCentres, handleSwitchCentre]);
+
   // ── Auth gate ─────────────────────────────────────────────────────────────
   if (authLoading)     return <LoadingScreen message="Loading..." />;
   if (!user)           return <AuthScreen />;
@@ -242,16 +252,19 @@ export default function App() {
       updateIncomeSource={updateIncomeSource}
       archiveCentre={handleArchiveHub}
       permanentDeleteCentre={handlePermanentDeleteHub}
+      restoreHub={handleRestoreHub}
       centreCount={centres.length}
     >
       <FinanceProvider value={{ ...financeValues, userPlan }}>
         <BrowserRouter>
           <DashboardShell
             centres={centres}
+            archivedCentres={archivedCentres}
             activeCentreId={centre?.id || null}
             userPlan={userPlan}
             onSwitchCentre={handleSwitchCentre}
             onHubCreated={handleHubCreated}
+            onRestoreHub={handleRestoreHub}
           />
         </BrowserRouter>
       </FinanceProvider>

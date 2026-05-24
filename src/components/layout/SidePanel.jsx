@@ -3,12 +3,14 @@
  *
  * Hub switcher panel — slides in from left when the centre name is tapped.
  * Lists all control centres; tapping one switches the active hub.
+ * Archived hubs rendered by ArchivedHubsList at the bottom of the list.
  */
 
-import { useState }      from 'react';
-import { useNavigate }   from 'react-router-dom';
+import { useState }           from 'react';
+import { useNavigate }        from 'react-router-dom';
+import { ArchivedHubsList }   from './ArchivedHubsList';
 
-export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, onCreateHub, userPlan }) {
+export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], activeCentreId, onSwitch, onCreateHub, onRestore, userPlan }) {
   const [hoveredRow, setHoveredRow] = useState(null);
   const navigate                    = useNavigate();
 
@@ -26,56 +28,34 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
   return (
     <>
       {isOpen && (
-        <div
-          onClick={onClose}
-          aria-hidden="true"
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 300 }}
-        />
+        <div onClick={onClose} aria-hidden="true"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 300 }} />
       )}
 
-      <aside
-        aria-label="Control centres"
-        style={{
-          position:      'fixed',
-          top:           0,
-          left:          isOpen
-            ? 'max(0px, calc(50vw - 220px))'
-            : 'calc(max(0px, calc(50vw - 220px)) - 290px)',
-          width:         290,
-          height:        '100dvh',
-          background:    'var(--c-card, #fff)',
-          zIndex:        400,
-          transition:    'left .25s ease',
-          boxShadow:     isOpen ? '6px 0 32px rgba(0,0,0,.18)' : 'none',
-          display:       'flex',
-          flexDirection: 'column',
-        }}
-      >
+      <aside aria-label="Control centres" style={{
+        position: 'fixed', top: 0,
+        left: isOpen ? 'max(0px, calc(50vw - 220px))' : 'calc(max(0px, calc(50vw - 220px)) - 290px)',
+        width: 290, height: '100dvh',
+        background: 'var(--c-card, #fff)', zIndex: 400,
+        transition: 'left .25s ease',
+        boxShadow: isOpen ? '6px 0 32px rgba(0,0,0,.18)' : 'none',
+        display: 'flex', flexDirection: 'column',
+      }}>
         {/* Header */}
         <div style={{
-          padding:    '22px 20px 16px',
+          padding: '22px 20px 16px',
           background: 'linear-gradient(135deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))',
-          display:    'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
         }}>
           <div>
-            <p style={{ fontSize: 16, fontWeight: 900, color: '#fff', margin: '0 0 2px' }}>
-              {countLabel}
-            </p>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,.65)', margin: 0, fontWeight: 600 }}>
-              Tap a hub to switch
-            </p>
+            <p style={{ fontSize: 16, fontWeight: 900, color: '#fff', margin: '0 0 2px' }}>{countLabel}</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,.65)', margin: 0, fontWeight: 600 }}>Tap a hub to switch</p>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close panel"
-            style={{
-              background: 'rgba(255,255,255,.12)', border: 'none', borderRadius: 8,
-              color: 'rgba(255,255,255,.9)', cursor: 'pointer', padding: '6px 8px',
-              display: 'flex', alignItems: 'center', marginTop: 2,
-            }}
-          >
+          <button onClick={onClose} aria-label="Close panel" style={{
+            background: 'rgba(255,255,255,.12)', border: 'none', borderRadius: 8,
+            color: 'rgba(255,255,255,.9)', cursor: 'pointer', padding: '6px 8px',
+            display: 'flex', alignItems: 'center', marginTop: 2,
+          }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
@@ -88,57 +68,33 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
             const active  = c.id === activeCentreId;
             const hovered = hoveredRow === c.id && !active;
             return (
-              <button
-                key={c.id}
-                onClick={() => handleSwitch(c.id)}
-                aria-label={`Switch to ${c.name}`}
-                onMouseEnter={() => setHoveredRow(c.id)}
-                onMouseLeave={() => setHoveredRow(null)}
+              <button key={c.id} onClick={() => handleSwitch(c.id)} aria-label={`Switch to ${c.name}`}
+                onMouseEnter={() => setHoveredRow(c.id)} onMouseLeave={() => setHoveredRow(null)}
                 style={{
-                  width:      '100%',
-                  padding:    '12px 16px 12px 14px',
-                  textAlign:  'left',
-                  background: active  ? 'var(--c-chip-selected-bg, #f0fdf4)'
-                             : hovered ? 'var(--c-chip-bg, #f3f4f6)'
-                             : 'transparent',
-                  borderTop:    'none', borderRight: 'none', borderBottom: 'none',
-                  borderLeft:   `4px solid ${active ? 'var(--c-primary, #064e3b)' : 'transparent'}`,
-                  cursor:     'pointer',
-                  display:    'block',
-                  transition: 'background .15s',
+                  width: '100%', padding: '12px 16px 12px 14px', textAlign: 'left',
+                  background: active ? 'var(--c-chip-selected-bg, #f0fdf4)' : hovered ? 'var(--c-chip-bg, #f3f4f6)' : 'transparent',
+                  borderTop: 'none', borderRight: 'none', borderBottom: 'none',
+                  borderLeft: `4px solid ${active ? 'var(--c-primary, #064e3b)' : 'transparent'}`,
+                  cursor: 'pointer', display: 'block', transition: 'background .15s',
                   fontFamily: "'Nunito', sans-serif",
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {/* Icon container — primary colour when active */}
                   <div style={{
                     width: 42, height: 42, borderRadius: 11, flexShrink: 0,
                     background: active ? 'var(--c-primary, #064e3b)' : 'var(--c-bg, #f3f4f6)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 20,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
                   }}>
                     {c.icon}
                   </div>
-
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{
-                      fontSize: 14, fontWeight: 900, margin: '0 0 2px',
-                      color: active ? 'var(--c-chip-selected-text, var(--c-primary, #064e3b))' : 'var(--c-text, #1c1917)',
-                    }}>
+                    <p style={{ fontSize: 14, fontWeight: 900, margin: '0 0 2px', color: active ? 'var(--c-chip-selected-text, var(--c-primary, #064e3b))' : 'var(--c-text, #1c1917)' }}>
                       {c.name}
                     </p>
-                    <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
-                      {c.currency}
-                    </p>
+                    <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0 }}>{c.currency}</p>
                   </div>
-
                   {active ? (
-                    <span style={{
-                      fontSize: 10, fontWeight: 800,
-                      color: 'var(--c-btn-text, #ffffff)',
-                      background: 'var(--c-primary, #064e3b)',
-                      padding: '3px 8px', borderRadius: 20, flexShrink: 0,
-                    }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--c-btn-text, #ffffff)', background: 'var(--c-primary, #064e3b)', padding: '3px 8px', borderRadius: 20, flexShrink: 0 }}>
                       Active
                     </span>
                   ) : (
@@ -150,45 +106,23 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
               </button>
             );
           })}
+
+          <ArchivedHubsList archivedCentres={archivedCentres} onRestore={onRestore} />
         </div>
 
         {/* Footer — create / upgrade */}
         <div style={{ padding: '16px 16px calc(16px + env(safe-area-inset-bottom, 20px))', borderTop: '1px solid var(--c-border, #e5e7eb)', flexShrink: 0 }}>
           {userPlan === 'free' ? (
             <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 12, padding: '12px 14px' }}>
-              <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', fontWeight: 700 }}>
-                Free plan · 1 hub included
-              </p>
-              <button
-                disabled
-                style={{
-                  width: '100%', padding: '11px', borderRadius: 10,
-                  border: '1.5px dashed var(--c-border, #e5e7eb)',
-                  background: 'transparent', color: 'var(--c-muted, #9ca3af)',
-                  fontSize: 14, fontWeight: 700, cursor: 'not-allowed',
-                  fontFamily: "'Nunito', sans-serif",
-                }}
-              >
+              <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', fontWeight: 700 }}>Free plan · 1 hub included</p>
+              <button disabled style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px dashed var(--c-border, #e5e7eb)', background: 'transparent', color: 'var(--c-muted, #9ca3af)', fontSize: 14, fontWeight: 700, cursor: 'not-allowed', fontFamily: "'Nunito', sans-serif" }}>
                 Upgrade to add more hubs
               </button>
             </div>
           ) : atProLimit ? (
-            <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0, fontWeight: 600, textAlign: 'center' }}>
-              Maximum 10 hubs reached
-            </p>
+            <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0, fontWeight: 600, textAlign: 'center' }}>Maximum 10 hubs reached</p>
           ) : (
-            <button
-              onClick={onCreateHub}
-              style={{
-                width: '100%', padding: '14px', borderRadius: 12,
-                border: 'none',
-                background: 'var(--c-primary, #064e3b)',
-                color: 'var(--c-btn-text, #ffffff)',
-                fontSize: 15, fontWeight: 800, cursor: 'pointer',
-                fontFamily: "'Nunito', sans-serif",
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
+            <button onClick={onCreateHub} style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               + New Control Centre
             </button>
           )}
