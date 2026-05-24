@@ -8,6 +8,7 @@
 
 import { useFinanceContext }      from '../../context/FinanceContext';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
+import { applyTheme }             from '../../lib/themes';
 
 const SKINS = [
   { key: 'family_warmth',         label: 'Family Warmth', emoji: '🌿', pro: false },
@@ -29,6 +30,7 @@ export function ThemeSection() {
 
   const handleSelect = (skin, locked) => {
     if (locked) return;
+    applyTheme(skin);
     saveThemeSkin(skin);
     updateCentre({ skin_id: skin });
   };
