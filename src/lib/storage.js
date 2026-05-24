@@ -18,7 +18,12 @@ const KEYS = {
   THEME_ACCENT:     'ffc_theme_accent',
   NOTIFICATIONS:    'ffc_notifications',
   ACTIVE_CENTRE_ID: 'ffc_active_centre_id',
+  PIN_ATTEMPTS:     'ffc_pin_attempts',
+  LOCKOUT_UNTIL:    'ffc_lockout_until',
 };
+
+// sessionStorage key — wiped on tab/app close intentionally
+const SESSION_PIN_UNLOCKED = 'ffc_pin_unlocked';
 
 const DEFAULT_PREFS = {
   themeSkin:     'family_warmth',
@@ -87,6 +92,41 @@ export const clearPrefs = () => {
   remove(KEYS.THEME_ACCENT);
   remove(KEYS.NOTIFICATIONS);
   remove(KEYS.ACTIVE_CENTRE_ID);
+  remove(KEYS.PIN_ATTEMPTS);
+  remove(KEYS.LOCKOUT_UNTIL);
+  try { sessionStorage.removeItem(SESSION_PIN_UNLOCKED); } catch (e) { /* ignore */ }
 };
+
+// ── PIN session / lockout helpers ─────────────────────────────────────────────
+
+/** Mark the PIN as verified for this session (sessionStorage — clears on tab close) */
+export const savePinUnlocked = () => {
+  try { sessionStorage.setItem(SESSION_PIN_UNLOCKED, '1'); } catch (e) { /* ignore */ }
+};
+
+/** Clear the session PIN unlock flag */
+export const clearPinUnlocked = () => {
+  try { sessionStorage.removeItem(SESSION_PIN_UNLOCKED); } catch (e) { /* ignore */ }
+};
+
+/** Check if the PIN has been verified this session */
+export const isPinUnlocked = () => {
+  try { return sessionStorage.getItem(SESSION_PIN_UNLOCKED) === '1'; } catch (e) { return false; }
+};
+
+/** Get the number of failed PIN attempts (0 if never set) */
+export const getPinAttempts = () => {
+  const v = load(KEYS.PIN_ATTEMPTS);
+  return typeof v === 'number' ? v : 0;
+};
+
+/** Set the failed PIN attempt count */
+export const setPinAttempts = (n) => persist(KEYS.PIN_ATTEMPTS, n);
+
+/** Get the lockout expiry timestamp (epoch ms), or null */
+export const getLockoutUntil = () => load(KEYS.LOCKOUT_UNTIL);
+
+/** Set the lockout expiry timestamp (epoch ms) */
+export const setLockoutUntil = (ts) => persist(KEYS.LOCKOUT_UNTIL, ts);
 
 export { DEFAULT_PREFS };

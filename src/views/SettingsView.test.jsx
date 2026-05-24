@@ -47,6 +47,16 @@ vi.mock('../context/FinanceContext', () => ({
 
 vi.mock('../lib/themes', () => ({ applyTheme: vi.fn() }));
 
+vi.mock('../context/PinContext', () => ({
+  usePinContext: () => ({
+    hasPinSetup:  false,
+    pinUnlocked:  true,
+    verifyPin:    vi.fn(),
+    setupPin:     vi.fn(),
+    removePin:    vi.fn(),
+  }),
+}));
+
 vi.mock('../services/guests.service', () => ({
   getGuestUsers:   vi.fn().mockResolvedValue({ data: [], error: null }),
   createGuestUser: vi.fn().mockResolvedValue({ data: null, error: null }),

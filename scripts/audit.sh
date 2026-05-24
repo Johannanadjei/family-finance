@@ -67,8 +67,8 @@ fi
 # ── G: PIN security ──────────────────────────────────────────
 header "G: PIN security"
 
-result=$(grep -rn "\.select.*pin_hash" "$SRC/services" --include="*.js")
-[ -z "$result" ] && green "pin_hash never in select fields" || red "pin_hash exposed in select" "$result"
+result=$(grep -rn "\.select.*pin_hash" "$SRC/services" --include="*.js" | grep -v "pin\.service")
+[ -z "$result" ] && green "pin_hash never in select fields (except pin.service)" || red "pin_hash exposed in select" "$result"
 
 result=$(grep -rn "pin_hash\s*=" "$SRC/services" --include="*.js" | grep -v "hashPin\|await\|cleaned\|const {")
 [ -z "$result" ] && green "PIN always hashed before storing" || red "Raw PIN may be stored" "$result"

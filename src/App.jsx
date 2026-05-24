@@ -17,19 +17,24 @@
 import { useState, useEffect, useCallback }      from 'react';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { useAuth }                               from './hooks/useAuth';
+import { usePin }                                from './hooks/usePin';
 import { useBudgetCentre }                       from './hooks/useBudgetCentre';
 import { useCentres }                            from './hooks/useCentres';
 import { useFinance }                            from './hooks/useFinance';
 import { BudgetCentreProvider }                  from './context/BudgetCentreContext';
 import { FinanceProvider }                       from './context/FinanceContext';
+import { PinProvider }                           from './context/PinContext';
 import { useBudgetCentreContext }                from './context/BudgetCentreContext';
 import { useFinanceContext }                     from './context/FinanceContext';
 import { applyTheme }                                        from './lib/themes';
 import { loadActiveCentreId, saveActiveCentreId, loadPrefs } from './lib/storage';
+import { supabase }                                          from './lib/supabase';
 
 // Apply saved skin immediately so there's no flash of default theme on reload
 applyTheme(loadPrefs().themeSkin);
 import { AuthScreen }                            from './views/AuthScreen';
+import { PinScreen }                             from './views/PinScreen';
+import { PinSetupFlow }                          from './views/PinSetupFlow';
 import { OnboardingFlow }                        from './features/onboarding/OnboardingFlow';
 import { Header }                                from './components/layout/Header';
 import { BottomNav }                             from './components/layout/BottomNav';
@@ -156,7 +161,11 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, on
 }
 
 export default function App() {
-  const { user, loading: authLoading }                    = useAuth();
+  const { user, loading: authLoading, signOut }           = useAuth();
+  const { hasPinSetup, pinLoading, pinUnlocked,
+          attempts, lockedUntil,
+          verifyPin, setupPin, removePin }                 = usePin(user);
+  const [pinSkipped, setPinSkipped]                        = useState(false);
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
   const { centres, archivedCentres, plan: userPlan, reload: reloadCentres } = useCentres(user);
   const { centre, categories, members, addCategory,
@@ -225,9 +234,30 @@ export default function App() {
     return { error: null };
   }, [restoreHub, reloadCentres, handleSwitchCentre]);
 
+  const handleForgotPin = useCallback(async () => {
+    await supabase.auth.resetPasswordForEmail(user?.email || '');
+    await removePin();
+    signOut();
+  }, [user?.email, removePin, signOut]);
+
   // ── Auth gate ─────────────────────────────────────────────────────────────
   if (authLoading)     return <LoadingScreen message="Loading..." />;
   if (!user)           return <AuthScreen />;
+
+  // ── PIN gate ──────────────────────────────────────────────────────────────
+  if (pinLoading)                      return <LoadingScreen message="Loading..." />;
+  if (!hasPinSetup && !pinSkipped)     return (
+    <PinSetupFlow setupPin={setupPin} onSkip={() => setPinSkipped(true)} />
+  );
+  if (hasPinSetup && !pinUnlocked)     return (
+    <PinScreen
+      user={user}
+      verifyPin={verifyPin}
+      lockedUntil={lockedUntil}
+      attempts={attempts}
+      onForgotPin={handleForgotPin}
+    />
+  );
 
   // ── Centre gate ───────────────────────────────────────────────────────────
   if (centreLoading)   return <LoadingScreen message="Setting up your dashboard..." />;
@@ -241,6 +271,7 @@ export default function App() {
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
   return (
+    <PinProvider value={{ hasPinSetup, pinLoading, pinUnlocked, attempts, lockedUntil, verifyPin, setupPin, removePin }}>
     <BudgetCentreProvider
       centre={centre}
       categories={categories}
@@ -269,5 +300,6 @@ export default function App() {
         </BrowserRouter>
       </FinanceProvider>
     </BudgetCentreProvider>
+    </PinProvider>
   );
 }

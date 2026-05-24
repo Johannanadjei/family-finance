@@ -17,6 +17,7 @@ import { IncomeSourceRow }            from './settings/IncomeSourceRow';
 import { ThemeSection }               from './settings/ThemeSection';
 import { AddCategorySheet }           from './budget/AddCategorySheet';
 import { GuestSettingsSection }       from './settings/GuestSettingsSection';
+import { SecuritySection }            from './settings/SecuritySection';
 
 const card         = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
 const sectionLabel = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 0.8 };
@@ -171,6 +172,9 @@ export function SettingsView() {
 
       {/* Guest Access */}
       <GuestSettingsSection />
+
+      {/* Security (PIN) */}
+      <SecuritySection />
 
       {/* Theme */}
       <ThemeSection />
