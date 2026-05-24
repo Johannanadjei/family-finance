@@ -21,7 +21,7 @@ export function BudgetHealthBar({ healthPct, budgetStatus, totalSpent }) {
         <div style={{
           height:     '100%',
           width:      hasSpending ? `${healthPct}%` : '0%',
-          background: budgetStatus.color,
+          background: 'rgba(255,255,255,0.9)',
           borderRadius: 4,
           transition: 'width .6s ease',
         }} />
