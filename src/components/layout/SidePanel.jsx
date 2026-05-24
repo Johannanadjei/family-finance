@@ -6,13 +6,24 @@
  * Archived hubs rendered by ArchivedHubsList at the bottom of the list.
  */
 
-import { useState }           from 'react';
-import { useNavigate }        from 'react-router-dom';
-import { ArchivedHubsList }   from './ArchivedHubsList';
+import { useState }                        from 'react';
+import { useNavigate }                     from 'react-router-dom';
+import { ArchivedHubsList }                from './ArchivedHubsList';
+import { getInstallPrompt, triggerInstall } from '../../lib/pwa';
+
+const _isIOS        = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const _isStandalone = window.matchMedia?.('(display-mode: standalone)')?.matches ?? false;
 
 export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], activeCentreId, onSwitch, onCreateHub, onRestore, userPlan }) {
-  const [hoveredRow, setHoveredRow] = useState(null);
-  const navigate                    = useNavigate();
+  const [hoveredRow,  setHoveredRow]  = useState(null);
+  const [installing,  setInstalling]  = useState(false);
+  const navigate                      = useNavigate();
+
+  const handleInstall = async () => {
+    setInstalling(true);
+    await triggerInstall();
+    setInstalling(false);
+  };
 
   const handleSwitch = (centreId) => {
     if (centreId === activeCentreId) { onClose(); return; }
@@ -109,6 +120,42 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
 
           <ArchivedHubsList archivedCentres={archivedCentres} onRestore={onRestore} />
         </div>
+
+        {/* Install prompt — contained block, no fixed/absolute positioning */}
+        {!_isStandalone && (
+          <div style={{ borderTop: '1px solid var(--c-border, #e5e7eb)', padding: '12px 16px', flexShrink: 0, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif" }}>
+            {_isIOS ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flexShrink: 0, background: 'var(--c-accent-light, #f0fdf4)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', color: 'var(--c-primary, #064e3b)' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 2v13M7 7l5-5 5 5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M20 13v7a1 1 0 01-1 1H5a1 1 0 01-1-1v-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--c-muted, #6b7280)', lineHeight: 1.4 }}>
+                  Tap <strong style={{ color: 'var(--c-text, #1c1917)' }}>Share</strong> → <strong style={{ color: 'var(--c-text, #1c1917)' }}>Add to Home Screen</strong>
+                </p>
+              </div>
+            ) : getInstallPrompt() ? (
+              <button onClick={handleInstall} disabled={installing} style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: installing ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+                {installing ? 'Opening…' : '📲 Install Money B.O.S'}
+              </button>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flexShrink: 0, background: 'var(--c-accent-light, #f0fdf4)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', color: 'var(--c-primary, #064e3b)' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="5"  r="1.5" fill="currentColor"/>
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                    <circle cx="12" cy="19" r="1.5" fill="currentColor"/>
+                  </svg>
+                </div>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--c-muted, #6b7280)', lineHeight: 1.4 }}>
+                  Tap <strong style={{ color: 'var(--c-text, #1c1917)' }}>⋮ menu</strong> → <strong style={{ color: 'var(--c-text, #1c1917)' }}>Add to Home Screen</strong>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Footer — create / upgrade */}
         <div style={{ padding: '16px 16px calc(16px + env(safe-area-inset-bottom, 20px))', borderTop: '1px solid var(--c-border, #e5e7eb)', flexShrink: 0 }}>
