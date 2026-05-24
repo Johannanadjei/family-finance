@@ -2,7 +2,6 @@ import { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import { setInstallPrompt } from './lib/pwa';
-import { InstallPrompt }    from './components/ui/InstallPrompt';
 
 // Capture beforeinstallprompt immediately — before React renders.
 // Stored in lib/pwa.js so InstallPrompt can read it even if it mounts after the event fired.
@@ -27,25 +26,15 @@ const LazyGuest = lazy(() =>
   import('./views/GuestPortal.jsx').then(m => ({ default: m.GuestPortal }))
 );
 
-// InstallPrompt renders outside Suspense so it mounts immediately — independent
-// of auth state and lazy-loading. The prompt event may fire before authentication.
 function Root() {
   if (_isGuest) {
     return (
-      <>
-        <Suspense fallback={null}>
-          <LazyGuest centreId={_centreId} currency={_currency} />
-        </Suspense>
-        <InstallPrompt />
-      </>
+      <Suspense fallback={null}>
+        <LazyGuest centreId={_centreId} currency={_currency} />
+      </Suspense>
     );
   }
-  return (
-    <>
-      <Suspense fallback={null}><LazyApp /></Suspense>
-      <InstallPrompt />
-    </>
-  );
+  return <Suspense fallback={null}><LazyApp /></Suspense>;
 }
 
 createRoot(document.getElementById('root')).render(

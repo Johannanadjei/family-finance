@@ -50,6 +50,7 @@ import { LogView }                               from './views/LogView';
 import { AddTransactionSheet }                   from './views/daily/AddTransactionSheet';
 import { SettingsView }                          from './views/SettingsView';
 import { Toast }                                 from './components/ui/Toast';
+import { InstallPrompt }                         from './components/ui/InstallPrompt';
 import { isKnownCategory }                       from './lib/finance';
 
 function LoadingScreen({ message }) {
@@ -140,6 +141,7 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, on
           onDismiss={() => setToast(null)}
         />
       )}
+      {!panelOpen && <InstallPrompt />}
       <SidePanel
         isOpen={panelOpen}
         onClose={() => setPanelOpen(false)}
