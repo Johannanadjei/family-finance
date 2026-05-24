@@ -84,4 +84,12 @@ describe('GuestPortal', () => {
     render(<GuestPortal centreId="c1" />);
     expect(screen.getByText('Loading…')).toBeTruthy();
   });
+
+  it('passes loadGuests as onRetry to GuestPinScreen', () => {
+    mockHookReturn = { ...noSession, guests: [], error: 'Could not load guests. Please try again.' };
+    render(<GuestPortal centreId="c1" />);
+    const retryBtn = screen.getByText('Try again');
+    retryBtn.click();
+    expect(mockLoadGuests).toHaveBeenCalled();
+  });
 });

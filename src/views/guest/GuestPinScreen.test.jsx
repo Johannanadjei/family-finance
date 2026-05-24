@@ -107,4 +107,31 @@ describe('GuestPinScreen', () => {
     await act(async () => { screen.getByTestId('guest-btn-guest-1').click(); });
     expect(screen.queryByTestId('guest-pin-input')).toBeNull();
   });
+
+  it('shows load error screen when error and no guests', () => {
+    renderScreen({ guests: [], error: 'Could not load guests. Please try again.' });
+    expect(screen.getByTestId('guest-load-error')).toBeTruthy();
+    expect(screen.getByText(/Could not load guests/)).toBeTruthy();
+    expect(screen.queryByText(/No guests set up/)).toBeNull();
+  });
+
+  it('shows retry button when onRetry provided with load error', () => {
+    const onRetry = vi.fn();
+    renderScreen({ guests: [], error: 'Could not load guests. Please try again.', onRetry });
+    const retryBtn = screen.getByText('Try again');
+    expect(retryBtn).toBeTruthy();
+    retryBtn.click();
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('hides retry button when no onRetry prop', () => {
+    renderScreen({ guests: [], error: 'Could not load guests. Please try again.' });
+    expect(screen.queryByText('Try again')).toBeNull();
+  });
+
+  it('shows guest list (not load error) when error is auth error and guests loaded', () => {
+    renderScreen({ guests: mockGuests, error: 'Incorrect PIN. Please try again.' });
+    expect(screen.queryByTestId('guest-load-error')).toBeNull();
+    expect(screen.getByTestId('guest-btn-guest-1')).toBeTruthy();
+  });
 });

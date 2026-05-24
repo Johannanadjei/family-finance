@@ -53,6 +53,7 @@ export function GuestPortal({ centreId, currency }) {
       loading={loading}
       error={error}
       onAuthenticate={authenticate}
+      onRetry={loadGuests}
     />
   );
 }

@@ -34,7 +34,7 @@ export function useGuestAuth(centreId) {
     return null;
   });
   const [guests,  setGuests]  = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);  // true until first load completes
   const [error,   setError]   = useState(null);
 
   const loadGuests = useCallback(async () => {
