@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor }                  from '@testing-library/react';
+import { renderHook, waitFor, act }              from '@testing-library/react';
 import { useBudgetCentre }                      from './useBudgetCentre';
 
 // Supabase chain mock.
@@ -28,6 +28,8 @@ vi.mock('../lib/supabase', () => {
 vi.mock('../services/centres.service', () => ({
   getCentreById:   vi.fn(),
   updateCentre:    vi.fn(),
+  archiveCentre:   vi.fn(),
+  deleteCentre:    vi.fn(),
 }));
 
 vi.mock('../services/categories.service', () => ({
@@ -40,7 +42,7 @@ vi.mock('../lib/finance', () => ({
   getCurrentMonth: () => '2026-05',
 }));
 
-import { getCentreById } from '../services/centres.service';
+import { getCentreById, archiveCentre, deleteCentre } from '../services/centres.service';
 
 const mockUser   = { id: 'user-1' };
 const mockCentre = { id: 'c-1', name: "The Adjei's", currency: 'GHS', skin_id: 'family_warmth' };
@@ -110,5 +112,63 @@ describe('useBudgetCentre', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(typeof result.current.reload).toBe('function');
     expect(typeof result.current.onOnboardingComplete).toBe('function');
+  });
+
+  // ── Archive / delete mutations ─────────────────────────────────────────────
+
+  it('exposes archiveCentre and permanentDeleteCentre as functions', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(typeof result.current.archiveCentre).toBe('function');
+    expect(typeof result.current.permanentDeleteCentre).toBe('function');
+  });
+
+  it('archiveCentre calls the service with the given centreId', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    archiveCentre.mockResolvedValue({ error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.archiveCentre('c-1'); });
+    expect(archiveCentre).toHaveBeenCalledWith('c-1');
+  });
+
+  it('archiveCentre returns { error: null } on success', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    archiveCentre.mockResolvedValue({ error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let res;
+    await act(async () => { res = await result.current.archiveCentre('c-1'); });
+    expect(res.error).toBeNull();
+  });
+
+  it('archiveCentre returns { error } on failure', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    archiveCentre.mockResolvedValue({ error: new Error('db error') });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let res;
+    await act(async () => { res = await result.current.archiveCentre('c-1'); });
+    expect(res.error).toBeTruthy();
+  });
+
+  it('permanentDeleteCentre calls deleteCentre service with the given centreId', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    deleteCentre.mockResolvedValue({ error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.permanentDeleteCentre('c-1'); });
+    expect(deleteCentre).toHaveBeenCalledWith('c-1');
+  });
+
+  it('permanentDeleteCentre returns { error: null } on success', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    deleteCentre.mockResolvedValue({ error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let res;
+    await act(async () => { res = await result.current.permanentDeleteCentre('c-1'); });
+    expect(res.error).toBeNull();
   });
 });

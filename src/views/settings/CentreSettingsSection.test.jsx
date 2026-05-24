@@ -7,18 +7,31 @@ import { render, screen, act, fireEvent }        from '@testing-library/react';
 import { CentreSettingsSection }                 from './CentreSettingsSection';
 import { mockCentre, mockFmt }                   from '../../test-utils/fixtures';
 
-const mockUpdateCentre = vi.fn().mockResolvedValue({ error: null });
-
+// Use vi.fn() for useBudgetCentreContext so we can vary centreCount per test
 vi.mock('../../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({
-    centre:       mockCentre,
-    fmt:          mockFmt,
-    updateCentre: mockUpdateCentre,
-  }),
+  useBudgetCentreContext: vi.fn(),
 }));
 
+import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
+
+const mockUpdateCentre        = vi.fn().mockResolvedValue({ error: null });
+const mockArchiveCentre       = vi.fn().mockResolvedValue({ error: null });
+const mockPermanentDeleteCentre = vi.fn().mockResolvedValue({ error: null });
+
+const makeCtx = (centreCount = 2) => ({
+  centre:               mockCentre,
+  fmt:                  mockFmt,
+  updateCentre:         mockUpdateCentre,
+  archiveCentre:        mockArchiveCentre,
+  permanentDeleteCentre: mockPermanentDeleteCentre,
+  centreCount,
+});
+
 describe('CentreSettingsSection', () => {
-  beforeEach(() => { mockUpdateCentre.mockClear(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useBudgetCentreContext.mockReturnValue(makeCtx(2));
+  });
 
   it('renders centre name', () => {
     render(<CentreSettingsSection />);
@@ -100,5 +113,26 @@ describe('CentreSettingsSection', () => {
     await act(async () => { screen.getByTestId('centre-save-btn').click(); });
     expect(screen.getByText('Please enter a name')).toBeTruthy();
     expect(mockUpdateCentre).not.toHaveBeenCalled();
+  });
+
+  // ── Danger zone ────────────────────────────────────────────────────────────
+
+  it('shows Archive this hub button when centreCount > 1', () => {
+    render(<CentreSettingsSection />);
+    expect(screen.getByTestId('archive-hub-btn')).toBeTruthy();
+    expect(screen.queryByTestId('archive-blocked-msg')).toBeNull();
+  });
+
+  it('shows blocked message and no archive button when centreCount is 1', () => {
+    useBudgetCentreContext.mockReturnValue(makeCtx(1));
+    render(<CentreSettingsSection />);
+    expect(screen.getByTestId('archive-blocked-msg')).toBeTruthy();
+    expect(screen.queryByTestId('archive-hub-btn')).toBeNull();
+  });
+
+  it('opens ArchiveHubSheet when archive button clicked', async () => {
+    render(<CentreSettingsSection />);
+    await act(async () => { screen.getByTestId('archive-hub-btn').click(); });
+    expect(screen.getByTestId('archive-hub-dialog')).toBeTruthy();
   });
 });

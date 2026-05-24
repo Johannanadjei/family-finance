@@ -159,6 +159,7 @@ export default function App() {
   const { centres, plan: userPlan, reload: reloadCentres } = useCentres(user);
   const { centre, categories, members, addCategory,
           updateCentre, updateCategory, deleteCategory, updateIncomeSource,
+          archiveCentre, permanentDeleteCentre,
           loading: centreLoading, needsOnboarding,
           error, onOnboardingComplete }                   = useBudgetCentre(user, activeCentreId);
   const financeValues                                     = useFinance({ centre, categories });
@@ -186,6 +187,34 @@ export default function App() {
     handleSwitchCentre(id);
   }, [reloadCentres, handleSwitchCentre]);
 
+  const handleArchiveHub = useCallback(async () => {
+    const nextHub = centres.find(c => c.id !== centre?.id);
+    const { error: err } = await archiveCentre(centre?.id);
+    if (err) return { error: err };
+    await reloadCentres();
+    if (nextHub) {
+      handleSwitchCentre(nextHub.id);
+    } else {
+      saveActiveCentreId(null);
+      setActiveCentreId(null);
+    }
+    return { error: null };
+  }, [centre?.id, centres, archiveCentre, reloadCentres, handleSwitchCentre]);
+
+  const handlePermanentDeleteHub = useCallback(async () => {
+    const nextHub = centres.find(c => c.id !== centre?.id);
+    const { error: err } = await permanentDeleteCentre(centre?.id);
+    if (err) return { error: err };
+    await reloadCentres();
+    if (nextHub) {
+      handleSwitchCentre(nextHub.id);
+    } else {
+      saveActiveCentreId(null);
+      setActiveCentreId(null);
+    }
+    return { error: null };
+  }, [centre?.id, centres, permanentDeleteCentre, reloadCentres, handleSwitchCentre]);
+
   // ── Auth gate ─────────────────────────────────────────────────────────────
   if (authLoading)     return <LoadingScreen message="Loading..." />;
   if (!user)           return <AuthScreen />;
@@ -211,6 +240,9 @@ export default function App() {
       updateCategory={updateCategory}
       deleteCategory={deleteCategory}
       updateIncomeSource={updateIncomeSource}
+      archiveCentre={handleArchiveHub}
+      permanentDeleteCentre={handlePermanentDeleteHub}
+      centreCount={centres.length}
     >
       <FinanceProvider value={{ ...financeValues, userPlan }}>
         <BrowserRouter>

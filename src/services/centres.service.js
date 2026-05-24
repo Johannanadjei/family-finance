@@ -26,6 +26,7 @@ export const getCentres = async () => {
     .from('budget_centres')
     .select('*')
     .is('deleted_at', null)
+    .eq('is_archived', false)
     .order('created_at', { ascending: true });
 
   if (error) console.error('[centres.service] getCentres error:', error.message);
@@ -155,7 +156,7 @@ export const deleteCentre = async (centreId) => {
 export const archiveCentre = async (centreId) => {
   const { error } = await supabase
     .from('budget_centres')
-    .update({ is_archived: true, deleted_at: new Date().toISOString() })
+    .update({ is_archived: true })
     .eq('id', centreId);
 
   if (error) console.error('[centres.service] archiveCentre error:', error.message);

@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 import { CURRENCIES }              from '../../features/onboarding/onboarding.constants';
+import { ArchiveHubSheet }         from './ArchiveHubSheet';
 
 const inputStyle = {
   width: '100%', padding: '10px 12px', borderRadius: 10,
@@ -19,12 +20,13 @@ const inputStyle = {
 };
 
 export function CentreSettingsSection() {
-  const { centre, updateCentre } = useBudgetCentreContext();
-  const [editing,  setEditing]  = useState(false);
-  const [name,     setName]     = useState('');
-  const [currency, setCurrency] = useState('');
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState(null);
+  const { centre, updateCentre, archiveCentre, permanentDeleteCentre, centreCount } = useBudgetCentreContext();
+  const [editing,          setEditing]          = useState(false);
+  const [name,             setName]             = useState('');
+  const [currency,         setCurrency]         = useState('');
+  const [saving,           setSaving]           = useState(false);
+  const [error,            setError]            = useState(null);
+  const [archiveSheetOpen, setArchiveSheetOpen] = useState(false);
 
   const openEdit = () => {
     setName(centre?.name || '');
@@ -87,6 +89,31 @@ export function CentreSettingsSection() {
           </div>
         </>
       )}
+
+      {/* Danger zone */}
+      <div style={{ borderTop: '1px solid var(--c-border, #e5e7eb)', marginTop: 16, paddingTop: 14 }}>
+        {centreCount <= 1 ? (
+          <p data-testid="archive-blocked-msg" style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0, lineHeight: 1.5 }}>
+            You can't archive your only hub. Create another hub first.
+          </p>
+        ) : (
+          <button
+            data-testid="archive-hub-btn"
+            onClick={() => setArchiveSheetOpen(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted, #9ca3af)', fontSize: 13, fontWeight: 700, padding: 0, fontFamily: "'Nunito', sans-serif" }}
+          >
+            Archive this hub
+          </button>
+        )}
+      </div>
+
+      <ArchiveHubSheet
+        isOpen={archiveSheetOpen}
+        onClose={() => setArchiveSheetOpen(false)}
+        centreName={centre?.name || ''}
+        onArchive={archiveCentre}
+        onPermanentDelete={permanentDeleteCentre}
+      />
     </div>
   );
 }

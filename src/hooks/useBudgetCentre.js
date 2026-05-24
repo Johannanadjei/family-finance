@@ -22,7 +22,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase }                          from '../lib/supabase';
-import { getCentreById, updateCentre as updateCentreService } from '../services/centres.service';
+import { getCentreById, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService } from '../services/centres.service';
 import { addCategory as addCategoryService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
 import { updateIncomeSource as updateIncomeSourceService } from '../services/income.service';
 import { getCurrentMonth } from '../lib/finance';
@@ -34,6 +34,7 @@ const fetchFirstCentre = async () => {
     .from('budget_centres')
     .select('*')
     .is('deleted_at', null)
+    .eq('is_archived', false)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -219,6 +220,18 @@ export function useBudgetCentre(user, centreId) {
     return { data, error: null };
   }, []);
 
+  const archiveCentre = useCallback(async (centreId) => {
+    const { error } = await archiveCentreService(centreId);
+    if (error) console.error('[useBudgetCentre] archiveCentre error:', error.message);
+    return { error: error || null };
+  }, []);
+
+  const permanentDeleteCentre = useCallback(async (centreId) => {
+    const { error } = await deleteCentreService(centreId);
+    if (error) console.error('[useBudgetCentre] permanentDeleteCentre error:', error.message);
+    return { error: error || null };
+  }, []);
+
   return {
     centre,
     centreId:       centre?.id || null,
@@ -232,6 +245,8 @@ export function useBudgetCentre(user, centreId) {
     updateCategory,
     deleteCategory,
     updateIncomeSource,
+    archiveCentre,
+    permanentDeleteCentre,
     onOnboardingComplete,
     reload: load,
   };
