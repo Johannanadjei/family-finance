@@ -65,7 +65,7 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
   const btnStyle = (primary) => ({ background: primary ? 'var(--c-primary, #064e3b)' : 'var(--c-border, #e5e7eb)', border: 'none', borderRadius: 8, padding: '6px 10px', color: primary ? 'var(--c-btn-text, #ffffff)' : 'inherit', fontSize: 14, cursor: 'pointer' });
 
   return (
-    <div style={{ background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', marginBottom: 12, border: `1.5px solid ${config.border}`, boxShadow: 'var(--c-shadow)' }}>
+    <div style={{ background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', marginBottom: 12, border: '1px solid rgba(255,255,255,0.2)', boxShadow: 'var(--c-shadow)' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

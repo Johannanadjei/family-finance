@@ -20,7 +20,7 @@ export function MonthlyIncomeCard({ allIncome, totalReceived, monthlyIncome, tot
   ];
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 20, padding: '20px 20px 18px', marginBottom: 12, color: '#fff', boxShadow: 'var(--c-shadow)' }}>
+    <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 20, padding: '20px 20px 18px', marginBottom: 12, color: '#fff', boxShadow: 'var(--c-shadow)', border: '1px solid rgba(255,255,255,0.2)' }}>
       <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: 2, color: 'rgba(255,255,255,.7)', margin: '0 0 6px', textTransform: 'uppercase' }}>
         Income Received
       </p>
