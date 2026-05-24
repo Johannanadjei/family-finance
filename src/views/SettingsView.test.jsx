@@ -47,6 +47,18 @@ vi.mock('../context/FinanceContext', () => ({
 
 vi.mock('../lib/themes', () => ({ applyTheme: vi.fn() }));
 
+vi.mock('../lib/pwa', () => ({
+  getInstallPrompt:   vi.fn(() => null),
+  triggerInstall:     vi.fn(async () => ({ outcome: 'dismissed' })),
+  clearInstallPrompt: vi.fn(),
+}));
+
+// InstallAppSection uses window.matchMedia at module level
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockReturnValue({ matches: false, media: '', onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() }),
+});
+
 vi.mock('../context/PinContext', () => ({
   usePinContext: () => ({
     hasPinSetup:  false,

@@ -15,6 +15,7 @@ import { CentreSettingsSection }      from './settings/CentreSettingsSection';
 import { CategorySettingsRow }        from './settings/CategorySettingsRow';
 import { IncomeSourceRow }            from './settings/IncomeSourceRow';
 import { ThemeSection }               from './settings/ThemeSection';
+import { InstallAppSection }          from './settings/InstallAppSection';
 import { AddCategorySheet }           from './budget/AddCategorySheet';
 import { GuestSettingsSection }       from './settings/GuestSettingsSection';
 import { SecuritySection }            from './settings/SecuritySection';
@@ -178,6 +179,9 @@ export function SettingsView() {
 
       {/* Theme */}
       <ThemeSection />
+
+      {/* Install App */}
+      <InstallAppSection />
 
       {/* Sign Out */}
       <div style={card}>
