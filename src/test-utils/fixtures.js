@@ -72,3 +72,8 @@ export const mockCategorySpend = {
   'Groceries': 200,
   'Transport': 0,
 };
+
+export const mockGuests = [
+  { id: 'guest-1', name: 'Sarah', budget_centre_id: 'c1', allowed_categories: ['Groceries', 'Transport'], is_active: true,  created_at: '2026-01-01T00:00:00Z' },
+  { id: 'guest-2', name: 'Tom',   budget_centre_id: 'c1', allowed_categories: ['Groceries'],               is_active: false, created_at: '2026-01-02T00:00:00Z' },
+];

@@ -41,10 +41,19 @@ vi.mock('../context/FinanceContext', () => ({
     saveThemeSkin:       vi.fn(),
     addIncomeSource:     mockAddIncomeSource,
     deleteIncomeSource:  mockDeleteIncomeSource,
+    userPlan:            'free',
   }),
 }));
 
 vi.mock('../lib/themes', () => ({ applyTheme: vi.fn() }));
+
+vi.mock('../services/guests.service', () => ({
+  getGuestUsers:   vi.fn().mockResolvedValue({ data: [], error: null }),
+  createGuestUser: vi.fn().mockResolvedValue({ data: null, error: null }),
+  updateGuestUser: vi.fn().mockResolvedValue({ data: null, error: null }),
+  setGuestActive:  vi.fn().mockResolvedValue({ data: null, error: null }),
+  deleteGuestUser: vi.fn().mockResolvedValue({ error: null }),
+}));
 
 const renderSettings = () =>
   render(<MemoryRouter><SettingsView /></MemoryRouter>);

@@ -14,7 +14,7 @@
 
 import { supabase } from '../lib/supabase';
 import { validateString } from '../lib/validation';
-import { hashPin, verifyPin } from '../lib/crypto';
+import { hashPin } from '../lib/crypto';
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
@@ -159,38 +159,63 @@ export const deleteGuestUser = async (guestId) => {
   return { error };
 };
 
-// ── Authentication ────────────────────────────────────────────────────────────
+// ── Authentication (server-side via SECURITY DEFINER RPCs) ───────────────────
 
 /**
- * Authenticate a guest user by centre ID and PIN.
- * Returns the guest user data if PIN matches — never returns pin_hash.
+ * List all active guest users for a centre — readable by anon key via RPC.
+ * Returns only (id, name) — no sensitive fields.
  *
  * @param {string} centreId
+ */
+export const getCentreGuests = async (centreId) => {
+  const { data, error } = await supabase.rpc('get_centre_guests', { p_centre_id: centreId });
+  if (error) console.error('[guests.service] getCentreGuests error:', error.message);
+  return { data: data || [], error };
+};
+
+/**
+ * Authenticate a guest by ID and raw PIN.
+ * PIN is hashed client-side; comparison and lockout happen server-side.
+ * Returns { status, id, name, allowed_categories, budget_centre_id } on success.
+ * Status values: 'ok' | 'wrong_pin' | 'locked'
+ *
+ * @param {string} guestId
  * @param {string} pin — raw PIN entered by guest
  */
-export const authenticateGuest = async (centreId, pin) => {
-  // Fetch all active guests for this centre including pin_hash for verification
-  const { data: guests, error } = await supabase
-    .from('guest_users')
-    .select('*')
-    .eq('budget_centre_id', centreId)
-    .eq('is_active', true)
-    .is('deleted_at', null);
-
+export const authenticateGuest = async (guestId, pin) => {
+  const pin_hash = await hashPin(String(pin));
+  const { data, error } = await supabase.rpc('authenticate_guest', {
+    p_guest_id:  guestId,
+    p_pin_hash:  pin_hash,
+  });
   if (error) {
-    console.error('[guests.service] authenticateGuest fetch error:', error.message);
+    console.error('[guests.service] authenticateGuest error:', error.message);
     return { data: null, error };
   }
+  const row = Array.isArray(data) ? data[0] : data;
+  return { data: row || null, error: null };
+};
 
-  // Verify PIN against each active guest
-  for (const guest of guests) {
-    const match = await verifyPin(String(pin), guest.pin_hash);
-    if (match) {
-      // Return guest without pin_hash
-      const { pin_hash, ...safeGuest } = guest;
-      return { data: safeGuest, error: null };
-    }
-  }
-
-  return { data: null, error: new Error('Invalid PIN') };
+/**
+ * Submit a guest expense transaction via the server-side RPC.
+ * Guest session (guestId + centreId) is validated server-side.
+ *
+ * @param {{ guestId, centreId, amount, categoryName, description, date, week, currency }}
+ * @returns {{ data: uuid|null, error }}
+ */
+export const submitGuestTransaction = async ({
+  guestId, centreId, amount, categoryName, description, date, week, currency,
+}) => {
+  const { data, error } = await supabase.rpc('submit_guest_transaction', {
+    p_guest_id:      guestId,
+    p_centre_id:     centreId,
+    p_amount:        amount,
+    p_category_name: categoryName,
+    p_description:   description || '',
+    p_date:          date,
+    p_week:          week,
+    p_currency:      currency,
+  });
+  if (error) console.error('[guests.service] submitGuestTransaction error:', error.message);
+  return { data, error };
 };
