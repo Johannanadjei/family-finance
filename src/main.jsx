@@ -1,21 +1,31 @@
 import { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
-import { GuestPortal } from './views/GuestPortal.jsx';
 
-// Detect guest mode at module scope — before any imports from App run.
-// This ensures App.jsx (and its Supabase auth chain) is never loaded for guest sessions.
+// Only React + CSS are imported above this line — no app code, no Supabase.
+// URL detection therefore runs before any app module has had a chance to load.
 const _p        = new URLSearchParams(window.location.search);
 const _isGuest  = _p.get('guest') === '1';
 const _centreId = _p.get('c') || null;
 const _currency = _p.get('cur') || 'GHS';
 
-// Lazy-load App so its modules are never fetched when guest=1 is in the URL
-const App = lazy(() => import('./App.jsx'));
+// Both entry points are lazy — only the matching one ever loads.
+// Guest path  → GuestPortal (+ anon Supabase client).  App.jsx never imports.
+// Owner path  → App (+ auth Supabase client).           GuestPortal never imports.
+const LazyApp = lazy(() => import('./App.jsx'));
+const LazyGuest = lazy(() =>
+  import('./views/GuestPortal.jsx').then(m => ({ default: m.GuestPortal }))
+);
 
 function Root() {
-  if (_isGuest) return <GuestPortal centreId={_centreId} currency={_currency} />;
-  return <Suspense fallback={null}><App /></Suspense>;
+  if (_isGuest) {
+    return (
+      <Suspense fallback={null}>
+        <LazyGuest centreId={_centreId} currency={_currency} />
+      </Suspense>
+    );
+  }
+  return <Suspense fallback={null}><LazyApp /></Suspense>;
 }
 
 createRoot(document.getElementById('root')).render(
