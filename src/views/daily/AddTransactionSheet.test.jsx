@@ -48,8 +48,8 @@ describe('AddTransactionSheet', () => {
   });
 
   it('renders date inputs pre-filled with today', () => {
-    renderSheet();
     const today = new Date();
+    renderSheet();
     expect(screen.getByTestId('add-date-input').value).toBe(String(today.getDate()));
     expect(screen.getByTestId('add-month-input').value).toBe(String(today.getMonth() + 1));
     expect(screen.getByTestId('add-year-input').value).toBe(String(today.getFullYear()));

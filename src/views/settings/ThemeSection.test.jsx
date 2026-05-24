@@ -42,6 +42,7 @@ describe('ThemeSection', () => {
     expect(screen.getByTestId('theme-minimal_light')).toBeTruthy();
     expect(screen.getByTestId('theme-royal_luxury')).toBeTruthy();
     expect(screen.getByTestId('theme-monochrome')).toBeTruthy();
+    expect(screen.getByTestId('theme-panda')).toBeTruthy();
   });
 
   it('disables pro themes for free users', () => {

@@ -34,11 +34,10 @@ export function ConfirmSheet({ income, isOpen, onClose, onConfirm, loading, erro
   useEffect(() => {
     if (isOpen && income) {
       setAmount(String(income.expected_amount));
-      const today = new Date().toISOString().split('T')[0];
-      const [y, m, d] = today.split('-');
-      setYear(y);
-      setMonth(String(parseInt(m)));
-      setDay(String(parseInt(d)));
+      const today = new Date();
+      setYear(String(today.getFullYear()));
+      setMonth(String(today.getMonth() + 1));
+      setDay(String(today.getDate()));
       setLocalError(null);
     }
   }, [isOpen, income?.id]);

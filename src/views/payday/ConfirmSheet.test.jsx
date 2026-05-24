@@ -43,8 +43,8 @@ describe('ConfirmSheet', () => {
   });
 
   it('renders date inputs pre-filled with today', () => {
-    renderSheet();
     const today = new Date();
+    renderSheet();
     expect(screen.getByTestId('confirm-date-day').value).toBe(String(today.getDate()));
     expect(screen.getByTestId('confirm-date-month').value).toBe(String(today.getMonth() + 1));
     expect(screen.getByTestId('confirm-date-year').value).toBe(String(today.getFullYear()));

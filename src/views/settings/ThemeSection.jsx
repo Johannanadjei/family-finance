@@ -19,6 +19,7 @@ const SKINS = [
   { key: 'minimal_light',         label: 'Minimal',       emoji: '◻️', pro: true  },
   { key: 'royal_luxury',          label: 'Royal',         emoji: '👑', pro: true  },
   { key: 'monochrome',            label: 'Mono',          emoji: '◼️', pro: true  },
+  { key: 'panda',                 label: 'Panda',         emoji: '🐼', pro: true  },
 ];
 
 export function ThemeSection() {
