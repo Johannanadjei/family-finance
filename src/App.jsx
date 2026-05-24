@@ -50,6 +50,7 @@ import { LogView }                               from './views/LogView';
 import { AddTransactionSheet }                   from './views/daily/AddTransactionSheet';
 import { SettingsView }                          from './views/SettingsView';
 import { Toast }                                 from './components/ui/Toast';
+import { InstallPrompt }                         from './components/ui/InstallPrompt';
 import { isKnownCategory }                       from './lib/finance';
 
 function LoadingScreen({ message }) {
@@ -298,6 +299,7 @@ export default function App() {
       centreCount={centres.length}
     >
       <FinanceProvider value={{ ...financeValues, userPlan }}>
+        <InstallPrompt />
         <BrowserRouter>
           <DashboardShell
             centres={centres}
