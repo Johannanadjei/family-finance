@@ -30,13 +30,23 @@ export const getPinHash = async (userId) => {
  * @returns {Promise<{ error: object|null }>}
  */
 export const savePinHash = async (userId, hash) => {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('users')
     .update({ pin_hash: hash })
-    .eq('id', userId);
+    .eq('id', userId)
+    .select('id')
+    .maybeSingle();
 
-  if (error) console.error('[pin.service] savePinHash error:', error.message);
-  return { error };
+  if (error) {
+    console.error('[pin.service] savePinHash error:', error.message);
+    return { error };
+  }
+  if (!data) {
+    const err = new Error('PIN could not be saved — no matching user row');
+    console.error('[pin.service] savePinHash: update matched 0 rows for userId:', userId);
+    return { error: err };
+  }
+  return { error: null };
 };
 
 /**

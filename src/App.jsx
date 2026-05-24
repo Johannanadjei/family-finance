@@ -247,7 +247,14 @@ export default function App() {
   // ── PIN gate ──────────────────────────────────────────────────────────────
   if (pinLoading)                      return <LoadingScreen message="Loading..." />;
   if (!hasPinSetup && !pinSkipped)     return (
-    <PinSetupFlow setupPin={setupPin} onSkip={() => setPinSkipped(true)} />
+    <PinSetupFlow
+      setupPin={async (pin) => {
+        const result = await setupPin(pin);
+        if (!result.error) window.history.replaceState({}, '', '/');
+        return result;
+      }}
+      onSkip={() => setPinSkipped(true)}
+    />
   );
   if (hasPinSetup && !pinUnlocked)     return (
     <PinScreen

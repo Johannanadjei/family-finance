@@ -24,24 +24,30 @@ function computeLockoutMs(attemptsSinceLock) {
 }
 
 export function usePin(user) {
-  const [pinHash,    setPinHash]    = useState(null);
-  const [pinLoading, setPinLoading] = useState(true);
+  // loadState tracks which user's pin_hash is currently loaded.
+  // Bundled so we can update hash + loadedFor atomically and avoid
+  // the race where user changes but pinLoading hasn't reset yet.
+  const [loadState, setLoadState] = useState({ hash: null, loadedFor: null, loading: false });
   const [pinUnlocked, setPinUnlocked] = useState(() => isPinUnlocked());
   const [attempts,   setAttempts]   = useState(() => getPinAttempts());
   const [lockedUntil, setLockedUntil] = useState(() => getLockoutUntil());
 
   // Load pin_hash from Supabase on mount / user change
   useEffect(() => {
-    if (!user) { setPinLoading(false); setPinHash(null); return; }
+    if (!user) { setLoadState({ hash: null, loadedFor: null, loading: false }); return; }
     let cancelled = false;
-    setPinLoading(true);
+    setLoadState(s => ({ ...s, loading: true }));
     getPinHash(user.id).then(({ data }) => {
-      if (!cancelled) { setPinHash(data); setPinLoading(false); }
+      if (!cancelled) setLoadState({ hash: data, loadedFor: user.id, loading: false });
     });
     return () => { cancelled = true; };
   }, [user?.id]);
 
-  const hasPinSetup = pinHash !== null && !pinLoading;
+  // pinLoading is true whenever user exists but we don't yet have their data loaded.
+  // This covers the race: user changes from null→non-null before the effect fires.
+  const pinLoading = loadState.loading || (!!user && loadState.loadedFor !== user?.id);
+  const pinHash    = loadState.hash;
+  const hasPinSetup = !pinLoading && pinHash !== null;
 
   /** Verify the entered PIN. Handles lockout and attempt counting. */
   const verifyPin = useCallback(async (pin) => {
@@ -86,7 +92,7 @@ export function usePin(user) {
     const hash = await hashPin(pin);
     const { error } = await savePinHash(user.id, hash);
     if (!error) {
-      setPinHash(hash);
+      setLoadState({ hash, loadedFor: user.id, loading: false });
       savePinUnlocked();
       setPinUnlocked(true);
     }
@@ -98,7 +104,7 @@ export function usePin(user) {
     if (!user) return { error: new Error('Not authenticated') };
     const { error } = await clearPinHash(user.id);
     if (!error) {
-      setPinHash(null);
+      setLoadState({ hash: null, loadedFor: user.id, loading: false });
       clearPinUnlocked();
       setPinUnlocked(false);
       setPinAttempts(0);

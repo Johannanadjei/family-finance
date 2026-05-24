@@ -64,16 +64,28 @@ describe('pin.service', () => {
   // ── savePinHash ───────────────────────────────────────────────────────────
 
   it('savePinHash — calls update with the given hash', async () => {
-    const spy = vi.fn().mockResolvedValue({ error: null });
-    chain.update = vi.fn(() => ({ eq: spy }));
+    chain.maybeSingle.mockResolvedValue({ data: { id: 'user-1' }, error: null });
     await savePinHash('user-1', 'deadbeef');
     expect(chain.update).toHaveBeenCalledWith({ pin_hash: 'deadbeef' });
   });
 
-  it('savePinHash — returns { error: null } on success', async () => {
-    chain.then = (resolve) => resolve({ error: null });
+  it('savePinHash — returns { error: null } when row is updated', async () => {
+    chain.maybeSingle.mockResolvedValue({ data: { id: 'user-1' }, error: null });
     const { error } = await savePinHash('user-1', 'abc');
     expect(error).toBeNull();
+  });
+
+  it('savePinHash — returns { error } when update matches 0 rows (no user row)', async () => {
+    chain.maybeSingle.mockResolvedValue({ data: null, error: null });
+    const { error } = await savePinHash('user-1', 'abc');
+    expect(error).toBeTruthy();
+    expect(error.message).toMatch(/no matching user row/i);
+  });
+
+  it('savePinHash — returns { error } on Supabase error', async () => {
+    chain.maybeSingle.mockResolvedValue({ data: null, error: { message: 'db error' } });
+    const { error } = await savePinHash('user-1', 'abc');
+    expect(error).toBeTruthy();
   });
 
   // ── clearPinHash ──────────────────────────────────────────────────────────
