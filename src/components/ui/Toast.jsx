@@ -52,7 +52,7 @@ export function Toast({ message, onEdit, actionLabel = 'Edit', onDismiss }) {
             onClick={onEdit}
             style={{
               background: 'none', border: 'none', fontSize: 13, fontWeight: 900,
-              color: '#6ee7b7', cursor: 'pointer', padding: 0,
+              color: 'var(--c-accent, #6ee7b7)', cursor: 'pointer', padding: 0,
               fontFamily: "'Nunito', sans-serif",
             }}
           >

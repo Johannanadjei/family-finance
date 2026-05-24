@@ -26,6 +26,7 @@ const SHARED = {
   '--c-chip-bg':            '#f3f4f6',
   '--c-chip-text':          '#1c1917',
   '--c-modal-bg':           '#ffffff',
+  '--c-btn-text':           '#ffffff',
 };
 
 const DARK_FUNCTIONAL = {
@@ -33,8 +34,8 @@ const DARK_FUNCTIONAL = {
   '--c-success':            '#34d399',
   '--c-warning':            '#fbbf24',
   '--c-danger-bg':          '#450a0a',
-  '--c-danger-light':       '#991b1b',
-  '--c-success-light':      '#065f46',
+  '--c-danger-light':       '#fca5a5',  // bright — used as text on dark gradient headers
+  '--c-success-light':      '#6ee7b7',  // bright — used as text on dark gradient headers
   '--c-warning-bg':         '#451a03',
   '--c-warning-text':       '#fcd34d',
   '--c-shadow':             '0 2px 12px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.4)',
@@ -42,6 +43,7 @@ const DARK_FUNCTIONAL = {
   '--c-danger-text':        '#f87171',
   '--c-chip-bg':            '#334155',
   '--c-chip-text':          '#f1f5f9',
+  '--c-btn-text':           '#ffffff',
 };
 
 export const THEMES = {
@@ -216,9 +218,9 @@ export const THEMES = {
     '--c-input-border':       'rgba(255,255,255,0.12)',
     '--c-danger':             '#ffffff',
     '--c-danger-bg':          '#111111',
-    '--c-danger-light':       '#999999',
+    '--c-danger-light':       '#fca5a5',  // bright — visible on black header
     '--c-success':            '#ffffff',
-    '--c-success-light':      '#111111',
+    '--c-success-light':      '#6ee7b7',  // bright mint — visible on black header
     '--c-warning':            '#bdbdbd',
     '--c-warning-bg':         '#111111',
     '--c-warning-text':       '#bdbdbd',
@@ -229,6 +231,7 @@ export const THEMES = {
     '--c-modal-bg':           '#000000',
     '--c-active-bg':          '#ffffff',
     '--c-active-text':        '#000000',
+    '--c-btn-text':           '#000000',  // black text on white panda buttons
     '--c-shadow':             'none',
   },
 
@@ -255,15 +258,16 @@ export const THEMES = {
     '--c-modal-bg':           '#1a1a1a',
     '--c-danger':             '#fca5a5',
     '--c-danger-bg':          '#1a0a0a',
-    '--c-danger-light':       '#991b1b',
+    '--c-danger-light':       '#fca5a5',  // bright — visible on dark gradient headers
     '--c-success':            '#6ee7b7',
-    '--c-success-light':      '#064e3b',
+    '--c-success-light':      '#6ee7b7',  // bright mint — visible on dark gradient headers
     '--c-warning':            '#fbbf24',
     '--c-warning-bg':         '#1a1500',
     '--c-warning-text':       '#fef3c7',
     '--c-shadow':             'none',
     '--c-success-text':       '#6ee7b7',
     '--c-danger-text':        '#fca5a5',
+    '--c-btn-text':           '#ffffff',
   },
 };
 

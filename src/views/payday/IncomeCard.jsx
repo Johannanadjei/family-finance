@@ -62,7 +62,7 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
 
   const handleKeepReceived = () => { setShowReceivedPrompt(false); setEditing(false); };
 
-  const btnStyle = (primary) => ({ background: primary ? 'var(--c-primary, #064e3b)' : 'var(--c-border, #e5e7eb)', border: 'none', borderRadius: 8, padding: '6px 10px', color: primary ? '#fff' : 'inherit', fontSize: 14, cursor: 'pointer' });
+  const btnStyle = (primary) => ({ background: primary ? 'var(--c-primary, #064e3b)' : 'var(--c-border, #e5e7eb)', border: 'none', borderRadius: 8, padding: '6px 10px', color: primary ? 'var(--c-btn-text, #ffffff)' : 'inherit', fontSize: 14, cursor: 'pointer' });
 
   return (
     <div style={{ background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', marginBottom: 12, border: `1.5px solid ${config.border}`, boxShadow: 'var(--c-shadow)' }}>
@@ -129,12 +129,12 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
       {/* Action button */}
       {income.received ? (
         <button onClick={() => onMarkPending(income.id)} disabled={disabled} onMouseEnter={() => !disabled && setHoveredPending(true)} onMouseLeave={() => setHoveredPending(false)}
-          style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: hoveredPending && !disabled ? 'var(--c-input-bg, #f9fafb)' : '#fff', color: 'var(--c-muted, #6b7280)', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1, fontFamily: "'Nunito', sans-serif", transition: 'background .15s' }}>
+          style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: hoveredPending && !disabled ? 'var(--c-input-bg, #f9fafb)' : 'var(--c-card, #ffffff)', color: 'var(--c-muted, #6b7280)', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1, fontFamily: "'Nunito', sans-serif", transition: 'background .15s' }}>
           {disabled ? 'Updating…' : 'Mark as Pending'}
         </button>
       ) : (
         <button onClick={() => onConfirm(income)} disabled={disabled}
-          style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: disabled ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: disabled ? 'var(--c-muted, #9ca3af)' : '#fff', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+          style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: disabled ? 'var(--c-border, #e5e7eb)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: disabled ? 'var(--c-muted, #9ca3af)' : 'var(--c-btn-text, #ffffff)', fontSize: 13, fontWeight: 800, cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
           {disabled ? 'Confirming…' : 'Confirm Received'}
         </button>
       )}

@@ -37,10 +37,10 @@ export function WeeklySummaryBar({ weeklyData, fmt, activeMonth }) {
               minWidth:     64,
             }}
           >
-            <p style={{ fontSize: 10, fontWeight: 800, color: isActive ? '#6ee7b7' : 'var(--c-muted, #6b7280)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 1 }}>
+            <p style={{ fontSize: 10, fontWeight: 800, color: isActive ? 'var(--c-btn-text, #ffffff)' : 'var(--c-muted, #6b7280)', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 1 }}>
               {w.week}
             </p>
-            <p style={{ fontSize: 13, fontWeight: 900, color: isActive ? '#fff' : 'var(--c-text, #1c1917)', margin: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 900, color: isActive ? 'var(--c-btn-text, #ffffff)' : 'var(--c-text, #1c1917)', margin: 0 }}>
               {fmt(w.variableSpending)}
             </p>
           </div>

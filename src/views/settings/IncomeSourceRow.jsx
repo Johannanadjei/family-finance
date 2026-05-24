@@ -118,7 +118,7 @@ export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
               aria-label="Save income source"
               onClick={handleEditSave}
               disabled={saving}
-              style={{ background: 'var(--c-primary, #064e3b)', border: 'none', borderRadius: 8, padding: '6px 14px', color: '#fff', fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif", fontWeight: 800 }}
+              style={{ background: 'var(--c-primary, #064e3b)', border: 'none', borderRadius: 8, padding: '6px 14px', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif", fontWeight: 800 }}
             >
               {saving ? '…' : '✓'}
             </button>
@@ -155,7 +155,7 @@ export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
                 <button
                   data-testid={`income-delete-confirm-${source.id}`}
                   onClick={handleDeleteConfirm}
-                  style={{ background: 'var(--c-danger, #dc2626)', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
+                  style={{ background: 'var(--c-danger, #dc2626)', border: 'none', borderRadius: 6, padding: '4px 10px', color: 'var(--c-btn-text, #ffffff)', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
                 >
                   Delete
                 </button>

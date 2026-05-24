@@ -98,11 +98,11 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                   width:      '100%',
                   padding:    '12px 16px 12px 14px',
                   textAlign:  'left',
-                  background: active  ? 'var(--c-accent-light, #f0fdf4)'
-                             : hovered ? 'var(--c-bg, #f3f4f6)'
+                  background: active  ? 'var(--c-chip-selected-bg, #f0fdf4)'
+                             : hovered ? 'var(--c-chip-bg, #f3f4f6)'
                              : 'transparent',
                   borderTop:    'none', borderRight: 'none', borderBottom: 'none',
-                  borderLeft:   `4px solid ${active ? 'var(--c-active-bg, var(--c-accent, #059669))' : 'transparent'}`,
+                  borderLeft:   `4px solid ${active ? 'var(--c-primary, #064e3b)' : 'transparent'}`,
                   cursor:     'pointer',
                   display:    'block',
                   transition: 'background .15s',
@@ -110,10 +110,10 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {/* Icon container — green when active */}
+                  {/* Icon container — primary colour when active */}
                   <div style={{
                     width: 42, height: 42, borderRadius: 11, flexShrink: 0,
-                    background: active ? 'var(--c-active-bg, var(--c-accent, #059669))' : 'var(--c-bg, #f3f4f6)',
+                    background: active ? 'var(--c-primary, #064e3b)' : 'var(--c-bg, #f3f4f6)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 20,
                   }}>
@@ -123,7 +123,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{
                       fontSize: 14, fontWeight: 900, margin: '0 0 2px',
-                      color: active ? 'var(--c-active-bg, var(--c-accent, #059669))' : 'var(--c-text, #1c1917)',
+                      color: active ? 'var(--c-chip-selected-text, var(--c-primary, #064e3b))' : 'var(--c-text, #1c1917)',
                     }}>
                       {c.name}
                     </p>
@@ -135,8 +135,8 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                   {active ? (
                     <span style={{
                       fontSize: 10, fontWeight: 800,
-                      color: 'var(--c-active-text, #fff)',
-                      background: 'var(--c-active-bg, var(--c-accent, #059669))',
+                      color: 'var(--c-btn-text, #ffffff)',
+                      background: 'var(--c-primary, #064e3b)',
                       padding: '3px 8px', borderRadius: 20, flexShrink: 0,
                     }}>
                       Active
@@ -183,7 +183,7 @@ export function SidePanel({ isOpen, onClose, centres, activeCentreId, onSwitch, 
                 width: '100%', padding: '14px', borderRadius: 12,
                 border: 'none',
                 background: 'var(--c-primary, #064e3b)',
-                color: '#fff',
+                color: 'var(--c-btn-text, #ffffff)',
                 fontSize: 15, fontWeight: 800, cursor: 'pointer',
                 fontFamily: "'Nunito', sans-serif",
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
