@@ -29,7 +29,7 @@ export function GuestSettingsSection() {
   useEffect(() => { loadGuests(); }, [loadGuests]);
 
   const portalLink = centre
-    ? `${window.location.origin}?guest=1&c=${centre.id}&cur=${encodeURIComponent(centre.currency || 'GHS')}`
+    ? `${window.location.origin}?guest=1&c=${centre.id}&cur=${centre.currency || 'GHS'}`
     : '';
 
   const handleCopy = () => {
@@ -77,12 +77,17 @@ export function GuestSettingsSection() {
         </p>
 
         {centre && (
-          <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 10, padding: '10px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <p data-testid="portal-link" style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0, flex: 1, wordBreak: 'break-all' }}>{portalLink}</p>
-            <button data-testid="copy-link-btn" onClick={handleCopy} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 8, border: 'none', background: copied ? 'var(--c-success, #059669)' : 'var(--c-primary, #064e3b)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-          </div>
+          <>
+            <p data-testid="portal-link-label" style={{ fontSize: 12, fontWeight: 800, color: 'var(--c-muted, #6b7280)', margin: '0 0 6px' }}>
+              Guest portal link for: <span style={{ color: 'var(--c-primary, #064e3b)' }}>{centre.name}</span>
+            </p>
+            <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 10, padding: '10px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <p data-testid="portal-link" style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0, flex: 1, wordBreak: 'break-all' }}>{portalLink}</p>
+              <button data-testid="copy-link-btn" onClick={handleCopy} style={{ flexShrink: 0, padding: '6px 12px', borderRadius: 8, border: 'none', background: copied ? 'var(--c-success, #059669)' : 'var(--c-primary, #064e3b)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </>
         )}
 
         {error && <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '8px 12px', marginBottom: 10 }}><p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{error}</p></div>}

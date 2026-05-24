@@ -46,6 +46,16 @@ describe('GuestSettingsSection', () => {
     expect(screen.getByTestId('portal-link')).toBeTruthy();
     expect(screen.getByTestId('portal-link').textContent).toContain('?guest=1');
     expect(screen.getByTestId('portal-link').textContent).toContain(mockCentre.id);
+    expect(screen.getByTestId('portal-link').textContent).toContain(`cur=${mockCentre.currency}`);
+  });
+
+  it('shows centre name label on portal link', async () => {
+    renderSection();
+    await act(async () => {});
+    const label = screen.getByTestId('portal-link-label');
+    expect(label).toBeTruthy();
+    expect(label.textContent).toContain('Guest portal link for:');
+    expect(label.textContent).toContain(mockCentre.name);
   });
 
   it('renders copy link button', async () => {
