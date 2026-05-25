@@ -41,7 +41,9 @@ export function JoinView() {
 
       setInvite(inv);
 
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) { setPhase('invalid'); return; }
+      const currentUser = authData?.user;
       if (currentUser) {
         // Warn if signed-in email differs from invited email
         if (currentUser.email?.toLowerCase() !== inv.invited_email?.toLowerCase()) {

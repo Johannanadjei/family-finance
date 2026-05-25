@@ -68,7 +68,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals:     true,
-    pool: 'forks',
     coverage: {
       provider:   'v8',
       reporter:   ['text', 'json', 'html'],

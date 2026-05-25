@@ -23,8 +23,6 @@ export function SettingsView() {
   const navigate  = useNavigate();
   const { signOut }                                                            = useAuth();
   const { categories, fmt, addCategory, updateCategory, deleteCategory, updateIncomeSource, centre, can } = useBudgetCentreContext();
-
-  if (!can('settings')) return <AccessBlocked message="Settings are only available to hub owners and full-access members." />;
   const { incomes, loading, addIncomeSource, deleteIncomeSource }             = useFinanceContext();
 
   const [addCatOpen,      setAddCatOpen]      = useState(false);
@@ -36,6 +34,8 @@ export function SettingsView() {
   const [addError,        setAddError]        = useState(null);
   const [savingSource,    setSavingSource]    = useState(false);
   const [showIncomeInfo,  setShowIncomeInfo]  = useState(false);
+
+  if (!can('settings')) return <AccessBlocked message="Settings are only available to hub owners and full-access members." />;
 
   const handleAddSource = async () => {
     if (!newLabel.trim()) { setAddError('Please enter a source name'); return; }

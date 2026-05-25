@@ -41,14 +41,13 @@ function PaydayViewSkeleton() {
 export function PaydayView() {
   const { fmt, can }                        = useBudgetCentreContext();
   const financeValues                       = useFinanceContext();
-
-  if (!can('viewIncome')) return <AccessBlocked message="Income tracking is only available to hub owners and full-access members." />;
   const navigate                            = useNavigate();
   const [selectedIncome, setSelectedIncome] = useState(null);
   const [sheetOpen,      setSheetOpen]      = useState(false);
   const [mutating,       setMutating]       = useState(false);
   const [mutateError,    setMutateError]    = useState(null);
 
+  if (!can('viewIncome')) return <AccessBlocked message="Income tracking is only available to hub owners and full-access members." />;
   if (financeValues.loading) return <PaydayViewSkeleton />;
 
   const {

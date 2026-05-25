@@ -254,8 +254,8 @@ export function useBudgetCentre(user, centreId) {
   const inviteMember = useCallback(async ({ email, role }) => {
     const id = centre?.id;
     if (!id) return { error: new Error('No active centre') };
-    const { data: { user } } = await supabase.auth.getUser();
-    return createInviteService({ centreId: id, email, role, invitedBy: user?.id });
+    const { data: authData } = await supabase.auth.getUser();
+    return createInviteService({ centreId: id, email, role, invitedBy: authData?.user?.id });
   }, [centre?.id]);
 
   const removeMemberFromHub = useCallback(async (memberId, memberRole) => {

@@ -34,17 +34,21 @@ export const createInvite = async ({ centreId, email, role, invitedBy }) => {
     return { data: null, error: new Error('A pending invite already exists for this email.') };
   }
 
-  // Existing active member check
-  const { data: member, error: memErr } = await supabase
+  // Existing active member check — filter by email via inner join
+  const { data: existingMember, error: memErr } = await supabase
     .from('budget_centre_members')
-    .select('id, users(email)')
+    .select('id, users!inner(email)')
     .eq('budget_centre_id', centreId)
+    .eq('users.email', normalised)
     .is('deleted_at', null)
     .maybeSingle();
 
   if (memErr) {
     console.error('[invites.service] createInvite member check error:', memErr.message);
     return { data: null, error: memErr };
+  }
+  if (existingMember) {
+    return { data: null, error: new Error('This person is already a member of this hub.') };
   }
 
   const { data: invite, error } = await supabase
