@@ -563,3 +563,43 @@ the tests and audit are green.
 See CLAUDE.md section 9.5: Triple-Check Pre-Commit Protocol. Every item on that list is
 required before `git commit` is run. Green tests and a green audit are necessary but not
 sufficient conditions for a commit.
+
+---
+
+## [2026-05-25] Server-side RPC for cross-user writes — born from invite RLS failures
+
+**Context:**
+The `accept_invite` flow required an unauthenticated invitee to insert a row into
+`budget_centre_members` (a table they are not yet a member of) and update a row in
+`centre_invites`. Both operations require RLS policies that reference `auth.users` to
+validate ownership and prevent abuse. Writing correct RLS for this is non-trivial:
+policies that use subqueries joining through `auth.users` trigger "permission denied for
+table users" errors because the calling user's JWT does not grant direct read access to
+`auth.users` from within an RLS policy evaluation context.
+
+Attempted approaches that failed:
+- `USING (invited_email = auth.email())` — `auth.email()` is not available in all RLS contexts
+- Subquery through `budget_centre_members` joining `users` — "permission denied for table users"
+- Complex multi-table policy combining ownership and invite validity — same error, harder to debug
+
+Hours were spent fighting RLS before the correct solution was identified: move the entire
+operation into a `SECURITY DEFINER` function that runs with elevated privileges, keeping all
+validation logic inside Postgres where it is atomic and unrestricted.
+
+**Decision:**
+Any write that crosses ownership boundaries or requires validation involving `auth.users`
+uses a `SECURITY DEFINER` RPC function. This is the same pattern already established for
+`authenticate_guest` and `submit_guest_transaction`. The pattern is now a permanent rule.
+
+The `accept_invite` RPC:
+1. Reads `auth.uid()` server-side — no userId passed from the client
+2. Validates the invite (token, status, expiry) atomically
+3. Guards against duplicate membership
+4. Inserts the member row and marks the invite accepted in a single transaction
+5. Returns `{ centreId, memberId }` as JSON
+
+**Rules derived:**
+- See CLAUDE.md section 9.6: Server-side RPC for cross-user writes
+- Never attempt to solve cross-ownership write problems with RLS alone
+- The RPC script lives in `scripts/` alongside the other RPC functions
+- Every RPC function must be `GRANT EXECUTE`-d to the appropriate role (`anon` or `authenticated`)

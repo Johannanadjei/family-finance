@@ -89,7 +89,7 @@ export function JoinView() {
 
   const handleJoin = async () => {
     setPhase('joining');
-    const { data, error } = await acceptInvite({ token, userId: user.id });
+    const { data, error } = await acceptInvite({ token });
     if (error && !data) { setJoinError(error.message); setPhase('error'); return; }
     saveActiveCentreId(data?.centreId);
     navigate('/');

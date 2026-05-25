@@ -120,53 +120,18 @@ export const cancelInvite = async (inviteId) => {
 };
 
 /**
- * Accept an invite — inserts a member row and marks invite as accepted.
- * Both writes must succeed; if the member insert fails the invite stays pending.
+ * Accept an invite via SECURITY DEFINER RPC.
+ * All validation and writes happen server-side in a single transaction.
+ * The caller must be signed in — auth.uid() is used server-side for the user ID.
  *
- * @param {{ token, userId }} opts
- * @returns {{ data, error }}
+ * @param {{ token }} opts
+ * @returns {{ data: { centreId }, error }}
  */
-export const acceptInvite = async ({ token, userId }) => {
-  // Re-fetch invite to get centreId + role (validates it's still pending)
-  const { data: invite, error: fetchErr } = await getInviteByToken(token);
-  if (fetchErr) return { data: null, error: fetchErr };
-  if (!invite)  return { data: null, error: new Error('Invite not found or already used.') };
-
-  // Check invite hasn't expired (belt-and-suspenders — RLS also checks)
-  if (new Date(invite.expires_at) < new Date()) {
-    return { data: null, error: new Error('This invite has expired.') };
+export const acceptInvite = async ({ token }) => {
+  const { data, error } = await supabase.rpc('accept_invite', { p_token: token });
+  if (error) {
+    console.error('[invites.service] acceptInvite error:', error.message);
+    return { data: null, error };
   }
-
-  // Insert member row
-  const { data: member, error: memberErr } = await supabase
-    .from('budget_centre_members')
-    .insert({
-      budget_centre_id: invite.budget_centre_id,
-      user_id:          userId,
-      role:             invite.role,
-    })
-    .select()
-    .single();
-
-  if (memberErr) {
-    console.error('[invites.service] acceptInvite member insert error:', memberErr.message);
-    return { data: null, error: memberErr };
-  }
-
-  // Mark invite accepted
-  const { error: acceptErr } = await supabase
-    .from('centre_invites')
-    .update({ status: 'accepted' })
-    .eq('id', invite.id);
-
-  if (acceptErr) {
-    console.error('[invites.service] acceptInvite status update error:', acceptErr.message);
-    // Member row inserted but invite stays pending — warn caller so UI can inform user.
-    return {
-      data:  { member, centreId: invite.budget_centre_id },
-      error: new Error('You have joined the hub, but the invite link was not marked as used. Your hub owner may need to cancel it manually.'),
-    };
-  }
-
-  return { data: { member, centreId: invite.budget_centre_id }, error: null };
+  return { data: { centreId: data?.centreId }, error: null };
 };

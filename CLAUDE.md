@@ -371,6 +371,65 @@ dated 2026-05-25 for the full post-mortem.
 
 ---
 
+## 9.6. Server-side RPC for cross-user writes
+
+Any operation where a user writes to a table they don't own, or where the write
+requires validation across multiple tables involving `auth.users`, **must use a
+`SECURITY DEFINER` RPC function — never a direct client-side Supabase insert.**
+
+### When RPC is required
+
+- The calling user needs to insert into a table they are not yet a member of
+  (e.g. joining a hub — the invitee is not yet in `budget_centre_members`)
+- The write needs to validate data in `auth.users` server-side
+  (e.g. PIN comparison, session validation)
+- The write spans multiple tables and must be atomic
+  (e.g. insert member row + mark invite accepted in one transaction)
+
+### Established RPC functions in this codebase
+
+| Function | File | Why RPC |
+|---|---|---|
+| `authenticate_guest` | `scripts/authenticate_guest.sql` | PIN hash comparison against `auth.users` |
+| `submit_guest_transaction` | `scripts/submit_guest_transaction.sql` | Guest has no auth session; validated insert |
+| `accept_invite` | `scripts/accept_invite.sql` | Invitee not yet a member; atomic member + invite update |
+
+### Pattern
+
+```sql
+CREATE OR REPLACE FUNCTION my_rpc(p_param text)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- All validation and writes here, runs as the DB owner
+  -- auth.uid() is still available for the calling user's ID
+END;
+$$;
+GRANT EXECUTE ON FUNCTION my_rpc(text) TO authenticated; -- or anon
+```
+
+```js
+// services/something.service.js
+export const doThing = async (param) => {
+  const { data, error } = await supabase.rpc('my_rpc', { p_param: param });
+  if (error) { console.error('[something.service] doThing error:', error.message); return { data: null, error }; }
+  return { data, error: null };
+};
+```
+
+### Rule
+
+Never fight RLS with complex policies that join through `auth.users` or reference
+subqueries across tables the calling user doesn't own. Write an RPC instead. It
+takes the same amount of time, is transactional, and works reliably. The time lost
+debugging RLS "permission denied for table users" errors exceeds the time to write
+a 30-line SQL function.
+
+---
+
 ## 10. File structure
 
 ```

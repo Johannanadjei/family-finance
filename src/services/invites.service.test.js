@@ -13,6 +13,7 @@ const mockInvite = {
 
 // Chainable Supabase mock — each test overrides resolve values via mockResolve
 let mockResolve;
+const mockRpc = vi.fn();
 
 vi.mock('../lib/supabase', () => {
   const chain = () => {
@@ -30,7 +31,7 @@ vi.mock('../lib/supabase', () => {
     };
     return q;
   };
-  return { supabase: { from: () => chain() } };
+  return { supabase: { from: () => chain(), rpc: (...args) => mockRpc(...args) } };
 });
 
 import {
@@ -39,6 +40,7 @@ import {
 
 beforeEach(() => {
   mockResolve = () => ({ data: null, error: null });
+  mockRpc.mockReset();
 });
 
 // ── createInvite ──────────────────────────────────────────────────────────────
@@ -137,44 +139,22 @@ describe('cancelInvite', () => {
 // ── acceptInvite ──────────────────────────────────────────────────────────────
 
 describe('acceptInvite', () => {
-  it('returns error when invite not found', async () => {
-    mockResolve = () => ({ data: null, error: null });
-    const { data, error } = await acceptInvite({ token: 'bad', userId: 'u-2' });
-    expect(data).toBeNull();
-    expect(error.message).toMatch(/not found/i);
+  it('calls rpc accept_invite with the token', async () => {
+    mockRpc.mockResolvedValueOnce({ data: { centreId: 'c-1', memberId: 'mem-2' }, error: null });
+    await acceptInvite({ token: 'tok-abc' });
+    expect(mockRpc).toHaveBeenCalledWith('accept_invite', { p_token: 'tok-abc' });
   });
 
-  it('returns error when invite is expired', async () => {
-    const expired = { ...mockInvite, expires_at: new Date(Date.now() - 1000).toISOString() };
-    mockResolve = () => ({ data: expired, error: null });
-    const { data, error } = await acceptInvite({ token: 'tok-abc', userId: 'u-2' });
-    expect(data).toBeNull();
-    expect(error.message).toMatch(/expired/i);
-  });
-
-  it('returns member + centreId on success', async () => {
-    const member = { id: 'mem-2', user_id: 'u-2', role: 'standard' };
-    let call = 0;
-    mockResolve = () => {
-      call++;
-      if (call === 1) return { data: mockInvite, error: null }; // getInviteByToken
-      if (call === 2) return { data: member,     error: null }; // insert member
-      return { error: null };                                    // mark accepted
-    };
-    const { data, error } = await acceptInvite({ token: 'tok-abc', userId: 'u-2' });
+  it('returns centreId on success', async () => {
+    mockRpc.mockResolvedValueOnce({ data: { centreId: 'c-1', memberId: 'mem-2' }, error: null });
+    const { data, error } = await acceptInvite({ token: 'tok-abc' });
     expect(error).toBeNull();
-    expect(data.member).toEqual(member);
     expect(data.centreId).toBe('c-1');
   });
 
-  it('returns error when member insert fails', async () => {
-    let call = 0;
-    mockResolve = () => {
-      call++;
-      if (call === 1) return { data: mockInvite,             error: null };
-      return           { data: null, error: new Error('constraint') };
-    };
-    const { data, error } = await acceptInvite({ token: 'tok-abc', userId: 'u-2' });
+  it('returns error on RPC failure', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: new Error('invite_not_found') });
+    const { data, error } = await acceptInvite({ token: 'bad' });
     expect(data).toBeNull();
     expect(error).toBeTruthy();
   });
