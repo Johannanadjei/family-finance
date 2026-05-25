@@ -52,6 +52,7 @@ import { SettingsView }                          from './views/SettingsView';
 import { Toast }                                 from './components/ui/Toast';
 import { InstallPrompt }                         from './components/ui/InstallPrompt';
 import { isKnownCategory }                       from './lib/finance';
+import { JoinView }                              from './views/JoinView';
 
 function LoadingScreen({ message }) {
   return (
@@ -73,7 +74,7 @@ function ErrorScreen({ message }) {
 
 function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, onSwitchCentre, onHubCreated, onRestoreHub }) {
   const navigate                           = useNavigate();
-  const { categories }                     = useBudgetCentreContext();
+  const { categories, can }                = useBudgetCentreContext();
   const { incomes, loading }               = useFinanceContext();
   const [panelOpen,       setPanelOpen]    = useState(false);
   const [addSheetOpen,    setAddSheetOpen] = useState(false);
@@ -118,7 +119,7 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, on
           </Routes>
         </main>
       </ErrorBoundary>
-      <FAB onClick={() => setAddSheetOpen(true)} />
+      {can('log') && <FAB onClick={() => setAddSheetOpen(true)} />}
       <BottomNav />
       <AddTransactionSheet
         isOpen={addSheetOpen}
@@ -170,9 +171,10 @@ export default function App() {
   const [pinSkipped, setPinSkipped]                        = useState(false);
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
   const { centres, archivedCentres, plan: userPlan, reload: reloadCentres } = useCentres(user);
-  const { centre, categories, members, addCategory,
-          updateCentre, updateCategory, deleteCategory, updateIncomeSource,
+  const { centre, categories, members, currentMemberRole,
+          addCategory, updateCentre, updateCategory, deleteCategory, updateIncomeSource,
           archiveCentre, permanentDeleteCentre, restoreHub,
+          inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite,
           loading: centreLoading, needsOnboarding,
           error, onOnboardingComplete }                   = useBudgetCentre(user, activeCentreId);
   const financeValues                                     = useFinance({ centre, categories });
@@ -242,6 +244,9 @@ export default function App() {
     signOut();
   }, [user?.email, removePin, signOut]);
 
+  // ── Invite join — bypass all gates so unauthenticated invitees can reach it
+  if (window.location.pathname === '/join') return <JoinView />;
+
   // ── Auth gate ─────────────────────────────────────────────────────────────
   if (authLoading)     return <LoadingScreen message="Loading..." />;
   if (!user)           return <AuthScreen />;
@@ -289,6 +294,7 @@ export default function App() {
       centre={centre}
       categories={categories}
       members={members}
+      currentMemberRole={currentMemberRole}
       addCategory={addCategory}
       updateCentre={updateCentre}
       updateCategory={updateCategory}
@@ -297,6 +303,11 @@ export default function App() {
       archiveCentre={handleArchiveHub}
       permanentDeleteCentre={handlePermanentDeleteHub}
       restoreHub={handleRestoreHub}
+      inviteMember={inviteMember}
+      removeMember={removeMember}
+      updateMemberRole={updateMemberRole}
+      getInvites={getInvites}
+      cancelInvite={cancelInvite}
       centreCount={centres.length}
     >
       <FinanceProvider value={{ ...financeValues, userPlan }}>

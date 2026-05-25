@@ -3,10 +3,14 @@
  * Component rendering tests for BottomNav.
  */
 
-import { describe, it, expect } from 'vitest';
-import { render, screen }       from '@testing-library/react';
-import { MemoryRouter }         from 'react-router-dom';
-import { BottomNav }            from './BottomNav';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen }           from '@testing-library/react';
+import { MemoryRouter }             from 'react-router-dom';
+import { BottomNav }                from './BottomNav';
+
+vi.mock('../../context/BudgetCentreContext', () => ({
+  useBudgetCentreContext: () => ({ can: () => true }),
+}));
 
 const renderNav = (initialPath = '/') =>
   render(

@@ -8,18 +8,22 @@
  */
 
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useBudgetCentreContext }   from '../../context/BudgetCentreContext';
 
-const TABS = [
-  { label: 'Home',   path: '/'       },
-  { label: 'Payday', path: '/payday' },
-  { label: 'Daily',  path: '/daily'  },
-  { label: 'Budget', path: '/budget' },
-  { label: 'Log',    path: '/log'    },
+const ALL_TABS = [
+  { label: 'Home',   path: '/',       permission: null           },
+  { label: 'Payday', path: '/payday', permission: 'viewIncome'  },
+  { label: 'Daily',  path: '/daily',  permission: null           },
+  { label: 'Budget', path: '/budget', permission: null           },
+  { label: 'Log',    path: '/log',    permission: null           },
 ];
 
 export function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { can }  = useBudgetCentreContext();
+
+  const TABS = ALL_TABS.filter(t => !t.permission || can(t.permission));
 
   return (
     <nav
@@ -34,7 +38,7 @@ export function BottomNav() {
         background:     'var(--c-card, #ffffff)',
         borderTop:      '1px solid var(--c-border, #e5e7eb)',
         display:        'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
+        gridTemplateColumns: `repeat(${TABS.length}, 1fr)`,
         paddingBottom:  'env(safe-area-inset-bottom)',
         zIndex:         200,
       }}

@@ -16,6 +16,11 @@ const mockAddCategory        = vi.fn().mockResolvedValue({ error: null });
 const mockAddIncomeSource    = vi.fn().mockResolvedValue({ error: null });
 const mockDeleteIncomeSource = vi.fn().mockResolvedValue({ error: null });
 const mockSignOut            = vi.fn().mockResolvedValue(undefined);
+const mockGetInvites         = vi.fn().mockResolvedValue({ data: [], error: null });
+const mockInviteMember       = vi.fn().mockResolvedValue({ data: { token: 'tok' }, error: null });
+const mockRemoveMember       = vi.fn().mockResolvedValue({ error: null });
+const mockCancelInvite       = vi.fn().mockResolvedValue({ error: null });
+const mockCan                = vi.fn().mockReturnValue(true);
 
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => ({ user: null, loading: false, signOut: mockSignOut }),
@@ -23,13 +28,20 @@ vi.mock('../hooks/useAuth', () => ({
 
 vi.mock('../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({
-    centre:         mockCentre,
-    fmt:            mockFmt,
-    categories:     mockCategories,
-    addCategory:    mockAddCategory,
-    updateCentre:   mockUpdateCentre,
-    updateCategory: mockUpdateCategory,
-    deleteCategory: mockDeleteCategory,
+    centre:            mockCentre,
+    fmt:               mockFmt,
+    categories:        mockCategories,
+    addCategory:       mockAddCategory,
+    updateCentre:      mockUpdateCentre,
+    updateCategory:    mockUpdateCategory,
+    deleteCategory:    mockDeleteCategory,
+    members:           [],
+    currentMemberRole: 'owner',
+    can:               mockCan,
+    inviteMember:      mockInviteMember,
+    removeMember:      mockRemoveMember,
+    getInvites:        mockGetInvites,
+    cancelInvite:      mockCancelInvite,
   }),
 }));
 

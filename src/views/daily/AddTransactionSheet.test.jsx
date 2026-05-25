@@ -14,6 +14,7 @@ vi.mock('../../context/BudgetCentreContext', () => ({
     fmt:        mockFmt,
     categories: mockCategories,
     getCatIcon: (name) => name === 'Groceries' ? '🛒' : '💸',
+    can:        () => true,
   }),
 }));
 

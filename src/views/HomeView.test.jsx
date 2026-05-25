@@ -10,7 +10,7 @@ import { HomeView }                 from './HomeView';
 import { mockCentre, mockFmt }      from '../test-utils/fixtures';
 
 vi.mock('../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt }),
+  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: () => true }),
 }));
 
 const mockFinance = {

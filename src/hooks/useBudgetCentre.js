@@ -25,6 +25,8 @@ import { supabase }                          from '../lib/supabase';
 import { getCentreById, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
 import { addCategory as addCategoryService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
 import { updateIncomeSource as updateIncomeSourceService } from '../services/income.service';
+import { addMember as addMemberService, removeMember as removeMemberService, updateMemberRole as updateMemberRoleService } from '../services/members.service';
+import { createInvite as createInviteService, getHubInvites as getHubInvitesService, cancelInvite as cancelInviteService } from '../services/invites.service';
 import { getCurrentMonth } from '../lib/finance';
 
 // ── Local Supabase helpers ────────────────────────────────────────────────────
@@ -64,18 +66,20 @@ const fetchMembers = async (centreId) => {
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useBudgetCentre(user, centreId) {
-  const [centre,          setCentre]          = useState(null);
-  const [categories,      setCategories]      = useState([]);
-  const [members,         setMembers]         = useState([]);
-  const [loading,         setLoading]         = useState(true);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [error,           setError]           = useState(null);
+  const [centre,            setCentre]            = useState(null);
+  const [categories,        setCategories]        = useState([]);
+  const [members,           setMembers]           = useState([]);
+  const [currentMemberRole, setCurrentMemberRole] = useState('view_only');
+  const [loading,           setLoading]           = useState(true);
+  const [needsOnboarding,   setNeedsOnboarding]   = useState(false);
+  const [error,             setError]             = useState(null);
 
   const load = useCallback(async () => {
     if (!user) {
       setCentre(null);
       setCategories([]);
       setMembers([]);
+      setCurrentMemberRole('view_only');
       setLoading(false);
       setNeedsOnboarding(false);
       return;
@@ -122,6 +126,7 @@ export function useBudgetCentre(user, centreId) {
       setCentre(null);
       setCategories([]);
       setMembers([]);
+      setCurrentMemberRole('view_only');
       setLoading(false);
       return;
     }
@@ -134,6 +139,10 @@ export function useBudgetCentre(user, centreId) {
     if (catResult.error)    console.error('[useBudgetCentre] categories fetch error:', catResult.error.message);
     if (memberResult.error) console.error('[useBudgetCentre] members fetch error:', memberResult.error.message);
 
+    // Derive the current user's role from their member row
+    const currentMember = memberResult.data.find(m => m.user_id === user.id);
+    const derivedRole   = currentMember?.role ?? 'view_only';
+
     // Resume detection: only on initial load (no centreId).
     // First centre has no categories → partial onboarding write — resume.
     if (!centreId && catResult.data.length === 0) {
@@ -141,6 +150,7 @@ export function useBudgetCentre(user, centreId) {
       setCentre(centreData);
       setCategories([]);
       setMembers(memberResult.data);
+      setCurrentMemberRole(derivedRole);
       setLoading(false);
       return;
     }
@@ -148,6 +158,7 @@ export function useBudgetCentre(user, centreId) {
     setCentre(centreData);
     setCategories(catResult.data);
     setMembers(memberResult.data);
+    setCurrentMemberRole(derivedRole);
     setNeedsOnboarding(false);
     setLoading(false);
   }, [user, centreId]);
@@ -238,11 +249,51 @@ export function useBudgetCentre(user, centreId) {
     return { error: error || null };
   }, []);
 
+  // ── Member + invite mutations ─────────────────────────────────────────────
+
+  const inviteMember = useCallback(async ({ email, role }) => {
+    const id = centre?.id;
+    if (!id) return { error: new Error('No active centre') };
+    const { data: { user } } = await supabase.auth.getUser();
+    return createInviteService({ centreId: id, email, role, invitedBy: user?.id });
+  }, [centre?.id]);
+
+  const removeMemberFromHub = useCallback(async (memberId, memberRole) => {
+    const { error } = await removeMemberService(memberId, memberRole);
+    if (error) {
+      console.error('[useBudgetCentre] removeMember error:', error.message);
+      return { error };
+    }
+    setMembers(prev => prev.filter(m => m.id !== memberId));
+    return { error: null };
+  }, []);
+
+  const updateMemberRoleInHub = useCallback(async (memberId, role) => {
+    const { data, error } = await updateMemberRoleService(memberId, role);
+    if (error) {
+      console.error('[useBudgetCentre] updateMemberRole error:', error.message);
+      return { error };
+    }
+    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role } : m));
+    return { data, error: null };
+  }, []);
+
+  const getInvites = useCallback(async () => {
+    const id = centre?.id;
+    if (!id) return { data: [], error: null };
+    return getHubInvitesService(id);
+  }, [centre?.id]);
+
+  const cancelInviteFromHub = useCallback(async (inviteId) => {
+    return cancelInviteService(inviteId);
+  }, []);
+
   return {
     centre,
-    centreId:       centre?.id || null,
+    centreId:            centre?.id || null,
     categories,
     members,
+    currentMemberRole,
     loading,
     needsOnboarding,
     error,
@@ -254,6 +305,11 @@ export function useBudgetCentre(user, centreId) {
     archiveCentre,
     permanentDeleteCentre,
     restoreHub,
+    inviteMember,
+    removeMember:        removeMemberFromHub,
+    updateMemberRole:    updateMemberRoleInHub,
+    getInvites,
+    cancelInvite:        cancelInviteFromHub,
     onOnboardingComplete,
     reload: load,
   };

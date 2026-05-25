@@ -7,6 +7,7 @@ import { useState }               from 'react';
 import { useNavigate }            from 'react-router-dom';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
+import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { getCurrentMonth, offsetMonth } from '../lib/finance';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { IncomeCard }             from './payday/IncomeCard';
@@ -38,8 +39,10 @@ function PaydayViewSkeleton() {
 }
 
 export function PaydayView() {
-  const { fmt }                             = useBudgetCentreContext();
+  const { fmt, can }                        = useBudgetCentreContext();
   const financeValues                       = useFinanceContext();
+
+  if (!can('viewIncome')) return <AccessBlocked message="Income tracking is only available to hub owners and full-access members." />;
   const navigate                            = useNavigate();
   const [selectedIncome, setSelectedIncome] = useState(null);
   const [sheetOpen,      setSheetOpen]      = useState(false);

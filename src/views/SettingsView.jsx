@@ -1,15 +1,9 @@
-/**
- * views/SettingsView.jsx
- *
- * Settings screen — centre config, categories, income sources, theme, sign out.
- * No Supabase calls — all writes delegate to hooks via context.
- */
-
 import { useState }                   from 'react';
 import { useNavigate }                from 'react-router-dom';
 import { useBudgetCentreContext }      from '../context/BudgetCentreContext';
 import { useFinanceContext }           from '../context/FinanceContext';
 import { useAuth }                    from '../hooks/useAuth';
+import { AccessBlocked }              from '../components/ui/AccessBlocked';
 import { getCurrentMonth }            from '../lib/finance';
 import { CentreSettingsSection }      from './settings/CentreSettingsSection';
 import { CategorySettingsRow }        from './settings/CategorySettingsRow';
@@ -18,6 +12,7 @@ import { ThemeSection }               from './settings/ThemeSection';
 import { InstallAppSection }          from './settings/InstallAppSection';
 import { AddCategorySheet }           from './budget/AddCategorySheet';
 import { GuestSettingsSection }       from './settings/GuestSettingsSection';
+import { MembersSection }             from './settings/MembersSection';
 import { SecuritySection }            from './settings/SecuritySection';
 
 const card         = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
@@ -27,7 +22,9 @@ const inputStyle   = { width: '100%', padding: '10px 12px', borderRadius: 10, bo
 export function SettingsView() {
   const navigate  = useNavigate();
   const { signOut }                                                            = useAuth();
-  const { categories, fmt, addCategory, updateCategory, deleteCategory, updateIncomeSource, centre } = useBudgetCentreContext();
+  const { categories, fmt, addCategory, updateCategory, deleteCategory, updateIncomeSource, centre, can } = useBudgetCentreContext();
+
+  if (!can('settings')) return <AccessBlocked message="Settings are only available to hub owners and full-access members." />;
   const { incomes, loading, addIncomeSource, deleteIncomeSource }             = useFinanceContext();
 
   const [addCatOpen,      setAddCatOpen]      = useState(false);
@@ -170,6 +167,9 @@ export function SettingsView() {
             ))
         }
       </div>
+
+      {/* Members */}
+      <MembersSection />
 
       {/* Guest Access */}
       <GuestSettingsSection />

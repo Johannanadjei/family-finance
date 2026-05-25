@@ -10,7 +10,7 @@ import { PaydayView }               from './PaydayView';
 import { mockCentre, mockFmt, mockIncomes } from '../test-utils/fixtures';
 
 vi.mock('../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt }),
+  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: () => true }),
 }));
 
 // Base finance context — overridden per test via mockFinance

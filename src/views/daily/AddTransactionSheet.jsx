@@ -16,6 +16,7 @@
 import { useState, useEffect }        from 'react';
 import { useBudgetCentreContext }     from '../../context/BudgetCentreContext';
 import { useFinanceContext }          from '../../context/FinanceContext';
+import { AccessBlocked }             from '../../components/ui/AccessBlocked';
 import { getWeekForDate }            from '../../lib/finance';
 
 const inputStyle = {
@@ -26,8 +27,8 @@ const inputStyle = {
 };
 
 export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null }) {
-  const { centre, categories, getCatIcon } = useBudgetCentreContext();
-  const { addTransaction, updateTransaction } = useFinanceContext();
+  const { centre, categories, getCatIcon, can } = useBudgetCentreContext();
+  const { addTransaction, updateTransaction }   = useFinanceContext();
 
   const [type,         setType]         = useState('expense');
   const [amount,       setAmount]       = useState('');
@@ -126,9 +127,9 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
         <div style={{ width: 40, height: 4, background: 'var(--c-border, #e5e7eb)', borderRadius: 2, margin: '0 auto 16px' }} />
         {editTx && <p style={{ fontSize: 17, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 16px', textAlign: 'center' }}>Edit Transaction</p>}
 
-        {/* Type toggle */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-          {['expense', 'income'].map(t => (
+        {/* Type toggle — income tab hidden for standard members */}
+        <div style={{ display: 'grid', gridTemplateColumns: can('logIncome') ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 16 }}>
+          {['expense', ...(can('logIncome') ? ['income'] : [])].map(t => (
             <button key={t} onClick={() => { setType(t); setCategoryName(''); setCategoryId(null); setError(null); }}
               style={{ padding: '10px', borderRadius: 10, border: 'none', fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 800, cursor: 'pointer', background: type === t ? 'var(--c-primary, #064e3b)' : 'var(--c-bg, #f3f4f6)', color: type === t ? 'var(--c-btn-text, #ffffff)' : 'var(--c-muted, #6b7280)' }}>
               {t.charAt(0).toUpperCase() + t.slice(1)}

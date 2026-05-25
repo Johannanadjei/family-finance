@@ -20,10 +20,11 @@
 
 import { createContext, useContext, useMemo } from 'react';
 import { makeFmt, getCategoryIcon } from '../lib/finance';
+import { can as canRole } from '../lib/roles';
 
 const BudgetCentreContext = createContext(null);
 
-export function BudgetCentreProvider({ centre, categories, members, addCategory, updateCentre, updateCategory, deleteCategory, updateIncomeSource, archiveCentre, permanentDeleteCentre, restoreHub, centreCount, children }) {
+export function BudgetCentreProvider({ centre, categories, members, currentMemberRole, addCategory, updateCentre, updateCategory, deleteCategory, updateIncomeSource, archiveCentre, permanentDeleteCentre, restoreHub, inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite, centreCount, children }) {
   const fmt = useMemo(
     () => makeFmt(centre?.currency || 'GHS'),
     [centre?.currency]
@@ -34,10 +35,17 @@ export function BudgetCentreProvider({ centre, categories, members, addCategory,
     [categories]
   );
 
+  const can = useMemo(
+    () => (permission) => canRole(currentMemberRole, permission),
+    [currentMemberRole]
+  );
+
   const value = useMemo(() => ({
     centre,
     categories,
     members,
+    currentMemberRole,
+    can,
     addCategory,
     updateCentre,
     updateCategory,
@@ -46,10 +54,15 @@ export function BudgetCentreProvider({ centre, categories, members, addCategory,
     archiveCentre,
     permanentDeleteCentre,
     restoreHub,
+    inviteMember,
+    removeMember,
+    updateMemberRole,
+    getInvites,
+    cancelInvite,
     centreCount,
     fmt,
     getCatIcon,
-  }), [centre, categories, members, addCategory, updateCentre, updateCategory, deleteCategory, updateIncomeSource, archiveCentre, permanentDeleteCentre, restoreHub, centreCount, fmt, getCatIcon]);
+  }), [centre, categories, members, currentMemberRole, can, addCategory, updateCentre, updateCategory, deleteCategory, updateIncomeSource, archiveCentre, permanentDeleteCentre, restoreHub, inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite, centreCount, fmt, getCatIcon]);
 
   return (
     <BudgetCentreContext.Provider value={value}>

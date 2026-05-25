@@ -10,6 +10,7 @@
 import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
+import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { MonthlyIncomeCard }      from './home/MonthlyIncomeCard';
 import { BudgetHealthBar }        from './home/BudgetHealthBar';
@@ -47,7 +48,7 @@ function HomeViewSkeleton() {
 }
 
 export function HomeView() {
-  const { fmt }         = useBudgetCentreContext();
+  const { fmt, can }    = useBudgetCentreContext();
   const financeValues   = useFinanceContext();
   const [activeInfo, setActiveInfo] = useState(null);
 
@@ -59,23 +60,28 @@ export function HomeView() {
     fixedTotal, variableSpent, spareMoney, txs,
   } = financeValues;
 
+  const showIncome = can('viewIncome');
 
   return (
     <div style={{ padding: '16px' }}>
-      <MonthlyIncomeCard
-        allIncome={allIncome}
-        totalReceived={totalReceived}
-        monthlyIncome={monthlyIncome}
-        totalSpent={totalSpent}
-        remaining={remaining}
-        spareMoney={spareMoney}
-      />
+      {showIncome && (
+        <MonthlyIncomeCard
+          allIncome={allIncome}
+          totalReceived={totalReceived}
+          monthlyIncome={monthlyIncome}
+          totalSpent={totalSpent}
+          remaining={remaining}
+          spareMoney={spareMoney}
+        />
+      )}
       <BudgetHealthBar healthPct={healthPct} budgetStatus={budgetStatus} totalSpent={totalSpent} />
-      <PaydaySummaryCard
-        nextUnpaid={nextUnpaid}
-        totalReceived={totalReceived}
-        totalExpected={totalExpected}
-      />
+      {showIncome && (
+        <PaydaySummaryCard
+          nextUnpaid={nextUnpaid}
+          totalReceived={totalReceived}
+          totalExpected={totalExpected}
+        />
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
         <StatCard
           label="Fixed Budget"
@@ -84,14 +90,16 @@ export function HomeView() {
           activeInfo={activeInfo}
           onInfo={setActiveInfo}
         />
-        <StatCard
-          label="Money In"
-          value={fmt(allIncome)}
-          infoKey="income"
-          activeInfo={activeInfo}
-          onInfo={setActiveInfo}
-          color="var(--c-success,#059669)"
-        />
+        {showIncome && (
+          <StatCard
+            label="Money In"
+            value={fmt(allIncome)}
+            infoKey="income"
+            activeInfo={activeInfo}
+            onInfo={setActiveInfo}
+            color="var(--c-success,#059669)"
+          />
+        )}
         <StatCard
           label="Variable Spent"
           value={fmt(variableSpent)}
@@ -108,7 +116,6 @@ export function HomeView() {
           onInfo={setActiveInfo}
           color="var(--c-success,#059669)"
         />
-
       </div>
       <RecentActivity txs={txs} />
     </div>

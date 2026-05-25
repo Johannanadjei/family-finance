@@ -23,11 +23,15 @@ export const getMembers = async (centreId) => {
 
 /**
  * Add a member to a budget centre by user ID.
+ *
+ * @param {string} centreId
+ * @param {string} userId
+ * @param {string} role — 'full_access' | 'standard' | 'view_only' (never 'owner' via this path)
  */
-export const addMember = async (centreId, userId) => {
+export const addMember = async (centreId, userId, role = 'full_access') => {
   const { data, error } = await supabase
     .from('budget_centre_members')
-    .insert({ budget_centre_id: centreId, user_id: userId, role: 'member' })
+    .insert({ budget_centre_id: centreId, user_id: userId, role })
     .select()
     .single();
 
@@ -36,9 +40,35 @@ export const addMember = async (centreId, userId) => {
 };
 
 /**
- * Soft-delete a member from a budget centre.
+ * Update a member's role.
+ *
+ * @param {string} memberId — budget_centre_members.id
+ * @param {string} role — 'full_access' | 'standard' | 'view_only'
  */
-export const removeMember = async (memberId) => {
+export const updateMemberRole = async (memberId, role) => {
+  const { data, error } = await supabase
+    .from('budget_centre_members')
+    .update({ role })
+    .eq('id', memberId)
+    .select()
+    .single();
+
+  if (error) console.error('[members.service] updateMemberRole error:', error.message);
+  return { data, error };
+};
+
+/**
+ * Soft-delete a member from a budget centre.
+ * Guards against removing the owner — that operation is never allowed.
+ *
+ * @param {string} memberId — budget_centre_members.id
+ * @param {string} memberRole — current role of the member being removed
+ */
+export const removeMember = async (memberId, memberRole) => {
+  if (memberRole === 'owner') {
+    return { error: new Error('The hub owner cannot be removed. Delete or transfer the hub instead.') };
+  }
+
   const { error } = await supabase
     .from('budget_centre_members')
     .update({ deleted_at: new Date().toISOString() })
