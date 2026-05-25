@@ -34,10 +34,12 @@ export function JoinView() {
   const [joinError, setJoinError] = useState(null);
 
   useEffect(() => {
+    console.warn('[JoinView] token from URL:', token, '| full search:', window.location.search);
     if (!token) { setPhase('invalid'); return; }
 
     const init = async () => {
       const { data: inv, error } = await getInviteByToken(token);
+      console.warn('[JoinView] getInviteByToken result:', { inv, error });
       if (error || !inv) { setPhase('invalid'); return; }
       if (new Date(inv.expires_at) < new Date()) { setPhase('invalid'); return; }
 
