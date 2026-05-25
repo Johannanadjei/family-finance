@@ -53,6 +53,12 @@ export const resetPasswordForEmail = async (email) => {
   return { error };
 };
 
+export const updateUserName = async (userId, name, email) => {
+  const { error } = await supabase.from('users').upsert({ id: userId, name, email }, { onConflict: 'id' });
+  if (error) console.error('[auth.service] updateUserName error:', error.message);
+  return { error };
+};
+
 // Polls getSession up to maxAttempts times with 500 ms gaps.
 // Supabase sessions can take a render cycle to propagate after signIn/signUp,
 // so an immediate RPC call using auth.uid() server-side may see null.

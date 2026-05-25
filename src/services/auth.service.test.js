@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getUserSession, signUpUser, signInUser, signOutUser, resetPasswordForEmail, waitForSession } from './auth.service';
+import { getUserSession, signUpUser, signInUser, signOutUser, resetPasswordForEmail, waitForSession, updateUserName } from './auth.service';
 
 const mockUpsert = vi.fn().mockResolvedValue({ error: null });
 
@@ -130,6 +130,28 @@ describe('resetPasswordForEmail', () => {
   it('returns error on failure', async () => {
     supabase.auth.resetPasswordForEmail.mockResolvedValue({ error: { message: 'rate limited' } });
     const { error } = await resetPasswordForEmail('a@b.com');
+    expect(error).toBeTruthy();
+  });
+});
+
+describe('updateUserName', () => {
+  it('upserts name and email to users table', async () => {
+    await updateUserName('u-1', 'Alice', 'a@b.com');
+    expect(supabase.from).toHaveBeenCalledWith('users');
+    expect(mockUpsert).toHaveBeenCalledWith(
+      { id: 'u-1', name: 'Alice', email: 'a@b.com' },
+      { onConflict: 'id' }
+    );
+  });
+
+  it('returns no error on success', async () => {
+    const { error } = await updateUserName('u-1', 'Alice', 'a@b.com');
+    expect(error).toBeNull();
+  });
+
+  it('returns error on failure', async () => {
+    mockUpsert.mockResolvedValueOnce({ error: { message: 'db error' } });
+    const { error } = await updateUserName('u-1', 'Alice', 'a@b.com');
     expect(error).toBeTruthy();
   });
 });

@@ -1,7 +1,6 @@
 import { useState, useEffect }  from 'react';
-import { useNavigate }          from 'react-router-dom';
 import { saveActiveCentreId }   from '../lib/storage';
-import { getUserSession, waitForSession, signUpUser, signInUser, signOutUser } from '../services/auth.service';
+import { getUserSession, waitForSession, signUpUser, signInUser, signOutUser, updateUserName } from '../services/auth.service';
 import { getInviteByToken, acceptInvite } from '../services/invites.service';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS } from '../lib/roles';
 
@@ -19,7 +18,6 @@ const inputStyle = { width: '100%', padding: '12px 14px', borderRadius: 10, bord
 const primaryBtn = { width: '100%', padding: 14, borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginBottom: 8 };
 
 export function JoinView() {
-  const navigate = useNavigate();
   const [token]  = useState(() => new URLSearchParams(window.location.search).get('token'));
 
   const [phase,     setPhase]     = useState('loading'); // loading | invalid | confirm | auth | joining | done | error
@@ -98,6 +96,7 @@ export function JoinView() {
     }
     const { data, error } = await acceptInvite({ token });
     if (error && !data) { setJoinError(error.message); setPhase('error'); return; }
+    if (name.trim() && user?.id) await updateUserName(user.id, name.trim(), user.email ?? email);
     saveActiveCentreId(data?.centreId);
     window.location.href = '/';
   };
