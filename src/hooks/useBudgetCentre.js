@@ -38,6 +38,7 @@ export function useBudgetCentre(user, centreId) {
   const [loading,           setLoading]           = useState(true);
   const [needsOnboarding,   setNeedsOnboarding]   = useState(false);
   const [error,             setError]             = useState(null);
+  const [removedFromHub,    setRemovedFromHub]    = useState(false);
 
   const load = useCallback(async () => {
     if (!user) {
@@ -52,6 +53,7 @@ export function useBudgetCentre(user, centreId) {
 
     setLoading(true);
     setError(null);
+    setRemovedFromHub(false);
 
     // Resolve the centre to load
     let centreData, centreErr;
@@ -104,8 +106,12 @@ export function useBudgetCentre(user, centreId) {
     if (catResult.error)    console.error('[useBudgetCentre] categories fetch error:', catResult.error.message);
     if (memberResult.error) console.error('[useBudgetCentre] members fetch error:', memberResult.error.message);
 
-    // Derive the current user's role from their member row
+    // Derive the current user's role from their member row.
+    // If the user is not found and the hub has members, they have been removed.
+    // NOTE: without a realtime subscription, removed members lose access on their
+    // next app reload or hub switch — not immediately.
     const currentMember = memberResult.data.find(m => m.user_id === user.id);
+    const isRemoved     = !memberResult.error && memberResult.data.length > 0 && !currentMember;
     const derivedRole   = currentMember?.role ?? 'standard';
 
     // Resume detection: only on initial load (no centreId).
@@ -120,6 +126,7 @@ export function useBudgetCentre(user, centreId) {
       return;
     }
 
+    setRemovedFromHub(isRemoved);
     setCentre(centreData);
     setCategories(catResult.data);
     setMembers(memberResult.data);
@@ -277,6 +284,7 @@ export function useBudgetCentre(user, centreId) {
     getInvites,
     cancelInvite:        cancelInviteFromHub,
     onOnboardingComplete,
+    removedFromHub,
     reload: load,
   };
 }

@@ -72,6 +72,28 @@ function ErrorScreen({ message }) {
   );
 }
 
+function RemovedScreen({ otherCentres, onSwitchHub, onSignOut }) {
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--c-bg, #f3f4f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, padding: 24, textAlign: 'center', fontFamily: "'Nunito', sans-serif" }}>
+      <p style={{ fontSize: 32, margin: 0 }}>🔒</p>
+      <p style={{ fontSize: 17, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>Removed from hub</p>
+      <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0, lineHeight: 1.5, maxWidth: 280 }}>
+        You have been removed from this hub. Contact the hub owner if you think this is a mistake.
+      </p>
+      {otherCentres.length > 0 && (
+        <button onClick={() => onSwitchHub(otherCentres[0].id)}
+          style={{ padding: '12px 24px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+          Switch to {otherCentres[0].name}
+        </button>
+      )}
+      <button onClick={onSignOut}
+        style={{ padding: '12px 24px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'transparent', color: 'var(--c-muted, #6b7280)', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+        Sign out
+      </button>
+    </div>
+  );
+}
+
 function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, onSwitchCentre, onHubCreated, onRestoreHub }) {
   const navigate                           = useNavigate();
   const { categories, can }                = useBudgetCentreContext();
@@ -175,7 +197,7 @@ export default function App() {
           addCategory, updateCentre, updateCategory, deleteCategory, updateIncomeSource,
           archiveCentre, permanentDeleteCentre, restoreHub,
           inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite,
-          loading: centreLoading, needsOnboarding,
+          loading: centreLoading, needsOnboarding, removedFromHub,
           error, onOnboardingComplete }                   = useBudgetCentre(user, activeCentreId);
   const financeValues                                     = useFinance({ centre, categories });
 
@@ -285,6 +307,13 @@ export default function App() {
     <OnboardingFlow
       onComplete={onOnboardingComplete}
       existingCentreId={centre?.id || null}
+    />
+  );
+  if (removedFromHub) return (
+    <RemovedScreen
+      otherCentres={centres.filter(c => c.id !== centre?.id)}
+      onSwitchHub={handleSwitchCentre}
+      onSignOut={signOut}
     />
   );
 

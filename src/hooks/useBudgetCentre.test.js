@@ -53,6 +53,7 @@ vi.mock('../services/auth.service', () => ({
 }));
 
 import { getCentreById, archiveCentre, deleteCentre, unarchiveCentre } from '../services/centres.service';
+import { getMembers } from '../services/members.service';
 
 const mockUser   = { id: 'user-1' };
 const mockCentre = { id: 'c-1', name: "The Adjei's", currency: 'GHS', skin_id: 'family_warmth' };
@@ -114,6 +115,38 @@ describe('useBudgetCentre', () => {
     const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe('network error');
+  });
+
+  it('removedFromHub is false when user is in members list', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    getMembers.mockResolvedValue({ data: [{ id: 'mem-1', user_id: 'user-1', role: 'standard' }], error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.removedFromHub).toBe(false);
+  });
+
+  it('removedFromHub is true when user is not found in a non-empty members list', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    getMembers.mockResolvedValue({ data: [{ id: 'mem-2', user_id: 'user-99', role: 'standard' }], error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.removedFromHub).toBe(true);
+  });
+
+  it('removedFromHub is false when members list is empty (no false positive)', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    getMembers.mockResolvedValue({ data: [], error: null });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.removedFromHub).toBe(false);
+  });
+
+  it('removedFromHub is false when members fetch errors (no false positive)', async () => {
+    getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+    getMembers.mockResolvedValue({ data: [], error: new Error('network') });
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.removedFromHub).toBe(false);
   });
 
   it('exposes reload and onOnboardingComplete as functions', async () => {
