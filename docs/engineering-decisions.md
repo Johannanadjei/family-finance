@@ -528,3 +528,38 @@ on month change to reset received=false, received_amount=0 for the new month.
 Income sources are permanent records — not month-scoped.
 Expected amount edits carry forward to all future months automatically.
 Never lock users into onboarding values — make everything editable from the dashboard.
+
+---
+
+## [2026-05-25] Triple-check pre-commit rule — born from RBAC feature bugs
+
+**Context:**
+The member invites and RBAC feature was committed with 6 bugs that only surfaced during a
+dedicated quality review after the commit. The bugs were:
+1. JoinView rendered outside BrowserRouter — `useNavigate()` crashed immediately
+2. SettingsView called hooks after a conditional return (Rules of Hooks violation)
+3. PaydayView called hooks after a conditional return (Rules of Hooks violation)
+4. `invites.service.js` member check used `.maybeSingle()` with no email filter,
+   blocking all invites on multi-member hubs (PGRST116 on 2+ members)
+5. Unsafe `getUser()` destructure in JoinView — crash on any auth network error
+6. Unsafe `getUser()` destructure in useBudgetCentre — crash on any auth network error
+
+Additionally during the final sweep: `canManage` used a hardcoded role check instead of
+`can('manageMembers')`, `can` was never added to MembersSection's context destructure
+(runtime crash for any non-owner), LogView had no role-based gating, and the HomeView grid
+was broken for the 3-card layout used by standard/view_only members.
+
+All of these passed `npm test` and `bash scripts/audit.sh`. Tests pass when mocks are
+incomplete. The audit checks code patterns, not semantic correctness. Neither tool catches
+hooks-order violations, missing context destructures, or broken permission gates.
+
+**Decision:**
+Add a mandatory pre-commit checklist that runs in addition to tests and audit. This is not
+a process suggestion — it is a rule Claude Code must follow before every commit. The
+checklist is mechanical and takes under 5 minutes. Skipping it is not permitted even when
+the tests and audit are green.
+
+**Rule derived:**
+See CLAUDE.md section 9.5: Triple-Check Pre-Commit Protocol. Every item on that list is
+required before `git commit` is run. Green tests and a green audit are necessary but not
+sufficient conditions for a commit.

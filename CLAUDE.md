@@ -300,6 +300,77 @@ polish(v2): card shadows and token consistency, 423 tests
 
 ---
 
+## 9.5. Triple-Check Pre-Commit Protocol
+
+**This is mandatory. Run after tests and audit pass, before writing the commit message.**
+
+Tests pass when mocks are incomplete. The audit checks code patterns, not semantic
+correctness. Neither catches hooks-order violations, missing context destructures, or
+broken permission gates. This checklist does.
+
+### Step 1 — Run tests and audit (both must be green)
+
+```
+npm test
+bash scripts/audit.sh
+```
+
+Zero failures required on both. If either fails, fix before proceeding.
+
+### Step 2 — Read every modified file and verify:
+
+- **Hooks called unconditionally** — no hook calls (`useState`, `useEffect`,
+  `useContext`, `useCallback`, `useMemo`, `useNavigate`, `useRef`) after any
+  conditional return. Permission guards (`if (!can(...)) return <AccessBlocked />`)
+  must come AFTER all hook calls.
+
+- **Context destructures are complete** — every value the component calls must
+  be in the destructure from `useBudgetCentreContext()` or `useFinanceContext()`.
+  If you add a `can()` call, add `can` to the destructure.
+
+- **Error always alongside data** — every `const { data ... } = await supabase...`
+  or `getUser()` call must also destructure `error`. `const { data, error }` not
+  `const { data }`.
+
+- **Optional chaining on nullable values** — any field access on a value that
+  could be null or undefined uses `?.`. `data?.token` not `data.token`.
+
+- **Stable useEffect dependencies** — dependency arrays must contain stable
+  primitives (`centre?.id`, `user?.id`) never function references that recreate
+  on every render (`getInvites`, `can`, `fmt`).
+
+- **Test mocks include every context value the component uses** — if a component
+  calls `can('x')`, the test mock must include `can`. If it reads `currentUserId`,
+  the mock must include `currentUserId`.
+
+### Step 3 — Verify permission gates
+
+- Every new `can('permission')` call has that permission key in the `PERMISSIONS`
+  map in `src/lib/roles.js` for all four roles.
+- Every view that gates on role also has a test that renders the gated state.
+
+### Step 4 — Verify new components
+
+- Every new `.jsx` file has a corresponding `.test.jsx` next to it.
+- The test covers: renders correctly, shows error state, handles empty state.
+
+### Step 5 — Check for console.log
+
+```
+grep -rn "console.log" src/ --include="*.js" --include="*.jsx" | grep -v "test\."
+```
+
+Zero hits required. `console.error` in service/hook error paths is permitted.
+
+---
+
+**Why this rule exists:** The RBAC feature passed tests and audit but shipped with 6
+bugs affecting real screens for non-owner members. Catching them before commit costs
+5 minutes. Catching them after costs user trust. See engineering-decisions.md entry
+dated 2026-05-25 for the full post-mortem.
+
+---
+
 ## 10. File structure
 
 ```
