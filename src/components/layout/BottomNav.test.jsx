@@ -3,13 +3,14 @@
  * Component rendering tests for BottomNav.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen }           from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { BottomNav }                from './BottomNav';
 
+let mockCan = () => true;
 vi.mock('../../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ can: () => true }),
+  useBudgetCentreContext: () => ({ can: (p) => mockCan(p) }),
 }));
 
 const renderNav = (initialPath = '/') =>
@@ -20,6 +21,7 @@ const renderNav = (initialPath = '/') =>
   );
 
 describe('BottomNav', () => {
+  beforeEach(() => { mockCan = () => true; });
   it('renders all 5 tabs', () => {
     renderNav();
     expect(screen.getByText('Home')).toBeTruthy();
@@ -42,5 +44,13 @@ describe('BottomNav', () => {
   it('marks no other tab active on /payday', () => {
     renderNav('/payday');
     expect(screen.getByLabelText('Home').getAttribute('aria-current')).toBeNull();
+  });
+
+  it('standard member does not see Payday tab', () => {
+    mockCan = () => false;
+    renderNav();
+    expect(screen.queryByText('Payday')).toBeNull();
+    expect(screen.getByText('Home')).toBeTruthy();
+    mockCan = () => true;
   });
 });

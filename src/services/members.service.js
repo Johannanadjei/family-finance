@@ -26,7 +26,7 @@ export const getMembers = async (centreId) => {
  *
  * @param {string} centreId
  * @param {string} userId
- * @param {string} role — 'full_access' | 'standard' | 'view_only' (never 'owner' via this path)
+ * @param {string} role — 'full_access' | 'standard' (never 'owner' via this path)
  */
 export const addMember = async (centreId, userId, role = 'full_access') => {
   const { data, error } = await supabase
@@ -43,7 +43,7 @@ export const addMember = async (centreId, userId, role = 'full_access') => {
  * Update a member's role.
  *
  * @param {string} memberId — budget_centre_members.id
- * @param {string} role — 'full_access' | 'standard' | 'view_only'
+ * @param {string} role — 'full_access' | 'standard'
  */
 export const updateMemberRole = async (memberId, role) => {
   const { data, error } = await supabase

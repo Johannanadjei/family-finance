@@ -10,17 +10,18 @@
  */
 
 const FILTERS = [
-  { key: 'all',     label: 'All'      },
-  { key: 'expense', label: 'Expenses' },
-  { key: 'income',  label: 'Income'   },
+  { key: 'all',     label: 'All',      requiresIncome: false },
+  { key: 'expense', label: 'Expenses', requiresIncome: false },
+  { key: 'income',  label: 'Income',   requiresIncome: true  },
 ];
 
-export function LogFilterBar({ filter, onFilter, search, onSearch }) {
+export function LogFilterBar({ filter, onFilter, search, onSearch, showIncome = true }) {
+  const visibleFilters = FILTERS.filter(f => !f.requiresIncome || showIncome);
   return (
     <div style={{ marginBottom: 12 }}>
       {/* Filter tabs */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-        {FILTERS.map(f => {
+        {visibleFilters.map(f => {
           const isActive = filter === f.key;
           return (
             <button

@@ -50,13 +50,15 @@ export function LogView({ onEditTx }) {
   const [deletingId,  setDeletingId]        = useState(null);
   const [deleteError, setDeleteError]       = useState(null);
 
-  if (!can('log')) return <AccessBlocked message="The transaction log is not available for view-only members." />;
+  if (!can('log')) return <AccessBlocked message="The transaction log is not available for your role." />;
   if (loading) return <LogViewSkeleton />;
 
   const isCurrentMonth = activeMonth === getCurrentMonth();
   const showAllTxs     = can('viewAllTxs');
+  const showIncome     = can('viewIncome');
 
   const filtered = txs
+    .filter(tx => showIncome || tx.type === 'expense')
     .filter(tx => showAllTxs || !currentUserId || tx.logged_by_user_id === currentUserId)
     .filter(tx => filter === 'all' || tx.type === filter)
     .filter(tx => !search || tx.category_name.toLowerCase().includes(search.toLowerCase()));
@@ -97,6 +99,7 @@ export function LogView({ onEditTx }) {
         onFilter={setFilter}
         search={search}
         onSearch={setSearch}
+        showIncome={showIncome}
       />
 
       {/* Error state */}

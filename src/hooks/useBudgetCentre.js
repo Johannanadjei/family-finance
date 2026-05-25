@@ -34,7 +34,7 @@ export function useBudgetCentre(user, centreId) {
   const [centre,            setCentre]            = useState(null);
   const [categories,        setCategories]        = useState([]);
   const [members,           setMembers]           = useState([]);
-  const [currentMemberRole, setCurrentMemberRole] = useState('view_only');
+  const [currentMemberRole, setCurrentMemberRole] = useState('standard');
   const [loading,           setLoading]           = useState(true);
   const [needsOnboarding,   setNeedsOnboarding]   = useState(false);
   const [error,             setError]             = useState(null);
@@ -44,7 +44,7 @@ export function useBudgetCentre(user, centreId) {
       setCentre(null);
       setCategories([]);
       setMembers([]);
-      setCurrentMemberRole('view_only');
+      setCurrentMemberRole('standard');
       setLoading(false);
       setNeedsOnboarding(false);
       return;
@@ -91,7 +91,7 @@ export function useBudgetCentre(user, centreId) {
       setCentre(null);
       setCategories([]);
       setMembers([]);
-      setCurrentMemberRole('view_only');
+      setCurrentMemberRole('standard');
       setLoading(false);
       return;
     }
@@ -106,7 +106,7 @@ export function useBudgetCentre(user, centreId) {
 
     // Derive the current user's role from their member row
     const currentMember = memberResult.data.find(m => m.user_id === user.id);
-    const derivedRole   = currentMember?.role ?? 'view_only';
+    const derivedRole   = currentMember?.role ?? 'standard';
 
     // Resume detection: only on initial load (no centreId).
     // First centre has no categories → partial onboarding write — resume.

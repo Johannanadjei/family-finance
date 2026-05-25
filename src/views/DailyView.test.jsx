@@ -3,14 +3,15 @@
  * Written before DailyView.jsx — TDD.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen }           from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { DailyView }                from './DailyView';
 import { mockCentre, mockFmt, mockTxs, mockWeeklyData } from '../test-utils/fixtures';
 
+let mockCan = () => true;
 vi.mock('../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt }),
+  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: (p) => mockCan(p) }),
 }));
 
 const mockFinance = {
@@ -31,6 +32,7 @@ vi.mock('../context/FinanceContext', () => ({
 const renderView = () => render(<MemoryRouter><DailyView /></MemoryRouter>);
 
 describe('DailyView', () => {
+  beforeEach(() => { mockCan = () => true; });
   it('shows skeleton when loading', () => {
     mockFinance.loading = true;
     const { container } = renderView();
@@ -53,10 +55,17 @@ describe('DailyView', () => {
     expect(screen.getByTestId('week-tab-Week 1')).toBeTruthy();
   });
 
-  it('shows transactions grouped by date', () => {
+  it('shows all transactions grouped by date for owner/full_access', () => {
     renderView();
     expect(screen.getByText('Groceries')).toBeTruthy();
     expect(screen.getByText('Adjei Salary')).toBeTruthy();
+  });
+
+  it('standard member sees only expense transactions', () => {
+    mockCan = () => false;
+    renderView();
+    expect(screen.getByText('Groceries')).toBeTruthy();
+    expect(screen.queryByText('Adjei Salary')).toBeNull();
   });
 
   it('shows empty state when no transactions', () => {

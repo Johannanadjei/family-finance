@@ -3,14 +3,15 @@
  * Written before LogView.jsx — TDD.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen }           from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { LogView }                  from './LogView';
 import { mockCentre, mockFmt, mockTxs } from '../test-utils/fixtures';
 
+let mockCan = () => true;
 vi.mock('../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: () => true, currentUserId: 'user-1' }),
+  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: (p) => mockCan(p), currentUserId: 'user-1' }),
 }));
 
 const mockFinance = {
@@ -30,7 +31,11 @@ vi.mock('../context/FinanceContext', () => ({
 const renderView = (props = {}) =>
   render(<MemoryRouter><LogView onEditTx={vi.fn()} {...props} /></MemoryRouter>);
 
+// standard role: can log expenses but cannot view income or all txs
+const standardCan = (p) => p === 'log';
+
 describe('LogView', () => {
+  beforeEach(() => { mockCan = () => true; });
   it('shows skeleton when loading', () => {
     mockFinance.loading = true;
     const { container } = renderView();
@@ -53,10 +58,17 @@ describe('LogView', () => {
     expect(screen.getByTestId('log-search-input')).toBeTruthy();
   });
 
-  it('shows all transactions by default', () => {
+  it('shows all transactions by default for owner/full_access', () => {
     renderView();
     expect(screen.getByText('Groceries')).toBeTruthy();
     expect(screen.getByText('Adjei Salary')).toBeTruthy();
+  });
+
+  it('standard member sees only expense transactions', () => {
+    mockCan = standardCan;
+    renderView();
+    expect(screen.getByText('Groceries')).toBeTruthy();
+    expect(screen.queryByText('Adjei Salary')).toBeNull();
   });
 
   it('shows empty state when no transactions', () => {

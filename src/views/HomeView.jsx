@@ -60,7 +60,8 @@ export function HomeView() {
     fixedTotal, variableSpent, spareMoney, txs,
   } = financeValues;
 
-  const showIncome = can('viewIncome');
+  const showIncome  = can('viewIncome');
+  const showBalance = can('viewBalance');
 
   return (
     <div style={{ padding: '16px' }}>
@@ -83,13 +84,15 @@ export function HomeView() {
         />
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        <StatCard
-          label="Fixed Budget"
-          value={fmt(fixedTotal)}
-          infoKey="fixed"
-          activeInfo={activeInfo}
-          onInfo={setActiveInfo}
-        />
+        {showBalance && (
+          <StatCard
+            label="Fixed Budget"
+            value={fmt(fixedTotal)}
+            infoKey="fixed"
+            activeInfo={activeInfo}
+            onInfo={setActiveInfo}
+          />
+        )}
         {showIncome && (
           <StatCard
             label="Money In"
@@ -108,16 +111,14 @@ export function HomeView() {
           onInfo={setActiveInfo}
           color={variableSpent > 0 ? 'var(--c-danger,#dc2626)' : undefined}
         />
-        <div style={!showIncome ? { gridColumn: '1 / -1' } : {}}>
-          <StatCard
-            label="Spare Money"
-            value={fmt(spareMoney)}
-            infoKey="spare"
-            activeInfo={activeInfo}
-            onInfo={setActiveInfo}
-            color="var(--c-success,#059669)"
-          />
-        </div>
+        <StatCard
+          label="Spare Money"
+          value={fmt(spareMoney)}
+          infoKey="spare"
+          activeInfo={activeInfo}
+          onInfo={setActiveInfo}
+          color="var(--c-success,#059669)"
+        />
       </div>
       <RecentActivity txs={txs} />
     </div>

@@ -2,7 +2,7 @@
  * components/ui/AccessBlocked.jsx
  *
  * Full-page blocked state for restricted routes (Payday, Settings).
- * Shown to standard and view_only members who navigate to gated views.
+ * Shown to standard members who navigate to gated views (Payday, Settings).
  */
 
 export function AccessBlocked({ message = "You don't have access to this section." }) {

@@ -3,14 +3,15 @@
  * Reads financeValues from FinanceContext — no props.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen }           from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { HomeView }                 from './HomeView';
 import { mockCentre, mockFmt }      from '../test-utils/fixtures';
 
+let mockCan = () => true;
 vi.mock('../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: () => true }),
+  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: (p) => mockCan(p) }),
 }));
 
 const mockFinance = {
@@ -42,6 +43,7 @@ vi.mock('../context/FinanceContext', () => ({
 const renderHome = () => render(<MemoryRouter><HomeView /></MemoryRouter>);
 
 describe('HomeView', () => {
+  beforeEach(() => { mockCan = () => true; });
   it('renders skeleton when loading', () => {
     mockFinance.loading = true;
     const { container } = renderHome();
@@ -85,13 +87,22 @@ describe('HomeView', () => {
     mockFinance.nextUnpaid    = { id: 'inc-2', label: 'Dita Salary', expected_amount: 15000, daysUntil: 7 };
   });
 
-  it('renders 4 stat card labels', () => {
+  it('renders 4 stat card labels for owner/full_access', () => {
     renderHome();
     expect(screen.getByText('Fixed Budget')).toBeTruthy();
     expect(screen.getByText('Money In')).toBeTruthy();
     expect(screen.getByText('Variable Spent')).toBeTruthy();
     expect(screen.getByText('Spare Money')).toBeTruthy();
     expect(screen.queryByText('Surplus Left')).toBeNull();
+  });
+
+  it('standard member sees only Variable Spent and Spare Money stat cards', () => {
+    mockCan = () => false;
+    renderHome();
+    expect(screen.queryByText('Fixed Budget')).toBeNull();
+    expect(screen.queryByText('Money In')).toBeNull();
+    expect(screen.getByText('Variable Spent')).toBeTruthy();
+    expect(screen.getByText('Spare Money')).toBeTruthy();
   });
 
   it('stat cards show formatted values', () => {

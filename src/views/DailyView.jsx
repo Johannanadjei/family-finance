@@ -38,7 +38,7 @@ function DailyViewSkeleton() {
 }
 
 export function DailyView() {
-  const { fmt }                              = useBudgetCentreContext();
+  const { fmt, can }                         = useBudgetCentreContext();
   const { txs, totalSpent, weeklyData,
           loading, error, activeMonth,
           loadMonth, deleteTransaction }      = useFinanceContext();
@@ -48,7 +48,8 @@ export function DailyView() {
   if (loading) return <DailyViewSkeleton />;
 
   const isCurrentMonth = activeMonth === getCurrentMonth();
-  const grouped        = groupByDate(txs);
+  const visibleTxs     = can('viewIncome') ? txs : txs.filter(tx => tx.type === 'expense');
+  const grouped        = groupByDate(visibleTxs);
   const dates          = Object.keys(grouped);
 
   const handleDelete = async (id) => {
@@ -105,7 +106,7 @@ export function DailyView() {
           </svg>
           <p style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 6px' }}>Nothing logged yet</p>
           {isCurrentMonth && (
-            <p style={{ fontSize: 13, color: 'var(--c-muted, #9ca3af)', margin: 0, fontWeight: 600 }}>Tap + to add your first transaction</p>
+            <p style={{ fontSize: 13, color: 'var(--c-muted, #9ca3af)', margin: 0, fontWeight: 600 }}>Tap + to add your first expense</p>
           )}
         </div>
       ) : (

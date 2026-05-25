@@ -26,12 +26,10 @@ describe('can()', () => {
     it('cannot manageMembers',() => expect(can('standard', 'manageMembers')).toBe(false));
   });
 
-  describe('view_only', () => {
-    it('cannot log',           () => expect(can('view_only', 'log')).toBe(false));
-    it('cannot logIncome',     () => expect(can('view_only', 'logIncome')).toBe(false));
-    it('cannot viewIncome',    () => expect(can('view_only', 'viewIncome')).toBe(false));
-    it('cannot settings',      () => expect(can('view_only', 'settings')).toBe(false));
-    it('cannot manageMembers', () => expect(can('view_only', 'manageMembers')).toBe(false));
+  describe('viewBalance', () => {
+    it('owner can viewBalance',      () => expect(can('owner', 'viewBalance')).toBe(true));
+    it('full_access can viewBalance',() => expect(can('full_access', 'viewBalance')).toBe(true));
+    it('standard cannot viewBalance',() => expect(can('standard', 'viewBalance')).toBe(false));
   });
 
   describe('unknown / edge cases', () => {
@@ -43,27 +41,24 @@ describe('can()', () => {
 });
 
 describe('ROLES constants', () => {
-  it('exports all four roles', () => {
+  it('exports all three roles', () => {
     expect(ROLES.OWNER).toBe('owner');
     expect(ROLES.FULL_ACCESS).toBe('full_access');
     expect(ROLES.STANDARD).toBe('standard');
-    expect(ROLES.VIEW_ONLY).toBe('view_only');
   });
 });
 
 describe('ROLE_LABELS', () => {
   it('has a label for every role', () => {
-    ['owner', 'full_access', 'standard', 'view_only'].forEach(r =>
+    ['owner', 'full_access', 'standard'].forEach(r =>
       expect(typeof ROLE_LABELS[r]).toBe('string')
     );
   });
 });
 
 describe('INVITABLE_ROLES', () => {
-  it('does not include owner', () => expect(INVITABLE_ROLES).not.toContain('owner'));
-  it('includes all three invitable roles', () => {
-    expect(INVITABLE_ROLES).toContain('full_access');
-    expect(INVITABLE_ROLES).toContain('standard');
-    expect(INVITABLE_ROLES).toContain('view_only');
-  });
+  it('does not include owner',   () => expect(INVITABLE_ROLES).not.toContain('owner'));
+  it('includes full_access',     () => expect(INVITABLE_ROLES).toContain('full_access'));
+  it('includes standard',        () => expect(INVITABLE_ROLES).toContain('standard'));
+  it('does not include view_only', () => expect(INVITABLE_ROLES).not.toContain('view_only'));
 });
