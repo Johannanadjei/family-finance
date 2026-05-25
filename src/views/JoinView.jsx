@@ -1,7 +1,7 @@
 import { useState, useEffect }  from 'react';
 import { useNavigate }          from 'react-router-dom';
 import { saveActiveCentreId }   from '../lib/storage';
-import { getUserSession, signUpUser, signInUser, signOutUser } from '../services/auth.service';
+import { getUserSession, waitForSession, signUpUser, signInUser, signOutUser } from '../services/auth.service';
 import { getInviteByToken, acceptInvite } from '../services/invites.service';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS } from '../lib/roles';
 
@@ -20,8 +20,6 @@ const primaryBtn = { width: '100%', padding: 14, borderRadius: 12, border: 'none
 
 export function JoinView() {
   const navigate = useNavigate();
-  // useState: token stable on mount — navigate('/') re-renders this component and would
-  // re-read search as empty, re-firing the useEffect with null and showing 'invalid'.
   const [token]  = useState(() => new URLSearchParams(window.location.search).get('token'));
 
   const [phase,     setPhase]     = useState('loading'); // loading | invalid | confirm | auth | joining | done | error
@@ -90,11 +88,18 @@ export function JoinView() {
   };
 
   const handleJoin = async () => {
+    setJoinError(null);
     setPhase('joining');
+    const { data: session, error: sessionErr } = await waitForSession();
+    if (!session) {
+      setJoinError(sessionErr?.message || 'Session is starting up. Please tap Join again.');
+      setPhase('confirm');
+      return;
+    }
     const { data, error } = await acceptInvite({ token });
     if (error && !data) { setJoinError(error.message); setPhase('error'); return; }
     saveActiveCentreId(data?.centreId);
-    navigate('/');
+    window.location.href = '/';
   };
 
   if (phase === 'loading') return (
@@ -172,6 +177,7 @@ export function JoinView() {
         <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: '0 0 24px', lineHeight: 1.5 }}>
           You'll join as <strong>{ROLE_LABELS[invite?.role]}</strong> — {ROLE_DESCRIPTIONS[invite?.role]}
         </p>
+        {joinError && <p style={{ fontSize: 12, color: 'var(--c-warning, #d97706)', margin: '0 0 10px', fontWeight: 700 }}>{joinError}</p>}
         <button data-testid="confirm-join-btn" onClick={handleJoin} style={primaryBtn}>
           Join hub
         </button>
@@ -179,22 +185,16 @@ export function JoinView() {
     );
   }
 
-  if (phase === 'joining') {
-    return (
-      <JoinCard>
-        <p style={{ textAlign: 'center', color: 'var(--c-muted, #6b7280)', fontWeight: 700 }}>Joining hub…</p>
-      </JoinCard>
-    );
-  }
+  if (phase === 'joining') return (
+    <JoinCard><p style={{ textAlign: 'center', color: 'var(--c-muted, #6b7280)', fontWeight: 700 }}>Joining hub…</p></JoinCard>
+  );
 
-  if (phase === 'error') {
-    return (
-      <JoinCard>
-        <p style={{ fontSize: 17, fontWeight: 900, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px' }}>Could not join hub</p>
-        <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0 }}>{joinError || 'Something went wrong. Please try again or contact your hub owner.'}</p>
-      </JoinCard>
-    );
-  }
+  if (phase === 'error') return (
+    <JoinCard>
+      <p style={{ fontSize: 17, fontWeight: 900, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px' }}>Could not join hub</p>
+      <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0 }}>{joinError || 'Something went wrong. Please try again or contact your hub owner.'}</p>
+    </JoinCard>
+  );
 
   return null;
 }

@@ -22,6 +22,7 @@ export function MembersSection() {
   const [linkCopied,    setLinkCopied]    = useState(false);
   const [removing,      setRemoving]      = useState(null);
   const [removeError,   setRemoveError]   = useState(null);
+  const [confirmRemove, setConfirmRemove] = useState(null);
   const [cancelling,    setCancelling]    = useState(null);
   const [cancelError,   setCancelError]   = useState(null);
 
@@ -93,11 +94,27 @@ export function MembersSection() {
             </div>
           </div>
           {canManage && m.role !== 'owner' && (
-            <button data-testid={`remove-member-${m.id}`} onClick={() => handleRemove(m.id, m.role)}
-              disabled={removing === m.id} aria-label={`Remove ${displayName}`}
-              style={{ background: 'none', border: 'none', cursor: removing === m.id ? 'not-allowed' : 'pointer', color: 'var(--c-danger, #dc2626)', padding: '4px 8px', fontSize: 12, fontWeight: 700, fontFamily: "'Nunito', sans-serif" }}>
-              {removing === m.id ? '…' : 'Remove'}
-            </button>
+            confirmRemove === m.id ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-muted, #6b7280)', whiteSpace: 'nowrap' }}>Remove {displayName}?</span>
+                <button data-testid={`confirm-remove-member-${m.id}`}
+                  onClick={() => { setConfirmRemove(null); handleRemove(m.id, m.role); }}
+                  style={{ background: 'var(--c-danger, #dc2626)', border: 'none', borderRadius: 6, padding: '3px 8px', color: 'var(--c-btn-text, #ffffff)', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+                  Yes
+                </button>
+                <button data-testid={`cancel-remove-member-${m.id}`}
+                  onClick={() => setConfirmRemove(null)}
+                  style={{ background: 'var(--c-border, #e5e7eb)', border: 'none', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+                  No
+                </button>
+              </div>
+            ) : (
+              <button data-testid={`remove-member-${m.id}`} onClick={() => setConfirmRemove(m.id)}
+                disabled={removing === m.id} aria-label={`Remove ${displayName}`}
+                style={{ background: 'none', border: 'none', cursor: removing === m.id ? 'not-allowed' : 'pointer', color: 'var(--c-danger, #dc2626)', padding: '4px 8px', fontSize: 12, fontWeight: 700, fontFamily: "'Nunito', sans-serif" }}>
+                {removing === m.id ? '…' : 'Remove'}
+              </button>
+            )
           )}
         </div>
         );

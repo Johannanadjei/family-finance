@@ -74,7 +74,8 @@ BEGIN
 
   -- 6. Ensure public.users row exists so the member shows a display name.
   --    Uses full_name from auth metadata; falls back to the email prefix.
-  --    DO NOTHING on conflict preserves any existing profile.
+  --    ON CONFLICT: update name only if the existing row has no name set,
+  --    so an existing profile is preserved but a blank name gets backfilled.
   INSERT INTO public.users (id, name, email)
   SELECT
     v_user_id,
@@ -82,7 +83,9 @@ BEGIN
     au.email
   FROM auth.users au
   WHERE au.id = v_user_id
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE
+    SET name = EXCLUDED.name
+    WHERE public.users.name IS NULL OR TRIM(public.users.name) = '';
 
   -- 7. Return context the client needs to set the active centre
   RETURN json_build_object(

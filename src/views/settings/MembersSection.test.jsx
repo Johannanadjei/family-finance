@@ -56,11 +56,38 @@ describe('MembersSection', () => {
     await waitFor(() => expect(screen.queryByTestId('remove-member-mem-1')).toBeNull());
   });
 
-  it('calls removeMember when Remove clicked', async () => {
+  it('shows confirmation prompt when Remove clicked', async () => {
     render(<MembersSection />);
     await waitFor(() => screen.getByTestId('remove-member-mem-2'));
     fireEvent.click(screen.getByTestId('remove-member-mem-2'));
+    expect(screen.getByText(/Remove Bob\?/)).toBeTruthy();
+    expect(screen.getByTestId('confirm-remove-member-mem-2')).toBeTruthy();
+    expect(screen.getByTestId('cancel-remove-member-mem-2')).toBeTruthy();
+  });
+
+  it('does not call removeMember after first click (waits for confirm)', async () => {
+    render(<MembersSection />);
+    await waitFor(() => screen.getByTestId('remove-member-mem-2'));
+    fireEvent.click(screen.getByTestId('remove-member-mem-2'));
+    expect(mockRemoveMember).not.toHaveBeenCalled();
+  });
+
+  it('calls removeMember when Yes confirmed', async () => {
+    render(<MembersSection />);
+    await waitFor(() => screen.getByTestId('remove-member-mem-2'));
+    fireEvent.click(screen.getByTestId('remove-member-mem-2'));
+    fireEvent.click(screen.getByTestId('confirm-remove-member-mem-2'));
     await waitFor(() => expect(mockRemoveMember).toHaveBeenCalledWith('mem-2', 'standard'));
+  });
+
+  it('hides confirmation and does not call removeMember when No clicked', async () => {
+    render(<MembersSection />);
+    await waitFor(() => screen.getByTestId('remove-member-mem-2'));
+    fireEvent.click(screen.getByTestId('remove-member-mem-2'));
+    fireEvent.click(screen.getByTestId('cancel-remove-member-mem-2'));
+    expect(mockRemoveMember).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Remove Bob\?/)).toBeNull();
+    expect(screen.getByTestId('remove-member-mem-2')).toBeTruthy();
   });
 
   it('shows invite form when + Invite Member clicked', async () => {

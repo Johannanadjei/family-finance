@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getUserSession, signUpUser, signInUser, signOutUser, resetPasswordForEmail } from './auth.service';
+import { getUserSession, signUpUser, signInUser, signOutUser, resetPasswordForEmail, waitForSession } from './auth.service';
 
 const mockUpsert = vi.fn().mockResolvedValue({ error: null });
 
@@ -7,6 +7,7 @@ vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: {
       getUser:               vi.fn(),
+      getSession:            vi.fn(),
       signUp:                vi.fn(),
       signInWithPassword:    vi.fn(),
       signOut:               vi.fn(),
@@ -130,5 +131,48 @@ describe('resetPasswordForEmail', () => {
     supabase.auth.resetPasswordForEmail.mockResolvedValue({ error: { message: 'rate limited' } });
     const { error } = await resetPasswordForEmail('a@b.com');
     expect(error).toBeTruthy();
+  });
+});
+
+describe('waitForSession', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('returns session when immediately available', async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session: { access_token: 'tok' } }, error: null });
+    const { data, error } = await waitForSession();
+    expect(data?.access_token).toBe('tok');
+    expect(error).toBeNull();
+  });
+
+  it('returns error immediately when getSession errors', async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: null, error: new Error('network') });
+    const { data, error } = await waitForSession();
+    expect(data).toBeNull();
+    expect(error.message).toBe('network');
+  });
+
+  it('retries and returns session on second attempt', async () => {
+    let call = 0;
+    supabase.auth.getSession.mockImplementation(async () => {
+      call++;
+      return call === 1
+        ? { data: { session: null }, error: null }
+        : { data: { session: { access_token: 'tok' } }, error: null };
+    });
+    const promise = waitForSession();
+    await vi.runAllTimersAsync();
+    const { data, error } = await promise;
+    expect(error).toBeNull();
+    expect(data?.access_token).toBe('tok');
+  });
+
+  it('returns Session not established after all attempts fail', async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    const promise = waitForSession(2);
+    await vi.runAllTimersAsync();
+    const { data, error } = await promise;
+    expect(data).toBeNull();
+    expect(error.message).toMatch(/session not established/i);
   });
 });
