@@ -20,7 +20,9 @@ const primaryBtn = { width: '100%', padding: 14, borderRadius: 12, border: 'none
 
 export function JoinView() {
   const navigate = useNavigate();
-  const token    = new URLSearchParams(window.location.search).get('token');
+  // useState: token stable on mount — navigate('/') re-renders this component and would
+  // re-read search as empty, re-firing the useEffect with null and showing 'invalid'.
+  const [token]  = useState(() => new URLSearchParams(window.location.search).get('token'));
 
   const [phase,     setPhase]     = useState('loading'); // loading | invalid | confirm | auth | joining | done | error
   const [invite,    setInvite]    = useState(null);

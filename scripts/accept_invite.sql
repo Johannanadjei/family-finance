@@ -8,13 +8,15 @@
 --   3. Guards against duplicate membership
 --   4. Inserts the member row into budget_centre_members
 --   5. Marks the invite as accepted
---   6. Returns { centreId, memberId } as JSON
+--   6. Ensures public.users row exists (DO NOTHING if already present)
+--   7. Returns { centreId, memberId } as JSON
 --
 -- Why SECURITY DEFINER:
 --   The invitee is not yet a member of the hub, so direct RLS policies on
 --   budget_centre_members and centre_invites would block the write. Running
 --   as the DB owner bypasses RLS for the writes while still validating the
---   caller via auth.uid().
+--   caller via auth.uid(). The auth.users read is also only available with
+--   elevated privileges.
 --
 -- JavaScript call:
 --   supabase.rpc('accept_invite', { p_token: token })
@@ -70,7 +72,19 @@ BEGIN
   SET    status = 'accepted'
   WHERE  id = v_invite.id;
 
-  -- 6. Return context the client needs to set the active centre
+  -- 6. Ensure public.users row exists so the member shows a display name.
+  --    Uses full_name from auth metadata; falls back to the email prefix.
+  --    DO NOTHING on conflict preserves any existing profile.
+  INSERT INTO public.users (id, name, email)
+  SELECT
+    v_user_id,
+    COALESCE(NULLIF(TRIM(au.raw_user_meta_data->>'full_name'), ''), split_part(au.email, '@', 1)),
+    au.email
+  FROM auth.users au
+  WHERE au.id = v_user_id
+  ON CONFLICT (id) DO NOTHING;
+
+  -- 7. Return context the client needs to set the active centre
   RETURN json_build_object(
     'centreId', v_invite.budget_centre_id,
     'memberId', v_member_id
