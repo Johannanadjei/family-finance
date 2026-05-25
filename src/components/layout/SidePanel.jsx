@@ -10,6 +10,8 @@ import { useState }                        from 'react';
 import { useNavigate }                     from 'react-router-dom';
 import { ArchivedHubsList }                from './ArchivedHubsList';
 import { getInstallPrompt, triggerInstall } from '../../lib/pwa';
+import { useBudgetCentreContext }          from '../../context/BudgetCentreContext';
+import { useAuth }                         from '../../hooks/useAuth';
 
 const _isIOS        = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const _isStandalone = window.matchMedia?.('(display-mode: standalone)')?.matches ?? false;
@@ -18,6 +20,8 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
   const [hoveredRow,  setHoveredRow]  = useState(null);
   const [installing,  setInstalling]  = useState(false);
   const navigate                      = useNavigate();
+  const { can }                       = useBudgetCentreContext();
+  const { signOut }                   = useAuth();
 
   const handleInstall = async () => {
     setInstalling(true);
@@ -157,23 +161,33 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
           </div>
         )}
 
-        {/* Footer — create / upgrade */}
-        <div style={{ padding: '16px 16px calc(16px + env(safe-area-inset-bottom, 20px))', borderTop: '1px solid var(--c-border, #e5e7eb)', flexShrink: 0 }}>
-          {userPlan === 'free' ? (
-            <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 12, padding: '12px 14px' }}>
-              <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', fontWeight: 700 }}>Free plan · 1 hub included</p>
-              <button disabled style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px dashed var(--c-border, #e5e7eb)', background: 'transparent', color: 'var(--c-muted, #9ca3af)', fontSize: 14, fontWeight: 700, cursor: 'not-allowed', fontFamily: "'Nunito', sans-serif" }}>
-                Upgrade to add more hubs
-              </button>
-            </div>
-          ) : atProLimit ? (
-            <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0, fontWeight: 600, textAlign: 'center' }}>Maximum 10 hubs reached</p>
-          ) : (
-            <button onClick={onCreateHub} style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              + New Control Centre
-            </button>
-          )}
+        {/* Sign out */}
+        <div style={{ borderTop: '1px solid var(--c-border, #e5e7eb)', padding: '10px 16px', flexShrink: 0 }}>
+          <button data-testid="side-panel-sign-out" onClick={signOut} aria-label="Sign out"
+            style={{ background: 'none', border: 'none', fontSize: 13, fontWeight: 700, color: 'var(--c-muted, #6b7280)', cursor: 'pointer', fontFamily: "'Nunito', sans-serif", padding: '4px 0', width: '100%', textAlign: 'left' }}>
+            Sign out
+          </button>
         </div>
+
+        {/* Footer — create / upgrade (hidden for standard members) */}
+        {can('settings') && (
+          <div style={{ padding: '12px 16px calc(16px + env(safe-area-inset-bottom, 20px))', borderTop: '1px solid var(--c-border, #e5e7eb)', flexShrink: 0 }}>
+            {userPlan === 'free' ? (
+              <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 12, padding: '12px 14px' }}>
+                <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', fontWeight: 700 }}>Free plan · 1 hub included</p>
+                <button disabled style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px dashed var(--c-border, #e5e7eb)', background: 'transparent', color: 'var(--c-muted, #9ca3af)', fontSize: 14, fontWeight: 700, cursor: 'not-allowed', fontFamily: "'Nunito', sans-serif" }}>
+                  Upgrade to add more hubs
+                </button>
+              </div>
+            ) : atProLimit ? (
+              <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0, fontWeight: 600, textAlign: 'center' }}>Maximum 10 hubs reached</p>
+            ) : (
+              <button onClick={onCreateHub} style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                + New Control Centre
+              </button>
+            )}
+          </div>
+        )}
       </aside>
     </>
   );

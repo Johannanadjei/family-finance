@@ -14,7 +14,7 @@ import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 import { useFinanceContext }      from '../../context/FinanceContext';
 
 export function Header({ onOpenPanel }) {
-  const { centre, fmt }            = useBudgetCentreContext();
+  const { centre, fmt, can }       = useBudgetCentreContext();
   const { availableNow } = useFinanceContext();
   const navigate         = useNavigate();
   const isNegative       = availableNow < 0;
@@ -59,21 +59,23 @@ export function Header({ onOpenPanel }) {
         </div>
       </button>
 
-      {/* Right — available now */}
+      {/* Right — available now (hidden for standard members) + settings */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            Available
-          </p>
-          <p style={{
-            fontSize:   16,
-            fontWeight: 900,
-            margin:     0,
-            color:      isNegative ? 'var(--c-danger-light, #fca5a5)' : 'var(--c-success-light, #6ee7b7)',
-          }}>
-            {fmt(availableNow)}
-          </p>
-        </div>
+        {can('viewBalance') && (
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Available
+            </p>
+            <p style={{
+              fontSize:   16,
+              fontWeight: 900,
+              margin:     0,
+              color:      isNegative ? 'var(--c-danger-light, #fca5a5)' : 'var(--c-success-light, #6ee7b7)',
+            }}>
+              {fmt(availableNow)}
+            </p>
+          </div>
+        )}
 
         {/* Settings */}
         <button

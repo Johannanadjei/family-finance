@@ -10,9 +10,10 @@ import { Header }                                from './Header';
 import { mockCentre, mockFmt }                   from '../../test-utils/fixtures';
 
 let mockCentreName = mockCentre.name;
+let mockCan        = () => true;
 
 vi.mock('../../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ centre: { ...mockCentre, name: mockCentreName }, fmt: mockFmt }),
+  useBudgetCentreContext: () => ({ centre: { ...mockCentre, name: mockCentreName }, fmt: mockFmt, can: (p) => mockCan(p) }),
 }));
 
 const mockFinance = {
@@ -31,7 +32,7 @@ const renderHeader = (props = {}) =>
   );
 
 describe('Header', () => {
-  beforeEach(() => { mockCentreName = mockCentre.name; });
+  beforeEach(() => { mockCentreName = mockCentre.name; mockCan = () => true; });
 
   it('renders centre name', () => {
     renderHeader();
@@ -54,5 +55,11 @@ describe('Header', () => {
     mockCentreName = 'The Adjei Family Household';
     renderHeader();
     expect(screen.getByText('The Adjei Family Hou…')).toBeTruthy();
+  });
+
+  it('standard member does not see Available balance', () => {
+    mockCan = () => false;
+    renderHeader();
+    expect(screen.queryByText('Available')).toBeNull();
   });
 });

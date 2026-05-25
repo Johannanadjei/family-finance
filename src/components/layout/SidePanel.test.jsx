@@ -2,10 +2,20 @@
  * components/layout/SidePanel.test.jsx
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, act }      from '@testing-library/react';
-import { MemoryRouter }             from 'react-router-dom';
-import { SidePanel }                from './SidePanel';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, act }                  from '@testing-library/react';
+import { MemoryRouter }                         from 'react-router-dom';
+import { SidePanel }                            from './SidePanel';
+
+const mockSignOut = vi.fn();
+let mockCan       = () => true;
+
+vi.mock('../../context/BudgetCentreContext', () => ({
+  useBudgetCentreContext: () => ({ can: (p) => mockCan(p) }),
+}));
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({ signOut: mockSignOut }),
+}));
 
 const mockCentres = [
   { id: 'c-1', name: "The Adjei's", currency: 'GHS', icon: '🏠' },
@@ -36,6 +46,8 @@ const renderPanel = (props = {}) =>
   );
 
 describe('SidePanel', () => {
+  beforeEach(() => { mockCan = () => true; vi.clearAllMocks(); });
+
   it('renders all centre names', () => {
     renderPanel();
     expect(screen.getByText("The Adjei's")).toBeTruthy();
@@ -115,6 +127,24 @@ describe('SidePanel', () => {
     }));
     renderPanel({ userPlan: 'pro', centres: tenCentres });
     expect(screen.getByText('Maximum 10 hubs reached')).toBeTruthy();
+  });
+
+  it('standard member does not see upgrade or create buttons', () => {
+    mockCan = () => false;
+    renderPanel({ userPlan: 'free' });
+    expect(screen.queryByText('Upgrade to add more hubs')).toBeNull();
+    expect(screen.queryByText('+ New Control Centre')).toBeNull();
+  });
+
+  it('shows Sign out button', () => {
+    renderPanel();
+    expect(screen.getByTestId('side-panel-sign-out')).toBeTruthy();
+  });
+
+  it('calls signOut when Sign out is clicked', () => {
+    renderPanel();
+    screen.getByTestId('side-panel-sign-out').click();
+    expect(mockSignOut).toHaveBeenCalledOnce();
   });
 });
 
