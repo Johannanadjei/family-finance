@@ -87,6 +87,8 @@ describe('MembersSection', () => {
     fireEvent.click(screen.getByTestId('send-invite-btn'));
     await waitFor(() => expect(mockInviteMember).toHaveBeenCalledWith({ email: 'new@test.com', role: 'standard' }));
     await waitFor(() => expect(screen.getByText(/invite link ready/i)).toBeTruthy());
+    expect(screen.getByText(/no email is sent automatically/i)).toBeTruthy();
+    expect(screen.getByText('new@test.com')).toBeTruthy();
   });
 
   it('shows pending invites', async () => {

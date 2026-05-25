@@ -245,7 +245,7 @@ export default function App() {
   }, [user?.email, removePin, signOut]);
 
   // ── Invite join — bypass all gates so unauthenticated invitees can reach it
-  if (window.location.pathname === '/join') return <BrowserRouter><JoinView /></BrowserRouter>;
+  if (window.location.pathname.replace(/\/$/, '') === '/join') return <BrowserRouter><JoinView /></BrowserRouter>;
 
   // ── Auth gate ─────────────────────────────────────────────────────────────
   if (authLoading)     return <LoadingScreen message="Loading..." />;

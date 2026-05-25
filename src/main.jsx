@@ -14,7 +14,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
 // Only React + CSS are imported above this line — no app code, no Supabase.
 // URL detection therefore runs before any app module has had a chance to load.
 const _p        = new URLSearchParams(window.location.search);
-const _isGuest  = _p.get('guest') === '1';
+const _isJoin   = window.location.pathname.replace(/\/$/, '') === '/join';
+const _isGuest  = !_isJoin && _p.get('guest') === '1';
 const _centreId = _p.get('c') || null;
 const _currency = _p.get('cur') || 'GHS';
 

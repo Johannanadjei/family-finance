@@ -20,6 +20,8 @@ export function MembersSection() {
   const [sending,       setSending]       = useState(false);
   const [sendError,     setSendError]     = useState(null);
   const [sentLink,      setSentLink]      = useState(null);
+  const [sentEmail,     setSentEmail]     = useState(null);
+  const [linkCopied,    setLinkCopied]    = useState(false);
   const [removing,      setRemoving]      = useState(null);
   const [removeError,   setRemoveError]   = useState(null);
   const [cancelling,    setCancelling]    = useState(null);
@@ -46,6 +48,8 @@ export function MembersSection() {
     setSending(false);
     if (error) { setSendError(error.message || 'Could not send invite. Please try again.'); return; }
     setSentLink(`${window.location.origin}/join?token=${data?.token}`);
+    setSentEmail(trimmed);
+    setLinkCopied(false);
     setEmail(''); setRole('standard'); setShowForm(false);
     await loadInvites();
   };
@@ -70,26 +74,29 @@ export function MembersSection() {
   return (
     <div style={card}>
       <p style={label}>Members</p>
-      {members.map((m, i) => (
+      {members.map((m, i) => {
+        const displayName = m.users?.name?.trim() || m.users?.email || 'Unknown';
+        return (
         <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 10, marginBottom: 10, borderBottom: i < members.length - 1 || pendingInvites.length > 0 ? '1px solid var(--c-border, #e5e7eb)' : 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--c-accent-light, #f0fdf4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, color: 'var(--c-primary, #064e3b)', flexShrink: 0 }}>
-              {(m.users?.name || m.users?.email || '?')[0].toUpperCase()}
+              {displayName[0].toUpperCase()}
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: 'var(--c-text, #1c1917)' }}>{m.users?.name || m.users?.email || 'Unknown'}</p>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: 'var(--c-text, #1c1917)' }}>{displayName}</p>
               <p style={{ margin: 0, fontSize: 11, color: 'var(--c-muted, #6b7280)' }}>{ROLE_LABELS[m.role] || m.role}</p>
             </div>
           </div>
           {canManage && m.role !== 'owner' && (
             <button data-testid={`remove-member-${m.id}`} onClick={() => handleRemove(m.id, m.role)}
-              disabled={removing === m.id} aria-label={`Remove ${m.users?.name || 'member'}`}
+              disabled={removing === m.id} aria-label={`Remove ${displayName}`}
               style={{ background: 'none', border: 'none', cursor: removing === m.id ? 'not-allowed' : 'pointer', color: 'var(--c-danger, #dc2626)', padding: '4px 8px', fontSize: 12, fontWeight: 700, fontFamily: "'Nunito', sans-serif" }}>
               {removing === m.id ? '…' : 'Remove'}
             </button>
           )}
         </div>
-      ))}
+        );
+      })}
       {removeError && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px', fontWeight: 700 }}>{removeError}</p>}
       {invitesLoaded && pendingInvites.length > 0 && (
         <div style={{ marginBottom: 12 }}>
@@ -112,12 +119,16 @@ export function MembersSection() {
         </div>
       )}
       {sentLink && (
-        <div style={{ background: 'var(--c-accent-light, #f0fdf4)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
-          <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 800, color: 'var(--c-text, #1c1917)' }}>Invite link ready — share it directly:</p>
-          <p style={{ margin: '0 0 8px', fontSize: 11, color: 'var(--c-muted, #6b7280)', wordBreak: 'break-all' }}>{sentLink}</p>
-          <button onClick={() => { navigator.clipboard?.writeText(sentLink); setSentLink(null); }}
-            style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
-            Copy Link
+        <div style={{ background: 'var(--c-accent-light, #f0fdf4)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
+          <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 900, color: 'var(--c-text, #1c1917)' }}>Invite link ready</p>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--c-muted, #6b7280)', fontWeight: 600 }}>
+            No email is sent automatically. Copy this link and share it directly with <strong style={{ color: 'var(--c-text, #1c1917)' }}>{sentEmail}</strong> via WhatsApp, SMS, or email.
+          </p>
+          <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--c-muted, #6b7280)', wordBreak: 'break-all', background: 'var(--c-card, #fff)', borderRadius: 6, padding: '6px 8px' }}>{sentLink}</p>
+          <button
+            onClick={() => { navigator.clipboard?.writeText(sentLink); setLinkCopied(true); }}
+            style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: linkCopied ? 'var(--c-success, #059669)' : 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", transition: 'background .2s' }}>
+            {linkCopied ? 'Copied!' : 'Copy Link'}
           </button>
         </div>
       )}
