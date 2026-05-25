@@ -1,10 +1,11 @@
 import { useNavigate }            from 'react-router-dom';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 
-export function RecentActivity({ txs }) {
+export function RecentActivity({ txs, showIncome = true }) {
   const { fmt } = useBudgetCentreContext();
   const navigate = useNavigate();
-  const recent   = txs.slice(0, 5);
+  const visible  = showIncome ? txs : txs.filter(tx => tx.type !== 'income');
+  const recent   = visible.slice(0, 5);
   return (
     <div style={{ background: 'var(--c-card,#fff)', borderRadius: 16, padding: '16px 18px', marginBottom: 24, boxShadow: 'var(--c-shadow)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>

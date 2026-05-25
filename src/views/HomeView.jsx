@@ -120,7 +120,7 @@ export function HomeView() {
           color="var(--c-success,#059669)"
         />
       </div>
-      <RecentActivity txs={txs} />
+      <RecentActivity txs={txs} showIncome={showIncome} />
     </div>
   );
 }

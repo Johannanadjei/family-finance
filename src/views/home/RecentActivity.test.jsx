@@ -59,4 +59,16 @@ describe('RecentActivity', () => {
     renderActivity();
     expect(screen.getByText('See all')).toBeTruthy();
   });
+
+  it('hides income transactions when showIncome is false', () => {
+    renderActivity({ showIncome: false });
+    expect(screen.queryByText('Adjei Salary')).toBeNull();
+    expect(screen.getByText('Groceries')).toBeTruthy();
+  });
+
+  it('shows empty state when all transactions are income and showIncome is false', () => {
+    const incomeTxs = [{ id: 'tx-i', type: 'income', amount: 500, category_name: 'Salary', date: '2026-05-19', logged_by_name: 'Johannan' }];
+    renderActivity({ txs: incomeTxs, showIncome: false });
+    expect(screen.getByText(/No transactions yet/)).toBeTruthy();
+  });
 });
