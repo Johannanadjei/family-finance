@@ -66,14 +66,14 @@ export function AndroidBanner({ onDismiss }) {
           <button
             data-testid="install-prompt-dismiss"
             onClick={onDismiss}
-            style={{ padding: '7px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'transparent', fontSize: 12, fontWeight: 700, color: 'var(--c-muted, #6b7280)', cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
+            style={{ padding: '7px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #ffffff)', fontSize: 12, fontWeight: 700, color: 'var(--c-text, #1c1917)', cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
           >
             Dismiss
           </button>
           <button
             data-testid="install-prompt-install"
             onClick={handleInstall}
-            style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', fontSize: 12, fontWeight: 800, color: '#fff', cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
+            style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', fontSize: 12, fontWeight: 800, color: 'var(--c-btn-text, #ffffff)', cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
           >
             Install
           </button>

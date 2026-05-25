@@ -137,7 +137,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
                 </p>
               </div>
             ) : getInstallPrompt() ? (
-              <button onClick={handleInstall} disabled={installing} style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: installing ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+              <button onClick={handleInstall} disabled={installing} style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 13, fontWeight: 800, cursor: installing ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
                 {installing ? 'Opening…' : '📲 Install Money B.O.S'}
               </button>
             ) : (
