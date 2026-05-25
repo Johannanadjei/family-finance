@@ -14,6 +14,8 @@ vi.mock('../../context/BudgetCentreContext', () => ({
       { id: 'mem-2', user_id: 'user-2', role: 'standard', users: { name: 'Bob',      email: 'b@test.com' } },
     ],
     currentMemberRole: 'owner',
+    currentUserId:     'user-1',
+    can:               () => true,
     inviteMember:      mockInviteMember,
     removeMember:      mockRemoveMember,
     getInvites:        mockGetInvites,

@@ -108,14 +108,16 @@ export function HomeView() {
           onInfo={setActiveInfo}
           color={variableSpent > 0 ? 'var(--c-danger,#dc2626)' : undefined}
         />
-        <StatCard
-          label="Spare Money"
-          value={fmt(spareMoney)}
-          infoKey="spare"
-          activeInfo={activeInfo}
-          onInfo={setActiveInfo}
-          color="var(--c-success,#059669)"
-        />
+        <div style={!showIncome ? { gridColumn: '1 / -1' } : {}}>
+          <StatCard
+            label="Spare Money"
+            value={fmt(spareMoney)}
+            infoKey="spare"
+            activeInfo={activeInfo}
+            onInfo={setActiveInfo}
+            color="var(--c-success,#059669)"
+          />
+        </div>
       </div>
       <RecentActivity txs={txs} />
     </div>

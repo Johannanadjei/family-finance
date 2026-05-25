@@ -295,6 +295,7 @@ export default function App() {
       categories={categories}
       members={members}
       currentMemberRole={currentMemberRole}
+      currentUserId={user?.id || null}
       addCategory={addCategory}
       updateCentre={updateCentre}
       updateCategory={updateCategory}

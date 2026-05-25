@@ -10,7 +10,7 @@ import { LogView }                  from './LogView';
 import { mockCentre, mockFmt, mockTxs } from '../test-utils/fixtures';
 
 vi.mock('../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt }),
+  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: () => true, currentUserId: 'user-1' }),
 }));
 
 const mockFinance = {

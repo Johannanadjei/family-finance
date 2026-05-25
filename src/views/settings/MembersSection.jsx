@@ -9,7 +9,7 @@ const label      = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b72
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 14, fontWeight: 700, marginBottom: 8, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
 
 export function MembersSection() {
-  const { members, currentMemberRole, inviteMember, removeMember, getInvites, cancelInvite, centre } = useBudgetCentreContext();
+  const { members, currentMemberRole, can, inviteMember, removeMember, getInvites, cancelInvite, centre } = useBudgetCentreContext();
   const { userPlan } = useFinanceContext();
 
   const [invites,       setInvites]       = useState([]);
@@ -45,7 +45,7 @@ export function MembersSection() {
     const { data, error } = await inviteMember({ email: trimmed, role });
     setSending(false);
     if (error) { setSendError(error.message || 'Could not send invite. Please try again.'); return; }
-    setSentLink(`${window.location.origin}/join?token=${data.token}`);
+    setSentLink(`${window.location.origin}/join?token=${data?.token}`);
     setEmail(''); setRole('standard'); setShowForm(false);
     await loadInvites();
   };
@@ -64,7 +64,7 @@ export function MembersSection() {
     await loadInvites();
   };
 
-  const canManage      = currentMemberRole === 'owner';
+  const canManage      = can('manageMembers');
   const pendingInvites = invites.filter(i => i.status === 'pending');
 
   return (

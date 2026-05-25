@@ -12,6 +12,7 @@
 import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
+import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { getCurrentMonth, offsetMonth, groupByDate } from '../lib/finance';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { TransactionRow }         from './daily/TransactionRow';
@@ -40,7 +41,7 @@ function LogViewSkeleton() {
 }
 
 export function LogView({ onEditTx }) {
-  const { fmt }                              = useBudgetCentreContext();
+  const { fmt, can, currentUserId }          = useBudgetCentreContext();
   const { txs, loading, error,
           activeMonth, loadMonth,
           deleteTransaction }                = useFinanceContext();
@@ -49,11 +50,14 @@ export function LogView({ onEditTx }) {
   const [deletingId,  setDeletingId]        = useState(null);
   const [deleteError, setDeleteError]       = useState(null);
 
+  if (!can('log')) return <AccessBlocked message="The transaction log is not available for view-only members." />;
   if (loading) return <LogViewSkeleton />;
 
   const isCurrentMonth = activeMonth === getCurrentMonth();
+  const showAllTxs     = can('viewAllTxs');
 
   const filtered = txs
+    .filter(tx => showAllTxs || !currentUserId || tx.logged_by_user_id === currentUserId)
     .filter(tx => filter === 'all' || tx.type === filter)
     .filter(tx => !search || tx.category_name.toLowerCase().includes(search.toLowerCase()));
 
