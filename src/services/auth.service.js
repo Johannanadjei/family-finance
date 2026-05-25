@@ -14,10 +14,25 @@ export const getUserSession = async () => {
   return { data, error };
 };
 
-export const signUpUser = async (email, password) => {
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) console.error('[auth.service] signUp error:', error.message);
-  return { data, error };
+export const signUpUser = async (email, password, name = '') => {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: name.trim() } },
+  });
+  if (error) {
+    console.error('[auth.service] signUp error:', error.message);
+    return { data, error };
+  }
+  // Belt-and-suspenders: upsert name into public.users so it is always saved
+  // correctly even if the on_auth_user_created trigger is absent or broken.
+  if (data?.user?.id) {
+    const { error: upsertErr } = await supabase
+      .from('users')
+      .upsert({ id: data.user.id, name: name.trim(), email: email.trim() }, { onConflict: 'id' });
+    if (upsertErr) console.error('[auth.service] user upsert error:', upsertErr.message);
+  }
+  return { data, error: null };
 };
 
 export const signInUser = async (email, password) => {

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getUserSession, signUpUser, signInUser, signOutUser, resetPasswordForEmail } from './auth.service';
 
+const mockUpsert = vi.fn().mockResolvedValue({ error: null });
+
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: {
@@ -10,12 +12,13 @@ vi.mock('../lib/supabase', () => ({
       signOut:               vi.fn(),
       resetPasswordForEmail: vi.fn(),
     },
+    from: vi.fn(() => ({ upsert: mockUpsert })),
   },
 }));
 
 import { supabase } from '../lib/supabase';
 
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => { vi.clearAllMocks(); mockUpsert.mockResolvedValue({ error: null }); });
 
 describe('getUserSession', () => {
   it('returns user data on success', async () => {
@@ -33,23 +36,45 @@ describe('getUserSession', () => {
 });
 
 describe('signUpUser', () => {
-  it('calls signUp with email and password', async () => {
+  it('calls signUp with email, password, and full_name metadata', async () => {
     supabase.auth.signUp.mockResolvedValue({ data: { user: { id: 'u-1' } }, error: null });
-    await signUpUser('a@b.com', 'pass123');
-    expect(supabase.auth.signUp).toHaveBeenCalledWith({ email: 'a@b.com', password: 'pass123' });
+    await signUpUser('a@b.com', 'pass123', 'Alice');
+    expect(supabase.auth.signUp).toHaveBeenCalledWith({
+      email: 'a@b.com', password: 'pass123',
+      options: { data: { full_name: 'Alice' } },
+    });
+  });
+
+  it('upserts user profile to users table on success', async () => {
+    supabase.auth.signUp.mockResolvedValue({ data: { user: { id: 'u-1' } }, error: null });
+    await signUpUser('a@b.com', 'pass123', 'Alice');
+    expect(supabase.from).toHaveBeenCalledWith('users');
+    expect(mockUpsert).toHaveBeenCalledWith(
+      { id: 'u-1', name: 'Alice', email: 'a@b.com' },
+      { onConflict: 'id' }
+    );
   });
 
   it('returns user data on success', async () => {
     supabase.auth.signUp.mockResolvedValue({ data: { user: { id: 'u-1' } }, error: null });
-    const { data, error } = await signUpUser('a@b.com', 'pass123');
+    const { data, error } = await signUpUser('a@b.com', 'pass123', 'Alice');
     expect(data.user.id).toBe('u-1');
     expect(error).toBeNull();
   });
 
-  it('returns error on failure', async () => {
+  it('upsert failure is non-fatal — still returns success', async () => {
+    supabase.auth.signUp.mockResolvedValue({ data: { user: { id: 'u-1' } }, error: null });
+    mockUpsert.mockResolvedValueOnce({ error: { message: 'db error' } });
+    const { data, error } = await signUpUser('a@b.com', 'pass123', 'Alice');
+    expect(data.user.id).toBe('u-1');
+    expect(error).toBeNull();
+  });
+
+  it('does not upsert when signup fails', async () => {
     supabase.auth.signUp.mockResolvedValue({ data: null, error: { message: 'Email already in use' } });
-    const { error } = await signUpUser('a@b.com', 'pass123');
+    const { error } = await signUpUser('a@b.com', 'pass123', 'Alice');
     expect(error).toBeTruthy();
+    expect(mockUpsert).not.toHaveBeenCalled();
   });
 });
 

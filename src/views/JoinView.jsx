@@ -26,6 +26,7 @@ export function JoinView() {
   const [invite,    setInvite]    = useState(null);
   const [user,      setUser]      = useState(null);
   const [authMode,  setAuthMode]  = useState('signup'); // signup | signin
+  const [name,      setName]      = useState('');
   const [email,     setEmail]     = useState('');
   const [password,  setPassword]  = useState('');
   const [authError, setAuthError] = useState(null);
@@ -46,7 +47,6 @@ export function JoinView() {
       if (authErr) { setPhase('invalid'); return; }
       const currentUser = authData?.user;
       if (currentUser) {
-        // Warn if signed-in email differs from invited email
         if (currentUser.email?.toLowerCase() !== inv.invited_email?.toLowerCase()) {
           setUser(currentUser);
           setPhase('wrongEmail');
@@ -64,10 +64,14 @@ export function JoinView() {
   }, [token]);
 
   const handleAuth = async () => {
+    if (authMode === 'signup' && !name.trim()) {
+      setAuthError('Please enter your name');
+      return;
+    }
     setAuthBusy(true);
     setAuthError(null);
     const result = authMode === 'signup'
-      ? await signUpUser(email, password)
+      ? await signUpUser(email, password, name.trim())
       : await signInUser(email, password);
     setAuthBusy(false);
     if (result.error) { setAuthError(result.error.message); return; }
@@ -85,22 +89,14 @@ export function JoinView() {
   const handleJoin = async () => {
     setPhase('joining');
     const { data, error } = await acceptInvite({ token, userId: user.id });
-    // Hard failure — member row not created
     if (error && !data) { setJoinError(error.message); setPhase('error'); return; }
-    // Partial success — member created but invite status update failed; still navigate in
     saveActiveCentreId(data?.centreId);
     navigate('/');
   };
 
-  // ── Render phases ─────────────────────────────────────────────────────────
-
-  if (phase === 'loading') {
-    return (
-      <JoinCard>
-        <p style={{ textAlign: 'center', color: 'var(--c-muted, #6b7280)', fontWeight: 700 }}>Checking invite…</p>
-      </JoinCard>
-    );
-  }
+  if (phase === 'loading') return (
+    <JoinCard><p style={{ textAlign: 'center', color: 'var(--c-muted, #6b7280)', fontWeight: 700 }}>Checking invite…</p></JoinCard>
+  );
 
   if (phase === 'invalid') {
     return (
@@ -150,6 +146,9 @@ export function JoinView() {
           ))}
         </div>
 
+        {authMode === 'signup' && (
+          <input type="text" value={name} onChange={e => { setName(e.target.value); setAuthError(null); }} placeholder="Your full name" style={inputStyle} autoComplete="name" />
+        )}
         <input type="email" value={email} onChange={e => { setEmail(e.target.value); setAuthError(null); }} placeholder="Email" style={inputStyle} />
         <input type="password" value={password} onChange={e => { setPassword(e.target.value); setAuthError(null); }} placeholder="Password" style={inputStyle} />
         {authError && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px', fontWeight: 700 }}>{authError}</p>}
