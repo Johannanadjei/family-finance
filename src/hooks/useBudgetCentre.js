@@ -21,47 +21,12 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase }                          from '../lib/supabase';
-import { getCentreById, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
-import { addCategory as addCategoryService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
+import { getCentreById, getFirstCentre, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
+import { getCategories, addCategory as addCategoryService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
+import { getMembers, addMember as addMemberService, removeMember as removeMemberService, updateMemberRole as updateMemberRoleService } from '../services/members.service';
 import { updateIncomeSource as updateIncomeSourceService } from '../services/income.service';
-import { addMember as addMemberService, removeMember as removeMemberService, updateMemberRole as updateMemberRoleService } from '../services/members.service';
 import { createInvite as createInviteService, getHubInvites as getHubInvitesService, cancelInvite as cancelInviteService } from '../services/invites.service';
-import { getCurrentMonth } from '../lib/finance';
-
-// ── Local Supabase helpers ────────────────────────────────────────────────────
-
-const fetchFirstCentre = async () => {
-  const { data, error } = await supabase
-    .from('budget_centres')
-    .select('*')
-    .is('deleted_at', null)
-    .eq('is_archived', false)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  return { data, error };
-};
-
-const fetchCategories = async (centreId) => {
-  const { data, error } = await supabase
-    .from('budget_categories')
-    .select('*')
-    .eq('budget_centre_id', centreId)
-    .eq('month', getCurrentMonth())
-    .is('deleted_at', null)
-    .order('sort_order', { ascending: true });
-  return { data: data || [], error };
-};
-
-const fetchMembers = async (centreId) => {
-  const { data, error } = await supabase
-    .from('budget_centre_members')
-    .select('*, users(id, name, email, avatar_url)')
-    .eq('budget_centre_id', centreId)
-    .is('deleted_at', null);
-  return { data: data || [], error };
-};
+import { getUserSession } from '../services/auth.service';
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -99,7 +64,7 @@ export function useBudgetCentre(user, centreId) {
         centreErr  = result.error;
       } else if (!result.data) {
         // Saved ID no longer valid — fall back gracefully
-        const fallback = await fetchFirstCentre();
+        const fallback = await getFirstCentre();
         centreData = fallback.data;
         centreErr  = fallback.error;
       } else {
@@ -108,7 +73,7 @@ export function useBudgetCentre(user, centreId) {
       }
     } else {
       // Initial load — first available centre
-      const result = await fetchFirstCentre();
+      const result = await getFirstCentre();
       centreData = result.data;
       centreErr  = result.error;
     }
@@ -132,8 +97,8 @@ export function useBudgetCentre(user, centreId) {
     }
 
     const [catResult, memberResult] = await Promise.all([
-      fetchCategories(centreData.id),
-      fetchMembers(centreData.id),
+      getCategories(centreData.id),
+      getMembers(centreData.id),
     ]);
 
     if (catResult.error)    console.error('[useBudgetCentre] categories fetch error:', catResult.error.message);
@@ -254,8 +219,8 @@ export function useBudgetCentre(user, centreId) {
   const inviteMember = useCallback(async ({ email, role }) => {
     const id = centre?.id;
     if (!id) return { error: new Error('No active centre') };
-    const { data: authData, error: authErr } = await supabase.auth.getUser();
-    if (authErr) console.error('[useBudgetCentre] getUser error:', authErr.message);
+    const { data: authData, error: authErr } = await getUserSession();
+    if (authErr) return { data: null, error: authErr };
     return createInviteService({ centreId: id, email, role, invitedBy: authData?.user?.id });
   }, [centre?.id]);
 

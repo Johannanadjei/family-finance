@@ -1,6 +1,7 @@
 import { useState, useEffect }  from 'react';
 import { useNavigate }          from 'react-router-dom';
-import { supabase }             from '../lib/supabase';
+import { saveActiveCentreId }   from '../lib/storage';
+import { getUserSession, signUpUser, signInUser, signOutUser } from '../services/auth.service';
 import { getInviteByToken, acceptInvite } from '../services/invites.service';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS } from '../lib/roles';
 
@@ -41,7 +42,7 @@ export function JoinView() {
 
       setInvite(inv);
 
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      const { data: authData, error: authErr } = await getUserSession();
       if (authErr) { setPhase('invalid'); return; }
       const currentUser = authData?.user;
       if (currentUser) {
@@ -65,24 +66,29 @@ export function JoinView() {
   const handleAuth = async () => {
     setAuthBusy(true);
     setAuthError(null);
-    let result;
-    if (authMode === 'signup') {
-      result = await supabase.auth.signUp({ email, password });
-    } else {
-      result = await supabase.auth.signInWithPassword({ email, password });
-    }
+    const result = authMode === 'signup'
+      ? await signUpUser(email, password)
+      : await signInUser(email, password);
     setAuthBusy(false);
     if (result.error) { setAuthError(result.error.message); return; }
     setUser(result.data.user);
     setPhase('confirm');
   };
 
+  const handleSignOut = async () => {
+    const { error: signOutErr } = await signOutUser();
+    if (signOutErr) console.error('[JoinView] signOut error:', signOutErr.message);
+    setUser(null);
+    setPhase('auth');
+  };
+
   const handleJoin = async () => {
     setPhase('joining');
     const { data, error } = await acceptInvite({ token, userId: user.id });
-    if (error) { setJoinError(error.message); setPhase('error'); return; }
-    const { saveActiveCentreId } = await import('../lib/storage');
-    saveActiveCentreId(data.centreId);
+    // Hard failure — member row not created
+    if (error && !data) { setJoinError(error.message); setPhase('error'); return; }
+    // Partial success — member created but invite status update failed; still navigate in
+    saveActiveCentreId(data?.centreId);
     navigate('/');
   };
 
@@ -117,7 +123,7 @@ export function JoinView() {
         <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: '0 0 16px', lineHeight: 1.5 }}>
           This invite was sent to <strong>{invite?.invited_email}</strong>. You are signed in as <strong>{user?.email}</strong>. Sign in with the correct account to accept this invite.
         </p>
-        <button onClick={() => supabase.auth.signOut().then(() => { setUser(null); setPhase('auth'); })} style={primaryBtn}>
+        <button onClick={handleSignOut} style={primaryBtn}>
           Sign out and switch account
         </button>
       </JoinCard>

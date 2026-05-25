@@ -26,21 +26,30 @@ vi.mock('../lib/supabase', () => {
 });
 
 vi.mock('../services/centres.service', () => ({
-  getCentreById:    vi.fn(),
-  updateCentre:     vi.fn(),
-  archiveCentre:    vi.fn(),
-  deleteCentre:     vi.fn(),
-  unarchiveCentre:  vi.fn(),
+  getCentreById:   vi.fn(),
+  getFirstCentre:  vi.fn().mockResolvedValue({ data: null, error: null }),
+  updateCentre:    vi.fn(),
+  archiveCentre:   vi.fn(),
+  deleteCentre:    vi.fn(),
+  unarchiveCentre: vi.fn(),
 }));
 
 vi.mock('../services/categories.service', () => ({
+  getCategories:  vi.fn().mockResolvedValue({ data: [], error: null }),
   addCategory:    vi.fn(),
   updateCategory: vi.fn(),
   deleteCategory: vi.fn(),
 }));
 
-vi.mock('../lib/finance', () => ({
-  getCurrentMonth: () => '2026-05',
+vi.mock('../services/members.service', () => ({
+  getMembers:       vi.fn().mockResolvedValue({ data: [], error: null }),
+  addMember:        vi.fn(),
+  removeMember:     vi.fn(),
+  updateMemberRole: vi.fn(),
+}));
+
+vi.mock('../services/auth.service', () => ({
+  getUserSession: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null }),
 }));
 
 import { getCentreById, archiveCentre, deleteCentre, unarchiveCentre } from '../services/centres.service';

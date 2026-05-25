@@ -49,6 +49,24 @@ export const getCentreById = async (centreId) => {
 };
 
 /**
+ * Fetch the first active, non-archived budget centre for the current user.
+ * Used as the initial load fallback when no explicit centreId is provided.
+ */
+export const getFirstCentre = async () => {
+  const { data, error } = await supabase
+    .from('budget_centres')
+    .select('*')
+    .is('deleted_at', null)
+    .eq('is_archived', false)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) console.error('[centres.service] getFirstCentre error:', error.message);
+  return { data, error };
+};
+
+/**
  * Create a new budget centre and its owner member row.
  *
  * @param {{ name, currency, surplus_target, icon, type, skin_id }} opts

@@ -111,4 +111,27 @@ describe('MembersSection', () => {
     fireEvent.click(screen.getByTestId('cancel-invite-inv-1'));
     await waitFor(() => expect(mockCancelInvite).toHaveBeenCalledWith('inv-1'));
   });
+
+  it('removes invite immediately (optimistic) when Cancel clicked', async () => {
+    mockGetInvites.mockResolvedValue({
+      data: [{ id: 'inv-1', invited_email: 'alice@test.com', role: 'standard', status: 'pending', expires_at: new Date(Date.now() + 86400000).toISOString() }],
+      error: null,
+    });
+    render(<MembersSection />);
+    await waitFor(() => screen.getByTestId('cancel-invite-inv-1'));
+    fireEvent.click(screen.getByTestId('cancel-invite-inv-1'));
+    await waitFor(() => expect(screen.queryByTestId('cancel-invite-inv-1')).toBeNull());
+  });
+
+  it('shows error and reloads if cancel fails', async () => {
+    mockGetInvites.mockResolvedValue({
+      data: [{ id: 'inv-1', invited_email: 'alice@test.com', role: 'standard', status: 'pending', expires_at: new Date(Date.now() + 86400000).toISOString() }],
+      error: null,
+    });
+    mockCancelInvite.mockResolvedValue({ error: { message: 'Network error' } });
+    render(<MembersSection />);
+    await waitFor(() => screen.getByTestId('cancel-invite-inv-1'));
+    fireEvent.click(screen.getByTestId('cancel-invite-inv-1'));
+    await waitFor(() => expect(screen.getByText('Network error')).toBeTruthy());
+  });
 });

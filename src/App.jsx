@@ -28,7 +28,7 @@ import { useBudgetCentreContext }                from './context/BudgetCentreCon
 import { useFinanceContext }                     from './context/FinanceContext';
 import { applyTheme }                                        from './lib/themes';
 import { loadActiveCentreId, saveActiveCentreId, loadPrefs } from './lib/storage';
-import { supabase }                                          from './lib/supabase';
+import { resetPasswordForEmail }                             from './services/auth.service';
 
 // Apply saved skin immediately so there's no flash of default theme on reload
 applyTheme(loadPrefs().themeSkin);
@@ -56,18 +56,18 @@ import { JoinView }                              from './views/JoinView';
 
 function LoadingScreen({ message }) {
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg, #064e3b, #0d7060)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
       <div style={{ fontSize: 48 }}>🏠</div>
-      <p style={{ fontSize: 16, fontWeight: 800, color: '#6ee7b7', margin: 0 }}>{message}</p>
+      <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--c-success-light, #6ee7b7)', margin: 0 }}>{message}</p>
     </div>
   );
 }
 
 function ErrorScreen({ message }) {
   return (
-    <div style={{ minHeight: '100vh', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, padding: 24 }}>
+    <div style={{ minHeight: '100vh', background: 'var(--c-danger-bg, #fef2f2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, padding: 24 }}>
       <div style={{ fontSize: 48 }}>⚠️</div>
-      <p style={{ fontSize: 16, fontWeight: 800, color: '#dc2626', margin: 0, textAlign: 'center' }}>{message}</p>
+      <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--c-danger, #dc2626)', margin: 0, textAlign: 'center' }}>{message}</p>
     </div>
   );
 }
@@ -239,7 +239,8 @@ export default function App() {
   }, [restoreHub, reloadCentres, handleSwitchCentre]);
 
   const handleForgotPin = useCallback(async () => {
-    await supabase.auth.resetPasswordForEmail(user?.email || '');
+    const { error } = await resetPasswordForEmail(user?.email || '');
+    if (error) console.error('[App] resetPasswordForEmail error:', error.message);
     await removePin();
     signOut();
   }, [user?.email, removePin, signOut]);

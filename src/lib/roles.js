@@ -31,7 +31,7 @@ const PERMISSIONS = {
  * Returns false for any unknown role or permission — safe default.
  *
  * @param {string} role
- * @param {string} permission — 'log' | 'logIncome' | 'viewIncome' | 'settings' | 'manageMembers'
+ * @param {string} permission — 'log' | 'logIncome' | 'viewIncome' | 'settings' | 'manageMembers' | 'viewAllTxs'
  * @returns {boolean}
  */
 export const can = (role, permission) =>
@@ -52,3 +52,6 @@ export const ROLE_DESCRIPTIONS = {
 };
 
 export const INVITABLE_ROLES = ['full_access', 'standard', 'view_only'];
+
+/** Maximum member count (active + pending invites) per plan tier. */
+export const MAX_MEMBERS = { free: 2, pro: 6 };

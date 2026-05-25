@@ -161,7 +161,11 @@ export const acceptInvite = async ({ token, userId }) => {
 
   if (acceptErr) {
     console.error('[invites.service] acceptInvite status update error:', acceptErr.message);
-    // Member row was inserted — non-fatal, log and continue
+    // Member row inserted but invite stays pending — warn caller so UI can inform user.
+    return {
+      data:  { member, centreId: invite.budget_centre_id },
+      error: new Error('You have joined the hub, but the invite link was not marked as used. Your hub owner may need to cancel it manually.'),
+    };
   }
 
   return { data: { member, centreId: invite.budget_centre_id }, error: null };

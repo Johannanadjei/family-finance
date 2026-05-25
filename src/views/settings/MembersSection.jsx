@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useBudgetCentreContext }           from '../../context/BudgetCentreContext';
 import { useFinanceContext }                from '../../context/FinanceContext';
-import { ROLE_LABELS, ROLE_DESCRIPTIONS, INVITABLE_ROLES } from '../../lib/roles';
-
-const MEMBER_LIMITS = { free: 2, pro: 6 };
+import { ROLE_LABELS, ROLE_DESCRIPTIONS, INVITABLE_ROLES, MAX_MEMBERS } from '../../lib/roles';
 const card       = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
 const label      = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: 0.8 };
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 14, fontWeight: 700, marginBottom: 8, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
@@ -25,9 +23,10 @@ export function MembersSection() {
   const [removing,      setRemoving]      = useState(null);
   const [removeError,   setRemoveError]   = useState(null);
   const [cancelling,    setCancelling]    = useState(null);
+  const [cancelError,   setCancelError]   = useState(null);
 
   const plan         = userPlan || 'free';
-  const limit        = MEMBER_LIMITS[plan] ?? 2;
+  const limit        = MAX_MEMBERS[plan] ?? 2;
   const activeCount  = members.length;
   const pendingCount = invites.filter(i => i.status === 'pending').length;
   const atLimit      = activeCount + pendingCount >= limit;
@@ -36,7 +35,7 @@ export function MembersSection() {
     const { data } = await getInvites();
     setInvites(data || []);
     setInvitesLoaded(true);
-  }, [centre?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [getInvites]);
 
   useEffect(() => { loadInvites(); }, [loadInvites]);
 
@@ -63,9 +62,15 @@ export function MembersSection() {
 
   const handleCancel = async (inviteId) => {
     setCancelling(inviteId);
-    await cancelInvite(inviteId);
+    setCancelError(null);
+    setInvites(prev => prev.filter(i => i.id !== inviteId));
+    const { error } = await cancelInvite(inviteId);
     setCancelling(null);
-    await loadInvites();
+    if (error) {
+      setCancelError(error.message || 'Could not cancel invite. Please try again.');
+      await loadInvites();
+      return;
+    }
   };
 
   const canManage      = can('manageMembers');
@@ -97,7 +102,8 @@ export function MembersSection() {
         </div>
         );
       })}
-      {removeError && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px', fontWeight: 700 }}>{removeError}</p>}
+      {removeError  && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px', fontWeight: 700 }}>{removeError}</p>}
+      {cancelError  && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px', fontWeight: 700 }}>{cancelError}</p>}
       {invitesLoaded && pendingInvites.length > 0 && (
         <div style={{ marginBottom: 12 }}>
           <p style={{ fontSize: 11, fontWeight: 900, color: 'var(--c-muted, #6b7280)', textTransform: 'uppercase', letterSpacing: 0.6, margin: '0 0 8px' }}>Pending Invites</p>
@@ -105,7 +111,7 @@ export function MembersSection() {
             <div key={inv.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--c-border, #e5e7eb)' }}>
               <div>
                 <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--c-text, #1c1917)' }}>{inv.invited_email}</p>
-                <p style={{ margin: 0, fontSize: 11, color: 'var(--c-muted, #6b7280)' }}>{ROLE_LABELS[inv.role]} · expires {new Date(inv.expires_at).toLocaleDateString('en-GB')}</p>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--c-muted, #6b7280)' }}>{ROLE_LABELS[inv.role]} · expires {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString('en-GB') : '—'}</p>
               </div>
               {canManage && (
                 <button data-testid={`cancel-invite-${inv.id}`} onClick={() => handleCancel(inv.id)}
