@@ -25,7 +25,7 @@ export function JoinView() {
   const [phase,     setPhase]     = useState('loading'); // loading | invalid | confirm | auth | joining | done | error
   const [invite,    setInvite]    = useState(null);
   const [user,      setUser]      = useState(null);
-  const [authMode,  setAuthMode]  = useState('signup'); // signup | signin
+  const [authMode,  setAuthMode]  = useState('signin'); // signin | signup
   const [name,      setName]      = useState('');
   const [email,     setEmail]     = useState('');
   const [password,  setPassword]  = useState('');
@@ -139,10 +139,10 @@ export function JoinView() {
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 16 }}>
-          {['signup', 'signin'].map(m => (
+          {['signin', 'signup'].map(m => (
             <button key={m} onClick={() => setAuthMode(m)}
               style={{ padding: '9px', borderRadius: 10, border: 'none', fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 800, cursor: 'pointer', background: authMode === m ? 'var(--c-primary, #064e3b)' : 'var(--c-bg, #f3f4f6)', color: authMode === m ? 'var(--c-btn-text, #ffffff)' : 'var(--c-muted, #6b7280)' }}>
-              {m === 'signup' ? 'Create account' : 'Sign in'}
+              {m === 'signin' ? 'Sign in' : 'Create account'}
             </button>
           ))}
         </div>
