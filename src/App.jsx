@@ -209,10 +209,14 @@ export default function App() {
     }
   }, [centre?.id, activeCentreId]);
 
-  // Apply theme — per-centre skin takes priority over global pref
+  // Apply theme — standard members always see family_warmth regardless of hub skin.
+  // Owners and full_access members get the hub skin, falling back to personal pref.
   useEffect(() => {
-    applyTheme(centre?.skin_id || financeValues.prefs?.themeSkin || 'family_warmth');
-  }, [centre?.skin_id, financeValues.prefs?.themeSkin]);
+    const skin = currentMemberRole === 'standard'
+      ? 'family_warmth'
+      : (centre?.skin_id || financeValues.prefs?.themeSkin || 'family_warmth');
+    applyTheme(skin);
+  }, [centre?.skin_id, financeValues.prefs?.themeSkin, currentMemberRole]);
 
   const handleSwitchCentre = useCallback((id) => {
     saveActiveCentreId(id);

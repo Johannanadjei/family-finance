@@ -25,8 +25,10 @@ const SKINS = [
 
 export function ThemeSection() {
   const { prefs, saveThemeSkin, userPlan } = useFinanceContext();
-  const { updateCentre }                   = useBudgetCentreContext();
+  const { updateCentre, can }              = useBudgetCentreContext();
   const current = prefs?.themeSkin || 'family_warmth';
+
+  if (!can('settings')) return null;
 
   const handleSelect = (skin, locked) => {
     if (locked) return;

@@ -10,6 +10,7 @@ import { ThemeSection }                          from './ThemeSection';
 const mockSaveThemeSkin = vi.fn();
 const mockUpdateCentre  = vi.fn();
 let   mockUserPlan      = 'free';
+let   mockCan           = () => true;
 
 vi.mock('../../context/FinanceContext', () => ({
   useFinanceContext: () => ({
@@ -20,12 +21,12 @@ vi.mock('../../context/FinanceContext', () => ({
 }));
 
 vi.mock('../../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ updateCentre: mockUpdateCentre }),
+  useBudgetCentreContext: () => ({ updateCentre: mockUpdateCentre, can: (p) => mockCan(p) }),
 }));
 
 
 describe('ThemeSection', () => {
-  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUpdateCentre.mockClear(); mockUserPlan = 'free'; });
+  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUpdateCentre.mockClear(); mockUserPlan = 'free'; mockCan = () => true; });
 
   it('renders free theme option', () => {
     render(<ThemeSection />);
@@ -86,5 +87,11 @@ describe('ThemeSection', () => {
     mockUserPlan = 'pro';
     render(<ThemeSection />);
     expect(screen.queryByText('PRO')).toBeNull();
+  });
+
+  it('renders nothing for standard members (no settings permission)', () => {
+    mockCan = () => false;
+    const { container } = render(<ThemeSection />);
+    expect(container.firstChild).toBeNull();
   });
 });
