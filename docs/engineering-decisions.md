@@ -707,3 +707,42 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 **Future tech debt logged**:
 - `MembersSection.jsx` at 200-line hard cap — next addition forces refactor
 - 3 files contain hardcoded hex in `inputStyle` (StepIncome, StepCentre) — separate token cleanup commit needed
+
+## 2026-05-26 — Cosmetic Session A Commit 3: StepCategories layout + token cleanup (L2)
+
+**Scope**: Fixed ✕ button cropping on narrow screens in the new BOS Hub onboarding flow, and tokenized all hardcoded hex in `StepCategories.jsx`.
+
+**Files changed**: 1 (StepCategories.jsx). Net +1 line.
+
+**Layout fixes** (3 changes):
+- Name input gets `minWidth: 0` so flex can shrink it below content-width on 360px screens.
+- Amount input narrowed from `width: 100` to `width: 80` — frees 20px for the rest of the row.
+- ✕ button restyled to explicit `32×32` with `display: flex` centering and `flexShrink: 0`. Previously padding-based at ~40×26, with no explicit min size — first to get cropped at narrow widths.
+
+**Accessibility win**: Added `aria-label="Remove category"` to the previously icon-only ✕ button. Screen readers can now announce its purpose.
+
+**Token cleanup** (18 hex replacements):
+- All `inputStyle` colors → `var(--c-border/-input-bg/-text)`
+- All onboarding step colors (heading, subtitle, totals) → `var(--c-primary/-muted)`
+- Row container background → `var(--c-input-bg)` (semantic dual-use as "subtle surface", matches StepIncome pattern)
+- ✕ button red → `var(--c-danger-bg, #fef2f2)` — intentionally shifted from `#fee2e2` (Tailwind red-100) to `#fef2f2` to align with existing theme token. Diff is ~3 shade steps in `family_warmth` skin only, imperceptible.
+- Error box + error text → `var(--c-danger-bg/-danger)`
+- "Add category" dashed border + text → `var(--c-accent)`
+- Back button → `var(--c-border/-card/-muted)`
+- Continue button gradient + text → `var(--c-primary/-primary-2/-btn-text)`
+
+**Decisions**:
+- F.1 resolved: chose Option B (align fallback with existing token value, not preserve exact red-100 pinkness). Avoids introducing a new token; visual diff imperceptible.
+- F.2 resolved: row background uses `--c-input-bg` for "subtle surface" semantic dual-use (matches StepIncome's IncomeCard container). Acceptable token reuse pattern.
+- Tap target: 32×32 chosen as minimum accessible icon-button size for dense row context. Tight versus Apple HIG 44×44 and Material 48×48 but appropriate for category list density.
+
+**Verification**:
+- npm test: 905/905 passed
+- bash scripts/audit.sh: 175/175 passed (§3 tokens now clean for this file)
+- Zero standalone hex remaining in `src/features/onboarding/steps/StepCategories.jsx`
+
+**Future tech debt remaining**:
+- `MembersSection.jsx` at 200-line hard cap (from Commit 2).
+- `StepIncome.jsx` and `StepCentre.jsx` still contain hardcoded hex in their `inputStyle` blocks (§3 violation) — logged as a separate cleanup commit.
+- B1 (logo assets + HTML metadata) gated on AJ supplying 192×192 and 512×512 PNGs.
+- B4 (in-app tagline placement) deferred — future product decision.
