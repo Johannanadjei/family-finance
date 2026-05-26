@@ -1,6 +1,6 @@
 import { useState, useEffect }  from 'react';
 import { saveActiveCentreId }   from '../lib/storage';
-import { getUserSession, waitForSession, signUpUser, signInUser, signOutUser, updateUserName } from '../services/auth.service';
+import { getUserSession, waitForSession, signUpUser, signInUser, signOutUser } from '../services/auth.service';
 import { getInviteByToken, acceptInvite } from '../services/invites.service';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS } from '../lib/roles';
 
@@ -37,6 +37,7 @@ export function JoinView() {
     const init = async () => {
       const { data: inv, error } = await getInviteByToken(token);
       if (error || !inv) { setPhase('invalid'); return; }
+      if (!inv.expires_at) { console.error('[JoinView] invite has null expires_at, token:', token); setPhase('invalid'); return; }
       if (new Date(inv.expires_at) < new Date()) { setPhase('invalid'); return; }
 
       setInvite(inv);
@@ -94,9 +95,8 @@ export function JoinView() {
       setPhase('confirm');
       return;
     }
-    const { data, error } = await acceptInvite({ token });
+    const { data, error } = await acceptInvite({ token, name: name.trim() });
     if (error && !data) { setJoinError(error.message); setPhase('error'); return; }
-    if (name.trim() && user?.id) await updateUserName(user.id, name.trim(), user.email ?? email);
     saveActiveCentreId(data?.centreId);
     window.location.href = '/';
   };

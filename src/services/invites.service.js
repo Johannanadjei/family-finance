@@ -51,6 +51,8 @@ export const createInvite = async ({ centreId, email, role, invitedBy }) => {
     return { data: null, error: new Error('This person is already a member of this hub.') };
   }
 
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
   const { data: invite, error } = await supabase
     .from('centre_invites')
     .insert({
@@ -58,6 +60,7 @@ export const createInvite = async ({ centreId, email, role, invitedBy }) => {
       invited_email:    normalised,
       role,
       invited_by:       invitedBy,
+      expires_at:       new Date(Date.now() + sevenDaysMs).toISOString(),
     })
     .select()
     .single();
@@ -127,8 +130,8 @@ export const cancelInvite = async (inviteId) => {
  * @param {{ token }} opts
  * @returns {{ data: { centreId }, error }}
  */
-export const acceptInvite = async ({ token }) => {
-  const { data, error } = await supabase.rpc('accept_invite', { p_token: token });
+export const acceptInvite = async ({ token, name = '' }) => {
+  const { data, error } = await supabase.rpc('accept_invite', { p_token: token, p_name: name });
   if (error) {
     console.error('[invites.service] acceptInvite error:', error.message);
     return { data: null, error };

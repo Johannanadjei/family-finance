@@ -2,27 +2,26 @@
 --
 -- Paste this entire file into the Supabase SQL Editor and click Run.
 --
--- What this function does:
---   1. Reads auth.uid() — the invitee must be signed in before calling
---   2. Validates the invite: token must match a pending, non-expired row
---   3. Guards against duplicate membership
---   4. Inserts the member row into budget_centre_members
---   5. Marks the invite as accepted
---   6. Ensures public.users row exists (DO NOTHING if already present)
---   7. Returns { centreId, memberId } as JSON
+-- Changes from previous version (2026-05-26):
+--   - Adds p_name TEXT DEFAULT '' parameter.
+--   - Name resolution priority: p_name → auth metadata full_name → email prefix.
+--   - Upserts public.users with the resolved name in the same transaction.
+--   - Old accept_invite(uuid) overload is dropped first — different Postgres signature,
+--     CREATE OR REPLACE alone would not replace it, leaving an ambiguous overload.
 --
 -- Why SECURITY DEFINER:
 --   The invitee is not yet a member of the hub, so direct RLS policies on
 --   budget_centre_members and centre_invites would block the write. Running
 --   as the DB owner bypasses RLS for the writes while still validating the
---   caller via auth.uid(). The auth.users read is also only available with
---   elevated privileges.
+--   caller via auth.uid(). The auth.users read is only available with elevated privileges.
 --
 -- JavaScript call:
---   supabase.rpc('accept_invite', { p_token: token })
---   where token is the UUID string from the invite URL query parameter.
+--   supabase.rpc('accept_invite', { p_token: token, p_name: name })
+--   p_name defaults to '' — safe to omit for sign-in users (RPC falls back to metadata).
 
-CREATE OR REPLACE FUNCTION accept_invite(p_token uuid)
+DROP FUNCTION IF EXISTS accept_invite(uuid);
+
+CREATE OR REPLACE FUNCTION accept_invite(p_token uuid, p_name text DEFAULT '')
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -32,6 +31,7 @@ DECLARE
   v_invite    centre_invites%ROWTYPE;
   v_user_id   uuid;
   v_member_id uuid;
+  v_name      text;
 BEGIN
 
   -- 1. Require an authenticated session
@@ -72,22 +72,30 @@ BEGIN
   SET    status = 'accepted'
   WHERE  id = v_invite.id;
 
-  -- 6. Ensure public.users row exists so the member shows a display name.
-  --    Uses full_name from auth metadata; falls back to the email prefix.
-  --    ON CONFLICT: update name only if the existing row has no name set,
-  --    so an existing profile is preserved but a blank name gets backfilled.
-  INSERT INTO public.users (id, name, email)
-  SELECT
-    v_user_id,
-    COALESCE(NULLIF(TRIM(au.raw_user_meta_data->>'full_name'), ''), split_part(au.email, '@', 1)),
-    au.email
+  -- 6. Resolve display name: caller-supplied → auth metadata → email prefix.
+  --    Priority: explicit name from client (sign-up path) beats auth metadata
+  --    which beats the email prefix fallback.
+  SELECT COALESCE(
+    NULLIF(TRIM(p_name), ''),
+    NULLIF(TRIM(au.raw_user_meta_data->>'full_name'), ''),
+    split_part(au.email, '@', 1)
+  )
+  INTO v_name
   FROM auth.users au
-  WHERE au.id = v_user_id
+  WHERE au.id = v_user_id;
+
+  -- 7. Upsert public.users with the resolved name.
+  --    ON CONFLICT: only overwrite if the existing name is NULL or blank.
+  --    A real existing name (profile previously set by the user) is preserved.
+  INSERT INTO public.users (id, name, email)
+  SELECT v_user_id, v_name, au.email
+  FROM   auth.users au
+  WHERE  au.id = v_user_id
   ON CONFLICT (id) DO UPDATE
     SET name = EXCLUDED.name
     WHERE public.users.name IS NULL OR TRIM(public.users.name) = '';
 
-  -- 7. Return context the client needs to set the active centre
+  -- 8. Return context the client needs to set the active centre
   RETURN json_build_object(
     'centreId', v_invite.budget_centre_id,
     'memberId', v_member_id
@@ -96,5 +104,5 @@ BEGIN
 END;
 $$;
 
--- Only authenticated users may accept invites — the invitee must be signed in.
-GRANT EXECUTE ON FUNCTION accept_invite(uuid) TO authenticated;
+-- Only authenticated users may accept invites.
+GRANT EXECUTE ON FUNCTION accept_invite(uuid, text) TO authenticated;

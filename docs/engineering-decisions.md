@@ -603,3 +603,55 @@ The `accept_invite` RPC:
 - Never attempt to solve cross-ownership write problems with RLS alone
 - The RPC script lives in `scripts/` alongside the other RPC functions
 - Every RPC function must be `GRANT EXECUTE`-d to the appropriate role (`anon` or `authenticated`)
+
+---
+
+## [2026-05-26] Three invite/join bugs — root causes, architectural fixes, candidate rule
+
+**Context:**
+Post-RBAC review identified three bugs in the invite/join flow that all passed `npm test` and `bash scripts/audit.sh`.
+
+**Bug 1 — Invite link showed "expired or invalid" immediately after creation**
+
+Root cause: `createInvite` in `invites.service.js` did not include `expires_at` in the insert payload. The `centre_invites.expires_at` column had no Postgres `DEFAULT`, so inserted rows had `expires_at = NULL`. `JoinView.jsx` checked `new Date(inv.expires_at) < new Date()` — `new Date(null)` evaluates to Unix epoch (1970), which is always less than now. Every newly created invite appeared expired.
+
+The second half of the failure: `null` and `expired` are different states. A `null` `expires_at` means something went wrong at the service layer (data integrity violation). A past `expires_at` means the invite window elapsed normally. The original code collapsed both into a single guard, making them indistinguishable in logs.
+
+Architectural fix:
+1. Database enforces the invariant: `ALTER TABLE centre_invites ALTER COLUMN expires_at SET NOT NULL` with `DEFAULT (NOW() + INTERVAL '7 days')`. Backfilled existing NULLs before adding the constraint.
+2. Service sets `expires_at` explicitly in the insert payload (belt-and-braces — DB DEFAULT is the primary defence, service is secondary).
+3. JoinView guards are split: `!inv.expires_at` → `console.error` + invalid phase; past `expires_at` → invalid phase silently.
+
+Why tests didn't catch it: The `createInvite` success test returned a pre-built `mockInvite` fixture that already had `expires_at` set. The mock swallowed the actual insert payload — no assertion existed on what was sent to Supabase. `JoinView.jsx` had no test file.
+
+**Bug 2 — Member name showed "Unknown" after joining via invite**
+
+Root cause — three-layer failure:
+
+Layer 1 (sign-in path, structural): `handleJoin` in `JoinView.jsx` called `updateUserName` only when `name.trim()` was truthy. `name` state is only populated by the signup form. Users who sign in (not sign up) have `name === ''` — `updateUserName` was never called for them. The name was never written to `public.users` for sign-in joiners.
+
+Layer 2 (sign-up path, timing): `signUpUser` fires a client-side upsert to `public.users` immediately after `supabase.auth.signUp`. Supabase Auth session propagation is asynchronous — `auth.uid()` may not be set in the request context when the upsert fires. If `public.users` has an RLS policy requiring `auth.uid() = id`, the upsert is silently rejected with no error returned. Tests mocked the upsert to always succeed — RLS rejection was invisible.
+
+Layer 3 (RPC, deployment): The `accept_invite` RPC previously used `ON CONFLICT (id) DO NOTHING` for the `public.users` upsert. Even if layers 1 and 2 failed to write the name, this was the designed backstop — but it was a no-op on conflict rather than a conditional update.
+
+Architectural fix: Name write moves entirely inside `accept_invite` RPC. The RPC now accepts `p_name text DEFAULT ''` and resolves the display name atomically in the same transaction: `p_name → auth.raw_user_meta_data.full_name → split_part(email, '@', 1)`. The `ON CONFLICT DO UPDATE WHERE name IS NULL OR TRIM(name) = ''` ensures existing real names are never overwritten. `updateUserName` is no longer called from the join flow. `acceptInvite` service now passes `p_name` to the RPC. `JoinView.handleJoin` passes `name.trim()` (empty string for sign-in path — the RPC uses auth metadata as fallback). The `DROP FUNCTION IF EXISTS accept_invite(uuid)` migration removes the old overload before the new `(uuid, text)` signature is installed (Postgres treats them as different overloads).
+
+A one-time backfill updated `public.users.name` for all existing members where the name was NULL or empty using the same priority logic.
+
+Why tests didn't catch it: `auth.service.test.js` mocked upsert to always succeed — RLS race is untestable without a real database. `JoinView.jsx` had no test file — the sign-in path through `handleJoin` was never exercised.
+
+**Bug 3 — Standard member skin not enforced**
+
+Fixed in a prior commit (40b1e3a). Recorded in prior entry. Regression tests added in this session:
+- `ThemeSection.test.jsx` already had `renders nothing for standard members (no settings permission)`.
+- `resolveSkin` extracted to `lib/themes.js` as a pure function; tested in `lib/themes.test.js` (8 cases). `App.jsx` now calls `applyTheme(resolveSkin(...))`. The pure function is independently testable without rendering App.jsx.
+
+**Why all three escaped tests and audit:**
+
+All three failures involved a component with no test file (`JoinView.jsx`) or a test that asserted the mock fixture rather than the actual payload sent to the database. The audit checks file size, import patterns, and `console.log` — it cannot verify semantic correctness or data invariants. This is the same gap identified in the 2026-05-25 entry (RBAC bugs).
+
+**Candidate rule for CLAUDE.md §6 — awaiting approval before adding:**
+
+> Database-enforced invariants beat client-side defaults. If a column must never be NULL, the constraint goes on the column. Service-layer defaults are belt-and-braces, not the primary defence.
+
+This would extend the existing §6 rule ("Non-negotiable rules for every service function") with a principle about where the authoritative constraint lives. The `expires_at` bug is a clean example: the service now sets it, but the DB DEFAULT and NOT NULL constraint are what make the invariant unbreakable — a future developer could forget the service line and the database would catch it.

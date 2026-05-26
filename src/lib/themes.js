@@ -272,6 +272,19 @@ export const THEMES = {
 };
 
 /**
+ * Resolve which skin to apply for the current member.
+ * Standard members always see family_warmth regardless of hub or pref settings.
+ * @param {string} role — currentMemberRole
+ * @param {string|null} centreSkinId — centre.skin_id
+ * @param {string|null} prefThemeSkin — prefs.themeSkin
+ * @returns {string} skin key
+ */
+export const resolveSkin = (role, centreSkinId, prefThemeSkin) => {
+  if (role === 'standard') return 'family_warmth';
+  return centreSkinId || prefThemeSkin || 'family_warmth';
+};
+
+/**
  * Apply a skin's CSS variable tokens to the document root.
  * Falls back to family_warmth if the skin is unknown or incomplete.
  * @param {string} skinName

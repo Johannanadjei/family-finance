@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const mockInsert = vi.fn();
+
 const mockInvite = {
   id:               'inv-1',
   budget_centre_id: 'c-1',
@@ -18,16 +20,16 @@ const mockRpc = vi.fn();
 vi.mock('../lib/supabase', () => {
   const chain = () => {
     const q = {
-      from:       () => q,
-      select:     () => q,
-      insert:     () => q,
-      update:     () => q,
-      eq:         () => q,
-      is:         () => q,
-      order:      () => q,
-      maybeSingle:() => mockResolve(),
-      single:     () => mockResolve(),
-      then:       (fn) => Promise.resolve(mockResolve()).then(fn),
+      from:        () => q,
+      select:      () => q,
+      insert:      (...args) => { mockInsert(...args); return q; },
+      update:      () => q,
+      eq:          () => q,
+      is:          () => q,
+      order:       () => q,
+      maybeSingle: () => mockResolve(),
+      single:      () => mockResolve(),
+      then:        (fn) => Promise.resolve(mockResolve()).then(fn),
     };
     return q;
   };
@@ -41,6 +43,7 @@ import {
 beforeEach(() => {
   mockResolve = () => ({ data: null, error: null });
   mockRpc.mockReset();
+  mockInsert.mockClear();
 });
 
 // ── createInvite ──────────────────────────────────────────────────────────────
@@ -69,6 +72,9 @@ describe('createInvite', () => {
     const { data, error } = await createInvite({ centreId: 'c-1', email: 'BOB@TEST.COM', role: 'standard', invitedBy: 'u-1' });
     expect(error).toBeNull();
     expect(data).toEqual(mockInvite);
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ expires_at: expect.any(String) })
+    );
   });
 
   it('returns error on Supabase failure', async () => {
@@ -139,10 +145,16 @@ describe('cancelInvite', () => {
 // ── acceptInvite ──────────────────────────────────────────────────────────────
 
 describe('acceptInvite', () => {
-  it('calls rpc accept_invite with the token', async () => {
+  it('calls rpc accept_invite with token and name', async () => {
+    mockRpc.mockResolvedValueOnce({ data: { centreId: 'c-1', memberId: 'mem-2' }, error: null });
+    await acceptInvite({ token: 'tok-abc', name: 'Alice' });
+    expect(mockRpc).toHaveBeenCalledWith('accept_invite', { p_token: 'tok-abc', p_name: 'Alice' });
+  });
+
+  it('passes empty string for name when omitted', async () => {
     mockRpc.mockResolvedValueOnce({ data: { centreId: 'c-1', memberId: 'mem-2' }, error: null });
     await acceptInvite({ token: 'tok-abc' });
-    expect(mockRpc).toHaveBeenCalledWith('accept_invite', { p_token: 'tok-abc' });
+    expect(mockRpc).toHaveBeenCalledWith('accept_invite', { p_token: 'tok-abc', p_name: '' });
   });
 
   it('returns centreId on success', async () => {

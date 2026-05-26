@@ -26,7 +26,7 @@ import { FinanceProvider }                       from './context/FinanceContext'
 import { PinProvider }                           from './context/PinContext';
 import { useBudgetCentreContext }                from './context/BudgetCentreContext';
 import { useFinanceContext }                     from './context/FinanceContext';
-import { applyTheme }                                        from './lib/themes';
+import { applyTheme, resolveSkin }                            from './lib/themes';
 import { loadActiveCentreId, saveActiveCentreId, loadPrefs } from './lib/storage';
 import { resetPasswordForEmail }                             from './services/auth.service';
 
@@ -209,14 +209,10 @@ export default function App() {
     }
   }, [centre?.id, activeCentreId]);
 
-  // Apply theme — standard members always see family_warmth regardless of hub skin.
-  // Owners and full_access members get the hub skin, falling back to personal pref.
+  // Apply theme — delegates role/skin resolution to the pure resolveSkin function in lib/themes.
   useEffect(() => {
-    const skin = currentMemberRole === 'standard'
-      ? 'family_warmth'
-      : (centre?.skin_id || financeValues.prefs?.themeSkin || 'family_warmth');
-    applyTheme(skin);
-  }, [centre?.skin_id, financeValues.prefs?.themeSkin, currentMemberRole]);
+    applyTheme(resolveSkin(currentMemberRole, centre?.skin_id, financeValues?.prefs?.themeSkin));
+  }, [centre?.skin_id, financeValues?.prefs?.themeSkin, currentMemberRole]);
 
   const handleSwitchCentre = useCallback((id) => {
     saveActiveCentreId(id);
