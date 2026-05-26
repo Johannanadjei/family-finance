@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useBudgetCentreContext }           from '../../context/BudgetCentreContext';
 import { useFinanceContext }                from '../../context/FinanceContext';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS, INVITABLE_ROLES, MAX_MEMBERS } from '../../lib/roles';
+import { selectStyle }                      from '../../lib/selectStyle';
 const card       = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
 const label      = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: 0.8 };
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 14, fontWeight: 700, marginBottom: 8, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
-
 export function MembersSection() {
   const { members, currentMemberRole, can, inviteMember, removeMember, getInvites, cancelInvite, centre } = useBudgetCentreContext();
   const { userPlan } = useFinanceContext();
@@ -170,7 +170,7 @@ export function MembersSection() {
                 onChange={e => { setEmail(e.target.value); setSendError(null); }}
                 placeholder="Enter email address" style={inputStyle} />
               <select data-testid="invite-role-select" value={role} onChange={e => setRole(e.target.value)}
-                style={{ ...inputStyle, appearance: 'none', WebkitAppearance: 'none' }}>
+                style={{ ...inputStyle, ...selectStyle }}>
                 {INVITABLE_ROLES.map(r => (
                   <option key={r} value={r}>{ROLE_LABELS[r]} — {ROLE_DESCRIPTIONS[r]}</option>
                 ))}

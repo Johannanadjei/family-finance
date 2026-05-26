@@ -8,6 +8,7 @@
  */
 
 import { useState, useMemo } from 'react';
+import { selectStyle }           from '../../lib/selectStyle';
 import { createCentre }          from '../../services/centres.service';
 import { bulkAddCategories }     from '../../services/categories.service';
 import { bulkAddIncomeSources }  from '../../services/income.service';
@@ -125,7 +126,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
                 onChange={e => { setHubName(e.target.value); setNameErr(null); }}
                 style={inputStyle}
               />
-              <select value={currency} onChange={e => setCurrency(e.target.value)} style={{ ...inputStyle, appearance: 'none' }}>
+              <select value={currency} onChange={e => setCurrency(e.target.value)} style={{ ...inputStyle, ...selectStyle }}>
                 {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
               </select>
               {nameErr && <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{nameErr}</p>}

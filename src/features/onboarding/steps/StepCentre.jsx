@@ -10,6 +10,7 @@
  */
 
 import { useState } from 'react';
+import { selectStyle }    from '../../../lib/selectStyle';
 import { validateCentreStep } from '../onboarding.validation';
 import { CURRENCIES, CENTRE_ICONS } from '../onboarding.constants';
 
@@ -92,7 +93,7 @@ export function StepCentre({ data, onNext }) {
         <select
           value={currency}
           onChange={e => { setCurrency(e.target.value); setError(null); }}
-          style={{ ...inputStyle, appearance: 'none' }}
+          style={{ ...inputStyle, ...selectStyle }}
         >
           {CURRENCIES.map(c => (
             <option key={c.code} value={c.code}>{c.label}</option>

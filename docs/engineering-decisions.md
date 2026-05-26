@@ -678,3 +678,32 @@ All three failures involved a component with no test file (`JoinView.jsx`) or a 
 - Body scroll-lock for modals — AJ explicitly declined this session
 
 This would extend the existing §6 rule ("Non-negotiable rules for every service function") with a principle about where the authoritative constraint lives. The `expires_at` bug is a clean example: the service now sets it, but the DB DEFAULT and NOT NULL constraint are what make the invariant unbreakable — a future developer could forget the service line and the database would catch it.
+
+## 2026-05-26 — Cosmetic Session A Commit 2: select chevron consistency (L3)
+
+**Scope**: Standardized all 9 `<select>` elements in the codebase with a shared style helper. Adds custom chevron SVG, proper right padding, and full cross-browser appearance reset.
+
+**Files changed**: 1 new + 8 modified = 9 files.
+
+**New file**: `src/lib/selectStyle.js` — exports a `selectStyle` object spread into every `<select>` style prop.
+
+**Design decisions**:
+- Custom chevron uses `stroke="currentColor"` inside an inline SVG data URI — inherits the select's text color automatically, working across both light skins and `dark_executive` without any hardcoded values.
+- `paddingRight: 36px` matches native browser select conventions (12px chevron + 12px margin + 12px text gutter).
+- `MozAppearance: 'none'` included alongside `appearance` + `WebkitAppearance` for full cross-browser coverage.
+- Spread pattern: `style={{ ...baseStyle, ...selectStyle }}` — `selectStyle` ALWAYS spread LAST so its `paddingRight` overrides any earlier value.
+- Helper file used by both `inputStyle` and `fieldStyle` base patterns, plus IncomeCard's fully-inline style.
+
+**Verification**:
+- npm test: 905/905 passed
+- bash scripts/audit.sh: 175/175 passed (new helper file added one file-size check)
+- Zero `appearance: 'none'` or `WebkitAppearance: 'none'` remaining outside selectStyle.js
+
+**Note on file size**: Adding the import line to `MembersSection.jsx` pushed it from 200 to 201 lines, failing audit §M. Resolved by removing one separator blank line between style constants and the component function — zero logical change. Logged as future tech debt: MembersSection.jsx is at hard cap; next change to that file will likely require refactoring into smaller pieces.
+
+**Deferred from this commit**:
+- Hex→token cleanup in `StepIncome.jsx` and `StepCentre.jsx` `inputStyle` blocks (CLAUDE.md §3 violations). Affects more than selects — needs separate diagnostic. Logged as a future Session A commit.
+
+**Future tech debt logged**:
+- `MembersSection.jsx` at 200-line hard cap — next addition forces refactor
+- 3 files contain hardcoded hex in `inputStyle` (StepIncome, StepCentre) — separate token cleanup commit needed

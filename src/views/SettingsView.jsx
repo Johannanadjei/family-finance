@@ -14,6 +14,7 @@ import { AddCategorySheet }           from './budget/AddCategorySheet';
 import { GuestSettingsSection }       from './settings/GuestSettingsSection';
 import { MembersSection }             from './settings/MembersSection';
 import { SecuritySection }            from './settings/SecuritySection';
+import { selectStyle }                from '../lib/selectStyle';
 
 const card         = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
 const sectionLabel = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 0.8 };
@@ -120,7 +121,7 @@ export function SettingsView() {
               placeholder="Expected amount (optional)" style={inputStyle} />
             <select data-testid="new-source-pay-day-type" value={newPayDayType}
               onChange={e => { setNewPayDayType(e.target.value); setNewPayDay(''); }}
-              style={{ ...inputStyle, appearance: 'none', WebkitAppearance: 'none' }}>
+              style={{ ...inputStyle, ...selectStyle }}>
               <option value="flexible">Flexible / Ad-hoc</option>
               <option value="fixed_date">Fixed date each month</option>
               <option value="last_working_day">Last working day</option>

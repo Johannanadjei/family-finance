@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 import { CURRENCIES }              from '../../features/onboarding/onboarding.constants';
+import { selectStyle }             from '../../lib/selectStyle';
 import { ArchiveHubSheet }         from './ArchiveHubSheet';
 
 const inputStyle = {
@@ -73,7 +74,7 @@ export function CentreSettingsSection() {
             data-testid="centre-currency-select"
             value={currency}
             onChange={e => setCurrency(e.target.value)}
-            style={{ ...inputStyle, appearance: 'none', WebkitAppearance: 'none' }}
+            style={{ ...inputStyle, ...selectStyle }}
           >
             {CURRENCIES.map(c => (
               <option key={c.code} value={c.code}>{c.label}</option>

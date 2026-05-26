@@ -11,6 +11,7 @@
  */
 
 import { useState } from 'react';
+import { selectStyle } from '../../lib/selectStyle';
 
 const fieldStyle = {
   width: '100%', padding: '6px 10px', borderRadius: 8,
@@ -94,7 +95,7 @@ export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
             data-testid={`income-edit-pay-day-type-${source.id}`}
             value={editPayDayType}
             onChange={e => { setEditPayDayType(e.target.value); setEditPayDay(''); }}
-            style={{ ...fieldStyle, appearance: 'none', WebkitAppearance: 'none' }}
+            style={{ ...fieldStyle, ...selectStyle }}
           >
             <option value="flexible">Flexible / Ad-hoc</option>
             <option value="fixed_date">Fixed date each month</option>

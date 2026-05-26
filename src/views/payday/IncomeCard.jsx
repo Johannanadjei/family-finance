@@ -6,6 +6,7 @@
 
 import { useState }                                                from 'react';
 import { getIncomeStatus, INCOME_STATUS_CONFIG, calcDaysUntil }   from '../../lib/finance';
+import { selectStyle }                                             from '../../lib/selectStyle';
 import { UpdateReceivedSheet }                                     from './UpdateReceivedSheet';
 
 export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpected, disabled }) {
@@ -91,7 +92,7 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
                   <button aria-label="Save expected amount" onClick={handleEditSave} disabled={saving} style={btnStyle(true)}>✓</button>
                   <button aria-label="Cancel edit" onClick={() => setEditing(false)} style={btnStyle(false)}>✕</button>
                 </div>
-                <select data-testid={`edit-pay-day-type-${income.id}`} value={payDayType} onChange={e => setPayDayType(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 13, fontWeight: 700, outline: 'none', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' }}>
+                <select data-testid={`edit-pay-day-type-${income.id}`} value={payDayType} onChange={e => setPayDayType(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 13, fontWeight: 700, outline: 'none', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)', ...selectStyle }}>
                   <option value="flexible">Flexible / Ad-hoc</option>
                   <option value="fixed_date">Fixed date each month</option>
                   <option value="last_working_day">Last working day</option>
