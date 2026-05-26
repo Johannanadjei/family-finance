@@ -746,3 +746,42 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - `StepIncome.jsx` and `StepCentre.jsx` still contain hardcoded hex in their `inputStyle` blocks (§3 violation) — logged as a separate cleanup commit.
 - B1 (logo assets + HTML metadata) gated on AJ supplying 192×192 and 512×512 PNGs.
 - B4 (in-app tagline placement) deferred — future product decision.
+
+## 2026-05-26 — Cosmetic Session A Commit 4: Money B.O.S branding assets + metadata (B1)
+
+**Scope**: Replace placeholder icon assets with AJ's branded PNGs, update HTML metadata strings, and fix the most user-visible stale brand string (AuthScreen heading). Completes the brand transition from "Family Finance Command Centre" to "Money B.O.S".
+
+**Files changed**: 5 (2 binary modified, 1 binary deleted, 2 text modified).
+
+**Asset changes**:
+- `public/icons/icon-192.png` — replaced 6.5KB Vite placeholder with AJ's 22KB branded asset (transparent PNG, 192×192)
+- `public/icons/icon-512.png` — replaced 19KB Vite placeholder with AJ's 191KB branded asset (transparent PNG, 512×512)
+- `public/icons/icon.svg` — removed (382-byte unreferenced placeholder, no remaining consumers)
+
+**Text changes** (5 strings):
+- `index.html` L14 `apple-mobile-web-app-title`: "FamilyFinance" → "Money B.O.S"
+- `index.html` L18 `description`: stale household-finance copy → "Money B.O.S — track income, allocations, and spending across your household and business hubs."
+- `index.html` L19 `application-name`: "Family Finance Command Centre" → "Money B.O.S"
+- `index.html` L24 `<title>`: "Family Finance Command Centre" → "Money B.O.S — Budget Overview System"
+- `src/views/AuthScreen.jsx` L114 brand heading: "Family Finance" → "Money B.O.S"
+
+**Decisions**:
+- AuthScreen.jsx edit bundled into B1 despite being outside the original "icons + HTML" scope. Rationale: it was the single most user-visible stale brand string in the app (shown on every sign-in/sign-up). Shipping the metadata fix without it would have been an incomplete brand transition.
+- favicon.svg (current 🏡 emoji SVG) intentionally not replaced — AJ did not supply an SVG version of the logo. Functional as-is; can be revisited when SVG branding assets are available.
+- public/brand/ directory contains the source marketing PNG (870KB) but is not committed — kept untracked as a working asset, not a deployment artifact.
+- manifest.json icon paths preserved (icon-192.png and icon-512.png); new assets renamed at filesystem level to match existing references rather than rewriting manifest paths. Fewer moving parts.
+
+**Verification**:
+- npm test: 905/905 passed (no AuthScreen test file exists — zero test regression risk)
+- bash scripts/audit.sh: 175/175 passed
+- Stale brand sweep `grep -rn "Family Finance\|FamilyFinance"` returns zero hits across src/, public/, index.html
+- All 6 icon path references in index.html + manifest.json resolve to existing files
+- PWA service worker auto-invalidated by vite-plugin-pwa on next build — no manual cache-busting required
+
+**Session A status**: COMPLETE. Commits 1–4 shipped. Items dropped from scope: L1 (collapsible Settings — low ROI), L4 (body scroll-lock — AJ declined), B4 (in-app tagline — deferred), hex cleanup in StepIncome/StepCentre (low priority).
+
+**Next**: Security audit Layer 1 + 2, then Stripe/Paystack integration.
+
+**Tech debt remaining**:
+- `MembersSection.jsx` at 200-line hard cap (from Commit 2)
+- `StepIncome.jsx` + `StepCentre.jsx` hardcoded hex in their `inputStyle` blocks
