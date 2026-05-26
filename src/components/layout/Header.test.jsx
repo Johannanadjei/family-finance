@@ -47,7 +47,7 @@ describe('Header', () => {
   it('calls onOpenPanel when centre name tapped', () => {
     const onOpenPanel = vi.fn();
     renderHeader({ onOpenPanel });
-    screen.getByLabelText('Open budget centres panel').click();
+    screen.getByLabelText('Open BOS Hubs panel').click();
     expect(onOpenPanel).toHaveBeenCalledOnce();
   });
 

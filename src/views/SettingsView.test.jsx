@@ -103,7 +103,7 @@ describe('SettingsView', () => {
     expect(screen.getByText('Settings')).toBeTruthy();
   });
 
-  it('renders Budget Centre section', () => {
+  it('renders BOS Hub section', () => {
     renderSettings();
     expect(screen.getByTestId('centre-name-display')).toBeTruthy();
   });

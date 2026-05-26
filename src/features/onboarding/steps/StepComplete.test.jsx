@@ -78,7 +78,7 @@ describe('StepComplete', () => {
   it('calls onConfirm when button tapped', () => {
     const onConfirm = vi.fn();
     renderStep({ onConfirm });
-    screen.getByText('Create Budget Centre 🎉').click();
+    screen.getByText('Create BOS Hub 🎉').click();
     expect(onConfirm).toHaveBeenCalled();
   });
 

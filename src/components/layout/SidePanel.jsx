@@ -38,7 +38,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
 
   const atProLimit = userPlan === 'pro' && centres.length >= 10;
   const n          = centres.length;
-  const countLabel = n === 0 ? 'Control Centres' : n === 1 ? '1 Control Centre' : `${n} Control Centres`;
+  const countLabel = n === 0 ? 'BOS Hubs' : n === 1 ? '1 BOS Hub' : `${n} BOS Hubs`;
 
   return (
     <>
@@ -47,7 +47,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 300 }} />
       )}
 
-      <aside aria-label="Control centres" style={{
+      <aside aria-label="BOS Hubs" style={{
         position: 'fixed', top: 0,
         left: isOpen ? 'max(0px, calc(50vw - 220px))' : 'calc(max(0px, calc(50vw - 220px)) - 290px)',
         width: 290, height: '100dvh',
@@ -183,7 +183,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
               <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0, fontWeight: 600, textAlign: 'center' }}>Maximum 10 hubs reached</p>
             ) : (
               <button onClick={onCreateHub} style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                + New Control Centre
+                + New BOS Hub
               </button>
             )}
           </div>

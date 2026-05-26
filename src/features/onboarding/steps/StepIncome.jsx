@@ -91,7 +91,7 @@ export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
           Add your income streams
         </p>
         <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
-          Add each source of income for this budget centre.
+          Add each source of income for this BOS Hub.
           {plan === 'free' && ` Free plan includes ${MAX_FREE_INCOMES} income streams.`}
         </p>
       </div>

@@ -56,17 +56,17 @@ describe('SidePanel', () => {
 
   it('shows correct plural count in header', () => {
     renderPanel();
-    expect(screen.getByText('2 Control Centres')).toBeTruthy();
+    expect(screen.getByText('2 BOS Hubs')).toBeTruthy();
   });
 
   it('shows singular count when one centre', () => {
     renderPanel({ centres: [mockCentres[0]] });
-    expect(screen.getByText('1 Control Centre')).toBeTruthy();
+    expect(screen.getByText('1 BOS Hub')).toBeTruthy();
   });
 
   it('shows label without count when centres array is empty', () => {
     renderPanel({ centres: [] });
-    expect(screen.getByText('Control Centres')).toBeTruthy();
+    expect(screen.getByText('BOS Hubs')).toBeTruthy();
   });
 
   it('marks the active centre with Active badge', () => {
@@ -111,13 +111,13 @@ describe('SidePanel', () => {
 
   it('shows create button for pro users below limit', () => {
     renderPanel({ userPlan: 'pro' });
-    expect(screen.getByText('+ New Control Centre')).toBeTruthy();
+    expect(screen.getByText('+ New BOS Hub')).toBeTruthy();
   });
 
   it('calls onCreateHub when create button tapped by pro user', () => {
     const onCreateHub = vi.fn();
     renderPanel({ userPlan: 'pro', onCreateHub });
-    screen.getByText('+ New Control Centre').click();
+    screen.getByText('+ New BOS Hub').click();
     expect(onCreateHub).toHaveBeenCalledOnce();
   });
 
@@ -133,7 +133,7 @@ describe('SidePanel', () => {
     mockCan = () => false;
     renderPanel({ userPlan: 'free' });
     expect(screen.queryByText('Upgrade to add more hubs')).toBeNull();
-    expect(screen.queryByText('+ New Control Centre')).toBeNull();
+    expect(screen.queryByText('+ New BOS Hub')).toBeNull();
   });
 
   it('shows Sign out button', () => {

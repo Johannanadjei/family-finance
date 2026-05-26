@@ -26,7 +26,7 @@ export const HUB_TYPES = [
   },
   {
     id:          'business',
-    label:       'Small Business',
+    label:       'Business',
     icon:        '🏪',
     defaultSkin: 'corporate',
     description: 'Revenue, costs, and cash flow for a small business',

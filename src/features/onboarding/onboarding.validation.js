@@ -15,8 +15,8 @@ import { validateCurrency } from '../../lib/validation';
  * @returns {string|null}
  */
 export const validateCentreStep = ({ name, currency }) => {
-  if (!name?.trim())   return 'Please give your budget centre a name';
-  if (name.trim().length > 50) return 'Budget centre name must be 50 characters or less';
+  if (!name?.trim())   return 'Please give your BOS Hub a name';
+  if (name.trim().length > 50) return 'BOS Hub name must be 50 characters or less';
   try {
     validateCurrency(currency);
   } catch {

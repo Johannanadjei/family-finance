@@ -654,4 +654,27 @@ All three failures involved a component with no test file (`JoinView.jsx`) or a 
 
 > Database-enforced invariants beat client-side defaults. If a column must never be NULL, the constraint goes on the column. Service-layer defaults are belt-and-braces, not the primary defence.
 
+---
+
+## [2026-05-26] Cosmetic Session A Commit 1: BOS Hub rename + Business label
+
+**Scope**: Renamed user-facing strings "Control Centre" / "Budget Centre" → "BOS Hub", and hub type label "Small Business" → "Business".
+
+**Files changed**: 11 production + 5 test = 16 files, 28 line changes (symmetric string swaps).
+
+**Decisions made**:
+- DB table `budget_centres` and column `budget_centre_id` intentionally NOT renamed (see CLAUDE.md "DB vs UI naming")
+- Internal `Error()` messages in `useFinance.js` intentionally NOT renamed — developer-only, kept for DB traceability
+- JSDoc and inline comments intentionally NOT renamed — developer documentation
+- `hubTypes.js` description field "Revenue, costs, and cash flow for a small business" intentionally NOT changed — per AJ's explicit instruction (label only, not description)
+- `ArchivedHubsList.jsx` "Archived" section header left unchanged — bare word, no centre terminology, parent context disambiguates
+- `SidePanel.jsx` L50 aria-label "Control centres" → "BOS Hubs" — caught proactively during Phase 3 verification, mixed-case pattern missed initial grep
+
+**Verification**: 905 tests pass, audit 174/174 clean.
+
+**Deferred from this commit**:
+- B1 (logo assets + HTML metadata) — gated on AJ supplying 192×192 + 512×512 PNGs
+- B4 (in-app tagline placement) — deferred for future product decision (see memory)
+- Body scroll-lock for modals — AJ explicitly declined this session
+
 This would extend the existing §6 rule ("Non-negotiable rules for every service function") with a principle about where the authoritative constraint lives. The `expires_at` bug is a clean example: the service now sets it, but the DB DEFAULT and NOT NULL constraint are what make the invariant unbreakable — a future developer could forget the service line and the database would catch it.

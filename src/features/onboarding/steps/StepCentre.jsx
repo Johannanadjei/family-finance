@@ -37,7 +37,7 @@ export function StepCentre({ data, onNext }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
         <p style={{ fontSize: 22, fontWeight: 900, color: '#064e3b', margin: '0 0 6px' }}>
-          Name your budget centre
+          Name your BOS Hub
         </p>
         <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
           This is your financial command centre. Call it anything — "The Adjei's", "Airbnb", "UK Residence".

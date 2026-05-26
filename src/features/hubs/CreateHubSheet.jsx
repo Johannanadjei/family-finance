@@ -106,7 +106,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
         {/* Header */}
         <div style={{ padding: '16px 20px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--c-border, #e5e7eb)', flexShrink: 0 }}>
           <div>
-            <p style={{ fontSize: 13, fontWeight: 900, color: 'var(--c-primary, #064e3b)', margin: '0 0 1px' }}>New Control Centre</p>
+            <p style={{ fontSize: 13, fontWeight: 900, color: 'var(--c-primary, #064e3b)', margin: '0 0 1px' }}>New BOS Hub</p>
             <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: 0 }}>Step {step + 1} of {TOTAL_STEPS}</p>
           </div>
           <button onClick={handleClose} aria-label="Close" style={{ background: 'var(--c-bg, #f3f4f6)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 14, color: 'var(--c-muted, #6b7280)' }}>✕</button>

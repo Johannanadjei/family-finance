@@ -21,6 +21,22 @@ Vitest + Testing Library, Vercel. Never suggest alternatives to any of these.
 
 ---
 
+## DB vs UI naming
+
+The database uses the original "centre" terminology. The UI uses "BOS Hub". These names are intentionally NOT synced:
+
+- DB table: `budget_centres` (do not rename)
+- DB column: `budget_centre_id` (do not rename — appears in 8+ FK relationships)
+- DB enum value: `'business'` (the hub_type string value)
+- Service-layer JSDoc: references "budget centre" — kept for DB traceability
+- Internal `Error()` messages in hooks: reference "budget centre" — developer-only, not user-visible
+- UI strings: always "BOS Hub" / "BOS Hubs"
+- UI labels: "Business" (not "Small Business")
+
+If a rename ever becomes necessary, treat it as a full migration project — not a cosmetic change. Affects RLS policies, FK constraints, ~200 code references, and live production data.
+
+---
+
 ## 2. Architecture — data flow
 
 ```

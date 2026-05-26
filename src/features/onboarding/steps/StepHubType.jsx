@@ -20,7 +20,7 @@ export function StepHubType({ selected, onSelect, onNext, onBack }) {
           What kind of hub?
         </p>
         <p style={{ fontSize: 14, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
-          Choose the type that best describes this control centre.
+          Choose the type that best describes this BOS Hub.
         </p>
       </div>
 

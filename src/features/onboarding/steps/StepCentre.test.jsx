@@ -14,7 +14,7 @@ const renderStep = (props = {}) =>
 describe('StepCentre', () => {
   it('renders step title', () => {
     renderStep();
-    expect(screen.getByText('Name your budget centre')).toBeTruthy();
+    expect(screen.getByText('Name your BOS Hub')).toBeTruthy();
   });
 
   it('renders name input', () => {
@@ -30,7 +30,7 @@ describe('StepCentre', () => {
   it('shows validation error when name is empty', async () => {
     renderStep();
     await act(async () => { screen.getByText('Continue →').click(); });
-    expect(screen.getByText(/Please give your budget centre a name/)).toBeTruthy();
+    expect(screen.getByText(/Please give your BOS Hub a name/)).toBeTruthy();
   });
 
   it('does not call onNext when name is empty', async () => {

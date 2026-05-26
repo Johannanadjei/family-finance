@@ -33,7 +33,7 @@ export function Header({ onOpenPanel }) {
       {/* Left — centre name, tap opens panel */}
       <button
         onClick={onOpenPanel}
-        aria-label="Open budget centres panel"
+        aria-label="Open BOS Hubs panel"
         style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0 }}
       >
         <div style={{

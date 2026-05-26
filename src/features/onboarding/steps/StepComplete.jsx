@@ -32,13 +32,13 @@ export function StepComplete({
           Everything looks good?
         </p>
         <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
-          Review your setup before we create your budget centre.
+          Review your setup before we create your BOS Hub.
         </p>
       </div>
 
       {/* Centre summary */}
       <div style={{ background: '#f0fdf4', borderRadius: 14, padding: '14px 16px' }}>
-        <p style={{ fontSize: 12, fontWeight: 800, color: '#065f46', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>Budget Centre</p>
+        <p style={{ fontSize: 12, fontWeight: 800, color: '#065f46', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 1 }}>BOS Hub</p>
         <p style={{ fontSize: 18, fontWeight: 900, color: '#064e3b', margin: '0 0 2px' }}>
           {centreData.icon} {centreData.name}
         </p>
@@ -102,7 +102,7 @@ export function StepComplete({
       {error && (
         <div style={{ background: '#fef2f2', borderRadius: 10, padding: '12px 14px' }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', margin: 0 }}>
-            {error} — tap "Create Budget Centre" to try again.
+            {error} — tap "Create BOS Hub" to try again.
           </p>
         </div>
       )}
@@ -110,7 +110,7 @@ export function StepComplete({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
         <button onClick={onBack} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid #e5e7eb', background: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: '#6b7280', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
         <button onClick={onConfirm} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: 'none', background: loading ? '#e5e7eb' : 'linear-gradient(135deg, #064e3b, #0d7060)', color: loading ? '#9ca3af' : '#fff', fontSize: 14, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
-          {loading ? 'Creating...' : 'Create Budget Centre 🎉'}
+          {loading ? 'Creating...' : 'Create BOS Hub 🎉'}
         </button>
       </div>
     </div>

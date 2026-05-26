@@ -79,7 +79,7 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
         surplus_target: surplusTarget,
       });
       if (centreErr) {
-        setError('We could not create your budget centre. Please check your connection and try again.');
+        setError('We could not create your BOS Hub. Please check your connection and try again.');
         setLoading(false);
         return;
       }
