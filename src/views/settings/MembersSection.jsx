@@ -183,7 +183,7 @@ export function MembersSection() {
                 </button>
                 <button data-testid="send-invite-btn" onClick={handleSendInvite} disabled={sending}
                   style={{ padding: '10px', borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 13, fontWeight: 800, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
-                  {sending ? 'Sending…' : 'Generate Invite Link'}
+                  {sending ? 'Creating link…' : 'Create Invite Link'}
                 </button>
               </div>
             </div>
