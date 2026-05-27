@@ -45,6 +45,20 @@ const DARK_FUNCTIONAL = {
   '--c-btn-text':           '#ffffff',
 };
 
+/**
+ * Build the dropdown chevron as a colour-baked data-URI SVG.
+ *
+ * The chevron colour cannot be driven by `currentColor` inside a background
+ * image (it never inherits the element's colour) nor by `var()` (CSS variables
+ * don't resolve inside a `url(...)` string). So each skin bakes its own chevron
+ * tinted to that skin's `--c-text`, exposed as the `--c-chevron` token and
+ * consumed by `selectStyle`. The `#` in the hex must be encoded as `%23`, or it
+ * is parsed as a URL fragment and the SVG fails to render.
+ * @param {string} hex — e.g. '#ffffff'
+ */
+const chevron = (hex) =>
+  `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='${hex.replace('#', '%23')}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>")`;
+
 export const THEMES = {
   family_warmth: {
     '--c-primary':            '#064e3b',
@@ -62,6 +76,7 @@ export const THEMES = {
     '--c-input-border':       '#e5e7eb',
     '--c-chip-selected-bg':   '#f0fdf4',
     '--c-chip-selected-text': '#064e3b',
+    '--c-chevron':            chevron('#1c1917'),
     ...SHARED,
   },
 
@@ -81,6 +96,7 @@ export const THEMES = {
     '--c-input-border':       '#e2e8f0',
     '--c-chip-selected-bg':   '#fef3c7',
     '--c-chip-selected-text': '#1e3a8a',
+    '--c-chevron':            chevron('#0f172a'),
     ...SHARED,
   },
 
@@ -100,6 +116,7 @@ export const THEMES = {
     '--c-input-border':       '#e2e8f0',
     '--c-chip-selected-bg':   '#d1fae5',
     '--c-chip-selected-text': '#0f172a',
+    '--c-chevron':            chevron('#0f172a'),
     ...SHARED,
   },
 
@@ -119,6 +136,7 @@ export const THEMES = {
     '--c-input-border':       '#fed7aa',
     '--c-chip-selected-bg':   '#fef3c7',
     '--c-chip-selected-text': '#c2410c',
+    '--c-chevron':            chevron('#1c1917'),
     ...SHARED,
   },
 
@@ -139,6 +157,7 @@ export const THEMES = {
     '--c-chip-selected-bg':   '#7c3aed',
     '--c-chip-selected-text': '#ffffff',
     '--c-modal-bg':           '#1e1b4b',
+    '--c-chevron':            chevron('#f8fafc'),
     ...DARK_FUNCTIONAL,
   },
 
@@ -159,6 +178,7 @@ export const THEMES = {
     '--c-chip-selected-bg':   '#1e40af',
     '--c-chip-selected-text': '#ffffff',
     '--c-modal-bg':           '#1e293b',
+    '--c-chevron':            chevron('#f1f5f9'),
     ...DARK_FUNCTIONAL,
   },
 
@@ -179,6 +199,7 @@ export const THEMES = {
     '--c-chip-selected-bg':   '#e5e7eb',
     '--c-chip-selected-text': '#111827',
     '--c-modal-bg':           '#f9fafb',
+    '--c-chevron':            chevron('#111827'),
     ...SHARED,
   },
 
@@ -198,6 +219,7 @@ export const THEMES = {
     '--c-input-border':       '#e9d5ff',
     '--c-chip-selected-bg':   '#fef3c7',
     '--c-chip-selected-text': '#6b21a8',
+    '--c-chevron':            chevron('#1c1917'),
     ...SHARED,
   },
 
@@ -232,6 +254,7 @@ export const THEMES = {
     '--c-active-text':        '#000000',
     '--c-btn-text':           '#000000',  // black text on white panda buttons
     '--c-shadow':             'none',
+    '--c-chevron':            chevron('#ffffff'),
   },
 };
 

@@ -1089,3 +1089,24 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - grep -rni "monochrome" src/ → zero results
 
 **Not changed**: docs/engineering-decisions.md historical entries (audit trail), family_warmth, panda, or any other skin. No toast/notice added — no real users to inform.
+
+---
+## 2026-05-27 — Bug fix: chevron color tracks skin text color
+
+**Scope**: Fixed dropdown chevrons appearing dark on all skins (most visible on panda where dark-on-dark made them invisible). Chevrons now match each skin's text color via a per-skin baked-color token.
+
+**Root cause**: selectStyle.js painted the chevron via a background-image data URI SVG with stroke="currentColor". CSS variables don't resolve inside url() strings, and currentColor doesn't inherit into background images — the chevron rendered as the SVG's literal default color (black) on every skin. Was invisible on light skins (black-on-light is fine) until panda made it visible.
+
+**Why the mask approach was rejected**: Initial Phase 2 design proposed a CSS mask-image. Phase 3 surfaced that CSS masks apply to the entire element (including the text and background), not just the background layer — it would have made the select's own text disappear. Switched to per-skin baked chevron tokens before any code shipped.
+
+**Edits**:
+- src/lib/themes.js — added chevron(hex) helper that builds the data-URI SVG with the stroke color baked in (with # → %23 encoding so hex isn't parsed as URL fragment). Added --c-chevron token to all 9 skins, each baked to that skin's --c-text value
+- src/lib/selectStyle.js — backgroundImage now reads var(--c-chevron, <fallback>) instead of the broken currentColor SVG. Doc comment rewritten to explain why token approach is required
+
+**Result**: Zero call-site changes. All 8 <select> elements pick up the fix through the shared selectStyle. Chevron stays a 2px stroked outline (identical shape), only recolored per skin.
+
+**Verification**:
+- npm test: 916 passed
+- bash scripts/audit.sh: 181/181 passed
+
+**Visual verification needed post-deploy**: family_warmth (near-black), panda (white), dark_executive + neon_futuristic (their text colors).
