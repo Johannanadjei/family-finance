@@ -1110,3 +1110,20 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - bash scripts/audit.sh: 181/181 passed
 
 **Visual verification needed post-deploy**: family_warmth (near-black), panda (white), dark_executive + neon_futuristic (their text colors).
+
+---
+## 2026-05-27 — Bug fix: Budget Health bar reflects status, not hardcoded white
+
+**Scope**: Fix Budget Health bar rendering as a white tracker line across most skins (6 of 9 — all light skins plus global_international and corporate_professional). Bar now colors itself by budget health status.
+
+**Root cause**: BudgetHealthBar.jsx:24 hardcoded `background: rgba(255,255,255,0.9)` for the fill. Invisible-ish on light skins (white-on-light), visible on dark skins by accident. The bar already received a `budgetStatus` prop containing the right color (green/amber/red for on-track/watch-out/over-budget) but only used it for the text label, not the fill.
+
+**Edit**: src/views/home/BudgetHealthBar.jsx:24 — `background: 'rgba(255,255,255,0.9)'` → `background: budgetStatus.color`.
+
+**Result**: Bar fill and status label now share one source of truth. Bar is green on healthy budget, amber on watch-out, red on over-budget. Contrast verified against every skin's --c-border in Phase 1. Also clears a CLAUDE.md §3 hardcoded-color violation.
+
+**Considered and rejected**: `var(--c-success)` as a per-skin token. Would have made the bar always green regardless of actual budget health — semantically wrong for a "health" indicator.
+
+**Verification**:
+- npm test: 916 passed
+- bash scripts/audit.sh: 181/181 passed (one §3 violation cleared)
