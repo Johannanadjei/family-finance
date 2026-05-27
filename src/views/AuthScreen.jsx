@@ -109,7 +109,7 @@ export function AuthScreen() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 44, marginBottom: 8 }}>🏠</div>
+          <img src="/icons/icon-192.png" alt="Money B.O.S logo" style={{ width: 64, height: 64, marginBottom: 8, objectFit: 'contain' }} />
           <p style={{ fontSize: 22, fontWeight: 900, color: 'var(--c-primary, #064e3b)', margin: '0 0 4px' }}>
             Money B.O.S
           </p>

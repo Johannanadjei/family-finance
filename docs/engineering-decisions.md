@@ -785,3 +785,39 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 **Tech debt remaining**:
 - `MembersSection.jsx` at 200-line hard cap (from Commit 2)
 - `StepIncome.jsx` + `StepCentre.jsx` hardcoded hex in their `inputStyle` blocks
+
+---
+## 2026-05-27 — Money B.O.S logo on 4 branded screens
+
+**Scope**: Replace the 🏠 placeholder emoji with the Money B.O.S logo image across all 4 branded "this is the app" splash moments. Continues the brand transition from Cosmetic Session A.
+
+**Files changed**: 4 — `src/views/AuthScreen.jsx`, `src/App.jsx`, `src/views/PinScreen.jsx`, `src/views/guest/GuestPinScreen.jsx`.
+
+**Edits** (all single-line `<div>🏠</div>` → `<img>` swaps):
+- `AuthScreen.jsx` L112: 64×64, `alt="Money B.O.S logo"` (primary brand moment — sign-in/sign-up screen)
+- `App.jsx` L60: 56×56, `alt=""` (decorative — loading screen between auth and main app)
+- `PinScreen.jsx` L64: 56×56, `alt=""` (decorative — PIN unlock screen)
+- `GuestPinScreen.jsx` L61: 56×56, `alt=""` (decorative — guest hub access)
+
+**Design decisions**:
+- Single asset (`/icons/icon-192.png`) reused across all 4 screens — keeps the user-facing branding identical at every entry point.
+- AuthScreen gets 64×64 (slightly larger for the brand moment); the other 3 utility screens get 56×56 to keep them feeling task-focused, not branded.
+- `alt="Money B.O.S logo"` only on AuthScreen — that's the one moment users should hear the brand announced. On loading/PIN/guest screens, the logo is decorative and would interrupt screen-reader flow; `alt=""` makes screen readers skip it cleanly.
+- `objectFit: 'contain'` everywhere — preserves the logo's aspect ratio at any container size.
+- No `borderRadius` — iOS auto-rounds home-screen icons at the OS level; adding rounding inside the app would double-round and look inconsistent vs the installed PWA.
+- No `<img>` error fallback added — the asset is served by Vercel's CDN from the public/ directory, can't realistically disappear. If a fallback ever becomes necessary, swap to a small inline emoji on `onError`.
+- No shared style helper extracted — only 4 sites, all already use file-scoped inline styles. A `logoStyle` helper would be over-engineering for this scope.
+
+**Verification**:
+- npm test: 905/905 passed
+- bash scripts/audit.sh: 175/175 passed
+- AuthScreen.jsx stays at exactly 200/200 (cap)
+- Zero `🏠` emojis remain in the 4 branded screens
+- 15 other `🏠` occurrences confirmed as legitimate user-icon data (hub defaults, category templates, picker arrays, fixtures) — out of scope
+
+**Brand transition status**: Complete. No remaining stale brand visuals on app entry-point screens.
+
+**Tech debt unchanged**:
+- `MembersSection.jsx` at 200-line cap (Commit 2)
+- `AuthScreen.jsx` at 200-line cap (Commit 4)
+- `StepIncome.jsx` + `StepCentre.jsx` hardcoded hex in `inputStyle` blocks

@@ -58,7 +58,7 @@ export function GuestPinScreen({ guests, loading, error, onAuthenticate, onRetry
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))' }}>
       <div style={{ padding: '52px 20px 28px', textAlign: 'center' }}>
-        <p style={{ fontSize: 36, margin: '0 0 10px' }}>🏠</p>
+        <img src="/icons/icon-192.png" alt="" style={{ width: 56, height: 56, margin: '0 0 10px', objectFit: 'contain' }} />
         <p style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: '0 0 4px' }}>Guest Access</p>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', margin: 0 }}>Select your name and enter your PIN</p>
       </div>
