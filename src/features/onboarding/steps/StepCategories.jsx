@@ -107,7 +107,7 @@ export function StepCategories({ data, fmt, onNext, onBack }) {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-        <button onClick={onBack} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-muted, #6b7280)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
+        <button onClick={onBack} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-text, #1c1917)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
         <button onClick={handleNext} style={{ padding: '14px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Continue →</button>
       </div>
     </div>

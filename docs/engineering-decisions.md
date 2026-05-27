@@ -916,3 +916,63 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - BUG 8 — Bottom nav active state appears inverted on panda (needs diagnostic)
 
 **Card lift "feels flat" feedback noted**: AJ reported that even after BUG 3 + BUG 3b, panda cards still feel visually flat. The 5% lift (`#0d0d0d` vs `#000000`) is barely perceptible on OLED displays. Filed as a separate enhancement (not bug) — would require raising `--c-card` to `#1a1a1a` or `#242424`, which is a design depth decision rather than a bug fix. Not in current session scope.
+
+---
+## 2026-05-27 — Bug fix batch A: Cancel + Back button contrast across dark skins (BUGS 1, 2, 9, 11)
+
+**Scope**: Fix Cancel and Back buttons that were unreadable on dark skins (`panda`, `monochrome`). All cases reduced to the same root cause: text color defaulting to or explicitly using a muted token, against backgrounds that go dark on dark skins.
+
+**Files changed**: 5 — one line each, color property only.
+
+**Two root cause patterns**:
+
+1. **Missing `color` property** (2 files): Cancel button had no `color` declared. Browser defaulted to black. Fine on light skins (`--c-card` = `#ffffff`), invisible on dark skins (`--c-card` = `#0d0d0d` on panda, `#242424` on monochrome).
+2. **`--c-muted` text on dark backgrounds** (3 files): Cancel/Back buttons used `color: 'var(--c-muted, #6b7280)'`. Panda's muted is `#999999` against `#111111` chip background = ~2.85:1 contrast — fails WCAG AA. Same failure on monochrome.
+
+**Edits**:
+
+| File | Bug | Edit |
+|---|---|---|
+| `src/views/settings/CategorySettingsRow.jsx` L80 | BUG 11 | ADD `color: 'var(--c-text, #1c1917)',` to Cancel button |
+| `src/views/settings/CentreSettingsSection.jsx` L85 | BUG 9 | ADD `color: 'var(--c-text, #1c1917)',` to Cancel button |
+| `src/views/daily/AddTransactionSheet.jsx` L187 | BUG 2 | CHANGE Cancel color from `--c-muted` to `--c-text` |
+| `src/views/budget/AddCategorySheet.jsx` L78 | BUG 2 | CHANGE Cancel color from `--c-muted` to `--c-text` |
+| `src/features/onboarding/steps/StepCategories.jsx` L110 | BUG 1 | CHANGE Back color from `--c-muted` to `--c-text` |
+
+**Backgrounds intentionally NOT changed**: Phase 2 considered swapping `--c-chip-bg` → `--c-card` on AddTransactionSheet and AddCategorySheet Cancel buttons. Rejected because it would have made Cancel buttons white on `family_warmth`, losing the grey-pill secondary-action design. Color-only fix achieves the contrast goal without disrupting the light-skin visual hierarchy.
+
+**Design impact across skins**:
+
+| Skin | Cancel/Back text before | Cancel/Back text after | Visual change |
+|---|---|---|---|
+| `family_warmth` | grey (`#6b7280`) or black (default) | near-black (`#1c1917`) | Slight darkening — Back/Cancel become more prominent, but still clearly secondary (no brand background) |
+| `panda` | black default OR grey on dark | white (`#ffffff`) | Major — buttons now visible |
+| `monochrome` | black default OR grey on dark | light grey (`#e5e5e5`) | Major — buttons now visible |
+| Other skins | unaffected | unaffected | no change |
+
+**Verification**:
+- npm test: 905/905 passed
+- bash scripts/audit.sh: 175/175 passed
+- git diff --stat: 5 files changed, 5 insertions, 5 deletions (color-only)
+
+**Decisions**:
+- Used `var(--c-text, #1c1917)` consistently across all 5 fixes — single, predictable token.
+- Did NOT introduce a shared `cancelButtonStyle` helper. The 5 buttons have differing layout properties (padding, borderRadius, fontSize) for their respective contexts. Premature abstraction.
+- Continue button on StepCategories L111 left untouched — it already correctly uses `--c-btn-text` against the brand-color gradient.
+
+**Bug list progress** (post this commit):
+- BUG 1 ✅ (this commit)
+- BUG 2 ✅ (this commit)
+- BUG 3 ✅ (shipped earlier today)
+- BUG 3b ✅ (shipped earlier today)
+- BUG 4 — Toggle button borders inactive state (queued)
+- BUG 5 — Budget Health bar white on family_warmth (queued)
+- BUG 6 ✅ (free side-effect of BUG 3)
+- BUG 7 — Install banner overlapping onboarding (queued)
+- BUG 8 — Bottom nav active state (needs diagnostic)
+- BUG 9 ✅ (this commit)
+- BUG 10 — Buttons look disabled on monochrome (likely resolved by this commit — needs visual verification)
+- BUG 11 ✅ (this commit)
+- BUG 12 — Currency dropdown chevron wrong color on monochrome (queued, needs diagnostic)
+
+**Next batch (B) discovered during Phase 3 verification**: Four more Cancel/Back buttons with the same `--c-muted` pattern in `CreateHubSheet.jsx` (×2), `AddGuestSheet.jsx`, and `UpdateReceivedSheet.jsx`. Same fix pattern. Will be the next commit.

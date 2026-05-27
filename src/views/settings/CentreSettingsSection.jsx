@@ -82,7 +82,7 @@ export function CentreSettingsSection() {
           </select>
           {error && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px', fontWeight: 700 }}>{error}</p>}
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Cancel</button>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', color: 'var(--c-text, #1c1917)', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Cancel</button>
             <button data-testid="centre-save-btn" onClick={handleSave} disabled={saving}
               style={{ flex: 2, padding: 10, borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 13, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
               {saving ? 'Saving…' : 'Save'}

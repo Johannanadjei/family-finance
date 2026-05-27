@@ -77,7 +77,7 @@ export function CategorySettingsRow({ cat, fmt, onUpdate, onDelete, isLast }) {
           <input data-testid={`cat-budget-input-${cat.id}`} type="number" value={budget} onChange={e => { setBudget(e.target.value); setError(null); }} style={inputStyle} />
           {error && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 4px', fontWeight: 700 }}>{error}</p>}
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #ffffff)', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Cancel</button>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #ffffff)', color: 'var(--c-text, #1c1917)', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Cancel</button>
             <button data-testid={`cat-save-${cat.id}`} onClick={handleSave} disabled={saving}
               style={{ flex: 2, padding: 8, borderRadius: 8, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 13, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
               {saving ? 'Saving…' : 'Save'}
