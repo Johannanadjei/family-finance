@@ -12,6 +12,9 @@ import { getCurrentMonth, offsetMonth } from '../lib/finance';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { IncomeCard }             from './payday/IncomeCard';
 import { ConfirmSheet }           from './payday/ConfirmSheet';
+import { PastIncomeCard }         from './payday/PastIncomeCard';
+import { MonthEmptyState }        from './payday/MonthEmptyState';
+import { NoIncomeSourcesEmpty }   from './payday/NoIncomeSourcesEmpty';
 
 const formatMonth = (ym) =>
   new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -51,11 +54,18 @@ export function PaydayView() {
   if (financeValues.loading) return <PaydayViewSkeleton />;
 
   const {
-    incomes, error, totalReceived, totalExpected, totalPending,
+    incomes, error, totalReceived, totalExpected, totalPending, totalIncome, txs,
     activeMonth, loadMonth, markReceived, markPending, updateExpectedAmount,
   } = financeValues;
 
-  const isCurrentMonth = activeMonth === getCurrentMonth();
+  const currentMonth   = getCurrentMonth();
+  const isCurrentMonth = activeMonth === currentMonth;
+  const isPastMonth    = activeMonth < currentMonth;   // 'YYYY-MM' compares lexicographically
+  const isFutureMonth  = activeMonth > currentMonth;
+
+  // Past months are read-only — confirmed income is derived from the month-scoped
+  // transactions already in context, not from the live income_sources rows.
+  const pastIncomeTxs  = isPastMonth ? txs.filter(t => t.type === 'income') : [];
 
   const handleOpenSheet = (income) => {
     setSelectedIncome(income);
@@ -108,26 +118,27 @@ export function PaydayView() {
         </button>
       </div>
 
-      {/* Summary card */}
-      <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff', boxShadow: 'var(--c-shadow)', border: '1px solid rgba(255,255,255,0.2)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <div>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Received</p>
-            <p data-testid="payday-total-received" style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>{fmt(totalReceived)}</p>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Pending</p>
-            <p data-testid="payday-total-pending" style={{ fontSize: 24, fontWeight: 900, margin: 0, color: totalPending > 0 ? 'var(--c-warning, #fbbf24)' : 'var(--c-success-light, #6ee7b7)' }}>{fmt(totalPending)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Past month warning */}
-      {!isCurrentMonth && (
-        <div style={{ background: 'var(--c-warning-bg, #fef3c7)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-warning-text, #92400e)', margin: 0 }}>
-            Income status shown reflects current state, not historical data.
-          </p>
+      {/* Summary card — hidden for future months (nothing to total yet) */}
+      {!isFutureMonth && (
+        <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff', boxShadow: 'var(--c-shadow)', border: '1px solid rgba(255,255,255,0.2)' }}>
+          {isCurrentMonth ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Received</p>
+                <p data-testid="payday-total-received" style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>{fmt(totalReceived)}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Pending</p>
+                <p data-testid="payday-total-pending" style={{ fontSize: 24, fontWeight: 900, margin: 0, color: totalPending > 0 ? 'var(--c-warning, #fbbf24)' : 'var(--c-success-light, #6ee7b7)' }}>{fmt(totalPending)}</p>
+              </div>
+            </div>
+          ) : (
+            // Past month — Received only. Pending is omitted entirely (not shown as "GHS 0").
+            <div>
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Received</p>
+              <p data-testid="payday-total-received" style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>{fmt(totalIncome)}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -140,28 +151,22 @@ export function PaydayView() {
         </div>
       )}
 
-      {/* Income list */}
-      {incomes.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 16px' }}>
-          <p style={{ fontSize: 36, margin: '0 0 12px' }}>💜</p>
-          <p style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 6px' }}>
-            No income sources set up yet.
-          </p>
-          <p style={{ fontSize: 15, color: 'var(--c-muted, #6b7280)', margin: '0 0 20px', lineHeight: 1.5 }}>
-            Go to Settings to add your salary or income sources.
-          </p>
-          <button
-            onClick={() => navigate('/settings')}
-            style={{
-              padding: '12px 24px', borderRadius: 12, border: 'none',
-              background: 'var(--c-primary, #064e3b)',
-              color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer',
-              fontFamily: "'Nunito', sans-serif",
-            }}
-          >
-            Go to Settings
-          </button>
-        </div>
+      {/* Income list — current month editable, past months read-only, future months empty */}
+      {isFutureMonth ? (
+        <MonthEmptyState
+          title={`No payday data for ${formatMonth(activeMonth)} yet`}
+          subtitle="Income will appear here once this month arrives."
+        />
+      ) : isPastMonth ? (
+        pastIncomeTxs.length === 0 ? (
+          <MonthEmptyState title={`No income recorded for ${formatMonth(activeMonth)}`} />
+        ) : (
+          pastIncomeTxs.map(tx => (
+            <PastIncomeCard key={tx.id} name={tx.category_name} amount={fmt(tx.amount)} />
+          ))
+        )
+      ) : incomes.length === 0 ? (
+        <NoIncomeSourcesEmpty onGoToSettings={() => navigate('/settings')} />
       ) : (
         incomes.map(income => (
           <IncomeCard

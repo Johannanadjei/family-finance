@@ -1033,3 +1033,39 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - Money B.O.S logo legibility on small PWA sizes — needs icon-only variant from AJ (logged)
 
 **Environment note**: This commit was the first made from the new GitHub Codespaces environment (Codespace "Urban trout" at `/workspaces/family-finance`). Switched from local macOS earlier in the session due to TCC permission blocks on the work laptop's Downloads folder. Codespace uses Node v24.14.0 / npm v11.9.0 — newer than local Node v20.12.1 but build and test suite identical.
+
+---
+## 2026-05-27 — Bug fix: Payday screen month-awareness
+
+**Scope**: Fix Payday screen showing identical data across all months. Past months now derive Received totals from the existing txs table (filtered by month + type='income'). Future months show empty state. Current month behavior unchanged.
+
+**Root cause**: income_sources table has no month dimension — received boolean lives directly on the config row. Every month read the same source rows, so every month showed identical totals. No per-month records table exists.
+
+**Why we didn't migrate schema**: Phase 1 surfaced two paths — (A) derive from existing txs data, (B) build new per-month income_receipts table with RLS + migrations + RPC. Option A is proportionate to the bug. Option B is a future feature project.
+
+**Files**:
+- src/views/PaydayView.jsx — month-type branching, banner removed, Received-only past header
+- src/views/PaydayView.test.jsx — replaced banner test, added 4 month-aware tests
+- src/views/payday/PastIncomeCard.{jsx,test.jsx} — NEW: read-only past-month card
+- src/views/payday/MonthEmptyState.{jsx,test.jsx} — NEW: past/future empty state (LogView visual)
+- src/views/payday/NoIncomeSourcesEmpty.{jsx,test.jsx} — NEW: current-month empty state when no sources configured
+
+**Behavior per month type**:
+- Current month: unchanged — income_sources cards + Confirm/Mark CTAs + Received + Pending header
+- Past months: read-only cards built from month-scoped txs (income type), header shows Received only (= totalIncome), Pending hidden, empty state when no txs
+- Future months: empty state only, no totals shown
+- Yellow "current state, not historical" warning banner: removed (workaround no longer needed)
+
+**Why three new components**: CLAUDE.md §10 enforces 200-line cap on views. After adding month-type branching, PaydayView hit 227 lines. Extracted the two empty-states (LogView visual pattern) + the read-only past-month card into their own files. Matches the per-display component convention in the codebase.
+
+**Future navigation unchanged**: The "next month" button remains disabled at current month per existing behavior. Future-month code is correct and tested but unreachable through normal UI navigation today. Will become live if forward navigation is unlocked later.
+
+**Tech debt logged (not in scope)**:
+- Global "+ Add" FAB in App.jsx:144 is shared with Daily/Log. Tapping it from a past month routes to current-month add flow, which could confuse users. Three options for future: leave as-is, hide globally on past months, or make context-aware. Not blocking.
+- lucide-react@0.383.0 is in package.json with 0 imports anywhere in src/. CLAUDE.md §3 mandates inline SVGs. Candidate for dependency removal.
+
+**Verification**:
+- npm test: 916 passed (905 + 11 new), 0 failed
+- bash scripts/audit.sh: 181/181 passed
+- New tests assert: Received total differs between April and May (the gap the old test suite missed)
+- Triple-check §9.5 verified

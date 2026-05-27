@@ -18,9 +18,11 @@ const mockFinance = {
   loading:        false,
   error:          null,
   incomes:        mockIncomes,
+  txs:            [],
   totalReceived:  30000,
   totalExpected:  45000,
   totalPending:   15000,
+  totalIncome:    0,
   activeMonth:    '2026-05',
   loadMonth:      vi.fn(),
   markReceived:   vi.fn().mockResolvedValue({ error: null }),
@@ -63,11 +65,58 @@ describe('PaydayView', () => {
     expect(screen.getByText('Dita Salary')).toBeTruthy();
   });
 
-  it('shows past month warning when not current month', () => {
+  it('no longer shows the legacy historical-data warning on a past month', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
     mockFinance.activeMonth = '2026-04';
     renderView();
-    expect(screen.getByText(/Income status shown reflects current state/)).toBeTruthy();
+    expect(screen.queryByText(/reflects current state/)).toBeNull();
     mockFinance.activeMonth = '2026-05';
+    vi.useRealTimers();
+  });
+
+  it('derives the Received total from transactions on a past month (changes between months)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
+    mockFinance.activeMonth  = '2026-04';
+    mockFinance.totalIncome  = 12000; // April income, from txs
+    mockFinance.txs          = [{ id: 'tx-i', type: 'income', amount: 12000, category_name: 'Adjei Salary' }];
+    renderView();
+    const received = screen.getByTestId('payday-total-received').textContent;
+    expect(received).toBe('GHS 12,000');
+    // proves month-awareness: NOT the current-month income_sources total (30,000)
+    expect(received).not.toBe('GHS 30,000');
+    // past-month read-only card renders from the transaction
+    expect(screen.getByText('Adjei Salary')).toBeTruthy();
+    // Pending half is omitted on past months
+    expect(screen.queryByTestId('payday-total-pending')).toBeNull();
+    mockFinance.activeMonth = '2026-05';
+    mockFinance.totalIncome = 0;
+    mockFinance.txs         = [];
+    vi.useRealTimers();
+  });
+
+  it('shows empty state for a past month with no income transactions', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
+    mockFinance.activeMonth = '2026-04';
+    mockFinance.txs         = [];
+    renderView();
+    expect(screen.getByText(/No income recorded for/)).toBeTruthy();
+    mockFinance.activeMonth = '2026-05';
+    vi.useRealTimers();
+  });
+
+  it('shows empty state and no totals for a future month', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
+    mockFinance.activeMonth = '2026-06';
+    renderView();
+    expect(screen.getByText(/No payday data for/)).toBeTruthy();
+    expect(screen.queryByTestId('payday-total-received')).toBeNull();
+    expect(screen.queryByTestId('payday-total-pending')).toBeNull();
+    mockFinance.activeMonth = '2026-05';
+    vi.useRealTimers();
   });
 
   it('shows empty state when no income sources', () => {
