@@ -212,10 +212,10 @@ export const THEMES = {
     '--c-text':               '#ffffff',
     '--c-muted':              '#999999',
     '--c-bg':                 '#000000',
-    '--c-card':               '#000000',
-    '--c-border':             'rgba(255,255,255,0.12)',
+    '--c-card':               '#0d0d0d',
+    '--c-border':             'rgba(255,255,255,0.25)',
     '--c-input-bg':           '#000000',
-    '--c-input-border':       'rgba(255,255,255,0.12)',
+    '--c-input-border':       'rgba(255,255,255,0.25)',
     '--c-danger':             '#ffffff',
     '--c-danger-bg':          '#111111',
     '--c-danger-light':       '#fca5a5',  // bright — visible on black header

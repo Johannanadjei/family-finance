@@ -821,3 +821,50 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - `MembersSection.jsx` at 200-line cap (Commit 2)
 - `AuthScreen.jsx` at 200-line cap (Commit 4)
 - `StepIncome.jsx` + `StepCentre.jsx` hardcoded hex in `inputStyle` blocks
+
+---
+## 2026-05-27 — Bug fix: panda skin invisible borders + flat cards (BUG 3)
+
+**Scope**: Fix panda skin (pure-black dark skin) where input field borders and section dividers were invisible against the background, and where cards shared their background with the page (no surface lift).
+
+**Files changed**: 1 — `src/lib/themes.js`. Panda skin block only. 3 line edits.
+
+**Token changes** (all within `panda: { ... }`):
+- `--c-border`: `rgba(255,255,255,0.12)` → `rgba(255,255,255,0.25)` (12% → 25% white opacity)
+- `--c-input-border`: `rgba(255,255,255,0.12)` → `rgba(255,255,255,0.25)` (matches `--c-border`)
+- `--c-card`: `#000000` → `#0d0d0d` (subtle 5% lift off the page background)
+
+**Tokens intentionally NOT changed**:
+- `--c-bg`: stays `#000000` (page background, pure black is intentional)
+- `--c-input-bg`: stays `#000000` (inputs sit flush against page, depth comes from the border)
+- All other skin definitions untouched (`family_warmth`, `dark_executive`, `monochrome`, `global_international`, `corporate_professional`, `sunset_warm`, `neon_futuristic`, `minimal_light`, `royal_luxury`)
+
+**Cascade impact**: 77 component usages of `--c-border` / `--c-input-border` across 33 files instantly reflect the new value on panda. Zero component code touched.
+
+**Decisions**:
+- Chose `rgba(255,255,255,0.25)` over solid hex (`#3a3a3a` or `#334155`) to match panda's existing rgba notation style and approximate the iOS/iPadOS dark-mode UI convention.
+- Kept `--c-border` and `--c-input-border` identical. Differentiating them is a polish call, not a bug fix.
+- Lifted `--c-card` but NOT `--c-input-bg`. Rationale: lifting both would create a four-tier depth system (bg → card → input → field-border) — too much hierarchy for the minimalist panda design. Lifting only the card keeps the system three-tier: pure-black page, slightly-lifted card surfaces, page-matching inputs that draw their separation from borders.
+- BUG 6 (Guest Access section missing border on panda) is fixed by this change as a free side-effect — its border was using `var(--c-border)` and now renders visibly.
+
+**Verification**:
+- npm test: 905/905 passed
+- bash scripts/audit.sh: 175/175 passed
+- Token isolation confirmed: new values appear only in panda block, zero leakage to other skins
+- All other dark skins (`dark_executive`, `monochrome`, `neon_futuristic`) unaffected
+
+**Visual verification required on live deploy** (panda skin only):
+- Add transaction sheet: all input field borders should be visible
+- Onboarding step 3: category row inputs should have visible borders
+- Settings → Guest Access section: should now have a boundary
+- Cards across all screens: subtle lift visible against page background
+
+**Bug list for this session** (per AJ's screenshots, 2026-05-27):
+- BUG 1 — Save button text invisible on panda (next)
+- BUG 2 — Cancel button low contrast on panda (next)
+- BUG 3 — Panda border/card visibility ✅ (this commit)
+- BUG 4 — Toggle button borders inactive state (next)
+- BUG 5 — Budget Health bar white instead of green on family_warmth (next)
+- BUG 6 — Guest Access section border ✅ (fixed by BUG 3 as a free side-effect)
+- BUG 7 — Install banner overlapping onboarding content (next)
+- BUG 8 — Bottom nav active state appears inverted on panda (needs diagnostic)
