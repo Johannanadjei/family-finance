@@ -1069,3 +1069,23 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - bash scripts/audit.sh: 181/181 passed
 - New tests assert: Received total differs between April and May (the gap the old test suite missed)
 - Triple-check §9.5 verified
+
+---
+## 2026-05-27 — Remove monochrome skin
+
+**Scope**: Deleted the monochrome skin entirely. AJ decision: visually too close to panda to justify maintaining as a separate option.
+
+**No migration**: No real users exist (test users only). Existing resolveSkin fallback returns 'family_warmth' for orphaned skin_id values, so any test user persisted as 'monochrome' fails over cleanly on next load. Zero code branches on the orphan case — applyTheme just skips and family_warmth defaults take over.
+
+**Edits**:
+- src/lib/themes.js L11 — removed "monochrome" from JSDoc Pro-skins comment
+- src/lib/themes.js L238-271 — deleted entire monochrome block (34 tokens)
+- src/views/settings/ThemeSection.jsx L22 — removed monochrome entry from SKINS array
+- src/views/settings/ThemeSection.test.jsx L45 — deleted theme-monochrome test assertion
+
+**Verification**:
+- npm test: 916 passed (no count drift — assertion removed, no test files deleted)
+- bash scripts/audit.sh: 181/181 passed
+- grep -rni "monochrome" src/ → zero results
+
+**Not changed**: docs/engineering-decisions.md historical entries (audit trail), family_warmth, panda, or any other skin. No toast/notice added — no real users to inform.

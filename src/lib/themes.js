@@ -7,8 +7,7 @@
  *
  * Free skin:  family_warmth
  * Pro skins:  global_international, corporate_professional, sunset_warm,
- *             neon_futuristic, dark_executive, minimal_light, royal_luxury,
- *             monochrome
+ *             neon_futuristic, dark_executive, minimal_light, royal_luxury
  */
 
 const SHARED = {
@@ -233,41 +232,6 @@ export const THEMES = {
     '--c-active-text':        '#000000',
     '--c-btn-text':           '#000000',  // black text on white panda buttons
     '--c-shadow':             'none',
-  },
-
-  monochrome: {
-    '--c-primary':            '#3a3a3a',  // dark — components hardcode #fff text on primary bg
-    '--c-primary-2':          '#2d2d2d',
-    '--c-accent':             '#ffffff',
-    '--c-accent-light':       '#242424',
-    '--c-header-from':        '#000000',
-    '--c-header-to':          '#1a1a1a',
-    '--c-text':               '#e5e5e5',  // near-white — softer than pure #fff
-    '--c-muted':              '#9ca3af',
-    '--c-bg':                 '#0a0a0a',
-    '--c-card':               '#242424',  // lifted from #1a1a1a — distinct against #0a0a0a bg
-    '--c-border':             '#3a3a3a',  // visible border on dark surfaces
-    '--c-input-bg':           '#111111',
-    '--c-input-border':       '#3a3a3a',
-    '--c-chip-bg':            '#242424',
-    '--c-chip-text':          '#e5e5e5',
-    '--c-chip-selected-bg':   '#2a2a2a',  // dark pill — white text on dark bg
-    '--c-chip-selected-text': '#ffffff',
-    '--c-active-bg':          '#ffffff',  // active hub highlight — white on dark card
-    '--c-active-text':        '#000000',  // text inside active-bg elements
-    '--c-modal-bg':           '#1a1a1a',
-    '--c-danger':             '#fca5a5',
-    '--c-danger-bg':          '#1a0a0a',
-    '--c-danger-light':       '#fca5a5',  // bright — visible on dark gradient headers
-    '--c-success':            '#6ee7b7',
-    '--c-success-light':      '#6ee7b7',  // bright mint — visible on dark gradient headers
-    '--c-warning':            '#fbbf24',
-    '--c-warning-bg':         '#1a1500',
-    '--c-warning-text':       '#fef3c7',
-    '--c-shadow':             'none',
-    '--c-success-text':       '#6ee7b7',
-    '--c-danger-text':        '#fca5a5',
-    '--c-btn-text':           '#ffffff',
   },
 };
 
