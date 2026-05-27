@@ -868,3 +868,51 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - BUG 6 — Guest Access section border ✅ (fixed by BUG 3 as a free side-effect)
 - BUG 7 — Install banner overlapping onboarding content (next)
 - BUG 8 — Bottom nav active state appears inverted on panda (needs diagnostic)
+
+---
+## 2026-05-27 — Bug fix: panda modal bg lift for sheet input visibility (BUG 3b)
+
+**Scope**: Fix panda skin where input fields inside bottom sheets (AddTransactionSheet, AddCategorySheet, ConfirmSheet, etc.) appeared borderless because the sheet container and input fields both rendered at pure `#000000`, providing zero surface contrast — even after BUG 3 raised the border opacity.
+
+**Follow-on from BUG 3**: BUG 3 lifted `--c-card` from `#000000` to `#0d0d0d`, which fixed Settings inputs (they sit on `--c-card` surfaces). Bottom sheets use a different token (`--c-modal-bg`), which BUG 3 didn't touch — leaving the same flatness in modal contexts.
+
+**Files changed**: 1 — `src/lib/themes.js`. Panda skin block only. 1 line edit.
+
+**Token change**:
+- `--c-modal-bg`: `#000000` → `#0d0d0d` (matches `--c-card` lift from BUG 3)
+
+**Tokens unchanged**:
+- `--c-bg`: still `#000000` (page background, pure black is intentional)
+- `--c-input-bg`: still `#000000` (inputs sit flush against page on bottom sheets too — separation comes from the lifted modal surface)
+- All other skin definitions untouched
+
+**Cascade impact**: Every bottom sheet in the app benefits — AddTransactionSheet, ConfirmSheet, UpdateReceivedSheet, AddCategorySheet, AddGuestSheet, ArchiveHubSheet, CreateHubSheet. Zero component code changed.
+
+**Decisions**:
+- Kept `--c-modal-bg` and `--c-card` at the same value (`#0d0d0d`). Treating them as the same "lifted surface" concept on panda is the right mental model — the bug was that they diverged.
+- Did NOT lift `--c-input-bg`. Phase 2 considered it (would have made inputs more visible everywhere) but rejected: would have added a third surface tier (page → card/modal → input), overcomplicating panda's minimalist depth system. The current two-tier system (page flat + lifted surfaces) is enough.
+- This fix is panda-only. Other dark skins (`dark_executive`, `monochrome`, `neon_futuristic`) already had distinct modal-bg values and were not affected by either BUG 3 or BUG 3b.
+
+**Verification**:
+- npm test: 905/905 passed
+- bash scripts/audit.sh: 175/175 passed
+- Token isolation confirmed: only panda's `--c-modal-bg` changed
+
+**Visual verification needed on live deploy** (panda skin only):
+- AddTransactionSheet: input fields should now be visible against lifted modal background
+- ConfirmSheet / AddCategorySheet / AddGuestSheet / etc.: same fix applies — modal surfaces lift, input fields stand out
+- Settings (should be unchanged): confirm no regression
+- Other skins (family_warmth, dark_executive, monochrome): no visual change expected
+
+**Bug list progress**:
+- BUG 1 — Save button text invisible on panda (next)
+- BUG 2 — Cancel button low contrast on panda (next)
+- BUG 3 — Panda border + card visibility ✅ (shipped)
+- BUG 3b — Panda modal-bg lift ✅ (this commit)
+- BUG 4 — Toggle button borders inactive state (next)
+- BUG 5 — Budget Health bar white on family_warmth (next)
+- BUG 6 — Guest Access section border ✅ (free side-effect of BUG 3)
+- BUG 7 — Install banner overlapping onboarding (next)
+- BUG 8 — Bottom nav active state appears inverted on panda (needs diagnostic)
+
+**Card lift "feels flat" feedback noted**: AJ reported that even after BUG 3 + BUG 3b, panda cards still feel visually flat. The 5% lift (`#0d0d0d` vs `#000000`) is barely perceptible on OLED displays. Filed as a separate enhancement (not bug) — would require raising `--c-card` to `#1a1a1a` or `#242424`, which is a design depth decision rather than a bug fix. Not in current session scope.

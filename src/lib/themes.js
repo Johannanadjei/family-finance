@@ -228,7 +228,7 @@ export const THEMES = {
     '--c-chip-text':          '#ffffff',
     '--c-chip-selected-bg':   '#ffffff',
     '--c-chip-selected-text': '#000000',
-    '--c-modal-bg':           '#000000',
+    '--c-modal-bg':           '#0d0d0d',
     '--c-active-bg':          '#ffffff',
     '--c-active-text':        '#000000',
     '--c-btn-text':           '#000000',  // black text on white panda buttons
