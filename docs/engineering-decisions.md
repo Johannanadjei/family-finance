@@ -976,3 +976,60 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - BUG 12 — Currency dropdown chevron wrong color on monochrome (queued, needs diagnostic)
 
 **Next batch (B) discovered during Phase 3 verification**: Four more Cancel/Back buttons with the same `--c-muted` pattern in `CreateHubSheet.jsx` (×2), `AddGuestSheet.jsx`, and `UpdateReceivedSheet.jsx`. Same fix pattern. Will be the next commit.
+
+---
+## 2026-05-27 — Bug fix batch B: Cancel/Back buttons (the last 4)
+
+**Scope**: Apply the Batch A color-token fix to 4 more buttons missed during the initial sweep. Same bug, same fix, different files.
+
+**Files changed**: 3 — one or two color-property edits each.
+
+**Root cause**: Same as Batch A "Root cause 2" — Cancel/Back buttons used `color: 'var(--c-muted, #6b7280)'`. Panda's muted is `#999999` against `#0d0d0d` card background = ~2.85:1 contrast, fails WCAG AA. Same failure on monochrome (`#242424` card + `#9ca3af` muted ~3.2:1).
+
+**Edits** (all change `color: 'var(--c-muted, #6b7280)'` → `color: 'var(--c-text, #1c1917)'`; backgrounds unchanged):
+
+| File | Line | Button | Function |
+|---|---|---|---|
+| `src/features/hubs/CreateHubSheet.jsx` | L134 | ← Back | step 1 → 0 in create-hub flow |
+| `src/features/hubs/CreateHubSheet.jsx` | L164 | ← Back | step 4 → 3 in create-hub flow |
+| `src/views/settings/AddGuestSheet.jsx` | L97 | Cancel | dismiss add-guest sheet |
+| `src/views/payday/UpdateReceivedSheet.jsx` | L60 | "No, keep as ..." | dismiss update-received confirmation |
+
+**Design impact across skins**: Identical to Batch A. On `family_warmth`, secondary text darkens from grey `#6b7280` to near-black `#1c1917` — slightly more prominent but still clearly secondary. On `panda`, secondary buttons now show white text on lifted card surfaces — fully readable. On `monochrome`, light grey text against dark grey card — readable.
+
+**Tech debt discovered (not fixed in this commit)**:
+- `CreateHubSheet.jsx` primary gradient buttons ("Continue →" L141-ish, "Create Hub 🎉" L182-ish) use hardcoded `color: '#fff'` instead of `var(--c-btn-text, #ffffff)`. §3 token violation. Logged for opportunistic cleanup when next touching this file.
+
+**Verification**:
+- npm test: 905/905 passed (75.60s)
+- bash scripts/audit.sh: 175/175 passed
+- git diff --stat: 3 files changed, 4 insertions(+), 4 deletions(-)
+- V1 sweep confirmed zero residual `--c-muted` on Cancel/Back buttons in the 3 files
+- V2 confirmed primary buttons untouched
+
+**Decisions**:
+- Used identical fix pattern as Batch A — no new tokens, no new helpers, no abstraction.
+- The 4th button (UpdateReceivedSheet "No, keep as ...") is labelled as a dismissive choice rather than literally "Cancel", but it's functionally the same secondary action. Correctly included.
+- Phase 2 (Design) was collapsed — no new design decisions vs. Batch A. Fix pattern was established and approved in the previous commit.
+
+**Bug list progress** (post this commit):
+- BUG 1 ✅ (Batch A)
+- BUG 2 ✅ (Batch A)
+- BUG 3 ✅ (commit 4fb7bb5)
+- BUG 3b ✅ (commit 79250cd)
+- BUG 4 — Toggle button borders inactive (queued)
+- BUG 5 — Budget Health bar white on family_warmth (queued)
+- BUG 6 ✅ (free side-effect of BUG 3)
+- BUG 7 — Install banner overlap (queued)
+- BUG 8 — Bottom nav active state (needs diagnostic)
+- BUG 9 ✅ (Batch A)
+- BUG 10 — Buttons look disabled on monochrome (likely resolved by Batch A — visual verification still needed)
+- BUG 11 ✅ (Batch A)
+- BUG 12 — Currency dropdown chevron wrong color on monochrome (queued)
+
+**Other separately tracked**:
+- Payday screen shows identical data across all months regardless of selection — confirmed data/query bug, higher priority than remaining cosmetic bugs (logged)
+- Card-flatness on panda — `#0d0d0d` lift may be too subtle on OLED displays — filed as enhancement (logged)
+- Money B.O.S logo legibility on small PWA sizes — needs icon-only variant from AJ (logged)
+
+**Environment note**: This commit was the first made from the new GitHub Codespaces environment (Codespace "Urban trout" at `/workspaces/family-finance`). Switched from local macOS earlier in the session due to TCC permission blocks on the work laptop's Downloads folder. Codespace uses Node v24.14.0 / npm v11.9.0 — newer than local Node v20.12.1 but build and test suite identical.

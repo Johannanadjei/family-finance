@@ -57,7 +57,7 @@ export function UpdateReceivedSheet({ isOpen, sourceId, receivedAmount, pendingA
           <button
             data-testid={`received-update-keep-${sourceId}`}
             onClick={onDismiss}
-            style={{ width: '100%', padding: '13px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", color: 'var(--c-muted, #6b7280)' }}
+            style={{ width: '100%', padding: '13px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' }}
           >
             No, keep as {fmt(receivedAmount)}
           </button>

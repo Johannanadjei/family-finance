@@ -131,7 +131,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
               </select>
               {nameErr && <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{nameErr}</p>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-                <button onClick={() => setStep(0)} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-muted, #6b7280)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
+                <button onClick={() => setStep(0)} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-text, #1c1917)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
                 <button onClick={handleNameNext} style={{ padding: '14px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Continue →</button>
               </div>
             </div>
@@ -161,7 +161,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
               </p>
               {error && <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{error}</p>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-                <button onClick={() => setStep(3)} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-muted, #6b7280)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
+                <button onClick={() => setStep(3)} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-text, #1c1917)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
                 <button onClick={handleConfirm} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: 'none', background: loading ? 'var(--c-border)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: loading ? 'var(--c-muted)' : '#fff', fontSize: 14, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
                   {loading ? 'Creating...' : 'Create Hub 🎉'}
                 </button>
