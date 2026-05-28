@@ -14,10 +14,15 @@
  * @param {function} onDismiss      — keep existing received amount
  */
 
+import { createPortal }   from 'react-dom';
+import { useModalChrome } from '../../hooks/useModalChrome';
+
 export function UpdateReceivedSheet({ isOpen, sourceId, receivedAmount, pendingAmount, fmt, onConfirm, onDismiss }) {
+  useModalChrome({ isOpen, onClose: onDismiss });
+
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <>
       <div
         data-testid="update-received-backdrop"
@@ -63,6 +68,7 @@ export function UpdateReceivedSheet({ isOpen, sourceId, receivedAmount, pendingA
           </button>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

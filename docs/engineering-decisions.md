@@ -1345,3 +1345,33 @@ The hook's `remaining` was distinct from the `remaining` props elsewhere in the 
 - npm test: 932 passed (933 → 932, −1 net: Header −2 Available-pill +1 chevron; useFinance −1 availableNow; MembersSection +1 ordering)
 - bash scripts/audit.sh: 183/183 passed (MembersSection.jsx held at 200-line cap)
 - Triple-check (§9.5): hooks unconditional, Header destructures only `centre`, no new permission gates, no new components, zero console.log, zero residual `availableNow`.
+
+## 2026-05-28 — Modal background-lock + back-button intercept (useModalChrome)
+
+**Problem**: When any bottom-sheet/drawer was open, the background page stayed scrollable and keyboard/a11y-reachable, and the device/browser back button navigated the underlying page instead of closing the modal. Tap-outside-to-close already worked (each sheet has a `position:fixed; inset:0` backdrop with `onClick=close`).
+
+**Diagnosis**: 7 bottom-sheets + SidePanel, all parent-`useState`-controlled, all bespoke-but-structurally-identical (no shared wrapper, no portals). No body scroll-lock, no `inert`, no `popstate` listener anywhere. The backdrop blocked pointer clicks (covers everything below its z-index) but not touch-scroll, keyboard, or screen-reader exploration.
+
+**Approach — single headless hook, not a wrapper extraction**: `useModalChrome({ isOpen, onClose })` called once per modal, above each `if (!isOpen) return null` guard (hooks-order). Three responsibilities:
+1. **Body scroll-lock** — `document.body.style.overflow='hidden'` on open; the *prior* value is captured at the 0→1 transition and restored at 1→0.
+2. **`inert` on `#app-shell`** — disables background pointer/keyboard/a11y in one attribute. Requires the modals to NOT be descendants of the inerted root, so…
+3. **Back-button intercept** — `history.pushState({__modalChrome:true}, '')` (no URL arg → address bar never changes) on open; `popstate → onClose`; `history.back()` on programmatic close to pop the dummy entry. Loop-guarded by a module-level `selfPop` flag so our own `back()` doesn't re-fire `onClose`.
+
+**Portals were required, not optional**: every sheet rendered inline as a descendant of the single DashboardShell root, so inerting that root would have disabled the modal itself. Each modal's render is now wrapped in `createPortal(<>…</>, document.body)` — making it a *sibling* of `<div id="app-shell">` so `inert` on the root can't reach it. This is a per-file JSX touch (one wrap each), chosen over dropping `inert` (weaker a11y) — see the locked Phase-2 decision.
+
+**Stacking coordinator**: module-level `openCount` (inc in effect, dec in cleanup — symmetric → StrictMode-safe); scroll + inert restored only at count 0. Per-instance `appliedRef` (idempotent lock) and `entryLiveRef` (owns-a-history-entry) refs persist across StrictMode's transient setup→cleanup→setup. App flows are hand-offs not true stacks (SidePanel closes as CreateHub opens; ConfirmSheet is for unreceived income while UpdateReceivedSheet is for already-received — mutually exclusive), so simultaneous stacking with out-of-order close does not occur; documented as an accepted limitation in-code.
+
+**selfPop-leak fix (found during test design)**: on a programmatic close of the *last* (non-stacked) modal, cleanup removes the listener before `history.back()`, so nothing consumes `selfPop` and it lingered `true` — which would silently eat the *next* modal's first back-press. Fixed by resetting `selfPop=false` at the top of the open effect. Stacked closes already self-healed (underlying listener consumed it). Production runs the effect once (history balanced); StrictMode's transient `back()` is swallowed by the guard, leaving at most a benign dev-only dangling forward entry.
+
+**iOS standalone PWA**: no system back inside the SPA, so the intercept is a no-op there; scroll-lock + inert still apply. Not a regression.
+
+**Files**:
+- src/hooks/useModalChrome.js — new hook (+ useModalChrome.test.js)
+- src/App.jsx — `id="app-shell"` on the DashboardShell root (the inert target)
+- src/views/daily/AddTransactionSheet.jsx, src/views/budget/AddCategorySheet.jsx, src/views/payday/ConfirmSheet.jsx, src/views/payday/UpdateReceivedSheet.jsx (close=`onDismiss`), src/views/settings/AddGuestSheet.jsx, src/views/settings/ArchiveHubSheet.jsx, src/features/hubs/CreateHubSheet.jsx (close=`handleClose`), src/components/layout/SidePanel.jsx (always-mounted, no guard) — each: `useModalChrome(...)` above the guard + `createPortal(..., document.body)`
+- src/views/daily/AddTransactionSheet.test.jsx — 3 integration tests (lock+inert open, no-lock closed, popstate closes)
+
+**Verification**:
+- npm test: 943 passed (932 → 943, +11: 8 hook unit tests + 3 AddTransactionSheet integration)
+- bash scripts/audit.sh: 183/183 passed
+- Triple-check (§9.5): `useModalChrome` precedes every modal's early-return guard (verified per file); effect deps `[isOpen]` with `onClose` via ref to avoid churn; optional chaining on `onCloseRef.current?.()`; no new context destructures; new hook has a test file; zero console.log.

@@ -13,6 +13,8 @@
  */
 
 import { useState, useEffect } from 'react';
+import { createPortal }        from 'react-dom';
+import { useModalChrome }      from '../../hooks/useModalChrome';
 
 const inputStyle = {
   width: '100%', padding: '12px 14px', borderRadius: 10,
@@ -30,6 +32,8 @@ export function ArchiveHubSheet({ isOpen, onClose, centreName, onArchive, onPerm
   useEffect(() => {
     if (isOpen) { setStep('archive'); setNameInput(''); setError(null); }
   }, [isOpen]);
+
+  useModalChrome({ isOpen, onClose });
 
   if (!isOpen) return null;
 
@@ -52,7 +56,7 @@ export function ArchiveHubSheet({ isOpen, onClose, centreName, onArchive, onPerm
 
   const nameMatches = nameInput === centreName;
 
-  return (
+  return createPortal(
     <>
       <div onClick={onClose} aria-hidden="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 340 }} />
       <div
@@ -159,6 +163,7 @@ export function ArchiveHubSheet({ isOpen, onClose, centreName, onArchive, onPerm
           </>
         )}
       </div>
-    </>
+    </>,
+    document.body
   );
 }

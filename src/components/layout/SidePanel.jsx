@@ -7,7 +7,9 @@
  */
 
 import { useState }                        from 'react';
+import { createPortal }                    from 'react-dom';
 import { useNavigate }                     from 'react-router-dom';
+import { useModalChrome }                  from '../../hooks/useModalChrome';
 import { ArchivedHubsList }                from './ArchivedHubsList';
 import { getInstallPrompt, triggerInstall } from '../../lib/pwa';
 import { useBudgetCentreContext }          from '../../context/BudgetCentreContext';
@@ -22,6 +24,8 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
   const navigate                      = useNavigate();
   const { can }                       = useBudgetCentreContext();
   const { signOut }                   = useAuth();
+
+  useModalChrome({ isOpen, onClose });
 
   const handleInstall = async () => {
     setInstalling(true);
@@ -40,7 +44,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
   const n          = centres.length;
   const countLabel = n === 0 ? 'BOS Hubs' : n === 1 ? '1 BOS Hub' : `${n} BOS Hubs`;
 
-  return (
+  return createPortal(
     <>
       {isOpen && (
         <div onClick={onClose} aria-hidden="true"
@@ -189,6 +193,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
           </div>
         )}
       </aside>
-    </>
+    </>,
+    document.body
   );
 }

@@ -6,7 +6,9 @@
  */
 
 import { useState, useEffect }        from 'react';
+import { createPortal }               from 'react-dom';
 import { useBudgetCentreContext }     from '../../context/BudgetCentreContext';
+import { useModalChrome }             from '../../hooks/useModalChrome';
 import { useFinanceContext }          from '../../context/FinanceContext';
 import { AccessBlocked }             from '../../components/ui/AccessBlocked';
 import { getWeekForDate }            from '../../lib/finance';
@@ -57,6 +59,8 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
   // Hide when no spare; edit-mode keeps it visible if the original tx had the flag.
   const showFromSpareToggle = type === 'expense' && (spareMoney > 0 || editTx?.from_spare === true);
 
+  useModalChrome({ isOpen, onClose });
+
   if (!isOpen) return null;
 
   const handleCategoryChip = (cat) => {
@@ -103,7 +107,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
     }
   };
 
-  return (
+  return createPortal(
     <>
       <div onClick={onClose} aria-hidden="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 340 }} />
       <div role="dialog" aria-label="Add transaction" style={{ position: 'fixed', bottom: 0, left: 'max(0px, calc(50vw - 220px))', width: '100%', maxWidth: 440, background: 'var(--c-modal-bg, var(--c-card, #fff))', borderRadius: '20px 20px 0 0', padding: '20px 20px calc(20px + env(safe-area-inset-bottom))', zIndex: 350, boxShadow: '0 -8px 32px rgba(0,0,0,.12)', maxHeight: '85vh', overflowY: 'auto' }}>
@@ -180,6 +184,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

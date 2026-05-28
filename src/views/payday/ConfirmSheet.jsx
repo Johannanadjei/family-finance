@@ -16,6 +16,8 @@
  */
 
 import { useState, useEffect } from 'react';
+import { createPortal }        from 'react-dom';
+import { useModalChrome }      from '../../hooks/useModalChrome';
 
 const inputStyle = {
   width: '100%', padding: '14px 16px', borderRadius: 12,
@@ -42,6 +44,8 @@ export function ConfirmSheet({ income, isOpen, onClose, onConfirm, loading, erro
     }
   }, [isOpen, income?.id]);
 
+  useModalChrome({ isOpen, onClose });
+
   if (!isOpen || !income) return null;
 
   const handleConfirm = () => {
@@ -57,7 +61,7 @@ export function ConfirmSheet({ income, isOpen, onClose, onConfirm, loading, erro
     onConfirm(income.id, n, dateStr);
   };
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -162,6 +166,7 @@ export function ConfirmSheet({ income, isOpen, onClose, onConfirm, loading, erro
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

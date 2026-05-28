@@ -8,6 +8,8 @@
  */
 
 import { useState, useMemo } from 'react';
+import { createPortal }          from 'react-dom';
+import { useModalChrome }        from '../../hooks/useModalChrome';
 import { selectStyle }           from '../../lib/selectStyle';
 import { createCentre }          from '../../services/centres.service';
 import { bulkAddCategories }     from '../../services/categories.service';
@@ -91,9 +93,11 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
     onComplete(data.id);
   };
 
+  useModalChrome({ isOpen, onClose: handleClose });
+
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <>
       <div onClick={handleClose} aria-hidden="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 500 }} />
 
@@ -170,6 +174,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
           )}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

@@ -117,7 +117,7 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, on
   };
 
   return (
-    <div style={{
+    <div id="app-shell" style={{
       maxWidth:   440,
       margin:     '0 auto',
       minHeight:  '100vh',

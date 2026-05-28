@@ -3,7 +3,7 @@
  * Written before AddTransactionSheet.jsx — TDD.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, fireEvent }     from '@testing-library/react';
 import { AddTransactionSheet }               from './AddTransactionSheet';
 import { mockCentre, mockFmt, mockCategories } from '../../test-utils/fixtures';
@@ -302,5 +302,38 @@ describe('AddTransactionSheet', () => {
     await act(async () => { screen.getByTestId('from-spare-toggle').click(); });
     expect(screen.getByTestId('from-spare-toggle')).toBeTruthy();
     expect(screen.getByTestId('from-spare-toggle').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  // ── modal chrome (scroll-lock + inert + back-button) ────────────────────────
+
+  describe('modal chrome', () => {
+    let root;
+    beforeEach(() => {
+      root = document.createElement('div');
+      root.id = 'app-shell';
+      root.inert = false; // jsdom doesn't implement the inert IDL property; seed the default
+      document.body.appendChild(root);
+      document.body.style.overflow = '';
+    });
+    afterEach(() => { root.remove(); document.body.style.overflow = ''; });
+
+    it('locks body scroll and inerts the root while open', () => {
+      renderSheet();
+      expect(document.body.style.overflow).toBe('hidden');
+      expect(root.inert).toBe(true);
+    });
+
+    it('does not lock the body while closed', () => {
+      renderSheet({ isOpen: false });
+      expect(document.body.style.overflow).toBe('');
+      expect(root.inert).toBe(false);
+    });
+
+    it('closes when the device back button (popstate) fires', () => {
+      const onClose = vi.fn();
+      renderSheet({ onClose });
+      act(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 });
