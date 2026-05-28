@@ -20,15 +20,12 @@ const mockFinance = {
   allIncome:      45000,
   monthlyIncome: 45000,
   totalSpent:    5000,
-  remaining:     40000,
   healthPct:     89,
   budgetStatus:  { label: 'On Track 🎯', color: '#059669' },
   nextUnpaid:    { id: 'inc-2', label: 'Dita Salary', expected_amount: 15000, daysUntil: 7 },
   totalExpected: 45000,
   fixedTotal:    28000,
   budgetRemaining: 23000,
-  variableSpent: 977,
-  surplusLeft:   2253,
   surplusTarget: 4500,
   spareMoney:    19600,
   txs: [
@@ -88,28 +85,41 @@ describe('HomeView', () => {
     mockFinance.nextUnpaid    = { id: 'inc-2', label: 'Dita Salary', expected_amount: 15000, daysUntil: 7 };
   });
 
-  it('renders 4 stat card labels for owner/full_access', () => {
+  it('renders 3 stat card labels for owner/full_access', () => {
     renderHome();
-    expect(screen.getByText('Budget Left')).toBeTruthy();
     expect(screen.getByText('Money In')).toBeTruthy();
-    expect(screen.getByText('Variable Spent')).toBeTruthy();
+    expect(screen.getByText('Budget Left')).toBeTruthy();
     expect(screen.getByText('Spare Money')).toBeTruthy();
+    expect(screen.queryByText('Variable Spent')).toBeNull();
     expect(screen.queryByText('Surplus Left')).toBeNull();
   });
 
-  it('standard member sees only Variable Spent and Spare Money stat cards', () => {
+  it('standard member sees only Spare Money stat card', () => {
     mockCan = () => false;
     renderHome();
-    expect(screen.queryByText('Budget Left')).toBeNull();
     expect(screen.queryByText('Money In')).toBeNull();
-    expect(screen.getByText('Variable Spent')).toBeTruthy();
+    expect(screen.queryByText('Budget Left')).toBeNull();
     expect(screen.getByText('Spare Money')).toBeTruthy();
   });
 
   it('stat cards show formatted values', () => {
     renderHome();
+    // Budget Left is unique to the StatCard (hero does not render budgetRemaining)
     expect(screen.getByText('GHS 23,000')).toBeTruthy();
-    expect(screen.getByText('GHS 977')).toBeTruthy();
+    // Spare Money is rendered in both the hero mini-stat and the StatCard
+    expect(screen.getAllByText('GHS 19,600').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('Spare Money StatCard uses danger colour when spareMoney is negative', () => {
+    mockFinance.spareMoney = -500;
+    renderHome();
+    // The StatCard value sits next to a "Spare Money" label; find it via the label's parent.
+    const spareLabel = screen.getByText('Spare Money');
+    const card = spareLabel.closest('div').parentElement;
+    const value = card.querySelector('p[style*="font-weight: 900"][style*="font-size: 20"]');
+    expect(value).toBeTruthy();
+    expect(value.style.color).toMatch(/dc2626|c-danger/);
+    mockFinance.spareMoney = 19600;
   });
 
 

@@ -1261,3 +1261,50 @@ Double-counting proof: every expense tx belongs to exactly one of `budgetSpend` 
 - npm test: 941 passed (922 → 941, +19 net)
 - bash scripts/audit.sh: 183/183 passed
 - Worked examples (from Phase 2): 10k income, 5k budget, 3k budget + 1k spare → spare £4k, budget left £2k ✓ ; 10k income, 5k budget, 6k budget + 1k spare → spare £3k, budget left £0 ✓ ; from_spare true tx leaves budgetSpend and healthPct untouched ✓
+
+---
+## 2026-05-28 — Money model redesign Commit 3: layout cleanup + dead-code purge
+
+**Scope**: Final commit in the three-commit money-model redesign. UI-only — no formula changes, no schema, no service changes. Removes the cards/mini-stats that the new model made obsolete, restructures Home into a clean 3-card dashboard, applies negative-spare styling, and purges the helper functions/exports left orphaned by Commits 1 and 2.
+
+**Layout changes**:
+- **New card order** (Home): hero (MonthlyIncomeCard) → PaydaySummaryCard → 1×3 stat grid (Money In | Budget Left | Spare Money) → BudgetHealthBar → RecentActivity.
+- **Removed**: "Variable Spent" StatCard (the new model has no separate variable pool; spare drawdown via overspend + `from_spare` is the unified signal). "Money Left" mini-stat in the hero (it diverged from Spare under Commits 1–2; consolidating to one Spare reading removes the inconsistency).
+- **Stat grid**: from 2×2 (4 cards) → 1×3 (3 cards). Per-card width at 440px container minus padding is ~128px; to fit the largest currency strings comfortably, StatCard value `fontSize` dropped 22 → 20 and card padding `'16px 18px' → '14px 14px'`. Applied globally to StatCard since it has no other callsites.
+- **Stat grid ordering**: Money In → Budget Left → Spare Money. Reads as the income → planned bucket → leftover pipeline mental model.
+- **Skeleton** rewritten to match the new 1×3 grid + reordered full-width bars. No load-flash hop.
+
+**Negative-spare styling**:
+- Spare Money StatCard: `color = spareMoney < 0 ? 'var(--c-danger,#dc2626)' : 'var(--c-success,#059669)'`.
+- Hero "Spare" mini-stat: extended the same logic with the on-gradient danger-light token, so the two surfaces stay consistent. (The locked design specified only the StatCard, but applying it to the hero mini-stat too keeps the two displays in sync — applying red in one place while staying neutral in the other would have read as a UI bug.)
+
+**Tooltip wording (Spare Money)**:
+- Old: "What's left after your bills and extra spending. Yours to use however you like." (vague, didn't pin when spare moves)
+- New: "Your income minus your budget — drawn down by overspend or by expenses you mark 'Take from Spare'." (plain words, matches Commit 1 + 2 model).
+- Removed `variable` key from STAT_INFO (orphaned by Variable Spent card removal).
+
+**Dead-code purge** (zero production callsites confirmed via grep):
+- `calcSurplusLeft` (finance.js) — orphaned since Commit 1.
+- `calcVariableSpent` (finance.js) + `variableSpent` memo + export in useFinance.js — orphaned by Variable Spent card removal.
+- `calcRemaining` (finance.js) + `remaining` memo + export in useFinance.js — orphaned by Money Left mini-stat removal.
+- Stale `variableSpent: 977`, `surplusLeft: 2253`, `remaining: 40000` mock fields in `contextMocks.js` and `HomeView.test.jsx`.
+
+The hook's `remaining` was distinct from the `remaining` props elsewhere in the codebase (`BudgetView`, `CategoryBudgetRow`, `PinScreen`) — those are unrelated local variables and are untouched.
+
+**Deferred to Commit 4 (separate PR)**: side-panel header button restyle (no chevron, no hover affordance — pure design task, separate from the money model).
+
+**Files**:
+- src/views/HomeView.jsx — reordered card sequence, 1×3 stat grid, removed Variable Spent StatCard, dynamic Spare colour, rewrote HomeViewSkeleton
+- src/views/home/MonthlyIncomeCard.jsx — removed Money Left mini-stat (kept Spent), dropped `remaining` prop, updated stale JSDoc, added negative-spare hero mini-stat colouring
+- src/views/home/StatCard.jsx — fontSize 22 → 20, padding 16/18 → 14/14, removed `variable` STAT_INFO key, rewrote `spare` STAT_INFO key
+- src/hooks/useFinance.js — purged `variableSpent` + `remaining` memos + exports + dead imports
+- src/lib/finance.js — purged calcSurplusLeft + calcVariableSpent + calcRemaining
+- src/lib/finance.test.js — removed calcRemaining (×2 blocks) + calcVariableSpent describes + their imports
+- src/views/HomeView.test.jsx — 3-card assertions, dropped Variable Spent mocks/assertions, standard-member test updated to Spare Money only, added negative-spare colour test
+- src/views/home/MonthlyIncomeCard.test.jsx — dropped Money Left test + `remaining` prop, added "Money Left not rendered" test + negative-spare hero colour test
+- src/test-utils/contextMocks.js — dropped `variableSpent`, `surplusLeft`, `remaining` mock fields
+
+**Verification**:
+- npm test: 933 passed (941 → 933, −8 net from purge: −10 from calcRemaining/calcVariableSpent describes; −1 MonthlyIncomeCard "shows remaining"; +1 MonthlyIncomeCard "Money Left not present"; +1 MonthlyIncomeCard negative-spare hero; +1 HomeView negative-spare StatCard)
+- bash scripts/audit.sh: 183/183 passed
+- Manual: 3-card dashboard renders cleanly at 440px, Variable Spent and Money Left both gone, Budget Health sits below stat grid, Payday sits below hero, negative spare renders red in both surfaces, tooltip text matches current model.

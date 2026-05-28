@@ -14,14 +14,12 @@ import {
   offsetMonth,
   calcTotalIncome,
   calcTotalSpent,
-  calcRemaining,
   calcBudgetUsedPct,
   getBudgetStatusFromBudget,
   calcSpareMoney,
   calcTotalFixed,
   calcCategorySpend,
   calcFixedSpent,
-  calcVariableSpent,
   calcTotalExpected,
   calcTotalReceived,
   calcAvailableNow,
@@ -183,19 +181,6 @@ describe('calcTotalSpent', () => {
     expect(calcTotalSpent([])).toBe(0));
 });
 
-// ── calcRemaining ─────────────────────────────────────────────────────────────
-
-describe('calcRemaining', () => {
-  it('subtracts spent from income', () =>
-    expect(calcRemaining(5000, 2000)).toBe(3000));
-
-  it('returns negative when overspent', () =>
-    expect(calcRemaining(1000, 1500)).toBe(-500));
-
-  it('returns 0 when exactly spent', () =>
-    expect(calcRemaining(1000, 1000)).toBe(0));
-});
-
 // ── calcBudgetUsedPct ─────────────────────────────────────────────────────────
 
 describe('calcBudgetUsedPct', () => {
@@ -338,42 +323,6 @@ describe('calcFixedSpent', () => {
     const txs = [makeTx({ type: 'expense', category_name: 'Other', amount: 100 })];
     expect(calcFixedSpent(txs, [])).toBe(0);
   });
-});
-
-// ── calcVariableSpent ─────────────────────────────────────────────────────────
-
-describe('calcVariableSpent', () => {
-  it('sums spend on unknown categories only', () => {
-    const txs = [
-      makeTx({ type: 'expense', category_name: 'Groceries', amount: 200 }),
-      makeTx({ type: 'expense', category_name: 'Other',     amount: 100 }),
-    ];
-    const cats = [makeCat({ name: 'Groceries' })];
-    expect(calcVariableSpent(txs, cats)).toBe(100);
-  });
-
-  it('returns 0 when all spend is in known categories', () => {
-    const txs  = [makeTx({ type: 'expense', category_name: 'Groceries', amount: 200 })];
-    const cats = [makeCat({ name: 'Groceries' })];
-    expect(calcVariableSpent(txs, cats)).toBe(0);
-  });
-});
-
-describe('calcRemaining (used as Money Left in hook)', () => {
-  it('surplus = income - all spending regardless of category', () =>
-    expect(calcRemaining(45000, 200)).toBe(44800));
-
-  it('surplus decreases when known category expense added', () =>
-    expect(calcRemaining(45000, 700)).toBe(44300));
-
-  it('surplus decreases when variable expense added', () =>
-    expect(calcRemaining(45000, 1200)).toBe(43800));
-
-  it('surplus is zero when all income spent', () =>
-    expect(calcRemaining(45000, 45000)).toBe(0));
-
-  it('surplus is negative when overspent', () =>
-    expect(calcRemaining(45000, 50000)).toBe(-5000));
 });
 
 // ── calcTotalExpected / calcTotalReceived ─────────────────────────────────────

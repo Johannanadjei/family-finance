@@ -60,9 +60,6 @@ export const calcTotalIncome = (txs) =>
 export const calcTotalSpent = (txs) =>
   txs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
 
-export const calcRemaining = (monthlyIncome, totalSpent) =>
-  monthlyIncome - totalSpent;
-
 export const calcBudgetUsedPct = (fixedSpent, fixedTotal) =>
   fixedTotal > 0 ? Math.round((fixedSpent / fixedTotal) * 100) : 0;
 
@@ -117,14 +114,6 @@ export const calcFixedSpent = (txs, categories = []) =>
   txs
     .filter(t => t.type === 'expense' && isKnownCategory(t.category_name, categories))
     .reduce((s, t) => s + Number(t.amount), 0);
-
-export const calcVariableSpent = (txs, categories = []) =>
-  txs
-    .filter(t => t.type === 'expense' && !isKnownCategory(t.category_name, categories))
-    .reduce((s, t) => s + Number(t.amount), 0);
-
-export const calcSurplusLeft = (monthlyIncome, totalBudgeted, variableSpent) =>
-  monthlyIncome - totalBudgeted - variableSpent;
 
 // budgetSpend = Σ expenses with from_spare=false (the default path)
 // spareSpend  = Σ expenses with from_spare=true  (user opted out of budget)

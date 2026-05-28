@@ -21,7 +21,6 @@ const renderCard = (props = {}) =>
         totalReceived={30000}
         monthlyIncome={45000}
         totalSpent={5000}
-        remaining={40000}
         spareMoney={4500}
         {...props}
       />
@@ -46,17 +45,22 @@ describe('MonthlyIncomeCard', () => {
 
   it('shows spent amount', () => {
     renderCard();
-    expect(screen.getByText('GHS 5,000')).toBeTruthy();
+    expect(screen.getByTestId('stat-spent').textContent).toBe('GHS 5,000');
   });
 
-  it('shows remaining amount', () => {
+  it('shows spareMoney as Spare', () => {
     renderCard();
-    expect(screen.getByText('GHS 40,000')).toBeTruthy();
+    expect(screen.getByTestId('stat-spare').textContent).toBe('GHS 4,500');
   });
 
-  it('shows spareMoney as Spare — not monthlyIncome minus totalSpent', () => {
+  it('does not render Money Left mini-stat', () => {
     renderCard();
-    expect(screen.getByText('GHS 4,500')).toBeTruthy();
-    expect(screen.queryByText('GHS 40,000', { selector: '[data-label="Spare"]' })).toBeNull();
+    expect(screen.queryByTestId('stat-money-left')).toBeNull();
+  });
+
+  it('Spare mini-stat uses danger colour when spareMoney is negative', () => {
+    renderCard({ spareMoney: -200 });
+    const spare = screen.getByTestId('stat-spare');
+    expect(spare.style.color).toMatch(/fca5a5|c-danger-light/);
   });
 });

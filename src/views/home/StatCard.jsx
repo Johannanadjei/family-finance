@@ -16,16 +16,15 @@
  */
 
 const STAT_INFO = {
-  fixed:    'How much of your monthly budget is still unspent. Overspend draws from Spare Money.',
-  income:   'Total income from all sources — salary and ad-hoc combined.',
-  variable: 'Spending outside your planned budget categories. This comes from your Spare Money.',
-  spare:    "What's left after your bills and extra spending. Yours to use however you like.",
+  fixed:  'How much of your monthly budget is still unspent. Overspend draws from Spare Money.',
+  income: 'Total income from all sources — salary and ad-hoc combined.',
+  spare:  "Your income minus your budget — drawn down by overspend or by expenses you mark 'Take from Spare'.",
 };
 
 export function StatCard({ label, value, subtitle, infoKey, color, activeInfo, onInfo }) {
   const isActive = activeInfo === infoKey;
   return (
-    <div style={{ background: 'var(--c-card,#fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)' }}>
+    <div style={{ background: 'var(--c-card,#fff)', borderRadius: 16, padding: '14px 14px', boxShadow: 'var(--c-shadow)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-muted,#6b7280)', margin: 0 }}>{label}</p>
         <button
@@ -40,7 +39,7 @@ export function StatCard({ label, value, subtitle, infoKey, color, activeInfo, o
           </svg>
         </button>
       </div>
-      <p style={{ fontSize: 22, fontWeight: 900, color: color || 'var(--c-text,#1c1917)', margin: 0 }}>{value}</p>
+      <p style={{ fontSize: 20, fontWeight: 900, color: color || 'var(--c-text,#1c1917)', margin: 0 }}>{value}</p>
       {subtitle && (
         <p style={{ fontSize: 11, color: 'var(--c-muted,#9ca3af)', margin: '4px 0 0', fontWeight: 600 }}>{subtitle}</p>
       )}
