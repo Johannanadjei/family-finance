@@ -57,7 +57,7 @@ export function HomeView() {
   const {
     totalReceived, monthlyIncome, totalSpent, remaining, allIncome,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
-    fixedTotal, variableSpent, spareMoney, txs,
+    fixedTotal, variableSpent, spareMoney, budgetRemaining, txs,
   } = financeValues;
 
   const showIncome  = can('viewIncome');
@@ -86,8 +86,8 @@ export function HomeView() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
         {showBalance && (
           <StatCard
-            label="Fixed Budget"
-            value={fmt(fixedTotal)}
+            label="Budget Left"
+            value={fmt(budgetRemaining)}
             infoKey="fixed"
             activeInfo={activeInfo}
             onInfo={setActiveInfo}

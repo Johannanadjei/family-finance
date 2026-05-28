@@ -1160,3 +1160,48 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - npm test: 920 passed (916 → 920, +4 net)
 - bash scripts/audit.sh: 181/181 passed
 - Numbers: fixedSpent 4301 / fixedTotal 2080 → 207%, Over Budget red, fill at 100% — matches Budget view
+
+---
+## 2026-05-28 — Money model redesign Commit 1: spare draws down on overspend, Budget StatCard counts down
+
+**Scope**: First of three commits redesigning the money model. Replace the income-relative spare formula with one that ties spare to budget overrun, and switch the home "Fixed Budget" StatCard to count down as the month progresses. No schema change. No card removal (Commit 3). No "from spare" toast / column (Commit 2).
+
+**Old model (broken)**: `spareMoney = allIncome − fixedTotal − variableSpent`. Two pools (budget + spare) where category-tagged spend reduced fixedSpent only and Other-tagged spend reduced spare via variableSpent. Overspending a category budget didn't touch spare — the overspend silently disappeared. Pinned by `useFinance.test.js:25` ("spareMoney unchanged when known category expense added", asserting 29300) — exactly the regression.
+
+**New model**: All expenses (category + Other) draw from BUDGET first. Spare only moves once total spend exceeds the budget total. One pool, with overflow.
+- `calcSpareMoney(allIncome, fixedTotal, totalSpent) = allIncome − max(fixedTotal, totalSpent)` — can go negative, intentional, displayed as-is in Commit 1 (Commit 3 will handle styling).
+- `budgetRemaining = max(0, fixedTotal − totalSpent)` — floored at zero; overspend goes against spare, not below-zero budget.
+
+**Verification math**:
+- Income 10k, Budget 5k, spent 4k (3k cat + 1k Other) → spare = 10k − max(5k, 4k) = 5k ✓ (untouched)
+- Income 10k, Budget 5k, spent 6k → spare = 10k − max(5k, 6k) = 4k ✓ (overspend 1k ate spare)
+- Income 5k, Budget 5k, no spend → spare = 0 ✓
+- Income 0, Budget 5k → spare = −5k ✓ (shown as-is)
+
+**Why computed not stored**: Phase 1 confirmed the entire derived state is a pure function of `txs + incomes + categories` — there are no stored deltas. Edit/delete unwinds correctly because `useMemo` recomputes from scratch. Stamping each tx with "drew from spare" at insert would create stored derived state that breaks when category budgets change mid-month (raising Groceries from 500 → 1500 should retroactively bring previously-overflowed expenses back into budget). Commit 2's "user explicitly chose spare" is irreducibly user intent and DOES need a stored `from_spare boolean` column — that's the migration in Commit 2, not here.
+
+**Budget StatCard rename (Q2 decision)**:
+- Label: "Fixed Budget" → "Budget Left"
+- Value: `fmt(fixedTotal)` → `fmt(budgetRemaining)`
+- Tooltip: "Your total planned monthly budget across all categories." → "How much of your monthly budget is still unspent. Overspend draws from Spare Money."
+- `fixedTotal` itself is retained (still feeds BudgetHealthBar denominator + BudgetView "Planned" header).
+
+**Known temporary divergence**: "Money Left" mini-stat (allIncome − totalSpent) and "Spare Money" StatCard (allIncome − max(fixedTotal, totalSpent)) now display different numbers for the same household state. Commit 3 removes the Money Left mini-stat (and Variable Spent card) to resolve this. Acceptable for an intermediate commit.
+
+**Cleanup in scope**: `calcSurplusLeft` was dead code (no production consumers) — removed its describe block (5 stale tests) + import + the stale `// surplusLeft = totalReceived - max(fixedTotal, totalSpent)` comment header that documented an old never-shipped model. Triggered by audit (finance.test.js hit 620/600 line limit after adding the new spare tests). `calcSurplusLeft` the function itself in `finance.js` left for now — purge in Commit 3 alongside the card removal.
+
+**Files**:
+- src/lib/finance.js — added calcSpareMoney
+- src/hooks/useFinance.js — swapped spareMoney memo, added budgetRemaining memo + export
+- src/views/HomeView.jsx — destructure budgetRemaining, swap StatCard label/value
+- src/views/home/StatCard.jsx — updated `fixed` tooltip text
+- src/lib/finance.test.js — new calcSpareMoney describe (6 cases), removed calcSurplusLeft describe + import + stale comment
+- src/hooks/useFinance.test.js — updated spareMoney assertions to new formula, added budgetRemaining test
+- src/views/HomeView.test.jsx — "Fixed Budget" → "Budget Left", added budgetRemaining to mock, updated GHS 28,000 → GHS 23,000
+- src/views/home/StatCard.test.jsx — label + tooltip text updated
+- src/test-utils/contextMocks.js — added budgetRemaining: 23000 to FinanceContext mock
+
+**Verification**:
+- npm test: 922 passed (920 → 922, +2 net = +6 calcSpareMoney + 1 budgetRemaining − 5 calcSurplusLeft removed)
+- bash scripts/audit.sh: 181/181 passed
+- Numbers (worked example, £10k income, £5k budget, £5,211 spent): spare = 10000 − max(5000, 5211) = £4,789; budgetRemaining = max(0, 5000 − 5211) = £0

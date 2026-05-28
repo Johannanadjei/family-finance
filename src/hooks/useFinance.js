@@ -24,6 +24,7 @@ import { getIncomeSources, markReceived as dbMarkReceived, markPending as dbMark
 import {
   calcTotalIncome, calcTotalSpent, calcRemaining, calcBudgetUsedPct,
   getBudgetStatusFromBudget, calcTotalFixed, calcFixedSpent, calcVariableSpent,
+  calcSpareMoney,
   calcTotalExpected, calcTotalReceived,
   calcWeeklyData, calcCategorySpend, calcTopCategories, calcDaysUntil,
   getWeekForDate, getCurrentMonth,
@@ -108,7 +109,8 @@ export function useFinance({ centre, categories }) {
   const fixedTotal     = useMemo(() => calcTotalFixed(categories),                              [categories]);
   const fixedSpent     = useMemo(() => calcFixedSpent(txs, categories),                        [txs, categories]);
   const variableSpent  = useMemo(() => calcVariableSpent(txs, categories),                     [txs, categories]);
-  const spareMoney     = useMemo(() => allIncome - fixedTotal - variableSpent,                  [allIncome, fixedTotal, variableSpent]);
+  const spareMoney     = useMemo(() => calcSpareMoney(allIncome, fixedTotal, totalSpent),       [allIncome, fixedTotal, totalSpent]);
+  const budgetRemaining = useMemo(() => Math.max(0, fixedTotal - totalSpent),                   [fixedTotal, totalSpent]);
   const remaining      = useMemo(() => calcRemaining(allIncome, totalSpent),                    [allIncome, totalSpent]);
   const healthPct      = useMemo(() => calcBudgetUsedPct(fixedSpent, fixedTotal),               [fixedSpent, fixedTotal]);
   const budgetStatus   = useMemo(() => getBudgetStatusFromBudget(healthPct),                    [healthPct]);
@@ -404,6 +406,7 @@ export function useFinance({ centre, categories }) {
     fixedSpent,
     variableSpent,
     spareMoney,
+    budgetRemaining,
     surplusTarget,
     remaining,
     healthPct,

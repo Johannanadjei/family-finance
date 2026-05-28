@@ -10,7 +10,7 @@ import { StatCard }                 from './StatCard';
 const renderCard = (props = {}) =>
   render(
     <StatCard
-      label="Fixed Budget"
+      label="Budget Left"
       value="GHS 28,000"
       infoKey="fixed"
       activeInfo={null}
@@ -22,7 +22,7 @@ const renderCard = (props = {}) =>
 describe('StatCard', () => {
   it('renders label', () => {
     renderCard();
-    expect(screen.getByText('Fixed Budget')).toBeTruthy();
+    expect(screen.getByText('Budget Left')).toBeTruthy();
   });
 
   it('renders formatted string value', () => {
@@ -42,25 +42,25 @@ describe('StatCard', () => {
 
   it('shows info tooltip when active', () => {
     renderCard({ activeInfo: 'fixed' });
-    expect(screen.getByText('Your total planned monthly budget across all categories.')).toBeTruthy();
+    expect(screen.getByText('How much of your monthly budget is still unspent. Overspend draws from Spare Money.')).toBeTruthy();
   });
 
   it('hides info tooltip when not active', () => {
     renderCard({ activeInfo: null });
-    expect(screen.queryByText('Your total planned monthly budget across all categories.')).toBeNull();
+    expect(screen.queryByText('How much of your monthly budget is still unspent. Overspend draws from Spare Money.')).toBeNull();
   });
 
   it('calls onInfo when info button tapped', () => {
     const onInfo = vi.fn();
     renderCard({ onInfo });
-    screen.getByLabelText('Info about Fixed Budget').click();
+    screen.getByLabelText('Info about Budget Left').click();
     expect(onInfo).toHaveBeenCalledWith('fixed');
   });
 
   it('calls onInfo with null when already active — dismisses', () => {
     const onInfo = vi.fn();
     renderCard({ activeInfo: 'fixed', onInfo });
-    screen.getByLabelText('Info about Fixed Budget').click();
+    screen.getByLabelText('Info about Budget Left').click();
     expect(onInfo).toHaveBeenCalledWith(null);
   });
 });

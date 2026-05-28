@@ -26,6 +26,7 @@ const mockFinance = {
   nextUnpaid:    { id: 'inc-2', label: 'Dita Salary', expected_amount: 15000, daysUntil: 7 },
   totalExpected: 45000,
   fixedTotal:    28000,
+  budgetRemaining: 23000,
   variableSpent: 977,
   surplusLeft:   2253,
   surplusTarget: 4500,
@@ -89,7 +90,7 @@ describe('HomeView', () => {
 
   it('renders 4 stat card labels for owner/full_access', () => {
     renderHome();
-    expect(screen.getByText('Fixed Budget')).toBeTruthy();
+    expect(screen.getByText('Budget Left')).toBeTruthy();
     expect(screen.getByText('Money In')).toBeTruthy();
     expect(screen.getByText('Variable Spent')).toBeTruthy();
     expect(screen.getByText('Spare Money')).toBeTruthy();
@@ -99,7 +100,7 @@ describe('HomeView', () => {
   it('standard member sees only Variable Spent and Spare Money stat cards', () => {
     mockCan = () => false;
     renderHome();
-    expect(screen.queryByText('Fixed Budget')).toBeNull();
+    expect(screen.queryByText('Budget Left')).toBeNull();
     expect(screen.queryByText('Money In')).toBeNull();
     expect(screen.getByText('Variable Spent')).toBeTruthy();
     expect(screen.getByText('Spare Money')).toBeTruthy();
@@ -107,7 +108,7 @@ describe('HomeView', () => {
 
   it('stat cards show formatted values', () => {
     renderHome();
-    expect(screen.getByText('GHS 28,000')).toBeTruthy();
+    expect(screen.getByText('GHS 23,000')).toBeTruthy();
     expect(screen.getByText('GHS 977')).toBeTruthy();
   });
 

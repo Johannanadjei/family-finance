@@ -17,11 +17,11 @@ import {
   calcRemaining,
   calcBudgetUsedPct,
   getBudgetStatusFromBudget,
+  calcSpareMoney,
   calcTotalFixed,
   calcCategorySpend,
   calcFixedSpent,
   calcVariableSpent,
-  calcSurplusLeft,
   calcTotalExpected,
   calcTotalReceived,
   calcAvailableNow,
@@ -247,6 +247,28 @@ describe('getBudgetStatusFromBudget', () => {
   });
 });
 
+// ── calcSpareMoney ────────────────────────────────────────────────────────────
+
+describe('calcSpareMoney', () => {
+  it('returns income − budget when under budget', () =>
+    expect(calcSpareMoney(10000, 5000, 4000)).toBe(5000));
+
+  it('returns income − budget when exactly at budget', () =>
+    expect(calcSpareMoney(10000, 5000, 5000)).toBe(5000));
+
+  it('returns income − spent when over budget (overspend draws from spare)', () =>
+    expect(calcSpareMoney(10000, 5000, 6000)).toBe(4000));
+
+  it('returns −budget when zero income', () =>
+    expect(calcSpareMoney(0, 5000, 0)).toBe(-5000));
+
+  it('allows negative spare when income < budget', () =>
+    expect(calcSpareMoney(3000, 5000, 0)).toBe(-2000));
+
+  it('returns 0 when income equals budget and nothing spent', () =>
+    expect(calcSpareMoney(5000, 5000, 0)).toBe(0));
+});
+
 // ── calcTotalFixed ────────────────────────────────────────────────────────────
 
 describe('calcTotalFixed', () => {
@@ -336,32 +358,7 @@ describe('calcVariableSpent', () => {
   });
 });
 
-// ── calcSurplusLeft ───────────────────────────────────────────────────────────
-
-describe('calcSurplusLeft', () => {
-  it('calculates correctly', () =>
-    expect(calcSurplusLeft(10000, 6000, 1000)).toBe(3000));
-
-  it('returns negative when overspent', () =>
-    expect(calcSurplusLeft(5000, 6000, 500)).toBe(-1500));
-
-  it('returns full income when nothing budgeted or spent', () =>
-    expect(calcSurplusLeft(5000, 0, 0)).toBe(5000));
-
-  it('uses received amount when income received — reflects reality not projection', () =>
-    expect(calcSurplusLeft(28000, 6000, 1000)).toBe(21000));
-
-  it('uses expected amount as projection when nothing received yet', () =>
-    expect(calcSurplusLeft(30000, 6000, 0)).toBe(24000));
-});
-
-// ── calcSurplusRemaining ──────────────────────────────────────────────────────
-// surplusLeft = totalReceived - max(fixedTotal, totalSpent)
-// Surplus = income minus budget allocation.
-// Protected while spending within budget.
-// Reduces only once total spending exceeds the fixed budget total.
-
-describe('calcRemaining (used as surplusLeft in hook)', () => {
+describe('calcRemaining (used as Money Left in hook)', () => {
   it('surplus = income - all spending regardless of category', () =>
     expect(calcRemaining(45000, 200)).toBe(44800));
 

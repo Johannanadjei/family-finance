@@ -126,6 +126,11 @@ export const calcVariableSpent = (txs, categories = []) =>
 export const calcSurplusLeft = (monthlyIncome, totalBudgeted, variableSpent) =>
   monthlyIncome - totalBudgeted - variableSpent;
 
+// Spare = income − whichever is larger, the planned budget or what was actually spent.
+// Spend up to budget is "earmarked"; overspend overflows to spare. Can go negative.
+export const calcSpareMoney = (allIncome, fixedTotal, totalSpent) =>
+  allIncome - Math.max(fixedTotal, totalSpent);
+
 export const calcTotalExpected = (sources) =>
   sources.reduce((s, i) => s + Number(i.expected_amount || 0), 0);
 

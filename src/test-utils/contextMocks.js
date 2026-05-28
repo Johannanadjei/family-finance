@@ -57,6 +57,7 @@ export function makeFinanceMock(overrides = {}) {
       budgetStatus:         { label: 'On Track 🎯', color: '#059669' },
       nextUnpaid:           { id: 'inc-2', label: 'Dita Salary', expected_amount: 15000, daysUntil: 7 },
       fixedTotal:           28000,
+      budgetRemaining:      23000,
       variableSpent:        977,
       surplusLeft:          2253,
       surplusTarget:        4500,

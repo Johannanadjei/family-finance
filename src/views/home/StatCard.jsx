@@ -16,7 +16,7 @@
  */
 
 const STAT_INFO = {
-  fixed:    'Your total planned monthly budget across all categories.',
+  fixed:    'How much of your monthly budget is still unspent. Overspend draws from Spare Money.',
   income:   'Total income from all sources — salary and ad-hoc combined.',
   variable: 'Spending outside your planned budget categories. This comes from your Spare Money.',
   spare:    "What's left after your bills and extra spending. Yours to use however you like.",
