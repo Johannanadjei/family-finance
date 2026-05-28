@@ -63,15 +63,13 @@ export const calcTotalSpent = (txs) =>
 export const calcRemaining = (monthlyIncome, totalSpent) =>
   monthlyIncome - totalSpent;
 
-export const calcHealthPct = (remaining, monthlyIncome) =>
-  monthlyIncome > 0
-    ? Math.max(0, Math.min(100, Math.round((remaining / monthlyIncome) * 100)))
-    : 0;
+export const calcBudgetUsedPct = (fixedSpent, fixedTotal) =>
+  fixedTotal > 0 ? Math.round((fixedSpent / fixedTotal) * 100) : 0;
 
-export const getBudgetStatus = (remaining, surplusTarget) => {
-  if (remaining > surplusTarget) return { label: 'On Track 🎯',   color: '#059669' };
-  if (remaining > 0)             return { label: 'Watch Out ⚠️',  color: '#d97706' };
-  return                                { label: 'Over Budget 🚨', color: '#dc2626' };
+export const getBudgetStatusFromBudget = (usedPct) => {
+  if (usedPct > 100) return { label: 'Over Budget 🚨', color: '#dc2626' };
+  if (usedPct >= 85) return { label: 'Watch Out ⚠️',  color: '#d97706' };
+  return                    { label: 'On Track 🎯',   color: '#059669' };
 };
 
 export const calcSpendByDay = (txs) => {

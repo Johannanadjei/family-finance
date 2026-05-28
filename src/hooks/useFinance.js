@@ -22,8 +22,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getTransactionsByMonth, addTransaction as dbAddTransaction, updateTransaction as dbUpdateTransaction, deleteTransaction as dbDeleteTransaction } from '../services/transactions.service';
 import { getIncomeSources, markReceived as dbMarkReceived, markPending as dbMarkPending, updateExpectedAmount as dbUpdateExpectedAmount, addIncomeSource as dbAddIncomeSource, deleteIncomeSource as dbDeleteIncomeSource } from '../services/income.service';
 import {
-  calcTotalIncome, calcTotalSpent, calcRemaining, calcHealthPct,
-  getBudgetStatus, calcTotalFixed, calcFixedSpent, calcVariableSpent,
+  calcTotalIncome, calcTotalSpent, calcRemaining, calcBudgetUsedPct,
+  getBudgetStatusFromBudget, calcTotalFixed, calcFixedSpent, calcVariableSpent,
   calcTotalExpected, calcTotalReceived,
   calcWeeklyData, calcCategorySpend, calcTopCategories, calcDaysUntil,
   getWeekForDate, getCurrentMonth,
@@ -110,8 +110,8 @@ export function useFinance({ centre, categories }) {
   const variableSpent  = useMemo(() => calcVariableSpent(txs, categories),                     [txs, categories]);
   const spareMoney     = useMemo(() => allIncome - fixedTotal - variableSpent,                  [allIncome, fixedTotal, variableSpent]);
   const remaining      = useMemo(() => calcRemaining(allIncome, totalSpent),                    [allIncome, totalSpent]);
-  const healthPct      = useMemo(() => calcHealthPct(remaining, allIncome),                     [remaining, allIncome]);
-  const budgetStatus   = useMemo(() => getBudgetStatus(remaining, surplusTarget),               [remaining, surplusTarget]);
+  const healthPct      = useMemo(() => calcBudgetUsedPct(fixedSpent, fixedTotal),               [fixedSpent, fixedTotal]);
+  const budgetStatus   = useMemo(() => getBudgetStatusFromBudget(healthPct),                    [healthPct]);
   const weeklyData     = useMemo(() => calcWeeklyData(txs, categories, monthlyIncome),         [txs, categories, monthlyIncome]);
   const categorySpend  = useMemo(() => calcCategorySpend(txs, categories),                     [txs, categories]);
   const topCategories  = useMemo(() => calcTopCategories(txs),                                  [txs]);

@@ -15,8 +15,8 @@ import {
   calcTotalIncome,
   calcTotalSpent,
   calcRemaining,
-  calcHealthPct,
-  getBudgetStatus,
+  calcBudgetUsedPct,
+  getBudgetStatusFromBudget,
   calcTotalFixed,
   calcCategorySpend,
   calcFixedSpent,
@@ -196,46 +196,54 @@ describe('calcRemaining', () => {
     expect(calcRemaining(1000, 1000)).toBe(0));
 });
 
-// ── calcHealthPct ─────────────────────────────────────────────────────────────
+// ── calcBudgetUsedPct ─────────────────────────────────────────────────────────
 
-describe('calcHealthPct', () => {
-  it('returns 100 when nothing spent', () =>
-    expect(calcHealthPct(5000, 5000)).toBe(100));
+describe('calcBudgetUsedPct', () => {
+  it('returns true % when over budget (does not cap)', () =>
+    expect(calcBudgetUsedPct(4301, 2080)).toBe(207));
 
-  it('returns 50 when half spent', () =>
-    expect(calcHealthPct(2500, 5000)).toBe(50));
+  it('returns 30 when 30% used', () =>
+    expect(calcBudgetUsedPct(624, 2080)).toBe(30));
 
-  it('returns 0 when all spent', () =>
-    expect(calcHealthPct(0, 5000)).toBe(0));
+  it('returns 0 when nothing spent', () =>
+    expect(calcBudgetUsedPct(0, 2080)).toBe(0));
 
-  it('caps at 0 when overspent', () =>
-    expect(calcHealthPct(-500, 5000)).toBe(0));
+  it('returns 100 when exactly at budget', () =>
+    expect(calcBudgetUsedPct(2080, 2080)).toBe(100));
 
-  it('returns 0 when monthlyIncome is 0', () =>
-    expect(calcHealthPct(0, 0)).toBe(0));
+  it('returns 0 when no budget categories (fixedTotal=0)', () =>
+    expect(calcBudgetUsedPct(500, 0)).toBe(0));
 });
 
-// ── getBudgetStatus ───────────────────────────────────────────────────────────
+// ── getBudgetStatusFromBudget ─────────────────────────────────────────────────
 
-describe('getBudgetStatus', () => {
-  it('returns On Track when remaining > surplusTarget', () => {
-    const status = getBudgetStatus(5000, 3000);
+describe('getBudgetStatusFromBudget', () => {
+  it('returns On Track below 85%', () => {
+    const status = getBudgetStatusFromBudget(50);
     expect(status.label).toContain('On Track');
+    expect(status.color).toBe('#059669');
   });
 
-  it('returns Watch Out when remaining > 0 but below target', () => {
-    const status = getBudgetStatus(1000, 3000);
+  it('returns Watch Out at 85%', () => {
+    const status = getBudgetStatusFromBudget(85);
+    expect(status.label).toContain('Watch Out');
+    expect(status.color).toBe('#d97706');
+  });
+
+  it('returns Watch Out at 90%', () => {
+    const status = getBudgetStatusFromBudget(90);
     expect(status.label).toContain('Watch Out');
   });
 
-  it('returns Over Budget when remaining <= 0', () => {
-    const status = getBudgetStatus(-100, 3000);
-    expect(status.label).toContain('Over Budget');
+  it('returns Watch Out at exactly 100%', () => {
+    const status = getBudgetStatusFromBudget(100);
+    expect(status.label).toContain('Watch Out');
   });
 
-  it('returns Over Budget when remaining is exactly 0', () => {
-    const status = getBudgetStatus(0, 3000);
+  it('returns Over Budget above 100%', () => {
+    const status = getBudgetStatusFromBudget(101);
     expect(status.label).toContain('Over Budget');
+    expect(status.color).toBe('#dc2626');
   });
 });
 

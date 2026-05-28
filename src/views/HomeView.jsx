@@ -75,7 +75,7 @@ export function HomeView() {
           spareMoney={spareMoney}
         />
       )}
-      <BudgetHealthBar healthPct={healthPct} budgetStatus={budgetStatus} totalSpent={totalSpent} />
+      <BudgetHealthBar healthPct={healthPct} budgetStatus={budgetStatus} totalSpent={totalSpent} fixedTotal={fixedTotal} />
       {showIncome && (
         <PaydaySummaryCard
           nextUnpaid={nextUnpaid}

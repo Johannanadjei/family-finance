@@ -1127,3 +1127,36 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 **Verification**:
 - npm test: 916 passed
 - bash scripts/audit.sh: 181/181 passed (one §3 violation cleared)
+
+---
+## 2026-05-27 — Bug fix: Budget Health bar measures spend-against-budget (not income)
+
+**Scope**: Fix the Home Budget Health bar showing misleading status. It read "62% remaining" green while the Budget view correctly showed £4,301 spent against £2,080 planned (over budget). The bar was measuring spend against INCOME, not budget.
+
+**Root cause**: calcHealthPct(spent, income) used total income (£11,500) as the denominator. £4,301 spent ÷ £11,500 income ≈ 62% "remaining" — technically true against income but meaningless as budget health. The Budget view already computed the correct figures (fixedTotal £2,080, fixedSpent £4,301), both exported by useFinance, but the health bar ignored them.
+
+**Fix**: New pure functions consuming the existing fixedSpent/fixedTotal ingredients.
+- calcBudgetUsedPct(fixedSpent, fixedTotal) — (fixedSpent / fixedTotal) × 100, NOT capped (true value can exceed 100 to show over-budget)
+- getBudgetStatusFromBudget(usedPct) — <85 green "On Track 🎯", 85–100 amber "Watch Out ⚠️", >100 red "Over Budget 🚨"
+- Removed the now-unused calcHealthPct + getBudgetStatus + their tests
+- surplusTarget read + context export kept (Option A) — still collected during onboarding, will be consumed by a future savings-progress widget; removing the read path would mismatch the data still being captured
+
+**Behavior**:
+- Bar fill capped at 100% width (doesn't overflow the track)
+- Label shows TRUE percentage: "207% of monthly budget used" when over
+- Color reflects status (green/amber/red) via budgetStatus.color wiring from 68c4761
+- fixedTotal === 0 (no categories): neutral "No budget categories set up yet", no status label
+- totalSpent === 0: existing neutral "No spending recorded yet"
+
+**Files**:
+- src/lib/finance.js — removed calcHealthPct/getBudgetStatus, added calcBudgetUsedPct/getBudgetStatusFromBudget
+- src/hooks/useFinance.js — swapped useMemos to new functions; healthPct/budgetStatus prop names kept; surplusTarget retained
+- src/views/home/BudgetHealthBar.jsx — fill cap, "used" label, no-categories branch
+- src/views/HomeView.jsx — passes fixedTotal to BudgetHealthBar
+- src/lib/finance.test.js — replaced assertions with new spec (incl. 4301/2080 → 207)
+- src/views/home/BudgetHealthBar.test.jsx — updated to "used" label, added >100% and no-categories tests
+
+**Verification**:
+- npm test: 920 passed (916 → 920, +4 net)
+- bash scripts/audit.sh: 181/181 passed
+- Numbers: fixedSpent 4301 / fixedTotal 2080 → 207%, Over Budget red, fill at 100% — matches Budget view
