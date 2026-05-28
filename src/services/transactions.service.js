@@ -131,6 +131,7 @@ export const updateTransaction = async (transactionId, updates) => {
     if (updates.amount        !== undefined) cleaned.amount        = Math.round(Math.max(0, Number(updates.amount)));
     if (updates.category_name !== undefined) cleaned.category_name = validateString(updates.category_name, 'category_name');
     if (updates.category_id   !== undefined) cleaned.category_id   = updates.category_id || null;
+    if (updates.from_spare    !== undefined) cleaned.from_spare    = !!updates.from_spare;
   } catch (e) {
     console.error('[transactions.service] updateTransaction validation error:', e.message);
     return { data: null, error: e };

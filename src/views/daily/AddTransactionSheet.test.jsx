@@ -18,11 +18,15 @@ vi.mock('../../context/BudgetCentreContext', () => ({
   }),
 }));
 
-const mockAddTransaction = vi.fn().mockResolvedValue({ error: null });
+const mockAddTransaction    = vi.fn().mockResolvedValue({ error: null });
+const mockUpdateTransaction = vi.fn().mockResolvedValue({ error: null });
+let mockSpareMoney          = 5000;
 
 vi.mock('../../context/FinanceContext', () => ({
   useFinanceContext: () => ({
-    addTransaction: mockAddTransaction,
+    addTransaction:    mockAddTransaction,
+    updateTransaction: mockUpdateTransaction,
+    spareMoney:        mockSpareMoney,
   }),
 }));
 
@@ -36,7 +40,11 @@ const renderSheet = (props = {}) =>
   );
 
 describe('AddTransactionSheet', () => {
-  beforeEach(() => { mockAddTransaction.mockClear(); });
+  beforeEach(() => {
+    mockAddTransaction.mockClear();
+    mockUpdateTransaction.mockClear();
+    mockSpareMoney = 5000;
+  });
 
   it('does not render when closed', () => {
     renderSheet({ isOpen: false });
@@ -216,5 +224,83 @@ describe('AddTransactionSheet', () => {
     await act(async () => { fireEvent.change(screen.getByTestId('add-year-input'),  { target: { value: '2026' } }); });
     await act(async () => { screen.getByText('Save').click(); });
     expect(screen.getByText('Please enter a valid date')).toBeTruthy();
+  });
+
+  // ── from_spare toggle ──────────────────────────────────────────────────────
+
+  it('renders from-spare toggle on expense when spareMoney > 0', () => {
+    mockSpareMoney = 5000;
+    renderSheet();
+    expect(screen.getByTestId('from-spare-toggle')).toBeTruthy();
+  });
+
+  it('hides from-spare toggle when spareMoney <= 0', () => {
+    mockSpareMoney = 0;
+    renderSheet();
+    expect(screen.queryByTestId('from-spare-toggle')).toBeNull();
+  });
+
+  it('hides from-spare toggle on income type even when spareMoney > 0', async () => {
+    mockSpareMoney = 5000;
+    renderSheet();
+    await act(async () => { screen.getByText('Income').click(); });
+    expect(screen.queryByTestId('from-spare-toggle')).toBeNull();
+  });
+
+  it('toggle defaults to off (aria-pressed=false) on fresh add', () => {
+    renderSheet();
+    expect(screen.getByTestId('from-spare-toggle').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('threads from_spare:true to addTransaction when toggled on', async () => {
+    renderSheet();
+    await act(async () => { fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '100' } }); });
+    await act(async () => { screen.getByTestId('from-spare-toggle').click(); });
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(mockAddTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ from_spare: true })
+    );
+  });
+
+  it('threads from_spare:false to addTransaction when toggle untouched', async () => {
+    renderSheet();
+    await act(async () => { fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '100' } }); });
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(mockAddTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ from_spare: false })
+    );
+  });
+
+  it('pre-fills toggle from editTx.from_spare', () => {
+    const editTx = { id:'tx-1', type:'expense', amount:200, category_name:'Groceries', category_id:'cat-1', description:'', date:'2026-05-20', from_spare:true };
+    renderSheet({ editTx });
+    expect(screen.getByTestId('from-spare-toggle').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('threads from_spare to updateTransaction on edit save', async () => {
+    const editTx = { id:'tx-1', type:'expense', amount:200, category_name:'Groceries', category_id:'cat-1', description:'', date:'2026-05-20', from_spare:false };
+    renderSheet({ editTx });
+    await act(async () => { screen.getByTestId('from-spare-toggle').click(); });
+    await act(async () => { screen.getByText('Save Changes').click(); });
+    expect(mockUpdateTransaction).toHaveBeenCalledWith(
+      'tx-1',
+      expect.objectContaining({ from_spare: true })
+    );
+  });
+
+  it('edit-mode exception: shows toggle even when spareMoney <= 0 if editTx.from_spare is true', () => {
+    mockSpareMoney = 0;
+    const editTx = { id:'tx-1', type:'expense', amount:200, category_name:'Groceries', category_id:'cat-1', description:'', date:'2026-05-20', from_spare:true };
+    renderSheet({ editTx });
+    expect(screen.getByTestId('from-spare-toggle')).toBeTruthy();
+  });
+
+  it('edit-mode exception: toggle stays visible after flipping off, within the session', async () => {
+    mockSpareMoney = 0;
+    const editTx = { id:'tx-1', type:'expense', amount:200, category_name:'Groceries', category_id:'cat-1', description:'', date:'2026-05-20', from_spare:true };
+    renderSheet({ editTx });
+    await act(async () => { screen.getByTestId('from-spare-toggle').click(); });
+    expect(screen.getByTestId('from-spare-toggle')).toBeTruthy();
+    expect(screen.getByTestId('from-spare-toggle').getAttribute('aria-pressed')).toBe('false');
   });
 });

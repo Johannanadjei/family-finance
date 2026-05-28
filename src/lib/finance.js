@@ -126,10 +126,13 @@ export const calcVariableSpent = (txs, categories = []) =>
 export const calcSurplusLeft = (monthlyIncome, totalBudgeted, variableSpent) =>
   monthlyIncome - totalBudgeted - variableSpent;
 
-// Spare = income − whichever is larger, the planned budget or what was actually spent.
-// Spend up to budget is "earmarked"; overspend overflows to spare. Can go negative.
-export const calcSpareMoney = (allIncome, fixedTotal, totalSpent) =>
-  allIncome - Math.max(fixedTotal, totalSpent);
+// budgetSpend = Σ expenses with from_spare=false (the default path)
+// spareSpend  = Σ expenses with from_spare=true  (user opted out of budget)
+// Spare envelope (= allIncome − fixedTotal) is reduced by two independent
+// withdrawals: overflow of budgetSpend beyond fixedTotal, plus direct spareSpend.
+// Reduces to Commit 1's formula when spareSpend = 0. Can go negative.
+export const calcSpareMoney = (allIncome, fixedTotal, budgetSpend, spareSpend) =>
+  allIncome - Math.max(fixedTotal, budgetSpend) - spareSpend;
 
 export const calcTotalExpected = (sources) =>
   sources.reduce((s, i) => s + Number(i.expected_amount || 0), 0);

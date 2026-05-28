@@ -109,10 +109,12 @@ export function useFinance({ centre, categories }) {
   const fixedTotal     = useMemo(() => calcTotalFixed(categories),                              [categories]);
   const fixedSpent     = useMemo(() => calcFixedSpent(txs, categories),                        [txs, categories]);
   const variableSpent  = useMemo(() => calcVariableSpent(txs, categories),                     [txs, categories]);
-  const spareMoney     = useMemo(() => calcSpareMoney(allIncome, fixedTotal, totalSpent),       [allIncome, fixedTotal, totalSpent]);
-  const budgetRemaining = useMemo(() => Math.max(0, fixedTotal - totalSpent),                   [fixedTotal, totalSpent]);
+  const budgetSpend    = useMemo(() => txs.filter(t => t.type === 'expense' && !t.from_spare).reduce((s, t) => s + Number(t.amount), 0), [txs]);
+  const spareSpend     = useMemo(() => txs.filter(t => t.type === 'expense' &&  t.from_spare).reduce((s, t) => s + Number(t.amount), 0), [txs]);
+  const spareMoney     = useMemo(() => calcSpareMoney(allIncome, fixedTotal, budgetSpend, spareSpend), [allIncome, fixedTotal, budgetSpend, spareSpend]);
+  const budgetRemaining = useMemo(() => Math.max(0, fixedTotal - budgetSpend),                  [fixedTotal, budgetSpend]);
   const remaining      = useMemo(() => calcRemaining(allIncome, totalSpent),                    [allIncome, totalSpent]);
-  const healthPct      = useMemo(() => calcBudgetUsedPct(fixedSpent, fixedTotal),               [fixedSpent, fixedTotal]);
+  const healthPct      = useMemo(() => calcBudgetUsedPct(budgetSpend, fixedTotal),              [budgetSpend, fixedTotal]);
   const budgetStatus   = useMemo(() => getBudgetStatusFromBudget(healthPct),                    [healthPct]);
   const weeklyData     = useMemo(() => calcWeeklyData(txs, categories, monthlyIncome),         [txs, categories, monthlyIncome]);
   const categorySpend  = useMemo(() => calcCategorySpend(txs, categories),                     [txs, categories]);
@@ -405,6 +407,8 @@ export function useFinance({ centre, categories }) {
     fixedTotal,
     fixedSpent,
     variableSpent,
+    budgetSpend,
+    spareSpend,
     spareMoney,
     budgetRemaining,
     surplusTarget,

@@ -10,7 +10,7 @@ import { Toast }                    from './Toast';
 const renderToast = (props = {}) =>
   render(
     <Toast
-      message="This will come from your Spare Money"
+      message="Test toast message"
       onEdit={vi.fn()}
       onDismiss={vi.fn()}
       {...props}
@@ -20,7 +20,7 @@ const renderToast = (props = {}) =>
 describe('Toast', () => {
   it('renders message', () => {
     renderToast();
-    expect(screen.getByText(/This will come from your Spare Money/)).toBeTruthy();
+    expect(screen.getByText(/Test toast message/)).toBeTruthy();
   });
 
   it('renders Edit button', () => {

@@ -248,25 +248,26 @@ describe('getBudgetStatusFromBudget', () => {
 });
 
 // ── calcSpareMoney ────────────────────────────────────────────────────────────
+// 4-arg signature splits expenses by from_spare. Reduces to Commit 1 when spareSpend=0.
 
 describe('calcSpareMoney', () => {
-  it('returns income − budget when under budget', () =>
-    expect(calcSpareMoney(10000, 5000, 4000)).toBe(5000));
+  it('under budget, nothing from spare → income − fixedTotal', () =>
+    expect(calcSpareMoney(10000, 5000, 3000, 0)).toBe(5000));
 
-  it('returns income − budget when exactly at budget', () =>
-    expect(calcSpareMoney(10000, 5000, 5000)).toBe(5000));
+  it('under budget, with spareSpend → spareSpend reduces spare directly', () =>
+    expect(calcSpareMoney(10000, 5000, 3000, 1000)).toBe(4000));
 
-  it('returns income − spent when over budget (overspend draws from spare)', () =>
-    expect(calcSpareMoney(10000, 5000, 6000)).toBe(4000));
+  it('over budget, nothing from spare → overflow draws from spare', () =>
+    expect(calcSpareMoney(10000, 5000, 6000, 0)).toBe(4000));
 
-  it('returns −budget when zero income', () =>
-    expect(calcSpareMoney(0, 5000, 0)).toBe(-5000));
+  it('over budget + spareSpend → both reduce spare without double-counting', () =>
+    expect(calcSpareMoney(10000, 5000, 6000, 1000)).toBe(3000));
 
-  it('allows negative spare when income < budget', () =>
-    expect(calcSpareMoney(3000, 5000, 0)).toBe(-2000));
+  it('zero income → −fixedTotal − spareSpend', () =>
+    expect(calcSpareMoney(0, 5000, 0, 0)).toBe(-5000));
 
-  it('returns 0 when income equals budget and nothing spent', () =>
-    expect(calcSpareMoney(5000, 5000, 0)).toBe(0));
+  it('allows negative spare when overspend + spareSpend exceed income', () =>
+    expect(calcSpareMoney(5000, 5000, 6000, 2000)).toBe(-3000));
 });
 
 // ── calcTotalFixed ────────────────────────────────────────────────────────────

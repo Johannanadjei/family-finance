@@ -80,7 +80,7 @@ export const validateUUID = (value, field) => {
  * Validate a full transaction object before insert.
  * Returns a cleaned, validated object ready for Supabase.
  */
-export const validateTransaction = ({ date, week, type, category_name, amount, currency, description, logged_by_name, source }) => ({
+export const validateTransaction = ({ date, week, type, category_name, amount, currency, description, logged_by_name, source, from_spare }) => ({
   date:          validateDate(date),
   week:          validateWeek(week),
   type:          validateType(type),
@@ -90,6 +90,7 @@ export const validateTransaction = ({ date, week, type, category_name, amount, c
   description:   typeof description === 'string' ? description.trim() : '',
   logged_by_name: typeof logged_by_name === 'string' ? logged_by_name.trim() : '',
   source:        ['main_app', 'guest_portal'].includes(source) ? source : 'main_app',
+  from_spare:    !!from_spare,
 });
 
 /**

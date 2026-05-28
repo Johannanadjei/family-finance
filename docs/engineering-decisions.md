@@ -1205,3 +1205,59 @@ This would extend the existing §6 rule ("Non-negotiable rules for every service
 - npm test: 922 passed (920 → 922, +2 net = +6 calcSpareMoney + 1 budgetRemaining − 5 calcSurplusLeft removed)
 - bash scripts/audit.sh: 181/181 passed
 - Numbers (worked example, £10k income, £5k budget, £5,211 spent): spare = 10000 − max(5000, 5211) = £4,789; budgetRemaining = max(0, 5000 − 5211) = £0
+
+---
+## 2026-05-28 — Money model redesign Commit 2: from_spare flag — user-chosen pool routing
+
+**Scope**: Second of three commits. Adds an opt-in "Take from Spare Money" toggle to the Add/Edit Expense sheet. Default routing (Commit 1) is preserved: every expense draws from Budget first, overspend auto-overflows to Spare. The new toggle lets a user explicitly route a single expense to Spare instead — a one-tap "this was a treat" decision at log time.
+
+**Schema (manual, owner-applied)**: one new file `scripts/migrate_transactions_from_spare.sql`:
+```sql
+ALTER TABLE transactions
+ADD COLUMN from_spare boolean NOT NULL DEFAULT false;
+```
+DEFAULT false covers all existing rows (their old semantics already match "draws from budget"), the guest portal (no UI to choose pool), and the `markReceived` income-tx insert (income txs are never from_spare). No backfill needed. No RLS impact — column adds never touch row policies. No SQL function changes — `submit_guest_transaction.sql` does not list the column and is unaffected.
+
+**Why stored not computed**: Phase 1 Commit 1 confirmed that auto-overflow correctly uses *computed* attribution (one pure function over `txs + categories`, edit/delete unwinds for free). Commit 2's case is different — the user's explicit choice is irreducibly intent. It cannot be derived from category + amount + budget. Stamping it on the tx at log-time is the only honest representation, and edit/delete still unwinds for free because the entire derived state remains a pure function of `txs`.
+
+**New formula (locked)**:
+- `budgetSpend = Σ expenses WHERE from_spare = false`
+- `spareSpend  = Σ expenses WHERE from_spare = true`
+- `budgetRemaining = max(0, fixedTotal − budgetSpend)`
+- `spareMoney = allIncome − max(fixedTotal, budgetSpend) − spareSpend`
+
+Double-counting proof: every expense tx belongs to exactly one of `budgetSpend` xor `spareSpend` (mutually exclusive partition). The "overflow" term in `spareMoney` is a function of `budgetSpend` alone, so no expense ever appears in two reduction terms. Reduces cleanly to Commit 1's formula when no tx is flagged (`spareSpend = 0`).
+
+**Adjacent fix bundled**: `healthPct` numerator switched from `fixedSpent` (known-category only) → `budgetSpend` (all non-spare expenses including Other). This resolves a Commit 1 carryover: previously the Budget Health bar tracked only categorised spend, while `budgetRemaining` tracked all spend. Now both are consistent. User-visible: households whose Other spending was "invisible" to the Health bar will see it tracked now — by design.
+
+**UX**:
+- Toggle placement: between Category chips and Description in `AddTransactionSheet`. Off by default.
+- Label: "Take from Spare Money" / subtitle "(instead of from Budget)".
+- Visibility: `showFromSpareToggle = type === 'expense' && (spareMoney > 0 || editTx?.from_spare === true)`. Hidden when no spare. **Edit-mode exception**: keyed off the original server value `editTx.from_spare`, not live state, so the toggle stays visible for the duration of an edit session if the tx originally had the flag — even if the user flips it off and live spare is zero. No flicker.
+- Toggle resets to false on type switch (expense → income → expense).
+- Edit symmetry: same sheet handles add and edit; pre-fill from `editTx?.from_spare`. From LogView's edit button, the toggle reflects current state and can be flipped.
+
+**Toggle vs Toast (decision)**: toggle won on edit symmetry (toast can't surface from LogView edit) and decision-at-log-time matching user mental model. The existing "This will come from your Spare Money" toast was already misleading under Commit 1 (Other expenses draw from budget, not spare). **Removed** the `kind === 'expense'` branch in `App.jsx` along with the matching `handleSaved` check and the now-unused `isKnownCategory` import + `categories` destructure. Income toast kept as-is. `Toast.test.jsx` fixture string updated to a neutral "Test toast message" — the Toast component itself is generic and still used by the income branch.
+
+**Files**:
+- scripts/migrate_transactions_from_spare.sql — new, ALTER TABLE
+- src/lib/finance.js — calcSpareMoney rewritten with 4-arg signature
+- src/hooks/useFinance.js — budgetSpend/spareSpend partition memos, rewired spareMoney + budgetRemaining + healthPct
+- src/lib/validation.js — validateTransaction destructures + coerces from_spare
+- src/services/transactions.service.js — updateTransaction allowlist accepts from_spare
+- src/views/daily/AddTransactionSheet.jsx — fromSpare state, pre-fill, threading, visibility logic; refactored payload to a shared `base` to stay under the 200-line audit limit
+- src/views/daily/FromSpareToggle.jsx — new pure display component (extracted from sheet)
+- src/views/daily/FromSpareToggle.test.jsx — new
+- src/App.jsx — deleted expense toast branch, handleSaved expense check, isKnownCategory import, unused categories destructure
+- src/lib/finance.test.js — rewrote calcSpareMoney block for 4-arg signature
+- src/hooks/useFinance.test.js — added 3 tests covering from_spare partitioning and healthPct behaviour
+- src/views/daily/AddTransactionSheet.test.jsx — 10 new tests covering toggle visibility, default, threading, edit pre-fill, edit-mode exception
+- src/lib/validation.test.js — 3 from_spare coercion tests
+- src/components/ui/Toast.test.jsx — fixture string neutralised
+
+**SQL ordering**: owner runs the migration in Supabase *before* the code merges. Code lands against a real column.
+
+**Verification**:
+- npm test: 941 passed (922 → 941, +19 net)
+- bash scripts/audit.sh: 183/183 passed
+- Worked examples (from Phase 2): 10k income, 5k budget, 3k budget + 1k spare → spare £4k, budget left £2k ✓ ; 10k income, 5k budget, 6k budget + 1k spare → spare £3k, budget left £0 ✓ ; from_spare true tx leaves budgetSpend and healthPct untouched ✓

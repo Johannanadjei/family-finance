@@ -2,14 +2,6 @@
  * views/daily/AddTransactionSheet.jsx
  *
  * Bottom sheet for logging transactions from any tab via FAB.
- * Rendered at App.jsx level — above all views.
- * Reads addTransaction from FinanceContext.
- * Reads categories, centre, fmt, getCatIcon from BudgetCentreContext.
- *
- * Type toggle: Expense (default) | Income.
- * Expense: category chips + free text fallback.
- * Income: free text source field only.
- *
  * z-index 350 — above BottomNav, below SidePanel (400).
  */
 
@@ -18,6 +10,7 @@ import { useBudgetCentreContext }     from '../../context/BudgetCentreContext';
 import { useFinanceContext }          from '../../context/FinanceContext';
 import { AccessBlocked }             from '../../components/ui/AccessBlocked';
 import { getWeekForDate }            from '../../lib/finance';
+import { FromSpareToggle }           from './FromSpareToggle';
 
 const inputStyle = {
   width: '100%', padding: '12px 14px', borderRadius: 10,
@@ -28,13 +21,14 @@ const inputStyle = {
 
 export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null }) {
   const { centre, categories, getCatIcon, can } = useBudgetCentreContext();
-  const { addTransaction, updateTransaction }   = useFinanceContext();
+  const { addTransaction, updateTransaction, spareMoney } = useFinanceContext();
 
   const [type,         setType]         = useState('expense');
   const [amount,       setAmount]       = useState('');
   const [categoryName, setCategoryName] = useState('');
   const [categoryId,   setCategoryId]   = useState(null);
   const [description,  setDescription]  = useState('');
+  const [fromSpare,    setFromSpare]    = useState(false);
   const [day,          setDay]          = useState(() => String(new Date().getDate()));
   const [month,        setMonth]        = useState(() => String(new Date().getMonth() + 1));
   const [year,         setYear]         = useState(() => String(new Date().getFullYear()));
@@ -49,6 +43,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
       setCategoryName(editTx?.category_name || '');
       setCategoryId(editTx?.category_id || null);
       setDescription(editTx?.description || '');
+      setFromSpare(!!editTx?.from_spare);
       const d = editTx?.date || new Date().toISOString().split('T')[0];
       const [y, m, dd] = d.split('-');
       setYear(y);
@@ -58,6 +53,9 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
       setSaved(false);
     }
   }, [isOpen, editTx?.id]);
+
+  // Hide when no spare; edit-mode keeps it visible if the original tx had the flag.
+  const showFromSpareToggle = type === 'expense' && (spareMoney > 0 || editTx?.from_spare === true);
 
   if (!isOpen) return null;
 
@@ -78,35 +76,20 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
     const finalCategory   = categoryName.trim() || 'Other';
     const finalCategoryId = categoryName.trim() ? categoryId : null;
     setLoading(true);
-    let savedTx = null;
-    let err     = null;
-
-    if (editTx) {
-      const result = await updateTransaction(editTx.id, {
-        amount:        n,
-        category_name: finalCategory,
-        category_id:   finalCategoryId,
-        description:   description.trim(),
-        date:          dateStr,
-        week:          getWeekForDate(dateStr),
-      });
-      err     = result.error;
-      savedTx = result.data;
-    } else {
-      const result = await addTransaction({
-        type,
-        amount:        n,
-        category_name: finalCategory,
-        category_id:   finalCategoryId,
-        description:   description.trim(),
-        date:          dateStr,
-        week:          getWeekForDate(dateStr),
-        currency:      centre?.currency || 'GHS',
-        source:        'main_app',
-      });
-      err     = result.error;
-      savedTx = result.data;
-    }
+    const base = {
+      amount:        n,
+      category_name: finalCategory,
+      category_id:   finalCategoryId,
+      description:   description.trim(),
+      date:          dateStr,
+      week:          getWeekForDate(dateStr),
+      from_spare:    type === 'expense' && fromSpare,
+    };
+    const result = editTx
+      ? await updateTransaction(editTx.id, base)
+      : await addTransaction({ ...base, type, currency: centre?.currency || 'GHS', source: 'main_app' });
+    const err     = result.error;
+    const savedTx = result.data;
 
     if (err) {
       console.error('[AddTransactionSheet] save error:', err);
@@ -130,7 +113,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
         {/* Type toggle — income tab hidden for standard members */}
         <div style={{ display: 'grid', gridTemplateColumns: can('logIncome') ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 16 }}>
           {['expense', ...(can('logIncome') ? ['income'] : [])].map(t => (
-            <button key={t} onClick={() => { setType(t); setCategoryName(''); setCategoryId(null); setError(null); }}
+            <button key={t} onClick={() => { setType(t); setCategoryName(''); setCategoryId(null); setFromSpare(false); setError(null); }}
               style={{ padding: '10px', borderRadius: 10, border: 'none', fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 800, cursor: 'pointer', background: type === t ? 'var(--c-primary, #064e3b)' : 'var(--c-bg, #f3f4f6)', color: type === t ? 'var(--c-btn-text, #ffffff)' : 'var(--c-muted, #6b7280)' }}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
@@ -155,6 +138,14 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
               </div>
               <input data-testid="add-category-input" type="text" value={categoryName} onChange={e => { setCategoryName(e.target.value); setCategoryId(null); setError(null); }} placeholder="Or type a custom category" style={inputStyle} />
             </div>
+          )}
+
+          {/* Take from Spare Money toggle — expense only, hidden when no spare to draw from */}
+          {showFromSpareToggle && (
+            <FromSpareToggle
+              on={fromSpare}
+              onToggle={() => { setFromSpare(v => !v); setError(null); }}
+            />
           )}
 
           {/* Source — income only */}

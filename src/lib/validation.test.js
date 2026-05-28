@@ -213,6 +213,21 @@ describe('validateTransaction', () => {
 
   it('throws for empty category_name', () =>
     expect(() => validateTransaction({ ...validTx, category_name: '' })).toThrow());
+
+  it('coerces from_spare to boolean false when missing', () => {
+    const result = validateTransaction(validTx);
+    expect(result.from_spare).toBe(false);
+  });
+
+  it('coerces from_spare to boolean true when truthy', () => {
+    const result = validateTransaction({ ...validTx, from_spare: true });
+    expect(result.from_spare).toBe(true);
+  });
+
+  it('coerces from_spare to boolean false when falsy non-boolean', () => {
+    const result = validateTransaction({ ...validTx, from_spare: 0 });
+    expect(result.from_spare).toBe(false);
+  });
 });
 
 // ── validateCategory ──────────────────────────────────────────────────────────

@@ -51,7 +51,6 @@ import { AddTransactionSheet }                   from './views/daily/AddTransact
 import { SettingsView }                          from './views/SettingsView';
 import { Toast }                                 from './components/ui/Toast';
 import { InstallPrompt }                         from './components/ui/InstallPrompt';
-import { isKnownCategory }                       from './lib/finance';
 import { JoinView }                              from './views/JoinView';
 
 function LoadingScreen({ message }) {
@@ -96,7 +95,7 @@ function RemovedScreen({ otherCentres, onSwitchHub, onSignOut }) {
 
 function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, onSwitchCentre, onHubCreated, onRestoreHub }) {
   const navigate                           = useNavigate();
-  const { categories, can }                = useBudgetCentreContext();
+  const { can }                            = useBudgetCentreContext();
   const { incomes, loading }               = useFinanceContext();
   const [panelOpen,       setPanelOpen]    = useState(false);
   const [addSheetOpen,    setAddSheetOpen] = useState(false);
@@ -108,9 +107,7 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, on
 
   const handleSaved = (savedTx) => {
     if (!savedTx) return;
-    if (savedTx.type === 'expense' && !isKnownCategory(savedTx.category_name, categories)) {
-      setToast({ tx: savedTx, kind: 'expense' });
-    } else if (
+    if (
       savedTx.type === 'income' &&
       !loading &&
       !incomes.some(src => src.label?.toLowerCase() === savedTx.category_name?.toLowerCase())
@@ -149,13 +146,6 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, on
         onSaved={handleSaved}
         editTx={editTx}
       />
-      {toast?.kind === 'expense' && (
-        <Toast
-          message="This will come from your Spare Money"
-          onEdit={() => { setEditTx(toast.tx); setAddSheetOpen(true); setToast(null); }}
-          onDismiss={() => setToast(null)}
-        />
-      )}
       {toast?.kind === 'income' && (
         <Toast
           message="Set up your income sources in Settings for better tracking"
