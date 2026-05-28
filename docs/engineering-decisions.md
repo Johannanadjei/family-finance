@@ -1308,3 +1308,40 @@ The hook's `remaining` was distinct from the `remaining` props elsewhere in the 
 - npm test: 933 passed (941 → 933, −8 net from purge: −10 from calcRemaining/calcVariableSpent describes; −1 MonthlyIncomeCard "shows remaining"; +1 MonthlyIncomeCard "Money Left not present"; +1 MonthlyIncomeCard negative-spare hero; +1 HomeView negative-spare StatCard)
 - bash scripts/audit.sh: 183/183 passed
 - Manual: 3-card dashboard renders cleanly at 440px, Variable Spent and Money Left both gone, Budget Health sits below stat grid, Payday sits below hero, negative spare renders red in both surfaces, tooltip text matches current model.
+
+## 2026-05-28 — Money model redesign Commit 4: Header cleanup + member ordering
+
+**Scope**: UI-only follow-up to the money-model redesign. Three changes: (1) remove the "Available" balance pill from the Header, (2) restyle the left identity pill with a chevron + hover affordance, (3) order the Settings members list owner-first then by join date. No formula changes, no schema, no service changes.
+
+**Supersedes a Commit 3 deferral note**: the Commit 3 entry parked the side-panel header button restyle as "no chevron, no hover affordance — pure design task". The locked design for this commit reverses that: the left pill *does* get a chevron and hover affordance. The earlier note is obsolete; this entry is authoritative.
+
+**Header — remove Available pill**:
+- Deleted the right-side `can('viewBalance')` block that rendered the "Available" label + `fmt(availableNow)` amount. The Settings icon (the only other right-side element) is untouched, byte-for-byte.
+- Cascading purge: `useFinanceContext` import, the `availableNow` destructure, the `isNegative` derived value, and the now-unused `fmt` + `can` destructures from `useBudgetCentreContext()`. Header now reads only `centre`.
+- `availableNow` had no other consumer (grep-confirmed), so its `useMemo` + return-object key were purged from `useFinance.js`, and its assertion from `useFinance.test.js`. `allIncome` (its only input dependency) stays — it still feeds `spareMoney`.
+
+**Header — left identity pill restyle**:
+- Added a 16×16 chevron-down inline SVG (`stroke="currentColor"`, `aria-hidden`, white-on-gradient via `rgba(255,255,255,.7)`) after the name block, signalling the pill opens a panel. Reuses the established inline-SVG pattern; the Settings hamburger icon was not redesigned.
+- Hover affordance via `useState` + `onMouseEnter`/`onMouseLeave` (per CLAUDE.md §3 — `:hover` unavailable inline): pill background `0.12 → 0.2` and border `0.18 → 0.32` on hover, with `transition`.
+
+**Members ordering (Settings)**:
+- Owner first, then remaining members by `joined_at` ASC. Sorted at render in `MembersSection` (presentational concern, view-level — deliberately *not* pushed into `useBudgetCentre`).
+- Implemented as an inline comparator on the `.map` source: `(a.role === 'owner' ? 0 : 1) - (b.role === 'owner' ? 0 : 1) || new Date(a.joined_at || 0) - new Date(b.joined_at || 0)`.
+- **Line-cap note**: `MembersSection.jsx` sits at the audit's 200-line hard cap. Adding the sort pushed it to 207. Compacted the comparator to one line and reclaimed 2 lines by removing two stylistic blank-line separators in the same function — back to exactly 200. No behaviour change.
+
+**Fixtures**:
+- `mockMembers` gained a `joined_at` field on each row and a second (non-owner, `standard`) member, so the ordering test asserts against realistic multi-member data. Only consumer is `contextMocks.js` (`makeBudgetCentreMock`), which is not yet imported by any test — no fallout.
+
+**Files**:
+- src/components/layout/Header.jsx — removed Available pill, purged availableNow/isNegative/fmt/can/useFinanceContext, added chevron + hover to left pill, updated doc comment
+- src/hooks/useFinance.js — purged `availableNow` memo + return key
+- src/hooks/useFinance.test.js — removed `availableNow` assertion
+- src/components/layout/Header.test.jsx — dropped 2 Available-pill tests, removed FinanceContext mock + unused fmt/can, added chevron-present test
+- src/views/settings/MembersSection.jsx — inline owner-first + joined_at ASC sort, reclaimed 2 blank lines to hold the 200-line cap
+- src/views/settings/MembersSection.test.jsx — mutable members mock, added owner-first/joined_at ordering test
+- src/test-utils/fixtures.js — `mockMembers` gained `joined_at` + a second member
+
+**Verification**:
+- npm test: 932 passed (933 → 932, −1 net: Header −2 Available-pill +1 chevron; useFinance −1 availableNow; MembersSection +1 ordering)
+- bash scripts/audit.sh: 183/183 passed (MembersSection.jsx held at 200-line cap)
+- Triple-check (§9.5): hooks unconditional, Header destructures only `centre`, no new permission gates, no new components, zero console.log, zero residual `availableNow`.

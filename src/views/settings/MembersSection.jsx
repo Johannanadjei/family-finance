@@ -73,17 +73,17 @@ export function MembersSection() {
       return;
     }
   };
-
   const canManage      = can('manageMembers');
   const pendingInvites = invites.filter(i => i.status === 'pending');
-
+  // Owner first, then remaining members by join date (earliest first).
+  const orderedMembers = [...members].sort((a, b) => (a.role === 'owner' ? 0 : 1) - (b.role === 'owner' ? 0 : 1) || new Date(a.joined_at || 0) - new Date(b.joined_at || 0));
   return (
     <div style={card}>
       <p style={label}>Members</p>
-      {members.map((m, i) => {
+      {orderedMembers.map((m, i) => {
         const displayName = m.users?.name?.trim() || m.users?.email || 'Unknown';
         return (
-        <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 10, marginBottom: 10, borderBottom: i < members.length - 1 || pendingInvites.length > 0 ? '1px solid var(--c-border, #e5e7eb)' : 'none' }}>
+        <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 10, marginBottom: 10, borderBottom: i < orderedMembers.length - 1 || pendingInvites.length > 0 ? '1px solid var(--c-border, #e5e7eb)' : 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--c-accent-light, #f0fdf4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, color: 'var(--c-primary, #064e3b)', flexShrink: 0 }}>
               {displayName[0].toUpperCase()}

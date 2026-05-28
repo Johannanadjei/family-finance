@@ -7,12 +7,15 @@ const mockRemoveMember  = vi.fn(async () => ({ error: null }));
 const mockGetInvites    = vi.fn(async () => ({ data: [], error: null }));
 const mockCancelInvite  = vi.fn(async () => ({ error: null }));
 
+const defaultMembers = [
+  { id: 'mem-1', user_id: 'user-1', role: 'owner',    joined_at: '2026-01-01T00:00:00Z', users: { name: 'Johannan', email: 'j@test.com' } },
+  { id: 'mem-2', user_id: 'user-2', role: 'standard', joined_at: '2026-02-01T00:00:00Z', users: { name: 'Bob',      email: 'b@test.com' } },
+];
+let mockMembersList = defaultMembers;
+
 vi.mock('../../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({
-    members:           [
-      { id: 'mem-1', user_id: 'user-1', role: 'owner',    users: { name: 'Johannan', email: 'j@test.com' } },
-      { id: 'mem-2', user_id: 'user-2', role: 'standard', users: { name: 'Bob',      email: 'b@test.com' } },
-    ],
+    members:           mockMembersList,
     currentMemberRole: 'owner',
     currentUserId:     'user-1',
     can:               () => true,
@@ -30,6 +33,7 @@ vi.mock('../../context/FinanceContext', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockMembersList = defaultMembers;
   mockGetInvites.mockResolvedValue({ data: [], error: null });
 });
 
@@ -38,6 +42,18 @@ describe('MembersSection', () => {
     render(<MembersSection />);
     await waitFor(() => expect(screen.getByText('Johannan')).toBeTruthy());
     expect(screen.getByText('Bob')).toBeTruthy();
+  });
+
+  it('orders members owner first, then by joined_at ascending', async () => {
+    mockMembersList = [
+      { id: 'mem-2', user_id: 'user-2', role: 'standard', joined_at: '2026-03-01T00:00:00Z', users: { name: 'Bob',      email: 'b@test.com' } },
+      { id: 'mem-3', user_id: 'user-3', role: 'standard', joined_at: '2026-02-01T00:00:00Z', users: { name: 'Carol',    email: 'c@test.com' } },
+      { id: 'mem-1', user_id: 'user-1', role: 'owner',    joined_at: '2026-04-01T00:00:00Z', users: { name: 'Johannan', email: 'j@test.com' } },
+    ];
+    render(<MembersSection />);
+    await waitFor(() => screen.getByText('Johannan'));
+    const names = screen.getAllByText(/^(Johannan|Carol|Bob)$/).map(n => n.textContent);
+    expect(names).toEqual(['Johannan', 'Carol', 'Bob']);
   });
 
   it('shows role labels', async () => {

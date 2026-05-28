@@ -2,22 +2,20 @@
  * components/layout/Header.jsx
  *
  * Top navigation bar.
- * Left: centre icon + name — tap opens SidePanel
- * Right: available now amount + settings icon
+ * Left: centre icon + name + chevron — tap opens SidePanel
+ * Right: settings icon
  *
- * Reads fmt and centre from BudgetCentreContext.
- * Reads availableNow from FinanceContext.
+ * Reads centre from BudgetCentreContext.
  */
 
+import { useState }     from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
-import { useFinanceContext }      from '../../context/FinanceContext';
 
 export function Header({ onOpenPanel }) {
-  const { centre, fmt, can }       = useBudgetCentreContext();
-  const { availableNow } = useFinanceContext();
-  const navigate         = useNavigate();
-  const isNegative       = availableNow < 0;
+  const { centre } = useBudgetCentreContext();
+  const navigate   = useNavigate();
+  const [hovered, setHovered] = useState(false);
 
   return (
     <header style={{
@@ -30,9 +28,11 @@ export function Header({ onOpenPanel }) {
       top:           0,
       zIndex:        100,
     }}>
-      {/* Left — centre name, tap opens panel */}
+      {/* Left — centre name + chevron, tap opens panel */}
       <button
         onClick={onOpenPanel}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         aria-label="Open BOS Hubs panel"
         style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0 }}
       >
@@ -40,10 +40,11 @@ export function Header({ onOpenPanel }) {
           display:      'flex',
           alignItems:   'center',
           gap:          8,
-          background:   'rgba(255,255,255,0.12)',
+          background:   hovered ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)',
           borderRadius: 20,
           padding:      '5px 12px',
-          border:       '1px solid rgba(255,255,255,0.18)',
+          border:       `1px solid ${hovered ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.18)'}`,
+          transition:   'background .15s, border-color .15s',
         }}>
           <span style={{ fontSize: 22 }}>{centre?.icon || '🏠'}</span>
           <div style={{ textAlign: 'left' }}>
@@ -56,27 +57,15 @@ export function Header({ onOpenPanel }) {
               {centre?.currency || 'GHS'}
             </p>
           </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+            style={{ color: 'rgba(255,255,255,.7)', flexShrink: 0 }}>
+            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </div>
       </button>
 
-      {/* Right — available now (hidden for standard members) + settings */}
+      {/* Right — settings */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {can('viewBalance') && (
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: '0 0 1px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              Available
-            </p>
-            <p style={{
-              fontSize:   16,
-              fontWeight: 900,
-              margin:     0,
-              color:      isNegative ? 'var(--c-danger-light, #fca5a5)' : 'var(--c-success-light, #6ee7b7)',
-            }}>
-              {fmt(availableNow)}
-            </p>
-          </div>
-        )}
-
         {/* Settings */}
         <button
           onClick={() => navigate('/settings')}

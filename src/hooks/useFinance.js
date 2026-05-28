@@ -105,7 +105,6 @@ export function useFinance({ centre, categories }) {
   const totalExpected  = useMemo(() => calcTotalExpected(incomes),                              [incomes]);
   const totalPending   = useMemo(() => incomes.filter(i => !i.received).reduce((sum, i) => sum + (i.expected_amount || 0), 0), [incomes]);
   const allIncome      = useMemo(() => totalIncome,                                                   [totalIncome]);
-  const availableNow   = useMemo(() => allIncome - totalSpent,                                  [allIncome, totalSpent]);
   const fixedTotal     = useMemo(() => calcTotalFixed(categories),                              [categories]);
   const fixedSpent     = useMemo(() => calcFixedSpent(txs, categories),                        [txs, categories]);
   const budgetSpend    = useMemo(() => txs.filter(t => t.type === 'expense' && !t.from_spare).reduce((s, t) => s + Number(t.amount), 0), [txs]);
@@ -401,7 +400,6 @@ export function useFinance({ centre, categories }) {
     allIncome,
     totalExpected,
     totalPending,
-    availableNow,
     fixedTotal,
     fixedSpent,
     budgetSpend,

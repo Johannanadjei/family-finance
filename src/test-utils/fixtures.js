@@ -23,7 +23,8 @@ export const mockCategories = [
 ];
 
 export const mockMembers = [
-  { id: 'mem-1', user_id: 'user-1', role: 'owner', users: { name: 'Johannan', email: 'johannan@test.com' } },
+  { id: 'mem-1', user_id: 'user-1', role: 'owner',    joined_at: '2026-01-01T00:00:00Z', users: { name: 'Johannan', email: 'johannan@test.com' } },
+  { id: 'mem-2', user_id: 'user-2', role: 'standard', joined_at: '2026-02-15T00:00:00Z', users: { name: 'Dita',     email: 'dita@test.com' } },
 ];
 
 export const mockIncomes = [

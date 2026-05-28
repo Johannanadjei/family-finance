@@ -306,7 +306,7 @@ type(scope): short description, N tests
 - `type`: `feat`, `fix`, `polish`, `refactor`, `test`, `chore`
 - `scope`: always `v2` for this codebase version
 - Always include the test count at the end
-- Co-author line: `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`
+- Do NOT add a Claude `Co-Authored-By` trailer (or any AI co-author line) to commits in this repo.
 
 ```
 feat(v2): add income source management, 423 tests
