@@ -38,10 +38,7 @@ export function AuthScreen() {
   const [error,    setError]    = useState(null);
   const [loading,  setLoading]  = useState(false);
 
-  const switchMode = (newMode) => {
-    setMode(newMode);
-    setError(null);
-  };
+  const switchMode = (newMode) => { setMode(newMode); setError(null); };
 
   const handleSubmit = async () => {
     const validationError = validateForm(email, password, name, mode);
@@ -79,16 +76,13 @@ export function AuthScreen() {
   };
 
   const inputStyle = {
-    width: '100%', padding: '14px 16px', borderRadius: 12,
-    border: '1.5px solid var(--c-input-border, #e5e7eb)', fontSize: 15, fontWeight: 600,
-    outline: 'none', background: 'var(--c-input-bg, #f9fafb)', boxSizing: 'border-box',
-    fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
+    width: '100%', padding: '14px 16px', borderRadius: 12, fontSize: 15, fontWeight: 600, outline: 'none',
+    border: '1.5px solid var(--c-input-border, #e5e7eb)', background: 'var(--c-input-bg, #f9fafb)',
+    boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
   };
-
   const btnStyle = (primary) => ({
-    width: '100%', padding: '15px', borderRadius: 12, border: 'none',
-    fontSize: 15, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer',
-    opacity: loading ? 0.7 : 1,
+    width: '100%', padding: '15px', borderRadius: 12, border: 'none', fontSize: 15, fontWeight: 800,
+    cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
     background: primary ? 'var(--c-primary, #064e3b)' : 'var(--c-card, #ffffff)',
     color: primary ? 'var(--c-btn-text, #ffffff)' : 'var(--c-text, #1c1917)',
     boxShadow: primary ? 'none' : '0 0 0 1.5px var(--c-border, #e5e7eb)',
@@ -97,26 +91,32 @@ export function AuthScreen() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px',
+      background: 'linear-gradient(145deg, #064e3b, #0d7060)',  // fixed — skin never overrides pre-sign-in
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '32px 16px', gap: 28,
+      fontFamily: "'Nunito', sans-serif",
     }}>
+      {/* Brand lockup — white icon + wordmark + tagline, on the green */}
+      <div style={{ textAlign: 'center' }}>
+        <img src="/icons/bos-icon-v2-white-512.png" alt="Money B.O.S logo" style={{ width: 72, height: 72, marginBottom: 14, objectFit: 'contain' }} />
+        <h1 style={{ fontFamily: "'Nunito', sans-serif", fontSize: 32, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', margin: '0 0 6px', lineHeight: 1.1 }}>
+          Money B.O.S
+        </h1>
+        <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.7)', margin: 0 }}>
+          Budget · Overview · System
+        </p>
+      </div>
+
       <div style={{
-        background: 'var(--c-card, #ffffff)', borderRadius: 24, padding: '36px 28px',
+        background: 'var(--c-card, #ffffff)', borderRadius: 24, padding: '32px 28px',
         width: '100%', maxWidth: 400,
         boxShadow: '0 24px 64px rgba(0,0,0,.18)',
         border: '1px solid var(--c-border, transparent)',
       }}>
 
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <img src="/icons/icon-192.png" alt="Money B.O.S logo" style={{ width: 64, height: 64, marginBottom: 8, objectFit: 'contain' }} />
-          <p style={{ fontSize: 22, fontWeight: 900, color: 'var(--c-primary, #064e3b)', margin: '0 0 4px' }}>
-            Money B.O.S
-          </p>
-          <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
-            {mode === 'signin' ? 'Welcome back' : 'Create your account'}
-          </p>
-        </div>
+        <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--c-muted, #6b7280)', margin: '0 0 20px', textAlign: 'center' }}>
+          {mode === 'signin' ? 'Welcome back' : 'Create your account'}
+        </p>
 
         {/* Mode tabs */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 24, background: 'var(--c-chip-bg, #f3f4f6)', borderRadius: 12, padding: 4 }}>

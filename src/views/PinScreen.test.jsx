@@ -31,6 +31,11 @@ describe('PinScreen', () => {
     expect(screen.getByText('test@example.com')).toBeTruthy();
   });
 
+  it('renders the app logo image', () => {
+    renderScreen();
+    expect(screen.getByAltText('Money B.O.S')).toBeTruthy();
+  });
+
   it('shows "Enter your PIN to continue" when no error and not locked', () => {
     renderScreen();
     expect(screen.getByText('Enter your PIN to continue')).toBeTruthy();

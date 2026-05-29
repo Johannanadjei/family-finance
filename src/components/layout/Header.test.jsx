@@ -42,6 +42,11 @@ describe('Header', () => {
     expect(screen.getByLabelText('Open BOS Hubs panel').querySelector('svg')).toBeTruthy();
   });
 
+  it('renders the centred brand logo image', () => {
+    renderHeader();
+    expect(screen.getByAltText('Money B.O.S')).toBeTruthy();
+  });
+
   it('truncates centre name longer than 20 chars with ellipsis', () => {
     mockCentreName = 'The Adjei Family Household';
     renderHeader();

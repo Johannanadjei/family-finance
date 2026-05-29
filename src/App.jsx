@@ -56,7 +56,7 @@ import { JoinView }                              from './views/JoinView';
 function LoadingScreen({ message }) {
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-      <img src="/icons/icon-192.png" alt="" style={{ width: 56, height: 56, objectFit: 'contain' }} />
+      <img src="/icons/bos-icon-v2-white-192.png" alt="" style={{ width: 56, height: 56, objectFit: 'contain' }} />
       <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--c-success-light, #6ee7b7)', margin: 0 }}>{message}</p>
     </div>
   );

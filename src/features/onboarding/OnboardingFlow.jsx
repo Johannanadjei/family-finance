@@ -125,6 +125,10 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
         boxShadow: '0 24px 64px rgba(0,0,0,.18)',
         maxHeight: '90vh', overflowY: 'auto',
       }}>
+        {/* Brand mark — dark variant, sits on the white card */}
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <img src="/icons/bos-icon-v2-192.png" alt="Money B.O.S" style={{ width: 56, height: 56, objectFit: 'contain' }} />
+        </div>
         <OnboardingProgress currentStep={step} totalSteps={STEPS.length} steps={STEPS} />
 
         {step === 0 && <StepCentre     data={centreData}    onNext={handleCentreNext} />}

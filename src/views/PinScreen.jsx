@@ -54,14 +54,15 @@ export function PinScreen({ user, verifyPin, lockedUntil, attempts, onForgotPin 
   return (
     <div data-testid="pin-screen" style={{
       minHeight: '100dvh',
-      background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))',
+      // Fixed brand gradient — pre-unlock, never overridden by a stored skin
+      background: 'linear-gradient(145deg, #064e3b, #0d7060)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       padding: '32px 24px calc(32px + env(safe-area-inset-bottom, 20px))',
       fontFamily: "'Nunito', sans-serif",
     }}>
       {/* App icon + identity */}
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <img src="/icons/icon-192.png" alt="" style={{ width: 56, height: 56, marginBottom: 12, objectFit: 'contain' }} />
+        <img src="/icons/bos-icon-v2-white-512.png" alt="Money B.O.S" style={{ width: 96, height: 96, marginBottom: 12, objectFit: 'contain' }} />
         <p style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: '0 0 4px' }}>Welcome back</p>
         {user?.email && (
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', margin: 0, fontWeight: 600 }}>

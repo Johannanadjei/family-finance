@@ -45,7 +45,8 @@ export function PinSetupFlow({ setupPin, onSkip }) {
   return (
     <div data-testid="pin-setup-flow" style={{
       minHeight: '100dvh',
-      background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))',
+      // Fixed brand gradient — pre-unlock, never overridden by a stored skin
+      background: 'linear-gradient(145deg, #064e3b, #0d7060)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       padding: '32px 24px calc(32px + env(safe-area-inset-bottom, 20px))',
       fontFamily: "'Nunito', sans-serif",

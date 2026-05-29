@@ -1484,3 +1484,37 @@ window.history.back();
 - npm test: 956 passed (955 → 956, +1 regression)
 - bash scripts/audit.sh: 187/187 passed
 - Triple-check (§9.5): `Banner` is a pure function component (no hooks → no hooks-order concern); no context/Supabase/permission changes; `InstallPrompt.jsx`/`useModalChrome.js` untouched; zero console.log; file under its 200-line cap.
+
+## 2026-05-29 — Money B.O.S logo wiring + neutral pre-sign-in surfaces
+
+**Context**: A single master brand asset (`public/icons/BOSicon.png`, 1024² RGBA) needed wiring across favicon, PWA manifest, apple-touch, AuthScreen, PinScreen, onboarding, and the Header. The old `icon-192.png`/`icon-512.png` had been deleted in Phase 1, leaving dangling `src` refs that rendered broken images app-wide (`App.jsx`, `AuthScreen`, `PinScreen`, `GuestPinScreen`, `index.html`, `manifest.json`, `vite.config.js`).
+
+**Key finding (overturned a locked design decision)**: The master is **dark-green line art** — measured average stroke `#2a4231`, ~10.9% opaque coverage — essentially the same hue as the brand background `#064e3b`. Composited onto green it **vanishes** (only the faint white sticker-halo survives). The Phase 2 plan placed the icon on green in five spots, so as-drawn it would have been invisible on all of them. Verified empirically by compositing downscales onto `#064e3b` before writing any code.
+
+**Decision**:
+- `scripts/gen-icons.mjs` (sharp, devDependency) emits **two palettes** from the one master: dark `bos-icon-v2-{32,180,192,512}.png` (favicon / PWA / apple-touch / placements on white) and **white** `bos-icon-v2-white-{192,512}.png` (every opaque pixel forced white, original alpha kept) for green surfaces.
+- Variant is chosen by the **surface the icon sits on, not the screen's outer background**: Header bar, AuthScreen lockup, PinScreen, and the LoadingScreen are genuinely on green → white. The **onboarding logo uses the DARK variant** because it sits inside the white card — a white icon there would be invisible (the outer green is irrelevant).
+- AuthScreen brand lockup (white icon + "Money B.O.S" wordmark + "Budget · Overview · System" tagline) moved **above** the white form card onto the green, realizing the white-on-green decision.
+- Pre-sign-in backgrounds (`AuthScreen`, `PinScreen`, `PinSetupFlow`) hardcode `linear-gradient(145deg, #064e3b, #0d7060)` instead of the `--c-header-*` tokens, so a stored UI skin can no longer recolour them before sign-in. Matches onboarding (already hardcoded) and the post-sign-in Header (keeps tokens — skin *should* apply there).
+- Manifest dropped the two `maskable` entries (the transparent line-art is not a safe-zone maskable design); kept two `any` entries (192, 512).
+
+**Rules derived**:
+- A logo's colour variant is dictated by the surface it paints on, not the route. Verify legibility by compositing onto the real background colour *before* wiring it in.
+- Pre-auth screens hardcode brand colours; only post-auth chrome reads skin tokens.
+
+**Files**:
+- scripts/gen-icons.mjs (new) — regenerates 6 icon files from the master; sharp added as devDependency.
+- public/icons/bos-icon-v2-{32,180,192,512}.png + bos-icon-v2-white-{192,512}.png (generated).
+- src/views/AuthScreen.jsx — lockup above card, white icon, fixed gradient (200 lines, at the cap).
+- src/views/PinScreen.jsx — white icon 96px + fixed gradient.
+- src/views/PinSetupFlow.jsx, src/App.jsx, src/views/guest/GuestPinScreen.jsx — fixed gradient / broken-ref `src` fixes.
+- src/features/onboarding/OnboardingFlow.jsx — dark 56px mark inside the white card.
+- src/components/layout/Header.jsx — absolute-centred 28px white mark (`pointerEvents:'none'`), pill name capped `maxWidth:110`.
+- index.html / public/manifest.json / vite.config.js — versioned icon refs, maskable entries removed.
+- Tests: AuthScreen.test.jsx (new, 5), Header.test.jsx (+1), PinScreen.test.jsx (+1).
+
+**Verification**:
+- npm test: 963 passed (956 → 963, +7)
+- bash scripts/audit.sh: 188/188 passed
+- Triple-check (§9.5): all touched components have hooks called unconditionally (no early returns added); no new context destructures, `can()` calls, Supabase reads, or permissions; `AuthScreen` already destructures `{ error }` on every auth call; zero console.log; AuthScreen at the 200-line cap, all other files under it.
+- White variant legibility confirmed by compositing `bos-icon-v2-white-512.png` onto `#064e3b` at 28/80px (crisp). 32px favicon legibility is marginal-but-recognisable (inherent to detailed line-art at that size); a simplified glyph favicon is deferred.
