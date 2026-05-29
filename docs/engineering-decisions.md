@@ -1443,3 +1443,24 @@ window.history.back();
 - npm test: 947 passed (946 → 947, +1 hand-off regression test)
 - bash scripts/audit.sh: 185/185 passed
 - Triple-check (§9.5): the `useEffect` is called unconditionally (`if (!isOpen) return` is inside the effect body, not a hook-skipping return); `[isOpen]` deps with `onClose` via ref; optional chaining on `onCloseRef.current?.()`; no context/Supabase/permissions/new components touched; zero console.log.
+
+## 2026-05-29 — Category icon picker for StepCategories (shared CategoryIconGrid)
+
+**Bug**: In the Create BOS Hub flow (and onboarding), the category step (`StepCategories`, step 3 of 5) showed each row's icon as a non-interactive `<span>` and "+ Add category" appended a row with a hardcoded `'💸'`. There was no way to choose a category icon. Not a portal/inert regression — the picker simply never existed in v2 (`StepCategories` is shared by `OnboardingFlow` and `CreateHubSheet`, so it was missing in both). The live `AddCategorySheet` (BudgetView) *did* have an inline icon grid, built from a local `icons` array literal.
+
+**Decision**: Extract one shared, pure-display `CategoryIconGrid` and use it in both places.
+
+- **`src/components/ui/CategoryIconGrid.jsx`** (new) — `{ value, onSelect }`, renders a `role="group"` grid of 36×36 buttons (`--c-chip-bg` / `--c-primary` selected, `aria-pressed`). The `CATEGORY_ICONS` array is **co-located and exported from this component**, deliberately NOT placed in `features/onboarding/onboarding.constants.js`. Reason: the grid lives in `components/ui/` (a verified leaf layer — nothing under `components/` imports from `features/` or `views/`). Co-locating the array means neither a view nor a feature imports the raw list — they render `<CategoryIconGrid>` — so the leaf layer stays leaf and there's no `views → features` upward import. (The audit's import check only verifies paths *resolve*, not direction, so the upward import would have passed; co-location is the cleaner choice, not an audit requirement.)
+- **`StepCategories.jsx`** — the row's icon `<span>` became a `<button>` (`aria-label="Choose icon"`, `aria-expanded`) that toggles an inline `<CategoryIconGrid>` rendered below the row. One-at-a-time via a single `openPickerId` state (string|null): toggling stores at most one row id; opening another row overwrites it so the prior grid unmounts. Selecting an icon calls the existing `update(id,'icon',i)` then `setOpenPickerId(null)`. No outside-tap handler (inline grid; tapping any row icon or selecting closes it). Inline placement avoids z-index/portal/positioning.
+- **`AddCategorySheet.jsx`** — dropped the local `icons` literal + inline `.map`, now renders `<CategoryIconGrid value={icon} onSelect={setIcon} />`. Behavior identical (same 15 icons, same order, same `'💸'` default state) — existing tests unchanged and green.
+
+**Files**:
+- src/components/ui/CategoryIconGrid.jsx (new, 35 lines) + CategoryIconGrid.test.jsx (renders all icons, aria-pressed on selected, onSelect arg)
+- src/features/onboarding/steps/StepCategories.jsx — per-row icon button + openPickerId + inline grid (115 → 132 lines, under the 200 features/ cap)
+- src/views/budget/AddCategorySheet.jsx — import + use CategoryIconGrid, literal removed (90 → 82 lines)
+- src/features/onboarding/steps/StepCategories.test.jsx — +6 picker tests (hidden by default, opens on tap, toggles closed, select updates row + closes, one-at-a-time)
+
+**Verification**:
+- npm test: 955 passed (947 → 955)
+- bash scripts/audit.sh: 187/187 passed
+- Triple-check (§9.5): `CategoryIconGrid` is pure-display (props only, no hooks, no fmt/calc); `StepCategories` hooks are unconditional (no early return); new component has a test file; no context/Supabase/permission changes; zero console.log; both touched files under their 200-line cap.

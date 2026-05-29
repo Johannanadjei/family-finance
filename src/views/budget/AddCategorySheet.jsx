@@ -14,6 +14,7 @@ import { useState, useEffect }    from 'react';
 import { createPortal }           from 'react-dom';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 import { useModalChrome }         from '../../hooks/useModalChrome';
+import { CategoryIconGrid }       from '../../components/ui/CategoryIconGrid';
 import { getCurrentMonth }         from '../../lib/finance';
 
 const inputStyle = {
@@ -49,8 +50,6 @@ export function AddCategorySheet({ isOpen, onClose, onAdd }) {
     setSaving(false);
   };
 
-  const icons = ['🏠','🚗','🛒','💡','💧','📱','🎓','🏥','🎯','✈️','🎉','💰','🏋️','🐾','💸'];
-
   return createPortal(
     <>
       <div onClick={onClose} aria-hidden="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 340 }} />
@@ -60,14 +59,7 @@ export function AddCategorySheet({ isOpen, onClose, onAdd }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Icon picker */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {icons.map(i => (
-              <button key={i} onClick={() => setIcon(i)}
-                style={{ width: 36, height: 36, borderRadius: 8, border: 'none', fontSize: 18, cursor: 'pointer', background: icon === i ? 'var(--c-primary, #064e3b)' : 'var(--c-chip-bg, #f3f4f6)' }}>
-                {i}
-              </button>
-            ))}
-          </div>
+          <CategoryIconGrid value={icon} onSelect={setIcon} />
 
           <input data-testid="add-cat-name-input" type="text" value={name} onChange={e => { setName(e.target.value); setError(null); }} placeholder="Category name (e.g. School Fees)" style={inputStyle} />
           <input data-testid="add-cat-amount-input" type="number" value={amount} onChange={e => { setAmount(e.target.value); setError(null); }} placeholder="Monthly budget (0 if flexible)" min="0" style={inputStyle} />

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, act }      from '@testing-library/react';
-import { StepCategories }           from './StepCategories';
+import { describe, it, expect, vi }       from 'vitest';
+import { render, screen, act, fireEvent } from '@testing-library/react';
+import { StepCategories }                 from './StepCategories';
 
 const mockFmt = (n) => `GHS ${Math.round(n || 0).toLocaleString()}`;
 
@@ -64,5 +64,45 @@ describe('StepCategories', () => {
     renderStep({ onBack });
     screen.getByText('← Back').click();
     expect(onBack).toHaveBeenCalled();
+  });
+
+  // ── icon picker ──────────────────────────────────────────────────────────
+  it('does not show the icon grid until a row icon is tapped', () => {
+    renderStep();
+    expect(screen.queryByRole('group', { name: 'Category icons' })).toBeNull();
+  });
+
+  it('opens the icon grid for a row when its icon is tapped', () => {
+    renderStep();
+    fireEvent.click(screen.getAllByLabelText('Choose icon')[0]);
+    expect(screen.getByRole('group', { name: 'Category icons' })).toBeTruthy();
+  });
+
+  it('toggles the grid closed when the same row icon is tapped again', () => {
+    renderStep();
+    const btn = screen.getAllByLabelText('Choose icon')[0];
+    fireEvent.click(btn);
+    expect(screen.getByRole('group', { name: 'Category icons' })).toBeTruthy();
+    fireEvent.click(btn);
+    expect(screen.queryByRole('group', { name: 'Category icons' })).toBeNull();
+  });
+
+  it('updates the row icon and closes the grid when an icon is selected', () => {
+    renderStep();
+    const iconButtons = screen.getAllByLabelText('Choose icon');
+    expect(iconButtons[0].textContent).toBe('🛒'); // Groceries default
+    fireEvent.click(iconButtons[0]);
+    fireEvent.click(screen.getByLabelText('Use icon 🎓'));
+    expect(screen.queryByRole('group', { name: 'Category icons' })).toBeNull();
+    expect(screen.getAllByLabelText('Choose icon')[0].textContent).toBe('🎓');
+  });
+
+  it('keeps only one row grid open at a time', () => {
+    renderStep();
+    const iconButtons = screen.getAllByLabelText('Choose icon');
+    fireEvent.click(iconButtons[0]);
+    expect(screen.getAllByRole('group', { name: 'Category icons' })).toHaveLength(1);
+    fireEvent.click(iconButtons[1]); // open a different row
+    expect(screen.getAllByRole('group', { name: 'Category icons' })).toHaveLength(1);
   });
 });

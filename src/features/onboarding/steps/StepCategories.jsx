@@ -13,6 +13,7 @@
 
 import { useState } from 'react';
 import { validateCategoriesStep } from '../onboarding.validation';
+import { CategoryIconGrid } from '../../../components/ui/CategoryIconGrid';
 
 const inputStyle = {
   padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)',
@@ -21,8 +22,9 @@ const inputStyle = {
 };
 
 export function StepCategories({ data, fmt, onNext, onBack }) {
-  const [categories, setCategories] = useState(data);
-  const [error,      setError]      = useState(null);
+  const [categories,   setCategories]   = useState(data);
+  const [error,        setError]        = useState(null);
+  const [openPickerId, setOpenPickerId] = useState(null); // row whose icon grid is open (one at a time)
 
   const update = (id, field, value) =>
     setCategories(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
@@ -65,30 +67,45 @@ export function StepCategories({ data, fmt, onNext, onBack }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {categories.map(cat => (
-          <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--c-input-bg, #f9fafb)', borderRadius: 12, padding: '10px 12px' }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>{cat.icon}</span>
-            <input
-              type="text"
-              value={cat.name}
-              onChange={e => update(cat.id, 'name', e.target.value)}
-              placeholder="Category name"
-              style={{ ...inputStyle, flex: 1, minWidth: 0 }}
-            />
-            <input
-              type="number"
-              value={cat.budget_amount || ''}
-              onChange={e => update(cat.id, 'budget_amount', parseFloat(e.target.value) || 0)}
-              placeholder="0"
-              min="0"
-              style={{ ...inputStyle, width: 80, textAlign: 'right' }}
-            />
-            <button
-              onClick={() => remove(cat.id)}
-              aria-label="Remove category"
-              style={{ background: 'var(--c-danger-bg, #fef2f2)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: 'var(--c-danger, #dc2626)', cursor: 'pointer', flexShrink: 0 }}
-            >
-              ✕
-            </button>
+          <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--c-input-bg, #f9fafb)', borderRadius: 12, padding: '10px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => setOpenPickerId(openPickerId === cat.id ? null : cat.id)}
+                aria-label="Choose icon"
+                aria-expanded={openPickerId === cat.id}
+                style={{ fontSize: 20, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+              >
+                {cat.icon}
+              </button>
+              <input
+                type="text"
+                value={cat.name}
+                onChange={e => update(cat.id, 'name', e.target.value)}
+                placeholder="Category name"
+                style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+              />
+              <input
+                type="number"
+                value={cat.budget_amount || ''}
+                onChange={e => update(cat.id, 'budget_amount', parseFloat(e.target.value) || 0)}
+                placeholder="0"
+                min="0"
+                style={{ ...inputStyle, width: 80, textAlign: 'right' }}
+              />
+              <button
+                onClick={() => remove(cat.id)}
+                aria-label="Remove category"
+                style={{ background: 'var(--c-danger-bg, #fef2f2)', border: 'none', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: 'var(--c-danger, #dc2626)', cursor: 'pointer', flexShrink: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+            {openPickerId === cat.id && (
+              <CategoryIconGrid
+                value={cat.icon}
+                onSelect={i => { update(cat.id, 'icon', i); setOpenPickerId(null); }}
+              />
+            )}
           </div>
         ))}
       </div>
