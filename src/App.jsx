@@ -56,7 +56,10 @@ import { JoinView }                              from './views/JoinView';
 function LoadingScreen({ message }) {
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-      <img src="/icons/bos-icon-v2-white-192.png" alt="" style={{ width: 56, height: 56, objectFit: 'contain' }} />
+      <img src="/icons/bos-icon-v2-white-512.png" alt="" style={{ width: 140, height: 140, objectFit: 'contain' }} />
+      <h1 style={{ fontFamily: "'Nunito', sans-serif", fontSize: 32, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.1, margin: '14px 0 6px' }}>
+        Money B.O.S
+      </h1>
       <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--c-success-light, #6ee7b7)', margin: 0 }}>{message}</p>
     </div>
   );

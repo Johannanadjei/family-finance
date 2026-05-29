@@ -47,7 +47,7 @@ export function Header({ onOpenPanel }) {
           transition:   'background .15s, border-color .15s',
         }}>
           <span style={{ fontSize: 22 }}>{centre?.icon || '🏠'}</span>
-          <div style={{ textAlign: 'left', maxWidth: 110, overflow: 'hidden' }}>
+          <div style={{ textAlign: 'left' }}>
             <p style={{ fontSize: 14, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.2 }}>
               {(centre?.name || 'My Budget').length > 20
                 ? (centre?.name || 'My Budget').slice(0, 20) + '…'
@@ -63,16 +63,6 @@ export function Header({ onOpenPanel }) {
           </svg>
         </div>
       </button>
-
-      {/* Centre brand mark — absolutely centred, never intercepts taps */}
-      <img
-        src="/icons/bos-icon-v2-white-512.png"
-        alt="Money B.O.S"
-        style={{
-          position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)',
-          width: 28, height: 28, objectFit: 'contain', pointerEvents: 'none', opacity: 0.95,
-        }}
-      />
 
       {/* Right — settings */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

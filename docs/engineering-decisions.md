@@ -1518,3 +1518,35 @@ window.history.back();
 - bash scripts/audit.sh: 188/188 passed
 - Triple-check (§9.5): all touched components have hooks called unconditionally (no early returns added); no new context destructures, `can()` calls, Supabase reads, or permissions; `AuthScreen` already destructures `{ error }` on every auth call; zero console.log; AuthScreen at the 200-line cap, all other files under it.
 - White variant legibility confirmed by compositing `bos-icon-v2-white-512.png` onto `#064e3b` at 28/80px (crisp). 32px favicon legibility is marginal-but-recognisable (inherent to detailed line-art at that size); a simplified glyph favicon is deferred.
+
+## 2026-05-29 — Logo polish: remove from Header, bump sizes, fix dim lockup
+
+**Context**: Follow-up to 6e91b21. AJ's live screenshots flagged: (1) the Header centre mark felt redundant against the identity pill; (2) the AuthScreen lockup looked dim/translucent; (3) the PWA install banner still showed the old icon; (4) SidePanel hub chips show green-bg house icons.
+
+**Diagnosis findings**:
+- **Dim lockup is NOT a colour/CSS bug.** Probed `bos-icon-v2-white-512.png`: opaque pixels measure RGB (254,254,254) = pure white, and the `<h1>` wordmark is already `#fff`. Header's `opacity:0.95` cannot leak (per-element inline style, different component). Root cause is thin-stroke anti-aliasing: the icon is ~11%-coverage line-art with ~29% of its ink already below `a=200`; rendering the 512px source at 72px sub-samples each ~1px stroke below one device pixel, so white blends with the green and reads grey. Fix = render bigger (more full-coverage pixels), not an opacity/colour change.
+- **Install banner** is a stale-build/stale-cache symptom: the new filenames are already an asset-level cache-bust; a Vercel rebuild on push regenerates `dist/sw.js` precache + manifest. Installed PWAs need a reinstall (OS bakes the icon at install — not fixable in code). A dual-manifest exists (`index.html` static `/manifest.json` wins over the plugin's injected `/manifest.webmanifest`); both point to the new icons, so it's cosmetic — deferred to backlog.
+- **SidePanel hub chips** render `{c.icon}` (per-hub user emoji, default 🏠) on a chip that's green only when the hub is active — the per-hub icon system, not the app logo. Left untouched.
+
+**Decision**:
+- Removed the Header centre mark + the pill `maxWidth:110` cap added in 6e91b21 (and its test) — Header is back to pill + settings.
+- Bumped icon sizes as the dim fix: AuthScreen 72→120, PinScreen 96→140, LoadingScreen 56→140 (switched to white-512 source for crispness), onboarding 56→80 (dark variant, inside the white card).
+- Added the "Money B.O.S" wordmark to LoadingScreen (matches AuthScreen: Nunito 32/900/#fff/-0.02em, `margin:'14px 0 6px'`), no tagline.
+- Skipped (fallback only): stroke dilation in gen-icons.mjs — size bump expected to suffice; LoadingScreen test — it's a private helper in App.jsx, not worth exporting.
+
+**Rules derived**:
+- A washed-out white asset on a coloured background is usually a *render-size/coverage* problem with thin line-art, not opacity or colour. Probe the alpha histogram before reaching for a CSS fix.
+
+**Files**:
+- src/components/layout/Header.jsx — removed centred `<img>` + reverted pill `maxWidth`; hooks/imports unchanged.
+- src/components/layout/Header.test.jsx — removed the centre-logo presence test.
+- src/App.jsx — LoadingScreen icon 56→140 (white-512) + wordmark added.
+- src/views/AuthScreen.jsx — lockup icon 72→120 (in-place, file stays at the 200-line cap).
+- src/views/PinScreen.jsx — icon 96→140.
+- src/features/onboarding/OnboardingFlow.jsx — dark icon 56→80.
+
+**Verification**:
+- npm test: 962 passed (963 → 962, −1 removed Header test)
+- bash scripts/audit.sh: 188/188 passed
+- Triple-check (§9.5): pure styling/size changes + one block removal + one test removal; Header retains all three hooks (all still used), no conditional-return reordering; no context/Supabase/permission/can() changes; zero console.log.
+- Viewport math (390×844, 100dvh): AuthScreen ~673px (signin) / ~731px (signup) — fits; PinScreen ~827px — ~17px headroom (fallback: trim icon `marginBottom 40→24` if tight); onboarding card scrolls internally so 80px can't crowd the progress indicator.

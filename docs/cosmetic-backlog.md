@@ -37,6 +37,9 @@ Captured 2026-05-26. Work split across two upcoming sessions: A (Brand + Layout)
 - **I1.** Settings → Income source edit: tick to save closes form but does not persist. Hook regression. Read `useFinance.js` editIncomeSource flow.
 - **I2.** Quick yes/no inline confirmation on Log screen delete. Reuse the inline confirm pattern already in MembersSection.
 
+### Build / PWA
+- **B1.** Dual web-app manifest — `index.html` hard-links `/manifest.json` (static `public/`) AND vite-plugin-pwa injects `/manifest.webmanifest`. The static one wins (first `rel="manifest"` in document order); both currently point to the same `bos-icon-v2-*` icons so it's harmless, but it's fragile parallel maintenance. Pick one source of truth: either delete `public/manifest.json` + the `index.html` link and let the plugin own it, or keep the static one and stop the plugin generating its own. Cosmetic, not breaking. (Diagnosed 2026-05-29 during logo polish.)
+
 ### Feature Additions
 - **F1.** Emoji picker overhaul — WhatsApp-style scrollable picker for category icons. Same picker reused in Add Category (Budget view) AND FAB Add Transaction (Daily view). Categories to add: gas, food, hearts, football, business types, international travel, church, coffin, wedding, tie, chef, nanny, etc. One source of truth in `lib/emoji.js`.
 

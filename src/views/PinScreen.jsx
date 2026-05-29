@@ -62,7 +62,7 @@ export function PinScreen({ user, verifyPin, lockedUntil, attempts, onForgotPin 
     }}>
       {/* App icon + identity */}
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
-        <img src="/icons/bos-icon-v2-white-512.png" alt="Money B.O.S" style={{ width: 96, height: 96, marginBottom: 12, objectFit: 'contain' }} />
+        <img src="/icons/bos-icon-v2-white-512.png" alt="Money B.O.S" style={{ width: 140, height: 140, marginBottom: 12, objectFit: 'contain' }} />
         <p style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: '0 0 4px' }}>Welcome back</p>
         {user?.email && (
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', margin: 0, fontWeight: 600 }}>

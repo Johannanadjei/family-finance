@@ -98,7 +98,7 @@ export function AuthScreen() {
     }}>
       {/* Brand lockup — white icon + wordmark + tagline, on the green */}
       <div style={{ textAlign: 'center' }}>
-        <img src="/icons/bos-icon-v2-white-512.png" alt="Money B.O.S logo" style={{ width: 72, height: 72, marginBottom: 14, objectFit: 'contain' }} />
+        <img src="/icons/bos-icon-v2-white-512.png" alt="Money B.O.S logo" style={{ width: 120, height: 120, marginBottom: 14, objectFit: 'contain' }} />
         <h1 style={{ fontFamily: "'Nunito', sans-serif", fontSize: 32, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', margin: '0 0 6px', lineHeight: 1.1 }}>
           Money B.O.S
         </h1>

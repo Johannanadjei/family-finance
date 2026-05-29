@@ -127,7 +127,7 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
       }}>
         {/* Brand mark — dark variant, sits on the white card */}
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <img src="/icons/bos-icon-v2-192.png" alt="Money B.O.S" style={{ width: 56, height: 56, objectFit: 'contain' }} />
+          <img src="/icons/bos-icon-v2-192.png" alt="Money B.O.S" style={{ width: 80, height: 80, objectFit: 'contain' }} />
         </div>
         <OnboardingProgress currentStep={step} totalSteps={STEPS.length} steps={STEPS} />
 
