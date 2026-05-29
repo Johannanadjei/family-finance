@@ -1375,3 +1375,33 @@ The hook's `remaining` was distinct from the `remaining` props elsewhere in the 
 - npm test: 943 passed (932 → 943, +11: 8 hook unit tests + 3 AddTransactionSheet integration)
 - bash scripts/audit.sh: 183/183 passed
 - Triple-check (§9.5): `useModalChrome` precedes every modal's early-return guard (verified per file); effect deps `[isOpen]` with `onClose` via ref to avoid churn; optional chaining on `onCloseRef.current?.()`; no new context destructures; new hook has a test file; zero console.log.
+
+## 2026-05-29 — Hero card polish (MonthlyIncomeCard mini-cards)
+
+**Scope**: UI-only. One component (`MonthlyIncomeCard.jsx`) + its skeleton (`HomeViewSkeleton`) + its test. No prop changes (HomeView already passes everything), no new tokens, no schema/service.
+
+**Income value**: 36px/900 → **44px/800**, lineHeight 1.05. 44 (not 48) is the largest size that keeps a 7-figure amount (`GHS 1,200,000`, ~13 chars) inside the ~368px hero inner width (440 − 16px page − 20px hero padding ×2); 48px clips/wraps it. Weight dropped 900→800 for a cleaner large-number read (still bold). No-income empty state keeps the `rgba(255,255,255,.4)` translucent treatment.
+
+**Spent/Spare → tinted mini-cards**: the old `gap:0` flex row of two 13px values became two `flex:1` mini-cards (gap 10, padding 12, radius 14), each with a 30px tinted icon square (16px inline SVG) + 10px uppercase label + **19px/800 value**. Extracted a file-local `MiniStat` pure-display sub-component — it receives pre-formatted value strings and all colours as props (does NOT call `fmt`, per §4); the view formats.
+
+**Icons (new, inline)**: `WalletIcon` (Spent, strokeWidth 2 — matches Header chevron) and `PiggyIcon` (Spare, strokeWidth 1.8 — interior detail muddies at 2/16px; 1.8 has SidePanel precedent). Both `viewBox 0 0 24 24`, `stroke="currentColor"`, round caps/joins, `aria-hidden`. File-local components, no separate files.
+
+**Colour model (hierarchy change)**: values are now **white**; the role colour moved to the **icon stroke** — Spent wallet `var(--c-danger-light)`, Spare piggy `var(--c-success-light)`. Previously the Spent *value text* was red; it's now white. Only negative spare turns a *value* red, as an alert.
+
+**Negative-spare treatment** (option (a) — rgba overlay, no new tokens): Spare mini-card bg `rgba(255,255,255,.08)` → `rgba(248,113,113,.12)`; icon square `rgba(255,255,255,.14)` → `rgba(248,113,113,.18)`; icon stroke + value → `var(--c-danger-light)`. Label stays neutral white (`.6`) in both states — the value carries the red. This makes negative spare a clear surface-level flip, not just a value-text colour shift.
+
+**Skin compatibility**: pure white/red `rgba` overlays on the per-skin `--c-header-from/to` gradient — works on all 9 skins (every header gradient is dark enough for white text; `--c-danger-light`/`--c-success-light` carry bright dark-mode variants). No skin-specific overrides.
+
+**Skeleton**: `HomeViewSkeleton` hero updated — bigger number placeholder (height 40) + two side-by-side mini-card placeholders (height 58, radius 12, gap 10) replacing the two thin 45% lines. No load-flash hop.
+
+**Piggy legibility caveat**: the piggy path is the riskiest shape at 16px. Path is geometrically well-formed and tests pass, but no pixel-level visual was captured here — if it reads unclearly in the running app, swap to a stacked-coins "savings" glyph (same meaning, more legible small). Flagged for an eyeball in the deployed build.
+
+**Files**:
+- src/views/home/MonthlyIncomeCard.jsx — 44px/800 income value; WalletIcon + PiggyIcon; MiniStat sub-component; two tinted mini-cards with negative-spare flip
+- src/views/HomeView.jsx — HomeViewSkeleton hero mirrors the two mini-cards
+- src/views/home/MonthlyIncomeCard.test.jsx — kept 7; added icon-present (per card) + negative-spare bg-tint + positive-stays-neutral (3)
+
+**Verification**:
+- npm test: 946 passed (943 → 946, +3)
+- bash scripts/audit.sh: 183/183 passed
+- Triple-check (§9.5): context call unconditional, only `fmt` destructured, sub-components receive pre-formatted strings (no `fmt`/calc), no new files, no console.log. `data-testid` `stat-spent`/`stat-spare` preserved on value elements; added `*-card` wrappers for icon/tint assertions.

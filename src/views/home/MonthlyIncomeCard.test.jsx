@@ -63,4 +63,20 @@ describe('MonthlyIncomeCard', () => {
     const spare = screen.getByTestId('stat-spare');
     expect(spare.style.color).toMatch(/fca5a5|c-danger-light/);
   });
+
+  it('renders an icon in each mini-card', () => {
+    renderCard();
+    expect(screen.getByTestId('stat-spent-card').querySelector('svg')).toBeTruthy();
+    expect(screen.getByTestId('stat-spare-card').querySelector('svg')).toBeTruthy();
+  });
+
+  it('Spare mini-card flips to a red background tint when spareMoney is negative', () => {
+    renderCard({ spareMoney: -200 });
+    expect(screen.getByTestId('stat-spare-card').style.background).toMatch(/248, ?113, ?113/);
+  });
+
+  it('Spare mini-card stays neutral (no red tint) when spareMoney is positive', () => {
+    renderCard({ spareMoney: 4500 });
+    expect(screen.getByTestId('stat-spare-card').style.background).not.toMatch(/248, ?113, ?113/);
+  });
 });

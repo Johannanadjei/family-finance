@@ -23,12 +23,12 @@ function HomeViewSkeleton() {
   return (
     <div style={{ padding: '16px' }}>
       {/* Hero */}
-      <div style={{ ...card, padding: '16px 18px', marginBottom: 12 }}>
+      <div style={{ ...card, padding: '20px 20px 18px', marginBottom: 12 }}>
         <Skeleton width="40%" height={12} borderRadius={6} />
-        <div style={{ marginTop: 10 }}><Skeleton width="60%" height={32} borderRadius={8} /></div>
-        <div style={{ marginTop: 8, display: 'flex', gap: 12 }}>
-          <Skeleton width="45%" height={12} borderRadius={6} />
-          <Skeleton width="45%" height={12} borderRadius={6} />
+        <div style={{ marginTop: 10 }}><Skeleton width="55%" height={40} borderRadius={8} /></div>
+        <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
+          <Skeleton width="50%" height={58} borderRadius={12} />
+          <Skeleton width="50%" height={58} borderRadius={12} />
         </div>
       </div>
       {/* Payday */}
