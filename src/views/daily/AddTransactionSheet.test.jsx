@@ -309,6 +309,25 @@ describe('AddTransactionSheet', () => {
   describe('modal chrome', () => {
     let root;
     beforeEach(() => {
+      // useModalChrome's cleanup registers a one-shot { once: true } popstate
+      // swallower that only auto-removes once a popstate arrives. In a real
+      // browser history.back() fires that popstate; jsdom NEVER does, so the
+      // many open-then-unmounted sheets in this file pile up swallowers on
+      // window that would silently eat this block's popstate test. Drain them:
+      // each popstate clears exactly one (stopImmediatePropagation), so loop
+      // until a last-registered sentinel survives. No sheet is mounted yet.
+      act(() => {
+        for (let i = 0; i < 100; i++) {
+          let reached = false;
+          const sentinel = () => { reached = true; };
+          window.addEventListener('popstate', sentinel);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+          window.removeEventListener('popstate', sentinel);
+          if (reached) break;
+        }
+      });
+      window.history.replaceState(null, '');
+
       root = document.createElement('div');
       root.id = 'app-shell';
       root.inert = false; // jsdom doesn't implement the inert IDL property; seed the default

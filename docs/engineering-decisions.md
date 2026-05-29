@@ -1405,3 +1405,41 @@ The hook's `remaining` was distinct from the `remaining` props elsewhere in the 
 - npm test: 946 passed (943 → 946, +3)
 - bash scripts/audit.sh: 183/183 passed
 - Triple-check (§9.5): context call unconditional, only `fmt` destructured, sub-components receive pre-formatted strings (no `fmt`/calc), no new files, no console.log. `data-testid` `stat-spent`/`stat-spare` preserved on value elements; added `*-card` wrappers for icon/tint assertions.
+
+## 2026-05-29 — Modal-chrome hand-off race: selfPop flag → one-shot popstate swallower
+
+**Bug**: The "+ New BOS Hub" button at the bottom of the SidePanel stopped opening CreateHubSheet (regressed in the modal-chrome commit). The sheet opened and closed in the same frame.
+
+**Root cause** (supersedes the *selfPop-leak fix* in the modal-chrome entry above): the module-level `selfPop` boolean plus its reset-on-open could not survive a *hand-off* — one modal closing while another opens in the **same** React commit (`setPanelOpen(false); setCreateHubOpen(true)` in `handleOpenCreateHub`). React flushes all effect cleanups before any setups, so the sequence was:
+1. SidePanel cleanup: `selfPop=true`, `history.back()` (popstate is async, fires next tick).
+2. CreateHub setup (same commit): `selfPop=false` (the reset) — **clobbers the flag** — then `pushState` + registers its `popstate` listener.
+3. The async popstate from step 1 lands: `selfPop` is now `false` and only CreateHub's listener is registered → it reads the synthetic pop as a user back-press → `onClose` → CreateHub closes the instant it opened.
+
+The earlier reset-on-open *was itself* the clobber. A single shared boolean can't both survive the in-flight back() of the closing modal and avoid leaking into the next modal — the two requirements are contradictory.
+
+**Fix**: Remove `selfPop` entirely. When firing a programmatic `back()`, register a **one-shot capturing** popstate listener that `stopImmediatePropagation()`s exactly that one synthetic event so it never reaches any modal's `onClose`:
+
+```js
+const swallow = (e) => { e.stopImmediatePropagation(); };
+window.addEventListener('popstate', swallow, { capture: true, once: true });
+window.history.back();
+```
+
+- No cross-instance flag → no clobber. `once:true` → auto-removes, no leak, no reset-on-open needed.
+- One mechanism covers single-modal *and* hand-off identically.
+
+**Ordering — why the swallower wins** (documented in-code, corrected from the initial design): popstate's target is `window`, so dispatch is `AT_TARGET`, where listeners fire in **registration order** — the `capture:true` flag grants **no** precedence here (kept only as harmless intent-signalling). The guarantee comes solely from React's cleanup-before-setup contract: the closing modal's cleanup registers the swallower *before* the incoming modal's setup registers its `onPop`, so the swallower is first and stops the event. It does **not** stop react-router's popstate handler (registered at app mount, earlier still) — benign, because the dummy entries use `pushState(state, '')` with no URL, so the router re-renders the same location (a no-op).
+
+**Test-isolation gotcha (jsdom)**: jsdom's `history.back()` **never** fires popstate (verified: sync/micro/macro all 0). So the one-shot swallower is never auto-consumed in tests, and every open-then-unmounted modal leaves one dangling on `window`; they pile up across a file and would silently eat a later test's popstate. Because `stopImmediatePropagation` halts a popstate at the first listener, one dispatch drains exactly one swallower. Fixed with a `beforeEach` drain loop (dispatch popstate, registering a last sentinel; if the sentinel survives, the stack is clear) in both `useModalChrome.test.js` and `AddTransactionSheet.test.jsx`. In real browsers `back()` always fires popstate, so the swallower self-consumes — this is a jsdom-only artifact, not a production concern.
+
+**Regression test**: added to `useModalChrome.test.js` — two hook instances (panel open, hub closed), flip both in one `act()` (cleanup-before-setup mirrors the real commit), then dispatch a synthetic popstate; assert neither `onClose` fires. Verified it **fails** against the old `selfPop` code and **passes** against the swallower.
+
+**Files**:
+- src/hooks/useModalChrome.js — removed module-level `selfPop` + reset-on-open + the `if (selfPop)` branch in `onPop`; replaced the cleanup's `selfPop=true; back()` with the one-shot capturing swallower (+ explanatory comment). `openCount`, `savedOverflow`, `appliedRef`, `entryLiveRef`, the lock, and the user-back `onPop` path are unchanged.
+- src/hooks/useModalChrome.test.js — drain-loop `beforeEach`; hand-off regression test (9 tests total).
+- src/views/daily/AddTransactionSheet.test.jsx — drain-loop in the modal-chrome block's `beforeEach`.
+
+**Verification**:
+- npm test: 947 passed (946 → 947, +1 hand-off regression test)
+- bash scripts/audit.sh: 185/185 passed
+- Triple-check (§9.5): the `useEffect` is called unconditionally (`if (!isOpen) return` is inside the effect body, not a hook-skipping return); `[isOpen]` deps with `onClose` via ref; optional chaining on `onCloseRef.current?.()`; no context/Supabase/permissions/new components touched; zero console.log.

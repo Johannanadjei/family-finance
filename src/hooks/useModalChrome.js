@@ -25,7 +25,6 @@ const ROOT_ID = 'app-shell';
 // and removes inert.
 let openCount     = 0;
 let savedOverflow = null;
-let selfPop       = false; // true only while WE are the ones calling history.back()
 
 export function useModalChrome({ isOpen, onClose }) {
   const appliedRef   = useRef(false); // did THIS instance take the lock?
@@ -38,17 +37,6 @@ export function useModalChrome({ isOpen, onClose }) {
 
     const body = document.body;
     const root = document.getElementById(ROOT_ID);
-
-    // Clear any stale self-pop flag from a prior close. The back() we fire on a
-    // programmatic close generates a popstate, but by then this instance's
-    // listener is already removed; in the single-modal case nothing consumes the
-    // flag, so it would otherwise linger true and swallow the NEXT modal's first
-    // real back-press. Resetting here guarantees a freshly-opened modal honours
-    // back. (Stacked closes self-heal: the underlying modal's listener consumes
-    // it.) The only residual race — a stale in-flight back()-popstate landing
-    // after a new modal opens in the same tick — requires opening a modal within
-    // ~1ms of closing another, which no human interaction produces.
-    selfPop = false;
 
     // --- acquire lock (idempotent per instance; symmetric with cleanup → StrictMode-safe) ---
     if (!appliedRef.current) {
@@ -66,7 +54,6 @@ export function useModalChrome({ isOpen, onClose }) {
     window.history.pushState({ __modalChrome: true }, '');
 
     const onPop = () => {
-      if (selfPop) { selfPop = false; return; } // our own back() — swallow, don't close
       entryLiveRef.current = false;             // user pressed back: browser already popped our entry
       onCloseRef.current?.();                   // ...so close, and do NOT call history.back() again
     };
@@ -97,7 +84,27 @@ export function useModalChrome({ isOpen, onClose }) {
       // is introduced.
       if (entryLiveRef.current) {
         entryLiveRef.current = false;
-        selfPop = true;          // mark so our own popstate handler swallows this back()
+
+        // The back() below fires a synthetic popstate we must NOT mistake for a
+        // user back-press — otherwise it would close whatever modal is now
+        // listening. A one-shot listener swallows exactly that one event via
+        // stopImmediatePropagation, then auto-removes (`once`). This replaces the
+        // old module-level `selfPop` flag, which a modal opening in the SAME
+        // commit (a hand-off) would reset before the synthetic popstate landed —
+        // closing the incoming modal the instant it opened.
+        //
+        // Why this swallower beats any modal's onPop to the event: popstate's
+        // target is `window`, so dispatch is AT_TARGET, where listeners fire in
+        // REGISTRATION order (the `capture: true` flag grants NO precedence here
+        // — it's kept only as harmless intent-signalling). React's effect
+        // contract runs all cleanups before any setups, so on a hand-off this
+        // cleanup (registering the swallower) runs before the incoming modal's
+        // setup registers its onPop — the swallower is therefore registered
+        // first and runs first. It does NOT stop react-router's popstate handler
+        // (registered at app mount, so earlier still), but that's benign: our
+        // dummy entries keep the same URL, so the router re-renders a no-op.
+        const swallow = (e) => { e.stopImmediatePropagation(); };
+        window.addEventListener('popstate', swallow, { capture: true, once: true });
         window.history.back();
       }
     };
