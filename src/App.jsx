@@ -231,6 +231,19 @@ export default function App() {
     handleSwitchCentre(id);
   }, [reloadCentres, handleSwitchCentre]);
 
+  // Onboarding handoff: refresh the hub LIST (SidePanel source) before clearing
+  // the onboarding gate, so the freshly-created first hub is present the moment
+  // the dashboard renders. onOnboardingComplete still fires even if the list
+  // refetch fails — the hub was created; only the list fetch is a separate
+  // problem and must not trap the user in onboarding.
+  const handleOnboardingComplete = useCallback(async () => {
+    try {
+      await reloadCentres();
+    } finally {
+      onOnboardingComplete();
+    }
+  }, [reloadCentres, onOnboardingComplete]);
+
   const handleArchiveHub = useCallback(async () => {
     const nextHub = centres.find(c => c.id !== centre?.id);
     const { error: err } = await archiveCentre(centre?.id);
@@ -312,7 +325,7 @@ export default function App() {
   if (error)           return <ErrorScreen message={error} />;
   if (needsOnboarding) return (
     <OnboardingFlow
-      onComplete={onOnboardingComplete}
+      onComplete={handleOnboardingComplete}
       existingCentreId={centre?.id || null}
     />
   );

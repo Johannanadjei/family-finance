@@ -1632,3 +1632,25 @@ post-MVP in docs/backlog.md.
   DashboardShell destructures `error`/`reload`; supabase calls destructure error;
   optional chaining on nullable session fields; stable effect deps (`[error]`,
   `[user?.id]`); hook test mocks updated for `../lib/auth`; zero console.log.
+
+## 2026-05-29 — Onboarding handoff didn't refresh the hub list (SidePanel missing the new hub)
+
+**Bug**: After a new user signed up and created their first hub in onboarding, the SidePanel hub list ("X BOS Hubs") didn't include the just-created hub — the count showed 0 and the list was empty until the user closed and reopened the app, which forced a fresh cold-load.
+
+**Root cause**: `centre` (active hub) and the hub *list* are owned by two separate hooks. `useBudgetCentre` owns the active centre; `useCentres` owns the list that feeds the SidePanel. Onboarding completion wired `onComplete={onOnboardingComplete}`, which only reloads `useBudgetCentre` (clearing the onboarding gate so the dashboard renders). It never reloaded `useCentres`, so `DashboardShell` was handed the pre-creation `centres = []`. App reopen worked only because it remounts `useCentres` from scratch. There is no realtime subscription anywhere (confirmed) — the app relies entirely on explicit refetch triggers. The existing "+ New Hub" path (`CreateHubSheet` → `handleHubCreated`) already did the right thing by awaiting `reloadCentres()`; onboarding simply missed it.
+
+**Decision**: Mirror the proven `handleHubCreated` pattern with a dedicated `handleOnboardingComplete` wrapper that awaits `reloadCentres()` *before* calling `onOnboardingComplete()`, then pass it as `OnboardingFlow`'s `onComplete`.
+
+- **Await before, not parallel** — the user lands on the dashboard the instant the gate clears and may open the SidePanel immediately. Awaiting the list refetch first means no 0→N count flicker. Cost is one extra fetch at a one-time handoff — acceptable.
+- **`try/finally`** — `onOnboardingComplete()` fires even if the list refetch fails. The hub was created successfully; a failed *list* fetch is a separate, lesser problem and must not trap the user in onboarding. (In practice `useCentres.load` never rejects — it routes failures to `setError` — so the `finally` is defensive insurance, not a path exercised today.)
+- **Kept separate from `handleHubCreated`** — they have different side-effects (onboarding clears `needsOnboarding`; CreateHubSheet switches to the new hub id). Folding them would add coupling without benefit. Both just call `reloadCentres()`.
+
+**Files**:
+- src/App.jsx — added `handleOnboardingComplete` useCallback (deps `[reloadCentres, onOnboardingComplete]`); swapped `OnboardingFlow`'s `onComplete` prop from `onOnboardingComplete` to it. No change to `useCentres`, `useBudgetCentre`, `onOnboardingComplete`, `OnboardingFlow`, or the CreateHubSheet path.
+- src/App.test.jsx (new) — first App-level test. Mocks the five startup hooks to land on the onboarding gate and stubs `OnboardingFlow` to expose `onComplete` as a button. Asserts `reloadCentres` is called AND that `onOnboardingComplete` does not fire until the (deferred) list refetch resolves — proving the await actually awaits, then asserts call order `['reload','complete']`.
+
+**Verification**:
+- Regression test verified to FAIL against pre-fix code first (`reloadCentres` called 0 times — same red-first discipline as the data-loss-on-refresh fix), then PASS after the wrapper.
+- npm test: 974 passed (973 → 974; +1 regression).
+- bash scripts/audit.sh: 192/192 passed.
+- Triple-check (§9.5): `handleOnboardingComplete` is a useCallback placed among the other handler callbacks, before any conditional return (hooks-order safe); `reloadCentres` + `onOnboardingComplete` both already destructured; stable deps; no new Supabase calls / nullable access / permissions; zero console.log.
