@@ -1654,3 +1654,47 @@ post-MVP in docs/backlog.md.
 - npm test: 974 passed (973 → 974; +1 regression).
 - bash scripts/audit.sh: 192/192 passed.
 - Triple-check (§9.5): `handleOnboardingComplete` is a useCallback placed among the other handler callbacks, before any conditional return (hooks-order safe); `reloadCentres` + `onOnboardingComplete` both already destructured; stable deps; no new Supabase calls / nullable access / permissions; zero console.log.
+
+## 2026-05-29 — Three category/budget regressions (confirm-delete, icon edit, health-bar thresholds)
+
+Batch fix for three reports. Each was investigated with an **exhaustive git history search** before deciding "regression vs never-existed" — the receipts mattered because the user recalled features existing before the recent logo-refresh work.
+
+### R3 — Budget Health bar "stuck green" → unify thresholds at 70/90 (the actual fix)
+
+**Not a code regression.** `BudgetHealthBar.jsx` has used `budgetStatus.color` since the fixes in `68c4761`/`462bbbf`; nothing after regressed it. The real cause was **two divergent, hardcoded threshold ladders** for the same concept:
+- Home `getBudgetStatusFromBudget` (`finance.js`): amber `>=85`, red `>100`.
+- Budget page `CategoryBudgetRow` (inline `barColor`): amber `>70`, red `>90`.
+
+So at ~75% spend the per-category Budget bars were amber while the Home aggregate bar was still green — the "stuck green" perception (its green zone ran to 85%, and aggregate-vs-per-category can also legitimately diverge).
+
+**Decision (locked with user): one canonical function at the Budget-page numbers — amber > 70, red > 90 — used everywhere.** `getBudgetStatusFromBudget` rewritten to those thresholds and changed to return **CSS var tokens** (`var(--c-danger/warning/success, #hex)`) instead of raw hex, because its new second consumer (`CategoryBudgetRow`) is a themed component and raw hex would break dark-skin theming. `CategoryBudgetRow` now calls `getBudgetStatusFromBudget(pctUsed).color` — zero behaviour change for the Budget page (it already used 70/90), green token shifts `--c-accent` → `--c-success` (same `#059669` fallback, semantically correct). The Home bar picks up the new thresholds + tokens automatically via `useFinance.js:120` — no edit to `BudgetHealthBar.jsx` or `useFinance.js`.
+
+**Left alone, by design (confirmed not bugs):**
+- Zero-spend state renders the neutral "No spending recorded yet" empty bar (`showData = totalSpent > 0`) — correct, not a green fill.
+- `budgetSpend` excludes `from_spare` expenses, so overspend routed to the spare pool never pushes the Home bar to red — intended money-model behaviour.
+
+### R1 — Category delete had no confirmation → port the in-repo IncomeSourceRow pattern
+
+**History receipt:** `git log --all -S "Are you sure"` returns exactly **one** commit, `c2e7bf0`, which added the two-tap confirm to **`IncomeSourceRow`** (income sources). `-S "confirmDelete"` / `-S "Are you sure"` scoped to `CategorySettingsRow.jsx` are **empty across all history** — category delete never had a confirm. `ConfirmSheet` has only ever served payday income confirmation. The user was conflating the (still-live) income-source confirm with categories — the two rows were deliberately styled alike in `c2e7bf0`.
+
+**Fix:** Ported the income-source two-tap pattern verbatim into `CategorySettingsRow` — `confirmDelete` state, first tap reveals `Are you sure?` + Delete (`cat-delete-confirm-*`) / Cancel (`cat-delete-cancel-*`); only confirm calls `onDelete`. Framed as a consistency gap, not a removed feature.
+
+### R2 — Emoji edit on existing categories → wire CategoryIconGrid into edit mode
+
+**History receipt:** `CategoryIconGrid` was born only days earlier (`df24cec`) and wired solely to **create** flows (onboarding `StepCategories`, `AddCategorySheet`). `AddCategorySheet` never had an `editCat`/`editing` prop in any version; `-S "setIcon"` history shows the picker only ever in create/hub-creation flows. So editing an existing category's emoji **never existed anywhere** — a missing feature, not a regression. The user likely remembers choosing an icon during creation.
+
+**Fix:** Wired `CategoryIconGrid` into `CategorySettingsRow`'s edit mode (per-row icon toggle button → inline grid; local `icon`/`showIconPicker` state; same UX as `StepCategories`, collapsed to a boolean since this is a single-row component). `handleSave` now sends `icon` in the `onUpdate` payload. `updateCategory` already accepts `icon` (`categories.service.js:131`) — **no service/validation change**.
+
+**Files:**
+- src/lib/finance.js — `getBudgetStatusFromBudget` thresholds 85/100 → 70/90; return var tokens.
+- src/views/budget/CategoryBudgetRow.jsx — inline `barColor` ladder → `getBudgetStatusFromBudget(pctUsed).color` (dedup; imports the pure fn).
+- src/views/settings/CategorySettingsRow.jsx — confirm-delete two-tap (R1) + edit-mode icon picker (R2).
+- src/lib/finance.test.js — +4 threshold regression tests (75→amber, 95→red, 70 & 90 boundaries); updated colour assertions to tokens; replaced the stale `100→Watch Out` with `>90→Over Budget`.
+- src/views/settings/CategorySettingsRow.test.jsx — +4 confirm-delete tests, +2 icon-picker tests; replaced two obsolete immediate-delete tests.
+- src/views/budget/CategoryBudgetRow.test.jsx — green assertion `--c-accent` → `--c-success`.
+
+**Verification:**
+- All three regression sets verified **red against current code first**, then green after each fix (R3: 4 finance tests fail; R1: 4 row tests fail; R2: 2 row tests fail) — same discipline as the data-loss-on-refresh and onboarding-refetch fixes.
+- npm test: 981 passed (974 → 981, +7 net).
+- bash scripts/audit.sh: 192/192 passed.
+- Triple-check (§9.5): new `CategorySettingsRow` `useState`s declared with the others before any return (no conditional hooks; component uses ternary, not early return); props-only components, no context/Supabase/permission changes; `cat.icon` guarded with `|| '💸'`; `CategoryBudgetRow` stays pure-display (imports a pure lib fn, `pctUsed` still arrives as a prop); zero console.log.

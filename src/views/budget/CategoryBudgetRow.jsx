@@ -13,11 +13,12 @@
  * @param {function} fmt
  */
 
+import { getBudgetStatusFromBudget } from '../../lib/finance';
+
 export function CategoryBudgetRow({ category, spent, remaining, pctUsed, overBudget, fmt }) {
-  const barColor =
-    pctUsed > 90 ? 'var(--c-danger, #dc2626)' :
-    pctUsed > 70 ? 'var(--c-warning, #d97706)' :
-    'var(--c-accent, #059669)';
+  // Shared canonical thresholds (amber > 70, red > 90) — single source of truth
+  // in lib/finance, also used by the Home Budget Health bar.
+  const barColor = getBudgetStatusFromBudget(pctUsed).color;
 
   return (
     <div style={{ padding: '14px 0', borderBottom: '1px solid var(--c-border, #e5e7eb)' }}>

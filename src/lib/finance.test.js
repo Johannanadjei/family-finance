@@ -203,16 +203,16 @@ describe('calcBudgetUsedPct', () => {
 // ── getBudgetStatusFromBudget ─────────────────────────────────────────────────
 
 describe('getBudgetStatusFromBudget', () => {
-  it('returns On Track below 85%', () => {
+  it('returns On Track below 70%', () => {
     const status = getBudgetStatusFromBudget(50);
     expect(status.label).toContain('On Track');
-    expect(status.color).toBe('#059669');
+    expect(status.color).toBe('var(--c-success, #059669)');
   });
 
   it('returns Watch Out at 85%', () => {
     const status = getBudgetStatusFromBudget(85);
     expect(status.label).toContain('Watch Out');
-    expect(status.color).toBe('#d97706');
+    expect(status.color).toBe('var(--c-warning, #d97706)');
   });
 
   it('returns Watch Out at 90%', () => {
@@ -220,15 +220,36 @@ describe('getBudgetStatusFromBudget', () => {
     expect(status.label).toContain('Watch Out');
   });
 
-  it('returns Watch Out at exactly 100%', () => {
-    const status = getBudgetStatusFromBudget(100);
-    expect(status.label).toContain('Watch Out');
-  });
-
-  it('returns Over Budget above 100%', () => {
+  it('returns Over Budget above 90%', () => {
     const status = getBudgetStatusFromBudget(101);
     expect(status.label).toContain('Over Budget');
-    expect(status.color).toBe('#dc2626');
+    expect(status.color).toBe('var(--c-danger, #dc2626)');
+  });
+
+  // ── Regression: canonical 70/90 thresholds shared with the Budget page ──────
+  // Home Budget Health bar must change colour the same way the per-category
+  // Budget page bars do (amber > 70, red > 90). Previously the home thresholds
+  // were 85/100, so it read "stuck green" relative to the Budget page.
+  it('returns Watch Out (amber) at 75% — green zone ends at 70', () => {
+    const status = getBudgetStatusFromBudget(75);
+    expect(status.label).toContain('Watch Out');
+    expect(status.color).toBe('var(--c-warning, #d97706)');
+  });
+
+  it('returns Over Budget (red) at 95% — red zone starts above 90', () => {
+    const status = getBudgetStatusFromBudget(95);
+    expect(status.label).toContain('Over Budget');
+    expect(status.color).toBe('var(--c-danger, #dc2626)');
+  });
+
+  it('green/amber boundary is at 70', () => {
+    expect(getBudgetStatusFromBudget(70).label).toContain('On Track');
+    expect(getBudgetStatusFromBudget(71).label).toContain('Watch Out');
+  });
+
+  it('amber/red boundary is at 90', () => {
+    expect(getBudgetStatusFromBudget(90).label).toContain('Watch Out');
+    expect(getBudgetStatusFromBudget(91).label).toContain('Over Budget');
   });
 });
 

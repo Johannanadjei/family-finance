@@ -64,18 +64,38 @@ describe('CategorySettingsRow', () => {
     expect(screen.queryByTestId('cat-name-input-cat-1')).toBeNull();
   });
 
-  it('calls onDelete when delete button tapped', async () => {
+  // ── Confirm-delete (two-tap) — mirrors IncomeSourceRow safety pattern ───────
+  it('shows confirmation after delete button tapped', async () => {
+    renderRow();
+    await act(async () => { screen.getByTestId('cat-delete-cat-1').click(); });
+    expect(screen.getByText('Are you sure?')).toBeTruthy();
+    expect(screen.getByTestId('cat-delete-confirm-cat-1')).toBeTruthy();
+    expect(screen.getByTestId('cat-delete-cancel-cat-1')).toBeTruthy();
+  });
+
+  it('does not call onDelete on first tap — only shows confirmation', async () => {
     const onDelete = vi.fn().mockResolvedValue({ error: null });
     renderRow({ onDelete });
     await act(async () => { screen.getByTestId('cat-delete-cat-1').click(); });
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  it('calls onDelete after confirm delete tapped', async () => {
+    const onDelete = vi.fn().mockResolvedValue({ error: null });
+    renderRow({ onDelete });
+    await act(async () => { screen.getByTestId('cat-delete-cat-1').click(); });
+    await act(async () => { screen.getByTestId('cat-delete-confirm-cat-1').click(); });
     expect(onDelete).toHaveBeenCalledWith('cat-1');
   });
 
-  it('disables delete button while deleting', () => {
-    const onDelete = vi.fn().mockReturnValue(new Promise(() => {}));
+  it('returns to normal state and does not delete when cancel tapped', async () => {
+    const onDelete = vi.fn();
     renderRow({ onDelete });
-    act(() => { screen.getByTestId('cat-delete-cat-1').click(); });
-    expect(screen.getByTestId('cat-delete-cat-1').disabled).toBe(true);
+    await act(async () => { screen.getByTestId('cat-delete-cat-1').click(); });
+    await act(async () => { screen.getByTestId('cat-delete-cancel-cat-1').click(); });
+    expect(screen.queryByText('Are you sure?')).toBeNull();
+    expect(screen.getByTestId('cat-delete-cat-1')).toBeTruthy();
+    expect(onDelete).not.toHaveBeenCalled();
   });
 
   it('cancels edit without saving when Cancel clicked', async () => {
@@ -109,5 +129,23 @@ describe('CategorySettingsRow', () => {
     await act(async () => { screen.getByTestId('cat-save-cat-1').click(); });
     expect(screen.getByText('Please enter a valid amount')).toBeTruthy();
     expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  // ── Icon picker in edit mode (reuses CategoryIconGrid) ──────────────────────
+  it('opens the icon picker in edit mode when the icon button is tapped', async () => {
+    renderRow();
+    await act(async () => { screen.getByTestId('cat-edit-cat-1').click(); });
+    await act(async () => { screen.getByTestId('cat-icon-toggle-cat-1').click(); });
+    expect(screen.getByLabelText('Use icon 🎓')).toBeTruthy();
+  });
+
+  it('saves the chosen icon via onUpdate', async () => {
+    const onUpdate = vi.fn().mockResolvedValue({ error: null });
+    renderRow({ onUpdate });
+    await act(async () => { screen.getByTestId('cat-edit-cat-1').click(); });
+    await act(async () => { screen.getByTestId('cat-icon-toggle-cat-1').click(); });
+    await act(async () => { screen.getByLabelText('Use icon 🎓').click(); });
+    await act(async () => { screen.getByTestId('cat-save-cat-1').click(); });
+    expect(onUpdate).toHaveBeenCalledWith('cat-1', expect.objectContaining({ icon: '🎓' }));
   });
 });

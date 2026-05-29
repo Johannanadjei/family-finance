@@ -63,7 +63,7 @@ describe('CategoryBudgetRow', () => {
   it('progress bar is green when under 70%', () => {
     renderRow({ pctUsed: 40 });
     const bar = screen.getByTestId('budget-bar-cat-1');
-    expect(bar.style.background).toContain('--c-accent');
+    expect(bar.style.background).toContain('--c-success');
   });
 
   it('progress bar is amber when 71-90%', () => {

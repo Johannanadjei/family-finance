@@ -63,10 +63,14 @@ export const calcTotalSpent = (txs) =>
 export const calcBudgetUsedPct = (fixedSpent, fixedTotal) =>
   fixedTotal > 0 ? Math.round((fixedSpent / fixedTotal) * 100) : 0;
 
+// Canonical budget-status thresholds, shared by the Home Budget Health bar
+// (via useFinance) and the per-category Budget page rows (CategoryBudgetRow):
+// amber above 70%, red above 90%. Returns CSS var tokens so both surfaces stay
+// theme-aware on every skin.
 export const getBudgetStatusFromBudget = (usedPct) => {
-  if (usedPct > 100) return { label: 'Over Budget 🚨', color: '#dc2626' };
-  if (usedPct >= 85) return { label: 'Watch Out ⚠️',  color: '#d97706' };
-  return                    { label: 'On Track 🎯',   color: '#059669' };
+  if (usedPct > 90) return { label: 'Over Budget 🚨', color: 'var(--c-danger, #dc2626)' };
+  if (usedPct > 70) return { label: 'Watch Out ⚠️',  color: 'var(--c-warning, #d97706)' };
+  return                    { label: 'On Track 🎯',   color: 'var(--c-success, #059669)' };
 };
 
 export const calcSpendByDay = (txs) => {
