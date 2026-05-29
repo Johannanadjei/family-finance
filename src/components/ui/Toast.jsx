@@ -7,18 +7,21 @@
  *
  * z-index 250 — above BottomNav, below ConfirmSheet (350) and SidePanel (400).
  *
- * @param {string}   message    — toast message text
- * @param {function} onEdit     — called when Edit tapped
- * @param {function} onDismiss  — called on auto-dismiss or manual dismiss
+ * @param {string}   message       — toast message text
+ * @param {function} onEdit        — called when Edit tapped
+ * @param {function} onDismiss     — called on auto-dismiss or manual dismiss
+ * @param {number|null} autoDismissMs — ms before auto-dismiss; null = persist
+ *                                      until dismissed (used for error banners)
  */
 
 import { useEffect } from 'react';
 
-export function Toast({ message, onEdit, actionLabel = 'Edit', onDismiss }) {
+export function Toast({ message, onEdit, actionLabel = 'Edit', onDismiss, autoDismissMs = 4000 }) {
   useEffect(() => {
-    const timer = setTimeout(onDismiss, 4000);
+    if (autoDismissMs == null) return;   // persistent toast — no auto-dismiss
+    const timer = setTimeout(onDismiss, autoDismissMs);
     return () => clearTimeout(timer);
-  }, [onDismiss]);
+  }, [onDismiss, autoDismissMs]);
 
   return (
     <div

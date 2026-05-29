@@ -25,6 +25,12 @@ vi.mock('../lib/supabase', () => {
   return { supabase: { from: () => makeChain() } };
 });
 
+vi.mock('../lib/auth', () => ({
+  waitForSession: vi.fn().mockResolvedValue({ data: { session: { expires_at: 9999999999 } }, error: null }),
+  warnOnEmptyColdLoad: vi.fn(),
+  sessionAgeMs: vi.fn(() => 0),
+}));
+
 vi.mock('../services/centres.service', () => ({
   getCentreById:   vi.fn(),
   getFirstCentre:  vi.fn().mockResolvedValue({ data: null, error: null }),

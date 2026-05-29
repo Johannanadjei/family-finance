@@ -519,3 +519,25 @@ simplicity and co-location — every component's styles are readable without lea
 **RLS at the database level.** Row-level security is the primary access control mechanism.
 The frontend anon key + user JWT enforce data isolation. The frontend never implements
 its own access checks — it trusts Supabase RLS.
+
+---
+
+## 12. Never mask fetch failures as empty results
+
+The service and hook layers MUST distinguish between (a) a successful fetch that
+returned zero rows, and (b) a fetch that failed (network, 401, RLS block).
+
+- Services return `{ data, error }` truthfully — never coerce an `error` into `data: []` or `data: null`.
+- Hooks expose `{ data, loading, error, loaded }`. `loaded` is true only after a fetch completes without error.
+- Views render: `loading` → skeleton; `error` → error state + retry; `loaded && data.length === 0` → empty state. The empty state ("No X yet…") renders ONLY for case (a).
+- Every data hook's first fetch on mount awaits `waitForSession()` (`src/lib/auth.js`) so queries never fire against an unhydrated/stale token.
+
+A failure must be visible in three places: hook state, the UI, and a test. See
+docs/engineering-decisions.md (data-loss-on-refresh post-mortem).
+
+**Why this rule exists:** a cold-load auth-token race let RLS-blocked queries return
+`200 []`, which services collapsed to `data: []` and views rendered as an empty
+dashboard — looking exactly like data loss. The token gate (`waitForSession`) is the
+fix; truthful errors + the `loaded` flag are defense-in-depth. Note one limit: a pure
+RLS-blocked `200 []` carries no error, so only the token gate prevents it — the
+truthful-error layer cannot, and `lib/auth.js warnOnEmptyColdLoad` is the residual canary.

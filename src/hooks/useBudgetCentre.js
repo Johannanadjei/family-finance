@@ -27,6 +27,7 @@ import { getMembers, addMember as addMemberService, removeMember as removeMember
 import { updateIncomeSource as updateIncomeSourceService } from '../services/income.service';
 import { createInvite as createInviteService, getHubInvites as getHubInvitesService, cancelInvite as cancelInviteService } from '../services/invites.service';
 import { getUserSession } from '../services/auth.service';
+import { waitForSession } from '../lib/auth';
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,17 @@ export function useBudgetCentre(user, centreId) {
     setLoading(true);
     setError(null);
     setRemovedFromHub(false);
+
+    // Auth-readiness gate — without it a cold-load centre query races the token
+    // refresh; an RLS-blocked 200 returns null and the user is wrongly bounced
+    // to onboarding (or sees an empty hub). See lib/auth.js.
+    const { error: sessionErr } = await waitForSession();
+    if (sessionErr) {
+      console.error('[useBudgetCentre] session not ready:', sessionErr.message);
+      setError('Could not verify your session. Please refresh.');
+      setLoading(false);
+      return;
+    }
 
     // Resolve the centre to load
     let centreData, centreErr;
@@ -106,21 +118,26 @@ export function useBudgetCentre(user, centreId) {
     if (catResult.error)    console.error('[useBudgetCentre] categories fetch error:', catResult.error.message);
     if (memberResult.error) console.error('[useBudgetCentre] members fetch error:', memberResult.error.message);
 
+    // Services now return errors truthfully (data: null on failure), so guard
+    // every array access with a local fallback before deriving state.
+    const cats = catResult.data    || [];
+    const mems = memberResult.data || [];
+
     // Derive the current user's role from their member row.
     // If the user is not found and the hub has members, they have been removed.
     // NOTE: without a realtime subscription, removed members lose access on their
     // next app reload or hub switch — not immediately.
-    const currentMember = memberResult.data.find(m => m.user_id === user.id);
-    const isRemoved     = !memberResult.error && memberResult.data.length > 0 && !currentMember;
+    const currentMember = mems.find(m => m.user_id === user.id);
+    const isRemoved     = !memberResult.error && mems.length > 0 && !currentMember;
     const derivedRole   = currentMember?.role ?? 'standard';
 
     // Resume detection: only on initial load (no centreId).
     // First centre has no categories → partial onboarding write — resume.
-    if (!centreId && catResult.data.length === 0) {
+    if (!centreId && cats.length === 0) {
       setNeedsOnboarding(true);
       setCentre(centreData);
       setCategories([]);
-      setMembers(memberResult.data);
+      setMembers(mems);
       setCurrentMemberRole(derivedRole);
       setLoading(false);
       return;
@@ -128,8 +145,8 @@ export function useBudgetCentre(user, centreId) {
 
     setRemovedFromHub(isRemoved);
     setCentre(centreData);
-    setCategories(catResult.data);
-    setMembers(memberResult.data);
+    setCategories(cats);
+    setMembers(mems);
     setCurrentMemberRole(derivedRole);
     setNeedsOnboarding(false);
     setLoading(false);

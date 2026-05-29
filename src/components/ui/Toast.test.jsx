@@ -55,4 +55,13 @@ describe('Toast', () => {
     expect(onDismiss).toHaveBeenCalled();
     vi.useRealTimers();
   });
+
+  it('does NOT auto-dismiss when autoDismissMs is null (persistent banner)', async () => {
+    vi.useFakeTimers();
+    const onDismiss = vi.fn();
+    renderToast({ onDismiss, autoDismissMs: null });
+    await act(async () => { vi.advanceTimersByTime(60000); });
+    expect(onDismiss).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
 });

@@ -1550,3 +1550,85 @@ window.history.back();
 - bash scripts/audit.sh: 188/188 passed
 - Triple-check (§9.5): pure styling/size changes + one block removal + one test removal; Header retains all three hooks (all still used), no conditional-return reordering; no context/Supabase/permission/can() changes; zero console.log.
 - Viewport math (390×844, 100dvh): AuthScreen ~673px (signin) / ~731px (signup) — fits; PinScreen ~827px — ~17px headroom (fallback: trim icon `marginBottom 40→24` if tight); onboarding card scrolls internally so 80px can't crowd the progress indicator.
+
+---
+
+## [2026-05-29] Data loss on refresh — auth-token race + failure masking
+
+**Context:**
+AJ reported intermittent data loss: on some refreshes the dashboard showed an
+empty state; a second refresh restored everything. Phase 1 diagnosis ruled out
+service-worker caching (only Google Fonts is runtime-cached, never Supabase),
+realtime (none used), and localStorage gating. Root cause was an auth-token
+hydration race on cold load:
+
+1. Data hooks fired PostgREST queries off the React `user`/`centre` object before
+   the Supabase access token was attached/refreshed in the client.
+2. RLS-blocked queries return HTTP **200 with `[]`** (not an error). Services
+   coerced `{ data: data || [], error }`, so a blocked read was indistinguishable
+   from a genuinely empty account.
+3. `useFinance` errors never reached the UI (only `useBudgetCentre`'s centre-fetch
+   error gated `ErrorScreen`), so a failed finance fetch rendered as a clean empty
+   dashboard. The second refresh worked because the session was warm by then.
+
+A latent severe variant: a raced centre query returns `null` → `needsOnboarding`
+→ a returning user bounced into onboarding. And a raced `usePin` query returns a
+null hash → a user with a PIN shown the PIN *setup* screen.
+
+**Decision:**
+Three-part fix, defense-in-depth.
+
+1. **Primary — auth-readiness gate.** New `src/lib/auth.js` `waitForSession()`:
+   awaits `getSession()` (which awaits the GoTrue init lock in supabase-js v2),
+   bounded-polls if a session hasn't propagated yet, and — crucially —
+   **refreshes an expired-but-present token** before returning (presence alone
+   was insufficient; the bug is a stale token, not an absent session). Every
+   data hook's first fetch awaits it: `useFinance`, `useBudgetCentre`,
+   `useCentres`, `usePin`. The old presence-only `waitForSession` in
+   `auth.service.js` is now a re-export of the canonical lib helper (JoinView
+   keeps working unchanged).
+2. **Defense — stop masking failures.** List-read services return errors
+   truthfully (`error ? null : (data || [])`): a failure is `data: null` + error,
+   a successful empty is `data: []`. `useFinance` exposes a `loaded` flag (true
+   only after a clean fetch). A failed finance fetch surfaces a persistent,
+   retryable error banner in `DashboardShell` (reused `Toast` with a new
+   `autoDismissMs={null}` prop) — never a silent empty.
+3. **Prevention.** `lib/auth.js warnOnEmptyColdLoad` logs a `console.warn` when a
+   cold-load read returns empty >1s after a session was established (residual
+   canary), wired into the transactions + centre reads. New CLAUDE.md §12 codifies
+   the rule. A race regression test (`useFinance.race.test.js`) asserts the fetch
+   does not fire until the gate resolves; it was verified to FAIL against the
+   pre-fix code first (same discipline as the modal-handoff fix, 300b434).
+
+**Important limit:** the truthful-error layer cannot catch a pure RLS-blocked
+`200 []` — that carries no error. Only the token gate prevents it; the canary is
+the residual smoke detector. Full observability (Sentry/PostHog) is logged as
+post-MVP in docs/backlog.md.
+
+**Rules derived:**
+- Never coerce a fetch failure to `[]`/`null` — distinguish (a) success-empty
+  from (b) failure at the service AND hook AND UI layers. (CLAUDE.md §12)
+- Every data hook's first mount fetch awaits `waitForSession()`.
+- A session can be present-but-expired; readiness means fresh, not just present.
+
+**Files:**
+- src/lib/auth.js (new) — `waitForSession` (freshness-aware), `sessionAgeMs`, `warnOnEmptyColdLoad`.
+- src/lib/auth.test.js (new) — gate + refresh + canary coverage.
+- src/hooks/useFinance.js — gate first fetch, `loaded` flag, safe arrays on error.
+- src/hooks/useFinance.race.test.js (new) — regression guard (proven to fail pre-fix).
+- src/hooks/useBudgetCentre.js, useCentres.js, usePin.js — gate first fetch.
+- src/services/{transactions,income,centres,categories,members}.service.js — truthful list reads; canary on tx + centre reads.
+- src/services/auth.service.js — `waitForSession` now re-exports lib/auth.
+- src/App.jsx — persistent retryable error banner in DashboardShell.
+- src/components/ui/Toast.jsx — `autoDismissMs` prop (null = persist).
+- CLAUDE.md — §12 "Never mask fetch failures as empty results".
+
+**Verification:**
+- npm test: 973 passed (962 → 973; +4 race, +6 lib/auth, +1 Toast).
+- bash scripts/audit.sh: 191/191 passed.
+- Race test verified FAIL against pre-fix code (4/4 failed, incl. a null.filter
+  crash proving the masking hazard), then PASS after the fix.
+- Triple-check (§9.5): all gate hooks added before any conditional return;
+  DashboardShell destructures `error`/`reload`; supabase calls destructure error;
+  optional chaining on nullable session fields; stable effect deps (`[error]`,
+  `[user?.id]`); hook test mocks updated for `../lib/auth`; zero console.log.

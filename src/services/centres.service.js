@@ -14,6 +14,7 @@
 
 import { supabase } from '../lib/supabase';
 import { validateString, validateCurrency } from '../lib/validation';
+import { warnOnEmptyColdLoad } from '../lib/auth';
 
 // ── Budget Centres ────────────────────────────────────────────────────────────
 
@@ -30,7 +31,8 @@ export const getCentres = async () => {
     .order('created_at', { ascending: true });
 
   if (error) console.error('[centres.service] getCentres error:', error.message);
-  return { data: data || [], error };
+  // Never mask a failure as []: error → data null; success → always an array. See CLAUDE.md §12.
+  return { data: error ? null : (data || []), error };
 };
 
 /**
@@ -45,6 +47,7 @@ export const getCentreById = async (centreId) => {
     .maybeSingle();
 
   if (error) console.error('[centres.service] getCentreById error:', error.message);
+  if (!error) warnOnEmptyColdLoad('budget_centres (by id)', data ? [data] : []);
   return { data, error };
 };
 
@@ -63,6 +66,7 @@ export const getFirstCentre = async () => {
     .maybeSingle();
 
   if (error) console.error('[centres.service] getFirstCentre error:', error.message);
+  if (!error) warnOnEmptyColdLoad('budget_centres (first)', data ? [data] : []);
   return { data, error };
 };
 
@@ -180,7 +184,7 @@ export const getArchivedCentres = async () => {
     .order('created_at', { ascending: true });
 
   if (error) console.error('[centres.service] getArchivedCentres error:', error.message);
-  return { data: data || [], error };
+  return { data: error ? null : (data || []), error };
 };
 
 /**

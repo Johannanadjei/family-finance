@@ -30,7 +30,8 @@ export const getIncomeSources = async (centreId) => {
     .order('created_at', { ascending: true });
 
   if (error) console.error('[income.service] getIncomeSources error:', error.message);
-  return { data: data || [], error };
+  // Never mask a failure as []: error → data null; success → always an array. See CLAUDE.md §12.
+  return { data: error ? null : (data || []), error };
 };
 
 /**

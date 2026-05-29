@@ -99,7 +99,7 @@ function RemovedScreen({ otherCentres, onSwitchHub, onSignOut }) {
 function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, onSwitchCentre, onHubCreated, onRestoreHub }) {
   const navigate                           = useNavigate();
   const { can }                            = useBudgetCentreContext();
-  const { incomes, loading }               = useFinanceContext();
+  const { incomes, loading, error, reload } = useFinanceContext();
   const [panelOpen,       setPanelOpen]    = useState(false);
   const [addSheetOpen,    setAddSheetOpen] = useState(false);
   const [createHubOpen,   setCreateHubOpen] = useState(false);
@@ -107,6 +107,11 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, on
   const handleHubCreatedNav  = useCallback(async (id) => { await onHubCreated(id); navigate('/'); }, [onHubCreated, navigate]);
   const [toast,           setToast]        = useState(null);
   const [editTx,          setEditTx]       = useState(null);
+  const [errorDismissed,  setErrorDismissed] = useState(false);
+
+  // Surface a failed finance fetch as a retryable banner — never let it render as
+  // a silent empty dashboard (the data-loss-on-refresh class). Reset on each new error.
+  useEffect(() => { if (error) setErrorDismissed(false); }, [error]);
 
   const handleSaved = (savedTx) => {
     if (!savedTx) return;
@@ -155,6 +160,15 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, on
           actionLabel="Go to Settings"
           onEdit={() => { navigate('/settings'); setToast(null); }}
           onDismiss={() => setToast(null)}
+        />
+      )}
+      {error && !errorDismissed && (
+        <Toast
+          message="Couldn't load your latest data."
+          actionLabel="Retry"
+          onEdit={() => reload()}
+          onDismiss={() => setErrorDismissed(true)}
+          autoDismissMs={null}
         />
       )}
       {!panelOpen && <InstallPrompt />}

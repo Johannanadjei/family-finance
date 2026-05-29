@@ -6,6 +6,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act }              from '@testing-library/react';
 import { usePin }                                from './usePin';
 
+vi.mock('../lib/auth', () => ({
+  waitForSession: vi.fn().mockResolvedValue({ data: { session: { expires_at: 9999999999 } }, error: null }),
+  warnOnEmptyColdLoad: vi.fn(),
+  sessionAgeMs: vi.fn(() => 0),
+}));
+
 vi.mock('../services/pin.service', () => ({
   getPinHash:  vi.fn(),
   savePinHash: vi.fn(),

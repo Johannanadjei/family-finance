@@ -30,6 +30,7 @@ import {
   getWeekForDate, getCurrentMonth,
 } from '../lib/finance';
 import { loadPrefs, saveThemeSkin as persistSkin, saveThemeAccent as persistAccent, saveNotifications as persistNotifs } from '../lib/storage';
+import { waitForSession } from '../lib/auth';
 
 export function useFinance({ centre, categories }) {
   const centreId      = centre?.id           || null;
@@ -41,6 +42,7 @@ export function useFinance({ centre, categories }) {
   const [incomes,        setIncomes]        = useState([]);
   const [activeMonth,    setActiveMonth]    = useState(getCurrentMonth());
   const [loading,        setLoading]        = useState(true);
+  const [loaded,         setLoaded]         = useState(false);
   const [error,          setError]          = useState(null);
   const [prefs,          setPrefs]          = useState(() => loadPrefs());
 
@@ -49,46 +51,49 @@ export function useFinance({ centre, categories }) {
   const loadTxs = useCallback(async (month) => {
     if (!centreId) return { data: [], error: null };
     const result = await getTransactionsByMonth(centreId, month);
-    if (result.error) {
-      console.error('[useFinance] loadTxs error:', result.error.message);
-    }
+    if (result.error) console.error('[useFinance] loadTxs error:', result.error.message);
     return result;
   }, [centreId]);
 
   const loadIncomes = useCallback(async () => {
     if (!centreId) return { data: [], error: null };
     const result = await getIncomeSources(centreId);
-    if (result.error) {
-      console.error('[useFinance] loadIncomes error:', result.error.message);
-    }
+    if (result.error) console.error('[useFinance] loadIncomes error:', result.error.message);
     return result;
   }, [centreId]);
 
   const load = useCallback(async (month) => {
-    if (!centreId) {
-      setTxs([]);
-      setIncomes([]);
-      setLoading(false);
-      return;
-    }
+    if (!centreId) { setTxs([]); setIncomes([]); setLoaded(true); setLoading(false); return; }
 
     setLoading(true);
     setError(null);
-    // Clear stale data immediately — prevents previous hub's data bleeding in
-    // during the async fetch when the user switches control centres.
+    // Clear stale data so a previous hub's rows can't bleed in during the fetch.
     setTxs([]);
     setIncomes([]);
+
+    // Auth-readiness gate — never query against an unhydrated/stale token (else a
+    // cold-load query races the refresh, RLS returns an empty 200 → silent data loss).
+    const { error: sessionErr } = await waitForSession();
+    if (sessionErr) {
+      console.error('[useFinance] session not ready:', sessionErr.message);
+      setError('Could not verify your session. Please retry.');
+      setLoading(false);
+      return;
+    }
 
     const [txResult, incomeResult] = await Promise.all([
       loadTxs(month),
       loadIncomes(),
     ]);
 
-    if (txResult.error)     setError(txResult.error.message);
-    if (incomeResult.error) setError(incomeResult.error.message);
+    // Never let an error masquerade as data: `loaded` flips true only on a clean fetch.
+    let ok = true;
+    if (txResult.error)     { setError(txResult.error.message); ok = false; }
+    if (incomeResult.error) { setError(incomeResult.error.message); ok = false; }
 
-    setTxs(txResult.data);
-    setIncomes(incomeResult.data);
+    setTxs(txResult.data || []);
+    setIncomes(incomeResult.data || []);
+    if (ok) setLoaded(true);
     setLoading(false);
   }, [centreId, loadTxs, loadIncomes]);
 
@@ -432,6 +437,7 @@ export function useFinance({ centre, categories }) {
 
     // State
     loading,
+    loaded,
     error,
 
     // Preferences

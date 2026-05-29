@@ -59,15 +59,7 @@ export const updateUserName = async (userId, name, email) => {
   return { error };
 };
 
-// Polls getSession up to maxAttempts times with 500 ms gaps.
-// Supabase sessions can take a render cycle to propagate after signIn/signUp,
-// so an immediate RPC call using auth.uid() server-side may see null.
-export const waitForSession = async (maxAttempts = 3) => {
-  for (let i = 0; i < maxAttempts; i++) {
-    const { data, error } = await supabase.auth.getSession();
-    if (data?.session) return { data: data.session, error: null };
-    if (error)         return { data: null, error };
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  return { data: null, error: new Error('Session not established') };
-};
+// Canonical session-readiness gate now lives in lib/auth.js (freshness-aware:
+// it also refreshes an expired-but-present token). Re-exported here so existing
+// callers (e.g. JoinView) keep importing it from the service layer.
+export { waitForSession } from '../lib/auth';

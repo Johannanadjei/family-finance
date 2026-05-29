@@ -14,6 +14,7 @@
 
 import { supabase } from '../lib/supabase';
 import { validateTransaction, validateString } from '../lib/validation';
+import { warnOnEmptyColdLoad } from '../lib/auth';
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
@@ -33,7 +34,8 @@ export const getTransactions = async (centreId) => {
     .order('created_at', { ascending: false });
 
   if (error) console.error('[transactions.service] getTransactions error:', error.message);
-  return { data: data || [], error };
+  // Never mask a failure as []: error → data null; success → always an array. See CLAUDE.md §12.
+  return { data: error ? null : (data || []), error };
 };
 
 /**
@@ -57,7 +59,9 @@ export const getTransactionsByMonth = async (centreId, month) => {
     .order('date', { ascending: false });
 
   if (error) console.error('[transactions.service] getTransactionsByMonth error:', error.message);
-  return { data: data || [], error };
+  if (!error) warnOnEmptyColdLoad('transactions', data);
+  // Never mask a failure as []: error → data null; success → always an array. See CLAUDE.md §12.
+  return { data: error ? null : (data || []), error };
 };
 
 /**

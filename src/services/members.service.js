@@ -18,7 +18,8 @@ export const getMembers = async (centreId) => {
     .is('deleted_at', null);
 
   if (error) console.error('[members.service] getMembers error:', error.message);
-  return { data: data || [], error };
+  // Never mask a failure as []: error → data null; success → always an array. See CLAUDE.md §12.
+  return { data: error ? null : (data || []), error };
 };
 
 /**

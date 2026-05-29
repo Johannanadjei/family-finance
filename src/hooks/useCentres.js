@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getCentres, getArchivedCentres, getUserPlan } from '../services/centres.service';
+import { waitForSession } from '../lib/auth';
 
 export function useCentres(user) {
   const [centres,         setCentres]         = useState([]);
@@ -28,6 +29,15 @@ export function useCentres(user) {
     }
     setLoading(true);
     setError(null);
+
+    // Auth-readiness gate — keep cold-load hub queries off a stale token.
+    const { error: sessionErr } = await waitForSession();
+    if (sessionErr) {
+      console.error('[useCentres] session not ready:', sessionErr.message);
+      setError(sessionErr.message);
+      setLoading(false);
+      return;
+    }
 
     const [centresResult, archivedResult, planResult] = await Promise.all([
       getCentres(),

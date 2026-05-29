@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getPinHash, savePinHash, clearPinHash } from '../services/pin.service';
 import { hashPin, verifyPin as cryptoVerify }    from '../lib/crypto';
+import { waitForSession }                        from '../lib/auth';
 import {
   isPinUnlocked, savePinUnlocked, clearPinUnlocked,
   getPinAttempts, setPinAttempts,
@@ -37,9 +38,17 @@ export function usePin(user) {
     if (!user) { setLoadState({ hash: null, loadedFor: null, loading: false }); return; }
     let cancelled = false;
     setLoadState(s => ({ ...s, loading: true }));
-    getPinHash(user.id).then(({ data }) => {
+    (async () => {
+      // Gate on a ready session first. A cold-load RLS block would return a null
+      // hash and wrongly drop a user who already has a PIN into the *setup* flow.
+      // On a broken session, stay in the loading state rather than concluding
+      // "no PIN set" — the auth layer handles a genuinely dead session.
+      const { error: sessionErr } = await waitForSession();
+      if (cancelled) return;
+      if (sessionErr) { console.error('[usePin] session not ready:', sessionErr.message); return; }
+      const { data } = await getPinHash(user.id);
       if (!cancelled) setLoadState({ hash: data, loadedFor: user.id, loading: false });
-    });
+    })();
     return () => { cancelled = true; };
   }, [user?.id]);
 

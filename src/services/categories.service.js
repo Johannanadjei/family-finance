@@ -35,7 +35,8 @@ export const getCategories = async (centreId, month = getCurrentMonth()) => {
     .order('sort_order', { ascending: true });
 
   if (error) console.error('[categories.service] getCategories error:', error.message);
-  return { data: data || [], error };
+  // Never mask a failure as []: error → data null; success → always an array. See CLAUDE.md §12.
+  return { data: error ? null : (data || []), error };
 };
 
 /**
