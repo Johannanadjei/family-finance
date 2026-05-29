@@ -68,6 +68,22 @@ describe('InstallPrompt — Android prompt captured before mount', () => {
     render(<InstallPrompt />);
     expect(screen.queryByTestId('install-prompt')).toBeNull();
   });
+
+  // Regression: the banner must portal OUT of #app-shell. useModalChrome sets
+  // `inert` on #app-shell while a modal is open, which disables its whole DOM
+  // subtree (regardless of position:fixed/z-index). Rendered inside #app-shell
+  // the banner would be dead on every tap whenever a modal was open (4c9837e).
+  it('portals the banner out of #app-shell (escapes the inert subtree)', async () => {
+    const shell = document.createElement('div');
+    shell.id = 'app-shell';
+    document.body.appendChild(shell);
+    const { InstallPrompt } = await import('./InstallPrompt');
+    render(<InstallPrompt />, { container: shell });
+    const banner = screen.getByTestId('install-prompt');
+    expect(banner.closest('#app-shell')).toBeNull();      // not a descendant of the inert root
+    expect(document.body.contains(banner)).toBe(true);     // portaled to <body>
+    shell.remove();
+  });
 });
 
 // ── Android — no prompt, shows after pwaInstallReady event ────────────────────

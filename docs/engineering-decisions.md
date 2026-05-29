@@ -1464,3 +1464,23 @@ window.history.back();
 - npm test: 955 passed (947 → 955)
 - bash scripts/audit.sh: 187/187 passed
 - Triple-check (§9.5): `CategoryIconGrid` is pure-display (props only, no hooks, no fmt/calc); `StepCategories` hooks are unconditional (no early return); new component has a test file; no context/Supabase/permission changes; zero console.log; both touched files under their 200-line cap.
+
+## 2026-05-29 — InstallPrompt inert regression: portal the Banner out of #app-shell
+
+**Bug**: The PWA install prompt rendered but was entirely unresponsive — both Install and Dismiss dead — whenever a modal was open.
+
+**Root cause**: A direct regression from `4c9837e` (modal chrome). That commit added `id="app-shell"` to the DashboardShell wrapper `<div>` — the container that already held `<InstallPrompt />` (`App.jsx:157`) — making it the `inert` target. `useModalChrome` sets `inert` on `#app-shell` while any modal is open. `inert` disables the **entire DOM subtree** regardless of `position:fixed`/`z-index`, so the banner (a non-portalled descendant, `zIndex:1000`) painted normally but ignored all input. Every other overlay (SidePanel, all sheets) portals to `document.body` to escape inert; `InstallPrompt` was the only one that didn't. `openCount` in `useModalChrome` is balanced (StrictMode-safe, symmetric per-instance), so inert is **not** permanently stuck — the banner was dead specifically while a modal was open, live otherwise. The pre-existing `{!panelOpen && …}` gate masked the SidePanel case only; the other sheets exposed it.
+
+**Fix**: Wrap the shared `Banner` shell in `InstallBanners.jsx` with `createPortal(<div…>{children}</div>, document.body)`. One wrap covers all three variants (`IosBanner`, `AndroidBanner`, `AndroidManualBanner`), making the banner a **sibling** of `#app-shell` so inert can't reach it — the same escape every modal uses. `InstallPrompt` is **not** a modal: it does NOT use `useModalChrome` (no scroll-lock, no history intercept) — it only needs to leave the inert subtree. State, handlers, and z-index unchanged.
+
+**Decision — kept the `!panelOpen` gate** (`App.jsx:157`, untouched). Its purpose is **visual**, not inert-related: SidePanel (`width 290`, `zIndex 400`) and the bottom-centre banner (`zIndex 1000`) overlap at the bottom, and once portalled the banner would paint interactive *over* the open panel. The gate deliberately hides the banner while the panel is open. The portal alone fixes the actual bug (banner dead during the other sheets); the gate stays as an independent UX choice.
+
+**Files**:
+- src/components/ui/InstallBanners.jsx — `createPortal` import; `Banner` shell portalled to `document.body` (+ explanatory comment). 90→ unchanged behavior, 148 lines (under the 200 components/ cap).
+- src/components/ui/InstallPrompt.test.jsx — +1 structural regression test: render `<InstallPrompt />` into a `<div id="app-shell">` container and assert `getByTestId('install-prompt').closest('#app-shell') === null` (banner escapes the inert subtree). jsdom doesn't enforce inert pointer-blocking, so the assertion is structural, not click-based. Verified it fails against the old non-portalled Banner and passes against the fix.
+- src/App.jsx — NOT changed (gate kept).
+
+**Verification**:
+- npm test: 956 passed (955 → 956, +1 regression)
+- bash scripts/audit.sh: 187/187 passed
+- Triple-check (§9.5): `Banner` is a pure function component (no hooks → no hooks-order concern); no context/Supabase/permission changes; `InstallPrompt.jsx`/`useModalChrome.js` untouched; zero console.log; file under its 200-line cap.

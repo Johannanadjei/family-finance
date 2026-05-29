@@ -5,11 +5,17 @@
  * Consumed by InstallPrompt.jsx.
  */
 
+import { createPortal } from 'react-dom';
 import { triggerInstall } from '../../lib/pwa';
 
 // ── Shared shell ──────────────────────────────────────────────────────────────
+// Portalled to <body> so it sits OUTSIDE #app-shell. useModalChrome sets `inert`
+// on #app-shell while any modal is open; an inert ancestor disables its entire
+// DOM subtree regardless of position:fixed/z-index, so a banner rendered inside
+// #app-shell would render but ignore all taps. Portalling makes it a sibling of
+// the inert root, keeping it interactive — the same escape every modal uses.
 export function Banner({ children }) {
-  return (
+  return createPortal(
     <div
       data-testid="install-prompt"
       style={{
@@ -29,7 +35,8 @@ export function Banner({ children }) {
       }}
     >
       {children}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
