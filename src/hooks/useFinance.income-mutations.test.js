@@ -22,11 +22,11 @@ import { useFinance } from './useFinance';
 
 vi.mock('../lib/auth', () => ({ waitForSession: vi.fn().mockResolvedValue({ data: { session: { expires_at: 9999999999 } }, error: null }), warnOnEmptyColdLoad: vi.fn(), sessionAgeMs: vi.fn(() => 0) }));
 vi.mock('../services/transactions.service', () => ({ getTransactionsByMonth: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn() }));
-vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn(), addIncomeSource: vi.fn(), deleteIncomeSource: vi.fn(), updateIncomeSource: vi.fn() }));
+vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn(), addIncomeSource: vi.fn(), bulkAddIncomeSources: vi.fn(), deleteIncomeSource: vi.fn(), updateIncomeSource: vi.fn() }));
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
 
 import { getTransactionsByMonth, addTransaction, updateTransaction, deleteTransaction } from '../services/transactions.service';
-import { getIncomeSources, markReceived, markPending, deleteIncomeSource, updateIncomeSource } from '../services/income.service';
+import { getIncomeSources, markReceived, markPending, bulkAddIncomeSources, deleteIncomeSource, updateIncomeSource } from '../services/income.service';
 
 const C    = { id: 'centre-1', currency: 'GHS', surplus_target: 0 };
 const CATS = [{ id: 'cat-1', name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true }];
@@ -104,5 +104,93 @@ describe('useFinance — income mutation reconciliation', () => {
     // The only income source is gone AND its income tx is gone → Home shows 0.
     expect(result.current.allIncome).toBe(0);
     expect(result.current.incomes).toHaveLength(0);
+  });
+});
+
+// ── Phase 2B: income rollforward (copyIncomeSourcesToMonth) ──────────────────
+// allIncomes spans two months; May has two recurring sources plus one migration
+// "Other Income" bucket that must never carry forward.
+const PREV = '2026-04', FROM = '2026-05', TO = '2026-06';
+const ALL_INCOMES = [
+  { id: 'inc-1',   label: 'Adjei Salary', icon: '💰', expected_amount: 30000, currency: 'GHS', pay_day: 31,   pay_day_type: 'last_working_day', received: true,  received_amount: 30000, month: FROM, notes: '' },
+  { id: 'inc-2',   label: 'Dita Salary',  icon: '💼', expected_amount: 15000, currency: 'GHS', pay_day: 25,   pay_day_type: 'fixed_date',       received: false, received_amount: 0,     month: FROM, notes: '' },
+  { id: 'bucket-1', label: 'Other Income', icon: '💰', expected_amount: 0,     currency: 'GHS', pay_day: null, pay_day_type: 'flexible',         received: true,  received_amount: 500,   month: FROM, notes: '__one_off_bucket__' },
+];
+const serverRow = (id, label, month) => ({ id, label, icon: '💰', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', received: false, received_amount: 0, month, notes: '' });
+
+describe('useFinance — copyIncomeSourcesToMonth (Phase 2B rollforward)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('copies ALL non-bucket sources when no ids are passed, into the target month', async () => {
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-1', 'Adjei Salary', TO), serverRow('new-2', 'Dita Salary', TO)], error: null });
+    await act(async () => { await result.current.copyIncomeSourcesToMonth(FROM, TO); });
+
+    expect(bulkAddIncomeSources).toHaveBeenCalledTimes(1);
+    const [cid, rows] = bulkAddIncomeSources.mock.calls[0];
+    expect(cid).toBe('centre-1');
+    expect(rows).toHaveLength(2);                                  // the bucket is excluded
+    expect(rows.map(r => r.label).sort()).toEqual(['Adjei Salary', 'Dita Salary']);
+    expect(rows.every(r => r.month === TO)).toBe(true);
+    expect(rows.every(r => r.notes === '')).toBe(true);
+    // Server rows land in allIncomes under the new month.
+    expect(result.current.allIncomes.filter(i => i.month === TO)).toHaveLength(2);
+  });
+
+  it('copies only the explicitly selected subset', async () => {
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-2', 'Dita Salary', TO)], error: null });
+    await act(async () => { await result.current.copyIncomeSourcesToMonth(FROM, TO, ['inc-2']); });
+
+    const [, rows] = bulkAddIncomeSources.mock.calls[0];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].label).toBe('Dita Salary');
+  });
+
+  it('excludes one-off buckets even when their id is passed explicitly (data-layer backstop)', async () => {
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-1', 'Adjei Salary', TO)], error: null });
+    await act(async () => { await result.current.copyIncomeSourcesToMonth(FROM, TO, ['inc-1', 'bucket-1']); });
+
+    const [, rows] = bulkAddIncomeSources.mock.calls[0];
+    expect(rows).toHaveLength(1);                                  // bucket-1 filtered out
+    expect(rows[0].label).toBe('Adjei Salary');
+  });
+
+  it('is a no-op (no insert) when the source month has no copyable sources', async () => {
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      const r = await result.current.copyIncomeSourcesToMonth(PREV, TO);   // April is empty
+      expect(r.error).toBeNull();
+      expect(r.data).toEqual([]);
+    });
+    expect(bulkAddIncomeSources).not.toHaveBeenCalled();
+  });
+
+  it('inserts optimistic rows immediately, then rolls them ALL back when the bulk insert fails', async () => {
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const before = result.current.allIncomes.length;
+
+    let resolveBulk;
+    bulkAddIncomeSources.mockReturnValue(new Promise(res => { resolveBulk = res; }));
+
+    let pending;
+    await act(async () => { pending = result.current.copyIncomeSourcesToMonth(FROM, TO); });
+    // Optimistic: both new TO-month rows are present before the service settles.
+    expect(result.current.allIncomes.filter(i => i.month === TO)).toHaveLength(2);
+
+    await act(async () => { resolveBulk({ data: null, error: new Error('network') }); await pending; });
+    // Rolled back — every optimistic row removed, list back to its original size.
+    expect(result.current.allIncomes.length).toBe(before);
+    expect(result.current.allIncomes.filter(i => i.month === TO)).toHaveLength(0);
   });
 });

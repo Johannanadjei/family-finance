@@ -11,11 +11,14 @@ import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { getCurrentMonth, offsetMonth } from '../lib/finance';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { Toast }                   from '../components/ui/Toast';
-import { IncomeCard }             from './payday/IncomeCard';
 import { ConfirmSheet }           from './payday/ConfirmSheet';
-import { PastIncomeCard }         from './payday/PastIncomeCard';
-import { MonthEmptyState }        from './payday/MonthEmptyState';
-import { NoIncomeSourcesEmpty }   from './payday/NoIncomeSourcesEmpty';
+import { CopyIncomeSheet }        from './payday/CopyIncomeSheet';
+import { PaydayHeader }           from './payday/PaydayHeader';
+import { PaydayIncomeBody }       from './payday/PaydayIncomeBody';
+
+// Migration-created "Other Income" buckets (engineering-decisions: income-month-
+// scoping) must never roll forward, nor count toward "N sources to copy".
+const ONE_OFF_MARKER = '__one_off_bucket__';
 
 const formatMonth = (ym) =>
   new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -50,13 +53,16 @@ export function PaydayView() {
   const [sheetOpen,      setSheetOpen]      = useState(false);
   const [mutating,       setMutating]       = useState(false);
   const [mutateError,    setMutateError]    = useState(null);
-  const [copyStub,       setCopyStub]       = useState(false);   // 2A: copy-from-last stub toast
+  const [copySheetOpen,  setCopySheetOpen]  = useState(false);   // 2B: multi-select rollforward sheet
+  const [copying,        setCopying]        = useState(false);
+  const [copyError,      setCopyError]      = useState(null);
+  const [copiedCount,    setCopiedCount]    = useState(0);       // >0 → success toast
   if (!can('viewIncome')) return <AccessBlocked message="Income tracking is only available to hub owners and full-access members." />;
   if (financeValues.loading) return <PaydayViewSkeleton />;
 
   const {
-    incomes, error, totalReceived, totalExpected, totalPending, totalIncome, txs,
-    activeMonth, loadMonth, markReceived, markPending, updateExpectedAmount,
+    incomes, allIncomes = [], error, totalReceived, totalExpected, totalPending, totalIncome, txs,
+    activeMonth, loadMonth, markReceived, markPending, updateExpectedAmount, copyIncomeSourcesToMonth,
   } = financeValues;
 
   const currentMonth   = getCurrentMonth();
@@ -66,6 +72,11 @@ export function PaydayView() {
 
   // Past months are read-only — income derived from month-scoped txs, not live sources.
   const pastIncomeTxs  = isPastMonth ? txs.filter(t => t.type === 'income') : [];
+
+  // Rollforward source: previous month's non-bucket sources (already in memory —
+  // allIncomes holds every month). Drives the empty-state CTA + the sheet list.
+  const prevMonth      = offsetMonth(activeMonth, -1);
+  const prevSources    = allIncomes.filter(i => i.month === prevMonth && i.notes !== ONE_OFF_MARKER && !i.deleted_at);
 
   const handleOpenSheet = (income) => {
     setSelectedIncome(income);
@@ -93,53 +104,33 @@ export function PaydayView() {
     setMutating(false);
   };
 
+  // Roll income forward from the previous month. `sourceIds` undefined → copy all
+  // non-bucket sources; an array → only the sheet-selected subset. The incomes
+  // slice re-derives automatically once allIncomes updates (no manual refetch).
+  const handleCopy = async (sourceIds) => {
+    setCopying(true);
+    setCopyError(null);
+    const { data, error: err } = await copyIncomeSourcesToMonth(prevMonth, activeMonth, sourceIds);
+    setCopying(false);
+    if (err) { setCopyError("Couldn't copy. Try again."); return; }
+    setCopySheetOpen(false);
+    setCopiedCount(data?.length || 0);
+  };
+
   return (
     <div style={{ padding: '16px 16px 0' }}>
 
-      {/* Month navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <button
-          onClick={() => loadMonth(offsetMonth(activeMonth, -1))}
-          aria-label="Previous month"
-          style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-primary, #064e3b)' }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <p data-testid="payday-month-label" style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
-          {formatMonth(activeMonth)}
-        </p>
-        <button
-          onClick={() => loadMonth(offsetMonth(activeMonth, 1))}
-          aria-label="Next month"
-          disabled={isCurrentMonth}
-          style={{ background: 'none', border: 'none', padding: '8px', cursor: isCurrentMonth ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isCurrentMonth ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      </div>
-
-      {/* Summary card — hidden for future months (nothing to total yet) */}
-      {!isFutureMonth && (
-        <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff', boxShadow: 'var(--c-shadow)', border: '1px solid rgba(255,255,255,0.2)' }}>
-          {isCurrentMonth ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Received</p>
-                <p data-testid="payday-total-received" style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>{fmt(totalReceived)}</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Pending</p>
-                <p data-testid="payday-total-pending" style={{ fontSize: 24, fontWeight: 900, margin: 0, color: totalPending > 0 ? 'var(--c-warning, #fbbf24)' : 'var(--c-success-light, #6ee7b7)' }}>{fmt(totalPending)}</p>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Received</p>
-              <p data-testid="payday-total-received" style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>{fmt(totalIncome)}</p>
-            </div>
-          )}
-        </div>
-      )}
+      <PaydayHeader
+        monthLabel={formatMonth(activeMonth)}
+        isCurrentMonth={isCurrentMonth}
+        isFutureMonth={isFutureMonth}
+        totalReceived={totalReceived}
+        totalPending={totalPending}
+        totalIncome={totalIncome}
+        fmt={fmt}
+        onPrev={() => loadMonth(offsetMonth(activeMonth, -1))}
+        onNext={() => loadMonth(offsetMonth(activeMonth, 1))}
+      />
 
       {/* Error state */}
       {(error || mutateError) && (
@@ -151,35 +142,25 @@ export function PaydayView() {
       )}
 
       {/* Income list — current month editable, past months read-only, future months empty */}
-      {isFutureMonth ? (
-        <MonthEmptyState
-          title={`No payday data for ${formatMonth(activeMonth)} yet`}
-          subtitle="Income will appear here once this month arrives."
-        />
-      ) : isPastMonth ? (
-        pastIncomeTxs.length === 0 ? (
-          <MonthEmptyState title={`No income recorded for ${formatMonth(activeMonth)}`} />
-        ) : (
-          pastIncomeTxs.map(tx => (
-            <PastIncomeCard key={tx.id} name={tx.category_name} amount={fmt(tx.amount)} />
-          ))
-        )
-      ) : incomes.length === 0 ? (
-        <NoIncomeSourcesEmpty monthLabel={formatMonth(activeMonth)} lastMonthLabel={formatMonth(offsetMonth(activeMonth, -1))}
-          onCopyFromLast={() => setCopyStub(true)} onAddManually={() => navigate('/settings')} />
-      ) : (
-        incomes.map(income => (
-          <IncomeCard
-            key={income.id}
-            income={income}
-            fmt={fmt}
-            onConfirm={handleOpenSheet}
-            onMarkPending={handleMarkPending}
-            onUpdateExpected={handleUpdateExpected}
-            disabled={mutating}
-          />
-        ))
-      )}
+      <PaydayIncomeBody
+        isFutureMonth={isFutureMonth}
+        isPastMonth={isPastMonth}
+        monthLabel={formatMonth(activeMonth)}
+        lastMonthLabel={formatMonth(prevMonth)}
+        pastIncomeTxs={pastIncomeTxs}
+        incomes={incomes}
+        fmt={fmt}
+        mutating={mutating}
+        prevSourceCount={prevSources.length}
+        copying={copying}
+        copyError={copyError}
+        onCopyAll={() => handleCopy(undefined)}
+        onChooseWhich={() => { setCopyError(null); setCopySheetOpen(true); }}
+        onAddManually={() => navigate('/settings')}
+        onConfirm={handleOpenSheet}
+        onMarkPending={handleMarkPending}
+        onUpdateExpected={handleUpdateExpected}
+      />
 
       <ConfirmSheet
         income={selectedIncome}
@@ -191,9 +172,23 @@ export function PaydayView() {
         fmt={fmt}
       />
 
-      {copyStub && (
-        <Toast message="Copying last month's income is coming soon." actionLabel="Got it"
-          onEdit={() => setCopyStub(false)} onDismiss={() => setCopyStub(false)} />
+      <CopyIncomeSheet
+        isOpen={copySheetOpen}
+        onClose={() => setCopySheetOpen(false)}
+        lastMonthLabel={formatMonth(prevMonth)}
+        sources={prevSources}
+        fmt={fmt}
+        onCopy={handleCopy}
+        copying={copying}
+      />
+
+      {copiedCount > 0 && (
+        <Toast
+          message={`Copied ${copiedCount} income ${copiedCount === 1 ? 'source' : 'sources'} to ${formatMonth(activeMonth)}`}
+          actionLabel="Done"
+          onEdit={() => setCopiedCount(0)}
+          onDismiss={() => setCopiedCount(0)}
+        />
       )}
     </div>
   );

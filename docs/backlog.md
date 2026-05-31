@@ -49,3 +49,16 @@ data debris.
   ```
 
 **Schedule:** post-MVP. Not urgent — pure cleanup.
+
+---
+
+## formatMonth helper duplication — POST-MVP code quality
+
+The `formatMonth(ym)` helper is defined identically in 4 view files:
+`IncomeSourcesSection.jsx`, `LogView.jsx`, `DailyView.jsx`, `PaydayView.jsx`. Pure
+display helper (`'YYYY-MM'` → `"Month Year"` via `toLocaleDateString`), no business
+logic. Should live in `lib/dates.js` alongside the other month helpers
+(`getCurrentMonth`, `isPastMonth`).
+
+**Schedule:** post-MVP code cleanup. Low priority — works correctly today, just
+duplicated across four files.

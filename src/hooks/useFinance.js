@@ -232,6 +232,7 @@ export function useFinance({ centre, categories }) {
     updateExpectedAmount,
     updateIncomeSource,
     addIncomeSource,
+    copyIncomeSourcesToMonth,
     deleteIncomeSource,
     // Mutations operate on the full cross-month list (find-by-id is month-agnostic);
     // the activeMonth `incomes` slice re-derives automatically.
@@ -307,6 +308,7 @@ export function useFinance({ centre, categories }) {
     updateExpectedAmount,
     updateIncomeSource,
     addIncomeSource,
+    copyIncomeSourcesToMonth,
     deleteIncomeSource,
 
     // Navigation

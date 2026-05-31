@@ -1863,3 +1863,63 @@ mutation story is far simpler than syncing two states.
   `IncomeSourcesSection`); contexts fully destructured (SettingsView dropped the now-unused
   `useFinanceContext`); new components have tests (`IncomeSourcesSection`, `dates`); fixtures
   + both context mocks carry `allIncomes`/`month`; zero console.log; no new permission keys.
+
+---
+
+## 2026-05-31 — income-rollforward (Phase 2B): "same as last month?" prompt
+
+Turns the 2A stub ("Copy from last month" → coming-soon toast) into a working
+rollforward. On a current month with zero income sources, PaydayView now offers to
+carry the previous month's sources forward — one tap for all, or a multi-select sheet
+to cherry-pick.
+
+**Explicitly NOT in this commit (deferred):** budget-category rollforward (Phase 2C),
+a combined income+budget prompt.
+
+### What landed where
+
+- **No new query, no RPC.** Detection reads the previous month straight off
+  `allIncomes` (2A already loads every month client-side). The copy is the existing
+  `bulkAddIncomeSources` (a single atomic multi-row insert) — a user inserting into
+  their own hub, so RLS covers it; §9.6 RPC is for cross-`auth.users` writes only.
+- **`useIncomeMutations.copyIncomeSourcesToMonth(fromMonth, toMonth, sourceIds?)`** —
+  new optimistic mutation. N temp rows inserted at once (each keyed by a `crypto.randomUUID`
+  tempId), the whole block swapped for server rows on success, all removed on rollback.
+  Copies only the recurring shape (label/icon/amount/schedule) into `toMonth`; `received`
+  / `received_amount` are left to DB defaults (pending in the new month), matching the
+  normal add path. Returns `{ data: [], error: null }` when nothing matches (no-op, not
+  an error).
+- **One-off buckets never roll forward.** The migration `notes = '__one_off_bucket__'`
+  marker is excluded in BOTH places: PaydayView's `prevSources` (so a bucket-only prior
+  month shows "+ Add manually", not "Copy 1") and the mutation itself (data-layer backstop
+  — excluded even if its id is passed explicitly).
+- **Three-state empty state** (`NoIncomeSourcesEmpty`): 0 prev sources → add-only;
+  ≥1 → "Income same as <month>?" with primary "Yes, copy N source(s)" (pluralised),
+  secondary "Choose which to copy", tertiary "+ Add manually".
+- **`CopyIncomeSheet`** (new) — multi-select bottom sheet, all-checked by default (the
+  primary CTA is copy-all; the sheet is for de-selection), live count, disables at zero.
+  Standard `useModalChrome` + portal chrome.
+- **Success via the existing `Toast`** (auto-dismiss); failure stays inline in the empty
+  state with a retry. No new dependency.
+
+### Decision under delegation (flag-for-veto)
+
+- **PaydayView extracted into `PaydayHeader` + `PaydayIncomeBody`** — wiring the
+  rollforward pushed the view to 248 lines (audit limit 200). Same move as
+  IncomeSourcesSection: pull self-contained, pure sub-views out; view now 195 lines.
+  `PaydayIncomeBody` carries a wide prop list (it's pure orchestration of already-built
+  sub-components, owns no state) — accepted over a view-local hook, which the hooks-order
+  rule blocks (the copy state must be declared above the `can('viewIncome')` guard, but
+  `activeMonth` isn't known until after the loading guard).
+
+### Verification
+
+- Red-first: `copyIncomeSourcesToMonth` (missing-symbol red), bucket-exclusion (count/contents
+  red on a no-filter impl), optimistic-then-rollback; UI State 1/2/3 detection + bucket-only
+  fallback. Covered in `useFinance.income-mutations.test.js`, `NoIncomeSourcesEmpty.test.jsx`,
+  `CopyIncomeSheet.test.jsx`, `PaydayView.test.jsx`.
+- npm test: 1040 passed (1009 → 1040, +31). bash scripts/audit.sh: 0 failures (205 checks).
+- Triple-check (§9.5): the 4 copy `useState`s declared above the `can()` guard (hooks order);
+  PaydayView destructures `allIncomes` + `copyIncomeSourcesToMonth`, both in the context mock;
+  error destructured alongside data in `handleCopy` + the mutation; `data?.length`/`data || []`
+  optional chaining; new components all have tests; zero console.log; no new permission keys.

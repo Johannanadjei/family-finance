@@ -14,9 +14,14 @@
  */
 
 import { useCallback } from 'react';
-import { markReceived as dbMarkReceived, markPending as dbMarkPending, updateExpectedAmount as dbUpdateExpectedAmount, updateIncomeSource as dbUpdateIncomeSource, addIncomeSource as dbAddIncomeSource, deleteIncomeSource as dbDeleteIncomeSource } from '../services/income.service';
+import { markReceived as dbMarkReceived, markPending as dbMarkPending, updateExpectedAmount as dbUpdateExpectedAmount, updateIncomeSource as dbUpdateIncomeSource, addIncomeSource as dbAddIncomeSource, bulkAddIncomeSources as dbBulkAddIncomeSources, deleteIncomeSource as dbDeleteIncomeSource } from '../services/income.service';
 import { addTransaction as dbAddTransaction, deleteTransaction as dbDeleteTransaction, updateTransaction as dbUpdateTransaction } from '../services/transactions.service';
 import { getWeekForDate } from '../lib/finance';
+
+// Load-bearing marker on migration-created "Other Income" buckets (see
+// docs/engineering-decisions.md income-month-scoping). One-off buckets are
+// already-received, ad-hoc catch-alls — they must NEVER roll forward.
+const ONE_OFF_MARKER = '__one_off_bucket__';
 
 export function useIncomeMutations({ centreId, currency, incomes, txs, setIncomes, setTxs }) {
 
@@ -209,6 +214,58 @@ export function useIncomeMutations({ centreId, currency, incomes, txs, setIncome
     return { data, error: null };
   }, [centreId, setIncomes]);
 
+  // Roll forward income sources from one month to another (Phase 2B). Copies the
+  // recurring "shape" of each source (label, icon, amount, schedule) into the new
+  // month as a fresh PENDING source (received=false / received_amount=0 via DB
+  // defaults). One-off buckets are filtered out at this data layer too — a
+  // backstop to the UI filter — so they never carry forward even if their id is
+  // passed explicitly. `incomes` here is the full cross-month allIncomes list.
+  //
+  // @param {string}   fromMonth — 'YYYY-MM' to copy from
+  // @param {string}   toMonth   — 'YYYY-MM' to copy into
+  // @param {string[]} [sourceIds] — optional subset; omit to copy ALL non-bucket
+  const copyIncomeSourcesToMonth = useCallback(async (fromMonth, toMonth, sourceIds) => {
+    if (!centreId) return { data: null, error: new Error('No active budget centre') };
+
+    const toCopy = incomes.filter(i =>
+      i.month === fromMonth &&
+      i.notes !== ONE_OFF_MARKER &&
+      !i.deleted_at &&
+      (!sourceIds || sourceIds.includes(i.id))
+    );
+    if (toCopy.length === 0) return { data: [], error: null };   // nothing to copy — not an error
+
+    // Only the fields a recurring source carries forward. received / received_amount
+    // are intentionally omitted — the DB defaults them (pending in the new month),
+    // matching the normal add path. notes cleared (buckets already excluded above).
+    const newRows = toCopy.map(s => ({
+      label:           s.label,
+      icon:            s.icon,
+      currency:        s.currency,
+      expected_amount: s.expected_amount,
+      pay_day:         s.pay_day,
+      pay_day_type:    s.pay_day_type,
+      month:           toMonth,
+      notes:           '',
+    }));
+
+    // Optimistic — N temp rows, each keyed so rollback/replace targets exactly them.
+    const optimistic = newRows.map(r => ({ ...r, id: crypto.randomUUID(), budget_centre_id: centreId, received: false, received_amount: 0, _optimistic: true }));
+    const tempIds    = new Set(optimistic.map(o => o.id));
+    setIncomes(prev => [...prev, ...optimistic]);
+
+    const { data, error } = await dbBulkAddIncomeSources(centreId, newRows);
+    if (error) {
+      setIncomes(prev => prev.filter(i => !tempIds.has(i.id)));
+      console.error('[useIncomeMutations] copyIncomeSourcesToMonth rollback:', error.message);
+      return { data: null, error };
+    }
+
+    // Swap the whole temp block for server rows (can't map temp→server by id).
+    setIncomes(prev => [...prev.filter(i => !tempIds.has(i.id)), ...(data || []).map(d => ({ ...d, _optimistic: false }))]);
+    return { data: data || [], error: null };
+  }, [centreId, incomes, setIncomes]);
+
   const deleteIncomeSource = useCallback(async (sourceId) => {
     const prev = incomes.find(i => i.id === sourceId);
     if (!prev) return { error: new Error('Income source not found') };
@@ -247,5 +304,5 @@ export function useIncomeMutations({ centreId, currency, incomes, txs, setIncome
     return { error: null };
   }, [incomes, txs, setIncomes, setTxs]);
 
-  return { markReceived, markPending, updateExpectedAmount, updateIncomeSource, addIncomeSource, deleteIncomeSource };
+  return { markReceived, markPending, updateExpectedAmount, updateIncomeSource, addIncomeSource, copyIncomeSourcesToMonth, deleteIncomeSource };
 }

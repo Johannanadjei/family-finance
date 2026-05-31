@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen }           from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { PaydayView }               from './PaydayView';
 import { mockCentre, mockFmt, mockIncomes } from '../test-utils/fixtures';
@@ -18,6 +18,7 @@ const mockFinance = {
   loading:        false,
   error:          null,
   incomes:        mockIncomes,
+  allIncomes:     mockIncomes,
   txs:            [],
   totalReceived:  30000,
   totalExpected:  45000,
@@ -28,6 +29,7 @@ const mockFinance = {
   markReceived:   vi.fn().mockResolvedValue({ error: null }),
   markPending:    vi.fn().mockResolvedValue({ error: null }),
   updateExpectedAmount: vi.fn().mockResolvedValue({ error: null }),
+  copyIncomeSourcesToMonth: vi.fn().mockResolvedValue({ data: [], error: null }),
 };
 
 vi.mock('../context/FinanceContext', () => ({
@@ -125,6 +127,53 @@ describe('PaydayView', () => {
     expect(screen.getByText(/No income tracked for/)).toBeTruthy();
     expect(screen.getByTestId('add-manually-btn')).toBeTruthy();
     mockFinance.incomes = mockIncomes;
+  });
+
+  // ── Phase 2B rollforward empty-state ──────────────────────────────────────
+  const PREV_SOURCES = [
+    { id: 'p1', label: 'Adjei Salary', icon: '💰', expected_amount: 30000, currency: 'GHS', month: '2026-04', notes: '' },
+    { id: 'p2', label: 'Dita Salary',  icon: '💼', expected_amount: 15000, currency: 'GHS', month: '2026-04', notes: '' },
+  ];
+  const resetIncomes = () => { mockFinance.incomes = mockIncomes; mockFinance.allIncomes = mockIncomes; };
+
+  it('rollforward State 3: shows the "Yes, copy N sources" CTA when the previous month had sources', () => {
+    mockFinance.incomes    = [];
+    mockFinance.allIncomes = PREV_SOURCES;
+    renderView();
+    expect(screen.getByText(/Income same as/)).toBeTruthy();
+    expect(screen.getByTestId('copy-all-btn').textContent).toBe('Yes, copy 2 sources');
+    expect(screen.getByTestId('choose-which-btn')).toBeTruthy();
+    resetIncomes();
+  });
+
+  it('rollforward: a bucket-only previous month falls back to State 1 (no copy CTA)', () => {
+    mockFinance.incomes    = [];
+    mockFinance.allIncomes = [{ id: 'b1', label: 'Other Income', icon: '💰', expected_amount: 0, currency: 'GHS', month: '2026-04', notes: '__one_off_bucket__' }];
+    renderView();
+    expect(screen.queryByTestId('copy-all-btn')).toBeNull();
+    expect(screen.getByTestId('add-manually-btn')).toBeTruthy();
+    resetIncomes();
+  });
+
+  it('rollforward: tapping "Yes, copy N" calls copyIncomeSourcesToMonth(prevMonth, activeMonth) with no subset', async () => {
+    mockFinance.incomes    = [];
+    mockFinance.allIncomes = PREV_SOURCES;
+    const copyFn = vi.fn().mockResolvedValue({ data: [{ id: 'n1' }, { id: 'n2' }], error: null });
+    mockFinance.copyIncomeSourcesToMonth = copyFn;
+    renderView();
+    fireEvent.click(screen.getByTestId('copy-all-btn'));
+    await waitFor(() => expect(copyFn).toHaveBeenCalledWith('2026-04', '2026-05', undefined));
+    mockFinance.copyIncomeSourcesToMonth = vi.fn().mockResolvedValue({ data: [], error: null });
+    resetIncomes();
+  });
+
+  it('rollforward: tapping "Choose which to copy" opens the multi-select sheet', () => {
+    mockFinance.incomes    = [];
+    mockFinance.allIncomes = PREV_SOURCES;
+    renderView();
+    fireEvent.click(screen.getByTestId('choose-which-btn'));
+    expect(screen.getByTestId('copy-income-sheet')).toBeTruthy();
+    resetIncomes();
   });
 
   it('shows error state when error is set', () => {
