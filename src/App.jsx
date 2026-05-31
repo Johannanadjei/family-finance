@@ -200,7 +200,7 @@ export default function App() {
   const [pinSkipped, setPinSkipped]                        = useState(false);
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
   const { centres, archivedCentres, plan: userPlan, reload: reloadCentres } = useCentres(user);
-  const { centre, categories, members, currentMemberRole,
+  const { centre, categories, allCategories, members, currentMemberRole,
           addCategory, updateCentre, updateCategory, deleteCategory,
           prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth,
           archiveCentre, permanentDeleteCentre, restoreHub,
@@ -344,6 +344,7 @@ export default function App() {
     <BudgetCentreProvider
       centre={centre}
       categories={categories}
+      allCategories={allCategories}
       members={members}
       currentMemberRole={currentMemberRole}
       currentUserId={user?.id || null}

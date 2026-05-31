@@ -42,6 +42,7 @@ vi.mock('../services/centres.service', () => ({
 
 vi.mock('../services/categories.service', () => ({
   getCategories:     vi.fn().mockResolvedValue({ data: [], error: null }),
+  getAllCategories:  vi.fn().mockResolvedValue({ data: [], error: null }),
   addCategory:       vi.fn(),
   bulkAddCategories: vi.fn(),
   updateCategory:    vi.fn(),
@@ -60,10 +61,10 @@ vi.mock('../services/auth.service', () => ({
 }));
 
 import { getCentreById, archiveCentre, deleteCentre, unarchiveCentre } from '../services/centres.service';
-import { getCategories, bulkAddCategories } from '../services/categories.service';
+import { getCategories, getAllCategories, addCategory, bulkAddCategories, updateCategory, deleteCategory } from '../services/categories.service';
 import { getMembers } from '../services/members.service';
 import { getCurrentMonth, offsetMonth } from '../lib/finance';
-import { mockPrevMonthCategories } from '../test-utils/fixtures';
+import { mockPrevMonthCategories, mockAllCategories } from '../test-utils/fixtures';
 
 const mockUser   = { id: 'user-1' };
 const mockCentre = { id: 'c-1', name: "The Adjei's", currency: 'GHS', skin_id: 'family_warmth' };
@@ -347,5 +348,74 @@ describe('useBudgetCentre — budget rollforward (Phase 2C)', () => {
     await act(async () => { resolveBulk({ data: null, error: new Error('network') }); await pending; });
     // Rolled back — every optimistic row removed.
     expect(result.current.categories).toHaveLength(0);
+  });
+});
+
+// ── Phase 2D: all-months categories (allCategories + current-month slice) ──
+// mockAllCategories spans THIS_MONTH (cat-1, cat-2) + LAST_MONTH (acat-3, acat-4).
+const THIS_M = getCurrentMonth();
+
+const mountLoaded = async () => {
+  getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+  getAllCategories.mockResolvedValue({ data: mockAllCategories, error: null });
+  const view = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+  await waitFor(() => expect(view.result.current.loading).toBe(false));
+  return view;
+};
+
+describe('useBudgetCentre — all-months categories (Phase 2D)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('loads every month into allCategories on mount (no month filter)', async () => {
+    const { result } = await mountLoaded();
+    expect(getAllCategories).toHaveBeenCalledWith('c-1');   // single arg — not month-filtered
+    expect(result.current.allCategories).toHaveLength(4);
+  });
+
+  it('exposes categories as the current-month slice of allCategories', async () => {
+    const { result } = await mountLoaded();
+    expect(result.current.categories).toHaveLength(2);
+    expect(result.current.categories.every(c => c.month === THIS_M)).toBe(true);
+    expect(result.current.categories.map(c => c.id)).toEqual(['cat-1', 'cat-2']);   // sort_order preserved
+  });
+
+  it('addCategory writes to allCategories and surfaces in the current-month slice', async () => {
+    const { result } = await mountLoaded();
+    addCategory.mockResolvedValue({ data: { id: 'cat-9', name: 'Health', budget_amount: 100, month: THIS_M }, error: null });
+    await act(async () => { await result.current.addCategory({ name: 'Health', budget_amount: 100, month: THIS_M }); });
+    expect(result.current.allCategories.some(c => c.id === 'cat-9')).toBe(true);
+    expect(result.current.categories.some(c => c.id === 'cat-9')).toBe(true);
+  });
+
+  it('updateCategory rollback restores the row AND preserves other months (snapshot is allCategories, not the slice)', async () => {
+    const { result } = await mountLoaded();
+    updateCategory.mockResolvedValue({ data: null, error: new Error('db') });
+    await act(async () => { await result.current.updateCategory('cat-1', { budget_amount: 999 }); });
+    expect(result.current.allCategories).toHaveLength(4);                                       // other months intact
+    expect(result.current.allCategories.find(c => c.id === 'cat-1').budget_amount).toBe(500);   // restored
+    expect(result.current.allCategories.some(c => c.id === 'acat-3')).toBe(true);               // LAST_MONTH untouched
+  });
+
+  it('updateCategory success replaces the row in allCategories', async () => {
+    const { result } = await mountLoaded();
+    updateCategory.mockResolvedValue({ data: { ...mockAllCategories[0], budget_amount: 777 }, error: null });
+    await act(async () => { await result.current.updateCategory('cat-1', { budget_amount: 777 }); });
+    expect(result.current.allCategories.find(c => c.id === 'cat-1').budget_amount).toBe(777);
+  });
+
+  it('deleteCategory rollback restores the row AND preserves other months', async () => {
+    const { result } = await mountLoaded();
+    deleteCategory.mockResolvedValue({ error: new Error('db') });
+    await act(async () => { await result.current.deleteCategory('cat-1'); });
+    expect(result.current.allCategories).toHaveLength(4);
+    expect(result.current.allCategories.some(c => c.id === 'cat-1')).toBe(true);
+  });
+
+  it('deleteCategory success removes only the target row from allCategories', async () => {
+    const { result } = await mountLoaded();
+    deleteCategory.mockResolvedValue({ error: null });
+    await act(async () => { await result.current.deleteCategory('cat-1'); });
+    expect(result.current.allCategories.some(c => c.id === 'cat-1')).toBe(false);
+    expect(result.current.allCategories).toHaveLength(3);   // acat-3, acat-4, cat-2 remain
   });
 });

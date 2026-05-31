@@ -40,6 +40,28 @@ export const getCategories = async (centreId, month = getCurrentMonth()) => {
 };
 
 /**
+ * Fetch ALL active budget categories for a centre across every month.
+ * Mirrors getIncomeSources (no month filter) — feeds useBudgetCentre's
+ * allCategories, from which the current-month `categories` slice is derived.
+ * Ordered month then sort_order so each month's slice stays sort_order-ascending.
+ *
+ * @param {string} centreId
+ */
+export const getAllCategories = async (centreId) => {
+  const { data, error } = await supabase
+    .from('budget_categories')
+    .select('*')
+    .eq('budget_centre_id', centreId)
+    .is('deleted_at', null)
+    .order('month', { ascending: false })
+    .order('sort_order', { ascending: true });
+
+  if (error) console.error('[categories.service] getAllCategories error:', error.message);
+  // Never mask a failure as []: error → data null; success → always an array. See CLAUDE.md §12.
+  return { data: error ? null : (data || []), error };
+};
+
+/**
  * Fetch a single category by ID.
  */
 export const getCategoryById = async (categoryId) => {

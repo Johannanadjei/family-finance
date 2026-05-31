@@ -20,9 +20,10 @@
  * when no centreId is provided.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { getCurrentMonth } from '../lib/dates';
 import { getCentreById, getFirstCentre, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
-import { getCategories, addCategory as addCategoryService, bulkAddCategories as bulkAddCategoriesService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
+import { getCategories, getAllCategories, addCategory as addCategoryService, bulkAddCategories as bulkAddCategoriesService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
 import { getMembers, addMember as addMemberService, removeMember as removeMemberService, updateMemberRole as updateMemberRoleService } from '../services/members.service';
 import { createInvite as createInviteService, getHubInvites as getHubInvitesService, cancelInvite as cancelInviteService } from '../services/invites.service';
 import { getUserSession } from '../services/auth.service';
@@ -32,7 +33,14 @@ import { waitForSession } from '../lib/auth';
 
 export function useBudgetCentre(user, centreId) {
   const [centre,            setCentre]            = useState(null);
-  const [categories,        setCategories]        = useState([]);
+  // All months' categories live in one array (mirrors useFinance.allIncomes).
+  // `categories` is the current-month slice — every existing consumer reads this
+  // and sees no behaviour change; the all-months Settings view reads allCategories.
+  const [allCategories,     setAllCategories]     = useState([]);
+  const categories = useMemo(
+    () => allCategories.filter(c => c.month === getCurrentMonth()),
+    [allCategories]
+  );
   // Previous month's categories — loaded on demand (Phase 2C) when the current
   // month's budget is empty, to drive the rollforward prompt + copy sheet. Kept
   // separate from `categories` (current month only); see loadPrevMonthCategories.
@@ -47,7 +55,7 @@ export function useBudgetCentre(user, centreId) {
   const load = useCallback(async () => {
     if (!user) {
       setCentre(null);
-      setCategories([]);
+      setAllCategories([]);
       setMembers([]);
       setCurrentMemberRole('standard');
       setLoading(false);
@@ -106,7 +114,7 @@ export function useBudgetCentre(user, centreId) {
       // No centres exist — first-time user needs onboarding
       setNeedsOnboarding(true);
       setCentre(null);
-      setCategories([]);
+      setAllCategories([]);
       setMembers([]);
       setCurrentMemberRole('standard');
       setLoading(false);
@@ -114,7 +122,7 @@ export function useBudgetCentre(user, centreId) {
     }
 
     const [catResult, memberResult] = await Promise.all([
-      getCategories(centreData.id),
+      getAllCategories(centreData.id),
       getMembers(centreData.id),
     ]);
 
@@ -139,7 +147,7 @@ export function useBudgetCentre(user, centreId) {
     if (!centreId && cats.length === 0) {
       setNeedsOnboarding(true);
       setCentre(centreData);
-      setCategories([]);
+      setAllCategories([]);
       setMembers(mems);
       setCurrentMemberRole(derivedRole);
       setLoading(false);
@@ -148,7 +156,7 @@ export function useBudgetCentre(user, centreId) {
 
     setRemovedFromHub(isRemoved);
     setCentre(centreData);
-    setCategories(cats);
+    setAllCategories(cats);
     setMembers(mems);
     setCurrentMemberRole(derivedRole);
     setNeedsOnboarding(false);
@@ -170,7 +178,7 @@ export function useBudgetCentre(user, centreId) {
     if (!id) return { error: new Error('No active centre') };
     const { data, error } = await addCategoryService(id, category);
     if (error) return { error };
-    setCategories(prev => [...prev, data]);
+    setAllCategories(prev => [...prev, data]);
     return { data, error: null };
   };
 
@@ -190,29 +198,29 @@ export function useBudgetCentre(user, centreId) {
   }, [centre]);
 
   const updateCategory = useCallback(async (categoryId, updates) => {
-    const prevCategories = categories;
-    setCategories(cats => cats.map(c => c.id === categoryId ? { ...c, ...updates } : c));
+    const prevAll = allCategories;
+    setAllCategories(cats => cats.map(c => c.id === categoryId ? { ...c, ...updates } : c));
     const { data, error } = await updateCategoryService(categoryId, updates);
     if (error) {
-      setCategories(prevCategories);
+      setAllCategories(prevAll);
       console.error('[useBudgetCentre] updateCategory rollback:', error.message);
       return { error };
     }
-    setCategories(cats => cats.map(c => c.id === categoryId ? data : c));
+    setAllCategories(cats => cats.map(c => c.id === categoryId ? data : c));
     return { data, error: null };
-  }, [categories]);
+  }, [allCategories]);
 
   const deleteCategory = useCallback(async (categoryId) => {
-    const prevCategories = categories;
-    setCategories(cats => cats.filter(c => c.id !== categoryId));
+    const prevAll = allCategories;
+    setAllCategories(cats => cats.filter(c => c.id !== categoryId));
     const { error } = await deleteCategoryService(categoryId);
     if (error) {
-      setCategories(prevCategories);
+      setAllCategories(prevAll);
       console.error('[useBudgetCentre] deleteCategory rollback:', error.message);
       return { error };
     }
     return { error: null };
-  }, [categories]);
+  }, [allCategories]);
 
   // Load the previous month's categories into `prevMonthCategories` (Phase 2C).
   // BudgetView fires this when the current month's budget is empty — the result
@@ -255,16 +263,16 @@ export function useBudgetCentre(user, centreId) {
 
     const optimistic = newRows.map(r => ({ ...r, id: crypto.randomUUID(), budget_centre_id: id, _optimistic: true }));
     const tempIds    = new Set(optimistic.map(o => o.id));
-    setCategories(prev => [...prev, ...optimistic]);
+    setAllCategories(prev => [...prev, ...optimistic]);
 
     const { data, error } = await bulkAddCategoriesService(id, newRows);
     if (error) {
-      setCategories(prev => prev.filter(c => !tempIds.has(c.id)));
+      setAllCategories(prev => prev.filter(c => !tempIds.has(c.id)));
       console.error('[useBudgetCentre] copyCategoriesToMonth rollback:', error.message);
       return { data: null, error };
     }
 
-    setCategories(prev => [...prev.filter(c => !tempIds.has(c.id)), ...(data || []).map(d => ({ ...d, _optimistic: false }))]);
+    setAllCategories(prev => [...prev.filter(c => !tempIds.has(c.id)), ...(data || []).map(d => ({ ...d, _optimistic: false }))]);
     return { data: data || [], error: null };
   }, [centre?.id, prevMonthCategories]);
 
@@ -330,6 +338,7 @@ export function useBudgetCentre(user, centreId) {
     centre,
     centreId:            centre?.id || null,
     categories,
+    allCategories,
     members,
     currentMemberRole,
     loading,

@@ -2192,3 +2192,59 @@ iOS keyboard-focus viewport shift is a SEPARATE issue, deferred to backlog.
   background doesn't pan behind any modal, inner scroll still works in the 6
   opted-in sheets, pull-to-refresh inside a modal does nothing, normal scroll
   resumes on close.
+
+---
+
+## [2026-05-31] Phase 2D commit 1 — all-months categories via additive allCategories
+
+**Context:**
+`useBudgetCentre` loaded only the current month's categories (`getCategories`,
+month-filtered) and exposed them as `categories`. Settings needs an all-months
+view (mirroring `IncomeSourcesSection`). Loading all months naively into
+`categories` would break three flat-list renderers (BudgetView, SettingsView,
+AddTransactionSheet show cross-month duplicates) and inflate every fixed total
+(`calcTotalFixed`/`calcWeeklyData` sum budgets across all months).
+
+**Decision (additive, mirrors useFinance.allIncomes):**
+Load all months into a new `allCategories` state; derive `categories` as a
+current-month `useMemo` slice (`allCategories.filter(c => c.month ===
+getCurrentMonth())`). Every existing consumer keeps reading `categories` and sees
+zero behaviour change; the future all-months Settings view reads `allCategories`.
+New service `getAllCategories(centreId)` (no month filter, ordered month-desc then
+sort_order-asc so each month's slice stays sort_order-ascending).
+
+This is a TWO-COMMIT split: commit 1 is hook expansion with ZERO UI change (this
+entry); commit 2 lands `BudgetCategoriesSection` + SettingsView wiring.
+
+**The real risk was mutation retargeting, not the consumers.**
+All four mutation setters (`addCategory`, `updateCategory`, `deleteCategory`,
+`copyCategoriesToMonth`) moved from `setCategories` to `setAllCategories`. The
+non-obvious trap: `updateCategory`/`deleteCategory` snapshot state for rollback —
+they previously captured the **slice** (`categories`). Restoring the full
+`allCategories` state to a slice snapshot would silently DELETE every other month
+on any failed mutation. Fixed by snapshotting `allCategories` (the full array);
+`.map`/`.filter` by unique category `id` operate correctly across months.
+
+**What was deliberately NOT touched (deferred to backlog, commit 2):**
+- `prevMonthCategories` + `loadPrevMonthCategories` (Phase 2C) — still a separate
+  fetch, now redundant (derivable from `allCategories.filter(month===prevMonth)`).
+- `copyCategoriesToMonth` still sources from `prevMonthCategories`.
+Keeping these untouched held the commit-1 blast radius to the hook + service only.
+
+**Rules derived:**
+- Load all-months data once; expose a current-period slice for existing consumers
+  and the full array for new period-spanning UI (the allIncomes/incomes pattern).
+- Optimistic-rollback snapshots must capture the FULL backing state, never a
+  derived slice — restoring a slice silently drops the rest.
+
+### Verification
+
+- Regression-first: all 6 `categories` consumer suites (BudgetView, SettingsView,
+  GuestSettingsSection, AddTransactionSheet, useFinance — 95 tests) pass UNMODIFIED,
+  proving the slice is behaviourally identical to the old `categories`.
+- New Phase 2D tests (useBudgetCentre.test.js, +7): allCategories loads all months,
+  `categories` is the current-month slice (sort_order preserved), each mutation
+  writes to allCategories, and — the key guard — failed update/delete rollback
+  restores all 4 rows including LAST_MONTH (would fail if snapshotting the 2-row
+  slice). The hook test was red on the unmocked `getAllCategories` until the mock
+  landed (red-first on the load switch). 1084 tests pass.

@@ -38,6 +38,16 @@ export const mockPrevMonthCategories = [
   { id: 'pcat-3', name: 'Fun',       icon: '🎉', budget_amount: 150, is_fixed: false, sort_order: 2, month: LAST_MONTH },
 ];
 
+// All-months categories (Phase 2D) — spans THIS_MONTH + LAST_MONTH so tests can
+// assert the current-month slice vs the full all-months array. Month-desc then
+// sort_order-asc, matching getAllCategories' ordering.
+export const mockAllCategories = [
+  { id: 'cat-1',  name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true,  sort_order: 0, month: THIS_MONTH },
+  { id: 'cat-2',  name: 'Transport', icon: '🚗', budget_amount: 200, is_fixed: true,  sort_order: 1, month: THIS_MONTH },
+  { id: 'acat-3', name: 'Groceries', icon: '🛒', budget_amount: 480, is_fixed: true,  sort_order: 0, month: LAST_MONTH },
+  { id: 'acat-4', name: 'Holiday',   icon: '✈️', budget_amount: 300, is_fixed: false, sort_order: 1, month: LAST_MONTH },
+];
+
 export const mockMembers = [
   { id: 'mem-1', user_id: 'user-1', role: 'owner',    joined_at: '2026-01-01T00:00:00Z', users: { name: 'Johannan', email: 'johannan@test.com' } },
   { id: 'mem-2', user_id: 'user-2', role: 'standard', joined_at: '2026-02-15T00:00:00Z', users: { name: 'Dita',     email: 'dita@test.com' } },
