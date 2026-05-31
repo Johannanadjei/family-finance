@@ -10,6 +10,7 @@
 import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
+import { getCurrentMonth }        from '../lib/finance';
 import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { MonthlyIncomeCard }      from './home/MonthlyIncomeCard';
@@ -17,6 +18,9 @@ import { BudgetHealthBar }        from './home/BudgetHealthBar';
 import { PaydaySummaryCard }      from './home/PaydaySummaryCard';
 import { StatCard }               from './home/StatCard';
 import { RecentActivity }         from './home/RecentActivity';
+
+const formatMonth = (ym) =>
+  new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 function HomeViewSkeleton() {
   const card = { background: 'var(--c-card,#fff)', borderRadius: 16, padding: '14px 14px', marginBottom: 12 };
@@ -66,9 +70,18 @@ export function HomeView() {
 
   const showIncome  = can('viewIncome');
   const showBalance = can('viewBalance');
+  const currentMonth = getCurrentMonth();
 
   return (
     <div style={{ padding: '16px' }}>
+
+      {/* Month label — static, ungated (visible without viewIncome); mirrors BudgetView (5e430d2) */}
+      <div style={{ marginBottom: 16, textAlign: 'center' }}>
+        <p data-testid="home-month-label" style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
+          {formatMonth(currentMonth)}
+        </p>
+      </div>
+
       {showIncome && (
         <MonthlyIncomeCard
           allIncome={allIncome}

@@ -7,7 +7,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen }           from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { HomeView }                 from './HomeView';
+import { getCurrentMonth }          from '../lib/finance';
 import { mockCentre, mockFmt }      from '../test-utils/fixtures';
+
+const expectedMonthLabel = () => new Date(getCurrentMonth() + '-01')
+  .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 let mockCan = () => true;
 vi.mock('../context/BudgetCentreContext', () => ({
@@ -47,6 +51,11 @@ describe('HomeView', () => {
     const { container } = renderHome();
     expect(container.firstChild).toBeTruthy();
     mockFinance.loading = false;
+  });
+
+  it('shows the current month label at the top of the view', () => {
+    renderHome();
+    expect(screen.getByTestId('home-month-label').textContent).toContain(expectedMonthLabel());
   });
 
   it('renders income received amount in income card', () => {
@@ -100,6 +109,8 @@ describe('HomeView', () => {
     expect(screen.queryByText('Money In')).toBeNull();
     expect(screen.queryByText('Budget Left')).toBeNull();
     expect(screen.getByText('Spare Money')).toBeTruthy();
+    // Month label is ungated — visible even without viewIncome permission
+    expect(screen.getByTestId('home-month-label').textContent).toContain(expectedMonthLabel());
   });
 
   it('stat cards show formatted values', () => {

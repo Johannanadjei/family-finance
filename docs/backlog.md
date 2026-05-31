@@ -54,14 +54,14 @@ data debris.
 
 ## formatMonth helper duplication — POST-MVP code quality
 
-The `formatMonth(ym)` helper is defined identically in 5 view files:
+The `formatMonth(ym)` helper is defined identically in 6 view files:
 `IncomeSourcesSection.jsx`, `LogView.jsx`, `DailyView.jsx`, `PaydayView.jsx`,
-`BudgetView.jsx`. Pure display helper (`'YYYY-MM'` → `"Month Year"` via
-`toLocaleDateString`), no business logic. Should live in `lib/dates.js` alongside
+`BudgetView.jsx`, `HomeView.jsx`. Pure display helper (`'YYYY-MM'` → `"Month Year"`
+via `toLocaleDateString`), no business logic. Should live in `lib/dates.js` alongside
 the other month helpers (`getCurrentMonth`, `isPastMonth`).
 
 **Schedule:** post-MVP code cleanup. Low priority — works correctly today, just
-duplicated across five files.
+duplicated across six files.
 
 ---
 
@@ -79,15 +79,3 @@ since BudgetView itself stays current-month-only.
 
 **Schedule:** post-2C. Low priority — rollforward (2C) covers the new-month gap;
 this is editing-parity polish.
-
----
-
-## Add month label to HomeView — POST-MVP
-
-HomeView currently lacks a visible month indicator (only shows "of X expected" on
-the income card). For consistency with Payday/Daily/Log/Budget — which all show a
-static or nav "[Month] YYYY" header — add a static centered month label at the top
-of HomeView. Same shape as BudgetView's label (commit that closed the Budget gap).
-
-**Schedule:** post-MVP. Not blocking — Home's income card carries implicit month
-context, just missing the explicit header.

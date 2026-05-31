@@ -2032,3 +2032,44 @@ non-blocking.
   passed after. In `BudgetView.test.jsx`.
 - BudgetView 187 lines (< 200). Reuses existing helper + variable — no new hooks,
   no context destructure change, zero console.log.
+
+---
+
+## [2026-05-31] Static month label on HomeView (closes Budget/Home gap)
+
+**Context:**
+The paired BudgetView label (5e430d2, same day) closed four of the five views;
+HomeView was the last view with no visible month indicator — it only carried
+implicit month context via the income card's "of X expected" line. This finishes
+the set: Payday/Daily/Log (nav headers) + Budget/Home (static labels) all now show
+"[Month] YYYY".
+
+**Decision:**
+Mirror 5e430d2 exactly — a static, centered "[Month] YYYY" label as the first child
+of HomeView's content root, reusing a local `formatMonth` helper + `getCurrentMonth()`.
+No nav, not tappable (HomeView is current-month-only).
+
+One deliberate divergence from Budget: the label is placed **outside** the
+`showIncome` permission gate. A standard member who lacks `viewIncome` still sees
+which month they are on — month context is permission-independent. (On BudgetView
+this was a non-issue; its first element was ungated already.)
+
+The `formatMonth` helper is now duplicated in 6 view files. We intentionally did
+NOT hoist it to `lib/dates.js` in this commit (scope creep) — that becomes one
+atomic refactor commit covering all 6 sites post-launch (backlog: formatMonth
+helper duplication).
+
+**Rules derived:**
+- Permission-independent context (month, currency) renders outside `can()` gates.
+- When mirroring a shipped pattern across views, replicate it verbatim and defer
+  the shared-helper extraction to a single atomic refactor rather than hoisting
+  piecemeal mid-feature.
+
+### Verification
+
+- Red-first: `getByTestId('home-month-label')` threw against pre-fix HomeView in
+  BOTH the default and the standard-member (`showIncome === false`) contexts;
+  both pass after. In `HomeView.test.jsx`.
+- HomeView 134 lines (< 200). No new hooks; `can` already destructured; zero
+  console.log. Backlog: HomeView label item removed (closed); formatMonth
+  duplication count bumped 5 -> 6.
