@@ -7,9 +7,13 @@ vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markRe
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
 import { getTransactionsByMonth } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
+import { getCurrentMonth } from '../lib/dates';
 const C = { id:'centre-1', currency:'GHS', surplus_target:4500 };
 const CATS = [{ id:'cat-1', name:'Groceries', icon:'🛒', budget_amount:500, is_fixed:true },{ id:'cat-2', name:'Transport', icon:'🚗', budget_amount:200, is_fixed:true }];
-const INC = [{ id:'inc-1', label:'Adjei Salary', expected_amount:30000, received:true, received_amount:30000, pay_day:31, pay_day_type:'last_working_day', currency:'GHS' },{ id:'inc-2', label:'Dita Salary', expected_amount:15000, received:false, received_amount:0, pay_day:25, pay_day_type:'fixed_date', currency:'GHS' }];
+// Sources are month-scoped (Phase 2A); useFinance derives `incomes` for the
+// active month (defaults to current), so fixtures must carry the current month.
+const M = getCurrentMonth();
+const INC = [{ id:'inc-1', label:'Adjei Salary', expected_amount:30000, received:true, received_amount:30000, pay_day:31, pay_day_type:'last_working_day', currency:'GHS', month:M },{ id:'inc-2', label:'Dita Salary', expected_amount:15000, received:false, received_amount:0, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:M }];
 const TXS = [{ id:'tx-1', type:'expense', amount:200, category_name:'Groceries', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false },{ id:'tx-2', type:'income', amount:30000, category_name:'Adjei Salary', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false }];
 const go = (txs=TXS, inc=INC) => { getTransactionsByMonth.mockResolvedValue({data:txs,error:null}); getIncomeSources.mockResolvedValue({data:inc,error:null}); return renderHook(()=>useFinance({centre:C,categories:CATS})); };
 describe('useFinance — derived values', () => {
@@ -31,4 +35,21 @@ describe('useFinance — derived values', () => {
   it('nextUnpaid returns first unpaid income', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.nextUnpaid.label).toBe('Dita Salary'); });
   it('returns empty arrays when no centreId', async()=>{ getTransactionsByMonth.mockResolvedValue({data:[],error:null}); getIncomeSources.mockResolvedValue({data:[],error:null}); const{result}=renderHook(()=>useFinance({centre:null,categories:[]})); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.txs).toEqual([]); });
   it('sets error when tx load fails', async()=>{ getTransactionsByMonth.mockResolvedValue({data:[],error:{message:'DB error'}}); getIncomeSources.mockResolvedValue({data:[],error:null}); const{result}=renderHook(()=>useFinance({centre:C,categories:CATS})); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.error).toBe('DB error'); });
+
+  // T2 (Phase 2A) — red-first anchor. allIncomes holds every month; `incomes`
+  // is the active-month slice. Pre-2A `incomes` returned ALL rows → this is RED
+  // (incomes would be length 3, totalReceived would include the other months).
+  it('incomes scopes to activeMonth while allIncomes keeps every month', async () => {
+    const mixed = [
+      { id:'cur-1', label:'This Month Salary', expected_amount:30000, received:true, received_amount:30000, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:M },
+      { id:'old-1', label:'Last Month Salary', expected_amount:20000, received:true, received_amount:20000, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:'2020-01' },
+      { id:'old-2', label:'Older Other',        expected_amount:5000,  received:false, received_amount:0,    pay_day:null, pay_day_type:'flexible',  currency:'GHS', month:'2019-12' },
+    ];
+    const { result } = go(TXS, mixed);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.allIncomes).toHaveLength(3);                 // every month retained
+    expect(result.current.incomes).toHaveLength(1);                    // only the active month
+    expect(result.current.incomes[0].id).toBe('cur-1');
+    expect(result.current.totalReceived).toBe(30000);                  // not 50000 — other months excluded
+  });
 });

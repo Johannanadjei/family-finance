@@ -1774,3 +1774,92 @@ context, never in `BudgetCentreContext` (static centre config only).
   the finance destructure); every service call in `useIncomeMutations` destructures
   `error`; `crypto.randomUUID()` temp-id + `_optimistic` flag preserved; no new
   permission keys; zero console.log; finance mock carries `updateIncomeSource`.
+
+---
+
+## 2026-05-31 — income-month-scoping (Phase 2A): income sources become month-scoped
+
+Foundation commit for a future rollforward model. Previously `income_sources` were
+timeless — one row per "salary", reused across every month — so the Payday confirm
+state (`received`/`received_amount`) was single-state with no monthly reset (a salary
+confirmed in May still read received in June). This commit makes each source belong to
+one **`month` ('YYYY-MM')**, mirroring the established `budget_categories.month` pattern.
+
+**Explicitly NOT in this commit (deferred):** the rollforward prompt UI (2B — "same as
+last month?"), budget month-scoping + rollforward (Commit 3). 2A is schema + backfill +
+read-path month-scoping + a stubbed empty-month placeholder.
+
+### Schema (`scripts/migrate_income_month.sql`, applied via Supabase editor)
+
+`ALTER TABLE income_sources ADD COLUMN month text` → backfill → `NOT NULL` + `CHECK
+(month ~ '^\d{4}-\d{2}$')` + index `(budget_centre_id, month)`. Single `month` text
+column (not separate year/month ints) for consistency with `budget_categories`,
+`getCurrentMonth()`, and validation. **Deploy ordering is INVERTED vs the FK migration:**
+STEP 6 (`SET NOT NULL`) hardens the column, so the code that always supplies `month`
+must deploy *before* it. Order locked in the SQL header: STEP 1–5 → deploy → re-run
+STEP 3 (mop up rows created in the gap) → STEP 6. As of this commit STEP 1–5 are applied;
+**STEP 6 is pending the Vercel deploy of this commit.**
+
+### Backfill (production, verified counts)
+
+- Existing sources: `month = earliest linked tx's month`, else `created_at` month.
+  Applied to all rows incl. soft-deleted (STEP 6 hardens every row). 14 active + 26
+  soft-deleted backfilled; 0 left without month.
+- The 20 NULL income txs (was 22 at FK-migration time; 2 soft-deleted since) → one
+  **"Other Income" bucket per (hub, month)**, 8 buckets across 8 hubs (all 2026-05),
+  linked by a load-bearing `notes = '__one_off_bucket__'` marker (NOT the human label —
+  protects any user-named "Other Income" source). Buckets: `received=true`,
+  `received_amount = SUM(tx.amount)`, `pay_day_type='flexible'`, `pay_day=null`.
+
+### Key architecture decision — single list + derived slice (not two queries)
+
+`useFinance` loads **`allIncomes`** (every month, no filter) as the single mutation
+source-of-truth; **`incomes`** is `useMemo(() => allIncomes.filter(i => i.month ===
+activeMonth))`. Payday/Home and every income total read the activeMonth slice; Settings
+reads `allIncomes`. This means month navigation needs no income refetch and mutations
+update one list. `getIncomeSources(centreId, month?)` gained a server-side month filter
+(used by the service contract + tested), but the hook derives client-side — for this
+app's scale (a handful of sources/month) the payload is trivial and the single-list
+mutation story is far simpler than syncing two states.
+
+### Decisions made under delegation (flag-for-veto)
+
+- **`pay_day_type='flexible'` (not null) on buckets** — avoids the `IncomeCard` "Day null"
+  render and needs no validation carve-out; `'flexible'` = "ad-hoc / no schedule" = Q4 intent.
+- **Empty-month placeholder** (`NoIncomeSourcesEmpty`, current/any month with 0 sources):
+  "Copy from <last month>" is **stubbed** (toast "coming soon", 2B) and "+ Add manually"
+  navigates to Settings (no new AddIncomeSheet built in 2A).
+- **`IncomeSourcesSection` extracted** from `SettingsView` (now 93 lines) — the segmented
+  all-months list + add-form pushed the view over the 200-line audit limit, and the section
+  now matches its already-extracted siblings (`MembersSection`, `GuestSettingsSection`).
+- **Known 2A limitation:** editing a *past-month* source's amount from Settings does not
+  reconcile its linked tx (the reconcile in `useIncomeMutations` only sees activeMonth txs).
+  Out of scope; current-month editing (the common path) reconciles correctly.
+
+### Code changes
+
+- `src/lib/dates.js` (**new**) — `getCurrentMonth` (canonical home; `finance.js` re-exports
+  it to avoid rewriting 11 importers) + `isPastMonth` (2B foundation).
+- `src/lib/validation.js` — `validateIncomeSource` requires + format-checks `month`.
+- `src/services/income.service.js` — `getIncomeSources(centreId, month?)` filters;
+  `updateIncomeSource` accepts `month`.
+- `src/hooks/useFinance.js` — `allIncomes` state + derived `incomes`; both exposed.
+- `src/views/settings/IncomeSourcesSection.jsx` (**new**) — month-segmented list + month picker.
+- `src/views/SettingsView.jsx` — delegates to `IncomeSourcesSection`.
+- `src/views/settings/IncomeSourceRow.jsx` — optional `monthLabel` badge.
+- `src/views/PaydayView.jsx` — month-scoped empty state + copy stub toast.
+- `src/features/onboarding/{onboarding.constants,OnboardingFlow}.jsx`,
+  `src/features/hubs/CreateHubSheet.jsx` — onboarding/hub income gets `month = current`.
+- `src/test-utils/fixtures.js` — `mockIncomes` carry the current month (dynamic, run-date-safe).
+
+### Verification
+
+- Red-first proofs (each fails on pre-2A code, passes after): **T1** `getIncomeSources`
+  filters by month (service); **T2** `useFinance.incomes` scopes to activeMonth while
+  `allIncomes` keeps every month (hook); **T3** `validateIncomeSource` requires/format-checks
+  month (lib). Verified by reverting each production file in isolation via `git stash`.
+- npm test: 1009 passed (984 → 1009, +25). bash scripts/audit.sh: 0 failures.
+- Triple-check (§9.5): hooks unconditional before guards (`SettingsView`, `PaydayView`,
+  `IncomeSourcesSection`); contexts fully destructured (SettingsView dropped the now-unused
+  `useFinanceContext`); new components have tests (`IncomeSourcesSection`, `dates`); fixtures
+  + both context mocks carry `allIncomes`/`month`; zero console.log; no new permission keys.

@@ -122,7 +122,8 @@ describe('PaydayView', () => {
   it('shows empty state when no income sources', () => {
     mockFinance.incomes = [];
     renderView();
-    expect(screen.getByText(/No income sources/)).toBeTruthy();
+    expect(screen.getByText(/No income tracked for/)).toBeTruthy();
+    expect(screen.getByTestId('add-manually-btn')).toBeTruthy();
     mockFinance.incomes = mockIncomes;
   });
 

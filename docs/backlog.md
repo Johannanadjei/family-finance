@@ -26,3 +26,26 @@ gate + truthful errors + retry banner. This is the visibility layer on top.
 
 **Constraint:** adds a dependency — confirm against the "no new dependencies"
 default before picking it up.
+
+---
+
+## Soft-deleted income tx debris (~125 rows) — POST-MVP cleanup
+
+The database has ~125 soft-deleted income transactions with `income_source_id`
+NULL, accumulated from live testing during May 2026 dev work. They don't affect
+app behaviour (excluded by every query via the `deleted_at` filter), but they're
+data debris.
+
+**Investigation needed:**
+- Are these all test data, or some real user transactions soft-deleted via the UI?
+- Can they be hard-deleted, or should they stay for audit?
+- Consider a one-time cleanup SQL:
+  ```sql
+  DELETE FROM transactions
+  WHERE type = 'income'
+    AND income_source_id IS NULL
+    AND deleted_at IS NOT NULL
+    AND deleted_at < '2026-06-01';
+  ```
+
+**Schedule:** post-MVP. Not urgent — pure cleanup.

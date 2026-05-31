@@ -10,6 +10,7 @@ import { useFinanceContext }      from '../context/FinanceContext';
 import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { getCurrentMonth, offsetMonth } from '../lib/finance';
 import { Skeleton }               from '../components/ui/Skeleton';
+import { Toast }                   from '../components/ui/Toast';
 import { IncomeCard }             from './payday/IncomeCard';
 import { ConfirmSheet }           from './payday/ConfirmSheet';
 import { PastIncomeCard }         from './payday/PastIncomeCard';
@@ -49,7 +50,7 @@ export function PaydayView() {
   const [sheetOpen,      setSheetOpen]      = useState(false);
   const [mutating,       setMutating]       = useState(false);
   const [mutateError,    setMutateError]    = useState(null);
-
+  const [copyStub,       setCopyStub]       = useState(false);   // 2A: copy-from-last stub toast
   if (!can('viewIncome')) return <AccessBlocked message="Income tracking is only available to hub owners and full-access members." />;
   if (financeValues.loading) return <PaydayViewSkeleton />;
 
@@ -63,8 +64,7 @@ export function PaydayView() {
   const isPastMonth    = activeMonth < currentMonth;   // 'YYYY-MM' compares lexicographically
   const isFutureMonth  = activeMonth > currentMonth;
 
-  // Past months are read-only — confirmed income is derived from the month-scoped
-  // transactions already in context, not from the live income_sources rows.
+  // Past months are read-only — income derived from month-scoped txs, not live sources.
   const pastIncomeTxs  = isPastMonth ? txs.filter(t => t.type === 'income') : [];
 
   const handleOpenSheet = (income) => {
@@ -133,7 +133,6 @@ export function PaydayView() {
               </div>
             </div>
           ) : (
-            // Past month — Received only. Pending is omitted entirely (not shown as "GHS 0").
             <div>
               <p style={{ fontSize: 12, color: 'rgba(255,255,255,.7)', margin: '0 0 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Received</p>
               <p data-testid="payday-total-received" style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>{fmt(totalIncome)}</p>
@@ -166,7 +165,8 @@ export function PaydayView() {
           ))
         )
       ) : incomes.length === 0 ? (
-        <NoIncomeSourcesEmpty onGoToSettings={() => navigate('/settings')} />
+        <NoIncomeSourcesEmpty monthLabel={formatMonth(activeMonth)} lastMonthLabel={formatMonth(offsetMonth(activeMonth, -1))}
+          onCopyFromLast={() => setCopyStub(true)} onAddManually={() => navigate('/settings')} />
       ) : (
         incomes.map(income => (
           <IncomeCard
@@ -190,6 +190,11 @@ export function PaydayView() {
         error={mutateError}
         fmt={fmt}
       />
+
+      {copyStub && (
+        <Toast message="Copying last month's income is coming soon." actionLabel="Got it"
+          onEdit={() => setCopyStub(false)} onDismiss={() => setCopyStub(false)} />
+      )}
     </div>
   );
 }

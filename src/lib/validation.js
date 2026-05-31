@@ -113,8 +113,9 @@ export const validateCategory = ({ name, icon, budget_amount, month, sort_order 
 /**
  * Validate an income source before insert or update.
  */
-export const validateIncomeSource = ({ label, icon, expected_amount, currency, pay_day, pay_day_type, notes }) => {
+export const validateIncomeSource = ({ label, icon, expected_amount, currency, pay_day, pay_day_type, notes, month }) => {
   const VALID_PAY_DAY_TYPES = ['fixed_date', 'last_working_day', 'flexible'];
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('Income source month must be YYYY-MM format');
   return {
     label:          validateString(label, 'label'),
     icon:           typeof icon === 'string' && icon.trim() ? icon.trim() : '💰',
@@ -123,5 +124,7 @@ export const validateIncomeSource = ({ label, icon, expected_amount, currency, p
     pay_day:        (pay_day !== null && pay_day !== undefined) ? Math.min(31, Math.max(1, parseInt(pay_day))) : null,
     pay_day_type:   VALID_PAY_DAY_TYPES.includes(pay_day_type) ? pay_day_type : 'flexible',
     notes:          typeof notes === 'string' ? notes.trim() : '',
+    // Month-scoping (Phase 2A): every source belongs to one 'YYYY-MM'. Required.
+    month,
   };
 };

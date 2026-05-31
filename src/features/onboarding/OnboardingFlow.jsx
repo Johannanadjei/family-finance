@@ -100,7 +100,7 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
     }
 
     // Step 3 — bulk insert income sources
-    const incomeRows = incomes.map(({ id, ...income }) => income);
+    const incomeRows = incomes.map(({ id, ...income }) => ({ ...income, month: getCurrentMonth() }));
     const { error: incomeErr } = await bulkAddIncomeSources(activeCentreId, incomeRows);
     if (incomeErr) {
       setError('We could not save your income streams. Please try again.');

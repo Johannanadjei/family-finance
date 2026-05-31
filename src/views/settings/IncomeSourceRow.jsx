@@ -7,6 +7,8 @@
  * @param {function} fmt
  * @param {function} onDelete — (id) => Promise<{ error }>
  * @param {function} onUpdate — (id, updates) => Promise<{ error }>
+ * @param {string}   [monthLabel] — shown as a badge when the source is not in
+ *                   the current month (null/omitted for current-month rows)
  * @param {boolean}  isLast
  */
 
@@ -20,7 +22,7 @@ const fieldStyle = {
   fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
 };
 
-export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
+export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, monthLabel = null, isLast }) {
   const [deleting,       setDeleting]       = useState(false);
   const [confirmDelete,  setConfirmDelete]  = useState(false);
   const [editing,        setEditing]        = useState(false);
@@ -137,7 +139,12 @@ export function IncomeSourceRow({ source, fmt, onDelete, onUpdate, isLast }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 18 }}>{source.icon || '💰'}</span>
             <div>
-              <p data-testid={`income-label-${source.id}`} style={{ fontSize: 14, fontWeight: 800, color: 'var(--c-text, #1c1917)', margin: 0 }}>{source.label}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <p data-testid={`income-label-${source.id}`} style={{ fontSize: 14, fontWeight: 800, color: 'var(--c-text, #1c1917)', margin: 0 }}>{source.label}</p>
+                {monthLabel && (
+                  <span data-testid={`income-month-badge-${source.id}`} style={{ fontSize: 10, fontWeight: 800, color: 'var(--c-muted, #6b7280)', background: 'var(--c-bg, #f3f4f6)', borderRadius: 6, padding: '2px 6px' }}>{monthLabel}</span>
+                )}
+              </div>
               <p data-testid={`income-amount-${source.id}`} style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0 }}>{fmt(source.expected_amount)}</p>
             </div>
           </div>

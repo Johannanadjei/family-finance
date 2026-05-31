@@ -46,6 +46,7 @@ export function makeFinanceMock(overrides = {}) {
       error:                null,
       txs:                  mockTxs,
       incomes:              mockIncomes,
+      allIncomes:           mockIncomes,
       totalReceived:        30000,
       totalExpected:        45000,
       totalPending:         15000,

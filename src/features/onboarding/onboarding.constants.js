@@ -6,6 +6,8 @@
  * All values here are app-level configuration — not per-user data.
  */
 
+import { getCurrentMonth } from '../../lib/dates';
+
 export const STEPS = ['Centre', 'Income', 'Categories', 'Target', 'Complete'];
 
 export const MAX_FREE_INCOMES  = 2;
@@ -58,4 +60,6 @@ export const emptyIncome = (centreCurrency) => ({
   pay_day:         null,
   pay_day_type:    'flexible',
   notes:           '',
+  // Month-scoping (Phase 2A): onboarding income belongs to the signup month.
+  month:           getCurrentMonth(),
 });

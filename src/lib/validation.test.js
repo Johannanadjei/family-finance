@@ -285,6 +285,7 @@ describe('validateIncomeSource', () => {
     pay_day:         25,
     pay_day_type:    'fixed_date',
     notes:           'Monthly salary',
+    month:           '2026-05',
   };
 
   it('accepts valid income source', () => {
@@ -327,5 +328,21 @@ describe('validateIncomeSource', () => {
   it('defaults notes to empty string when null', () => {
     const result = validateIncomeSource({ ...validSource, notes: null });
     expect(result.notes).toBe('');
+  });
+
+  // T3 (Phase 2A month-scoping) — month is required and format-checked.
+  it('returns the month unchanged when valid', () => {
+    expect(validateIncomeSource({ ...validSource, month: '2026-06' }).month).toBe('2026-06');
+  });
+
+  it('throws when month is missing', () => {
+    const { month, ...noMonth } = validSource;
+    expect(() => validateIncomeSource(noMonth)).toThrow(/month/i);
+  });
+
+  it('throws when month is malformed', () => {
+    expect(() => validateIncomeSource({ ...validSource, month: '2026-6' })).toThrow(/month/i);
+    expect(() => validateIncomeSource({ ...validSource, month: 'May 2026' })).toThrow(/month/i);
+    expect(() => validateIncomeSource({ ...validSource, month: '2026-05-01' })).toThrow(/month/i);
   });
 });

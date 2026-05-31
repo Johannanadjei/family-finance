@@ -5,6 +5,11 @@
  * Currency formatting created per budget centre via makeFmt().
  */
 
+// getCurrentMonth lives in lib/dates.js (canonical month-key home); re-exported
+// here so the many existing `import { getCurrentMonth } from '../lib/finance'`
+// call sites keep working without a churn-wide import rewrite.
+export { getCurrentMonth } from './dates';
+
 export const WEEKS = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'];
 
 const CURRENCY_CONFIG = {
@@ -44,8 +49,6 @@ export const getWeekForDate = (dateStr) => {
   if (day <= 28) return 'Week 4';
   return 'Week 5';
 };
-
-export const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
 export const offsetMonth = (ym, delta) => {
   const [y, m] = ym.split('-').map(Number);

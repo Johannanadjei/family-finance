@@ -17,17 +17,19 @@ import { validateIncomeSource, validateAmount, validateDate, validateCurrency } 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 /**
- * Fetch all active income sources for a budget centre.
- *
- * @param {string} centreId
+ * Fetch active income sources. Month-scoped (Phase 2A): pass a 'YYYY-MM' month
+ * for one month; omit it for every month (Settings' all-months view).
  */
-export const getIncomeSources = async (centreId) => {
-  const { data, error } = await supabase
+export const getIncomeSources = async (centreId, month) => {
+  let query = supabase
     .from('income_sources')
     .select('*')
     .eq('budget_centre_id', centreId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: true });
+    .is('deleted_at', null);
+
+  if (month) query = query.eq('month', month);
+
+  const { data, error } = await query.order('created_at', { ascending: true });
 
   if (error) console.error('[income.service] getIncomeSources error:', error.message);
   // Never mask a failure as []: error → data null; success → always an array. See CLAUDE.md §12.
@@ -51,12 +53,7 @@ export const getIncomeSourceById = async (sourceId) => {
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-/**
- * Add a new income source.
- *
- * @param {string} centreId
- * @param {{ label, icon, expected_amount, currency, pay_day, pay_day_type, notes }} source
- */
+/** Add a new income source. `source` is validated (month required) before insert. */
 export const addIncomeSource = async (centreId, source) => {
   let validated;
   try {
@@ -79,12 +76,7 @@ export const addIncomeSource = async (centreId, source) => {
   return { data, error };
 };
 
-/**
- * Bulk insert income sources — used during onboarding.
- *
- * @param {string} centreId
- * @param {Array} sources
- */
+/** Bulk insert income sources — used during onboarding / hub creation. */
 export const bulkAddIncomeSources = async (centreId, sources) => {
   const rows = [];
 
@@ -127,6 +119,10 @@ export const updateIncomeSource = async (sourceId, updates) => {
       cleaned.pay_day_type = VALID.includes(updates.pay_day_type) ? updates.pay_day_type : 'flexible';
     }
     if (updates.notes !== undefined) cleaned.notes = typeof updates.notes === 'string' ? updates.notes.trim() : '';
+    if (updates.month !== undefined) {
+      if (!/^\d{4}-\d{2}$/.test(updates.month)) throw new Error('month must be YYYY-MM format');
+      cleaned.month = updates.month;
+    }
   } catch (e) {
     console.error('[income.service] updateIncomeSource validation error:', e.message);
     return { data: null, error: e };

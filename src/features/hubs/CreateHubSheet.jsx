@@ -83,7 +83,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
     if (catErr) { setError('Could not save categories. Please try again.'); setLoading(false); return; }
 
     if (incomes.length > 0) {
-      const srcRows = incomes.map(({ id: _id, ...src }) => src);
+      const srcRows = incomes.map(({ id: _id, ...src }) => ({ ...src, month: getCurrentMonth() }));
       const { error: incErr } = await bulkAddIncomeSources(data.id, srcRows);
       if (incErr) { setError('Could not save income sources. Please try again.'); setLoading(false); return; }
     }

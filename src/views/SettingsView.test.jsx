@@ -8,6 +8,7 @@ import { render, screen, act, fireEvent }        from '@testing-library/react';
 import { MemoryRouter }                          from 'react-router-dom';
 import { SettingsView }                          from './SettingsView';
 import { mockCentre, mockFmt, mockCategories, mockIncomes } from '../test-utils/fixtures';
+import { getCurrentMonth } from '../lib/dates';
 
 const mockUpdateCentre       = vi.fn().mockResolvedValue({ error: null });
 const mockUpdateCategory     = vi.fn().mockResolvedValue({ error: null });
@@ -49,6 +50,7 @@ vi.mock('../context/BudgetCentreContext', () => ({
 vi.mock('../context/FinanceContext', () => ({
   useFinanceContext: () => ({
     incomes:             mockIncomes,
+    allIncomes:          mockIncomes,
     loading:             false,
     prefs:               { themeSkin: 'family_warmth' },
     saveThemeSkin:       vi.fn(),
@@ -120,6 +122,20 @@ describe('SettingsView', () => {
     renderSettings();
     expect(screen.getByTestId('income-label-inc-1')).toBeTruthy();
     expect(screen.getByTestId('income-label-inc-2')).toBeTruthy();
+  });
+
+  // T4 (Phase 2A) — income sources are grouped under a month section header,
+  // and the current month is expanded by default. Collapsing hides its rows.
+  it('groups income sources under a month section, expanded by default', () => {
+    renderSettings();
+    expect(screen.getByTestId(`income-month-header-${getCurrentMonth()}`)).toBeTruthy();
+    expect(screen.getByTestId('income-label-inc-1')).toBeTruthy();   // visible while expanded
+  });
+
+  it('collapsing a month section hides its income rows', () => {
+    renderSettings();
+    fireEvent.click(screen.getByTestId(`income-month-header-${getCurrentMonth()}`));
+    expect(screen.queryByTestId('income-label-inc-1')).toBeNull();
   });
 
   it('renders theme section', () => {

@@ -40,7 +40,10 @@ export function useFinance({ centre, categories }) {
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [txs,            setTxs]            = useState([]);
-  const [incomes,        setIncomes]        = useState([]);
+  // allIncomes holds income sources across ALL months (Settings' all-months
+  // view + the single mutation source-of-truth). `incomes` below is the
+  // activeMonth slice derived from it — Payday/Home read the slice.
+  const [allIncomes,     setAllIncomes]     = useState([]);
   const [activeMonth,    setActiveMonth]    = useState(getCurrentMonth());
   const [loading,        setLoading]        = useState(true);
   const [loaded,         setLoaded]         = useState(false);
@@ -56,6 +59,9 @@ export function useFinance({ centre, categories }) {
     return result;
   }, [centreId]);
 
+  // Loads every month's sources (no month filter) into allIncomes. The active
+  // month is derived client-side (see `incomes` memo) so month navigation needs
+  // no refetch, and mutations have a single list to update.
   const loadIncomes = useCallback(async () => {
     if (!centreId) return { data: [], error: null };
     const result = await getIncomeSources(centreId);
@@ -64,13 +70,13 @@ export function useFinance({ centre, categories }) {
   }, [centreId]);
 
   const load = useCallback(async (month) => {
-    if (!centreId) { setTxs([]); setIncomes([]); setLoaded(true); setLoading(false); return; }
+    if (!centreId) { setTxs([]); setAllIncomes([]); setLoaded(true); setLoading(false); return; }
 
     setLoading(true);
     setError(null);
     // Clear stale data so a previous hub's rows can't bleed in during the fetch.
     setTxs([]);
-    setIncomes([]);
+    setAllIncomes([]);
 
     // Auth-readiness gate — never query against an unhydrated/stale token (else a
     // cold-load query races the refresh, RLS returns an empty 200 → silent data loss).
@@ -93,7 +99,7 @@ export function useFinance({ centre, categories }) {
     if (incomeResult.error) { setError(incomeResult.error.message); ok = false; }
 
     setTxs(txResult.data || []);
-    setIncomes(incomeResult.data || []);
+    setAllIncomes(incomeResult.data || []);
     if (ok) setLoaded(true);
     setLoading(false);
   }, [centreId, loadTxs, loadIncomes]);
@@ -103,6 +109,10 @@ export function useFinance({ centre, categories }) {
   }, [load, activeMonth]);
 
   // ── Derived values ────────────────────────────────────────────────────────
+
+  // Active-month slice of allIncomes. Payday/Home and every income total below
+  // read THIS, not allIncomes — so they stay scoped to the month being viewed.
+  const incomes        = useMemo(() => allIncomes.filter(i => i.month === activeMonth),         [allIncomes, activeMonth]);
 
   const monthlyIncome  = useMemo(() => calcTotalExpected(incomes),                              [incomes]);
   const totalIncome    = useMemo(() => calcTotalIncome(txs),                                    [txs]);
@@ -223,7 +233,9 @@ export function useFinance({ centre, categories }) {
     updateIncomeSource,
     addIncomeSource,
     deleteIncomeSource,
-  } = useIncomeMutations({ centreId, currency, incomes, txs, setIncomes, setTxs });
+    // Mutations operate on the full cross-month list (find-by-id is month-agnostic);
+    // the activeMonth `incomes` slice re-derives automatically.
+  } = useIncomeMutations({ centreId, currency, incomes: allIncomes, txs, setIncomes: setAllIncomes, setTxs });
 
   // ── Month navigation ──────────────────────────────────────────────────────
 
@@ -258,7 +270,8 @@ export function useFinance({ centre, categories }) {
   return {
     // Raw data
     txs,
-    incomes,
+    incomes,        // activeMonth slice — Payday / Home / totals
+    allIncomes,     // every month — Settings' all-months view
     activeMonth,
 
     // Derived financial values

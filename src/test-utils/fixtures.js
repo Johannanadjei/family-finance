@@ -6,6 +6,12 @@
  * Never imported in production code.
  */
 
+import { getCurrentMonth } from '../lib/dates';
+
+// Income sources are month-scoped (Phase 2A). Fixtures use the *current* month
+// so views that show "this month's" income render them regardless of run date.
+const THIS_MONTH = getCurrentMonth();
+
 export const mockCentre = {
   id:             'c1',
   name:           "The Adjei's",
@@ -28,8 +34,8 @@ export const mockMembers = [
 ];
 
 export const mockIncomes = [
-  { id: 'inc-1', label: 'Adjei Salary', expected_amount: 30000, received: true,  received_amount: 30000, currency: 'GHS', pay_day: 31, pay_day_type: 'last_working_day' },
-  { id: 'inc-2', label: 'Dita Salary',  expected_amount: 15000, received: false, received_amount: 0,     currency: 'GHS', pay_day: 25, pay_day_type: 'fixed_date'       },
+  { id: 'inc-1', label: 'Adjei Salary', expected_amount: 30000, received: true,  received_amount: 30000, currency: 'GHS', pay_day: 31, pay_day_type: 'last_working_day', month: THIS_MONTH },
+  { id: 'inc-2', label: 'Dita Salary',  expected_amount: 15000, received: false, received_amount: 0,     currency: 'GHS', pay_day: 25, pay_day_type: 'fixed_date',       month: THIS_MONTH },
 ];
 
 export const mockTxs = [
