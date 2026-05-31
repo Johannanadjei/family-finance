@@ -4,18 +4,25 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen }           from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { BudgetView }               from './BudgetView';
-import { mockCentre, mockFmt, mockCategories, mockCategorySpend } from '../test-utils/fixtures';
+import { getCurrentMonth, offsetMonth } from '../lib/finance';
+import { mockCentre, mockFmt, mockCategories, mockPrevMonthCategories, mockCategorySpend } from '../test-utils/fixtures';
+
+// Mutable so tests can flip `categories` empty to exercise the rollforward state.
+const mockBudgetCentre = {
+  centre:                  mockCentre,
+  fmt:                     mockFmt,
+  categories:              mockCategories,
+  getCatIcon:              (name) => name === 'Groceries' ? '🛒' : '🚗',
+  prevMonthCategories:     [],
+  loadPrevMonthCategories: vi.fn().mockResolvedValue({ data: [], error: null }),
+  copyCategoriesToMonth:   vi.fn().mockResolvedValue({ data: [], error: null }),
+};
 
 vi.mock('../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({
-    centre:     mockCentre,
-    fmt:        mockFmt,
-    categories: mockCategories,
-    getCatIcon: (name) => name === 'Groceries' ? '🛒' : '🚗',
-  }),
+  useBudgetCentreContext: () => mockBudgetCentre,
 }));
 
 const mockFinance = {
@@ -31,6 +38,8 @@ vi.mock('../context/FinanceContext', () => ({
 }));
 
 const renderView = () => render(<MemoryRouter><BudgetView /></MemoryRouter>);
+
+const resetCats = () => { mockBudgetCentre.categories = mockCategories; mockBudgetCentre.prevMonthCategories = []; };
 
 describe('BudgetView', () => {
   it('shows skeleton when loading', () => {
@@ -67,5 +76,61 @@ describe('BudgetView', () => {
     renderView();
     const rows = screen.getAllByText(/Groceries|Transport/);
     expect(rows[0].textContent).toContain('Groceries');
+  });
+
+  // ── Phase 2C budget rollforward empty-state ───────────────────────────────
+  it('rollforward State 3: shows "Yes, copy N categories" when the previous month had categories', () => {
+    mockBudgetCentre.categories          = [];
+    mockBudgetCentre.prevMonthCategories = mockPrevMonthCategories;   // 3 categories
+    renderView();
+    expect(screen.getByText(/Budget same as/)).toBeTruthy();
+    expect(screen.getByTestId('copy-all-categories-btn').textContent).toBe('Yes, copy 3 categories');
+    expect(screen.getByTestId('choose-which-categories-btn')).toBeTruthy();
+    resetCats();
+  });
+
+  it('rollforward State 1: an empty previous month shows add-only (no copy CTA)', () => {
+    mockBudgetCentre.categories          = [];
+    mockBudgetCentre.prevMonthCategories = [];
+    renderView();
+    expect(screen.getByText(/No budget set for/)).toBeTruthy();
+    expect(screen.queryByTestId('copy-all-categories-btn')).toBeNull();
+    expect(screen.getByTestId('add-category-manually-btn')).toBeTruthy();
+    resetCats();
+  });
+
+  it('loads the previous month\'s categories when the current budget is empty', async () => {
+    const loadFn = vi.fn().mockResolvedValue({ data: mockPrevMonthCategories, error: null });
+    mockBudgetCentre.categories              = [];
+    mockBudgetCentre.prevMonthCategories     = mockPrevMonthCategories;
+    mockBudgetCentre.loadPrevMonthCategories = loadFn;
+    renderView();
+    const prevMonth = offsetMonth(getCurrentMonth(), -1);
+    await waitFor(() => expect(loadFn).toHaveBeenCalledWith(prevMonth));
+    mockBudgetCentre.loadPrevMonthCategories = vi.fn().mockResolvedValue({ data: [], error: null });
+    resetCats();
+  });
+
+  it('tapping "Yes, copy N" calls copyCategoriesToMonth(prevMonth, currentMonth) with no subset', async () => {
+    const copyFn = vi.fn().mockResolvedValue({ data: [{ id: 'n1' }, { id: 'n2' }, { id: 'n3' }], error: null });
+    mockBudgetCentre.categories            = [];
+    mockBudgetCentre.prevMonthCategories   = mockPrevMonthCategories;
+    mockBudgetCentre.copyCategoriesToMonth = copyFn;
+    renderView();
+    fireEvent.click(screen.getByTestId('copy-all-categories-btn'));
+    const currentMonth = getCurrentMonth();
+    const prevMonth    = offsetMonth(currentMonth, -1);
+    await waitFor(() => expect(copyFn).toHaveBeenCalledWith(prevMonth, currentMonth, undefined));
+    mockBudgetCentre.copyCategoriesToMonth = vi.fn().mockResolvedValue({ data: [], error: null });
+    resetCats();
+  });
+
+  it('tapping "Choose which to copy" opens the multi-select sheet', () => {
+    mockBudgetCentre.categories          = [];
+    mockBudgetCentre.prevMonthCategories = mockPrevMonthCategories;
+    renderView();
+    fireEvent.click(screen.getByTestId('choose-which-categories-btn'));
+    expect(screen.getByTestId('copy-categories-sheet')).toBeTruthy();
+    resetCats();
   });
 });

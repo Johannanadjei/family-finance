@@ -41,10 +41,11 @@ vi.mock('../services/centres.service', () => ({
 }));
 
 vi.mock('../services/categories.service', () => ({
-  getCategories:  vi.fn().mockResolvedValue({ data: [], error: null }),
-  addCategory:    vi.fn(),
-  updateCategory: vi.fn(),
-  deleteCategory: vi.fn(),
+  getCategories:     vi.fn().mockResolvedValue({ data: [], error: null }),
+  addCategory:       vi.fn(),
+  bulkAddCategories: vi.fn(),
+  updateCategory:    vi.fn(),
+  deleteCategory:    vi.fn(),
 }));
 
 vi.mock('../services/members.service', () => ({
@@ -59,7 +60,10 @@ vi.mock('../services/auth.service', () => ({
 }));
 
 import { getCentreById, archiveCentre, deleteCentre, unarchiveCentre } from '../services/centres.service';
+import { getCategories, bulkAddCategories } from '../services/categories.service';
 import { getMembers } from '../services/members.service';
+import { getCurrentMonth, offsetMonth } from '../lib/finance';
+import { mockPrevMonthCategories } from '../test-utils/fixtures';
 
 const mockUser   = { id: 'user-1' };
 const mockCentre = { id: 'c-1', name: "The Adjei's", currency: 'GHS', skin_id: 'family_warmth' };
@@ -255,5 +259,93 @@ describe('useBudgetCentre', () => {
     let res;
     await act(async () => { res = await result.current.restoreHub('a-1'); });
     expect(res.error).toBeTruthy();
+  });
+});
+
+// ── Phase 2C: budget rollforward (loadPrevMonthCategories + copyCategoriesToMonth) ──
+const FROM = offsetMonth(getCurrentMonth(), -1);   // previous month — matches mockPrevMonthCategories
+const TO   = getCurrentMonth();
+
+// Mount with a resolved centre and an EMPTY current month, so categories start [].
+const mountEmpty = async () => {
+  getCentreById.mockResolvedValue({ data: mockCentre, error: null });
+  getCategories.mockResolvedValue({ data: [], error: null });
+  const view = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+  await waitFor(() => expect(view.result.current.loading).toBe(false));
+  return view;
+};
+
+describe('useBudgetCentre — budget rollforward (Phase 2C)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('loadPrevMonthCategories fetches the previous month and stores it', async () => {
+    const { result } = await mountEmpty();
+    expect(result.current.categories).toEqual([]);
+
+    getCategories.mockResolvedValue({ data: mockPrevMonthCategories, error: null });
+    await act(async () => { await result.current.loadPrevMonthCategories(FROM); });
+
+    expect(getCategories).toHaveBeenLastCalledWith('c-1', FROM);
+    expect(result.current.prevMonthCategories).toHaveLength(3);
+  });
+
+  it('copyCategoriesToMonth copies ALL prev categories into the target month when no ids passed', async () => {
+    const { result } = await mountEmpty();
+    getCategories.mockResolvedValue({ data: mockPrevMonthCategories, error: null });
+    await act(async () => { await result.current.loadPrevMonthCategories(FROM); });
+
+    bulkAddCategories.mockResolvedValue({ data: mockPrevMonthCategories.map(c => ({ ...c, id: 'new-' + c.id, month: TO })), error: null });
+    await act(async () => { await result.current.copyCategoriesToMonth(FROM, TO); });
+
+    expect(bulkAddCategories).toHaveBeenCalledTimes(1);
+    const [cid, rows] = bulkAddCategories.mock.calls[0];
+    expect(cid).toBe('c-1');
+    expect(rows).toHaveLength(3);
+    expect(rows.every(r => r.month === TO)).toBe(true);
+    expect(rows.map(r => r.name).sort()).toEqual(['Fun', 'Groceries', 'Transport']);
+    expect(result.current.categories).toHaveLength(3);   // server rows landed
+  });
+
+  it('copyCategoriesToMonth copies only the explicitly selected subset', async () => {
+    const { result } = await mountEmpty();
+    getCategories.mockResolvedValue({ data: mockPrevMonthCategories, error: null });
+    await act(async () => { await result.current.loadPrevMonthCategories(FROM); });
+
+    bulkAddCategories.mockResolvedValue({ data: [{ id: 'new-2', name: 'Transport', month: TO }], error: null });
+    await act(async () => { await result.current.copyCategoriesToMonth(FROM, TO, ['pcat-2']); });
+
+    const [, rows] = bulkAddCategories.mock.calls[0];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].name).toBe('Transport');
+  });
+
+  it('is a no-op (no insert) when the previous month has no categories', async () => {
+    const { result } = await mountEmpty();   // prevMonthCategories never loaded → empty
+    await act(async () => {
+      const r = await result.current.copyCategoriesToMonth(FROM, TO);
+      expect(r.error).toBeNull();
+      expect(r.data).toEqual([]);
+    });
+    expect(bulkAddCategories).not.toHaveBeenCalled();
+  });
+
+  it('inserts optimistic rows immediately, then rolls them ALL back when the bulk insert fails', async () => {
+    const { result } = await mountEmpty();
+    getCategories.mockResolvedValue({ data: mockPrevMonthCategories, error: null });
+    await act(async () => { await result.current.loadPrevMonthCategories(FROM); });
+    expect(result.current.categories).toHaveLength(0);
+
+    let resolveBulk;
+    bulkAddCategories.mockReturnValue(new Promise(res => { resolveBulk = res; }));
+
+    let pending;
+    await act(async () => { pending = result.current.copyCategoriesToMonth(FROM, TO); });
+    // Optimistic: all 3 rows present before the service settles.
+    expect(result.current.categories).toHaveLength(3);
+    expect(result.current.categories.every(c => c._optimistic)).toBe(true);
+
+    await act(async () => { resolveBulk({ data: null, error: new Error('network') }); await pending; });
+    // Rolled back — every optimistic row removed.
+    expect(result.current.categories).toHaveLength(0);
   });
 });

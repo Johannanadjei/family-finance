@@ -7,10 +7,13 @@
  */
 
 import { getCurrentMonth } from '../lib/dates';
+import { offsetMonth }     from '../lib/finance';
 
-// Income sources are month-scoped (Phase 2A). Fixtures use the *current* month
-// so views that show "this month's" income render them regardless of run date.
+// Income sources + budget categories are month-scoped (Phase 2A/2C). Fixtures use
+// the *current* month so views that show "this month's" data render them
+// regardless of run date; LAST_MONTH backs rollforward (Phase 2B/2C) fixtures.
 const THIS_MONTH = getCurrentMonth();
+const LAST_MONTH = offsetMonth(THIS_MONTH, -1);
 
 export const mockCentre = {
   id:             'c1',
@@ -24,8 +27,15 @@ export const mockCentre = {
 export const mockFmt = (n) => `GHS ${Math.round(n || 0).toLocaleString()}`;
 
 export const mockCategories = [
-  { id: 'cat-1', name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true,  sort_order: 0 },
-  { id: 'cat-2', name: 'Transport', icon: '🚗', budget_amount: 200, is_fixed: true,  sort_order: 1 },
+  { id: 'cat-1', name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true,  sort_order: 0, month: THIS_MONTH },
+  { id: 'cat-2', name: 'Transport', icon: '🚗', budget_amount: 200, is_fixed: true,  sort_order: 1, month: THIS_MONTH },
+];
+
+// Previous month's categories — drives the Phase 2C budget-rollforward prompt.
+export const mockPrevMonthCategories = [
+  { id: 'pcat-1', name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true, sort_order: 0, month: LAST_MONTH },
+  { id: 'pcat-2', name: 'Transport', icon: '🚗', budget_amount: 200, is_fixed: true, sort_order: 1, month: LAST_MONTH },
+  { id: 'pcat-3', name: 'Fun',       icon: '🎉', budget_amount: 150, is_fixed: false, sort_order: 2, month: LAST_MONTH },
 ];
 
 export const mockMembers = [

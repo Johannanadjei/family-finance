@@ -160,31 +160,3 @@ export const deleteCategory = async (categoryId) => {
   if (error) console.error('[categories.service] deleteCategory error:', error.message);
   return { error };
 };
-
-/**
- * Copy categories from one month to the next.
- * Used at the start of each new month to carry forward the budget plan.
- *
- * @param {string} centreId
- * @param {string} fromMonth — 'YYYY-MM'
- * @param {string} toMonth   — 'YYYY-MM'
- */
-export const copyCategoriesToMonth = async (centreId, fromMonth, toMonth) => {
-  const { data: existing, error: fetchErr } = await getCategories(centreId, fromMonth);
-
-  if (fetchErr) return { data: null, error: fetchErr };
-  if (!existing.length) return { data: [], error: null };
-
-  const rows = existing.map(({ id, created_at, updated_at, deleted_at, ...cat }) => ({
-    ...cat,
-    month: toMonth,
-  }));
-
-  const { data, error } = await supabase
-    .from('budget_categories')
-    .insert(rows)
-    .select();
-
-  if (error) console.error('[categories.service] copyCategoriesToMonth error:', error.message);
-  return { data: data || [], error };
-};

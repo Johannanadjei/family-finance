@@ -1923,3 +1923,74 @@ a combined income+budget prompt.
   PaydayView destructures `allIncomes` + `copyIncomeSourcesToMonth`, both in the context mock;
   error destructured alongside data in `handleCopy` + the mutation; `data?.length`/`data || []`
   optional chaining; new components all have tests; zero console.log; no new permission keys.
+
+---
+
+## 2026-05-31 — budget-category rollforward (Phase 2C): "budget same as last month?"
+
+Ports the 2B income rollforward to `budget_categories`. On a current month with zero
+categories, BudgetView offers to carry last month's categories forward — one tap for
+all, or a multi-select sheet.
+
+**No migration.** `budget_categories.month` already existed (it's the pattern 2A's
+income migration *mirrored* — see income-month-scoping entry). Column, `CHECK`, index,
+`validateCategory` month-requirement, and `getCategories(centreId, month)` filtering
+were all already in production. So 2C is pure UX + one optimistic mutation — no SQL,
+no backfill, no deploy ordering.
+
+**No bucket.** Unlike income (which needed an `__one_off_bucket__` to rehome pre-FK
+orphan income txs), categories are always explicitly user-created and always stamped
+with a month. Orphan (null `category_id`) transactions are just uncategorized spend —
+rollforward copies the *budget plan*, not transactions. Nothing to exclude.
+
+### The architectural divergence from income
+
+Income lives in `useFinance`, which loads **all months** (`allIncomes`) and derives a
+slice — so 2B detected "last month had sources" from memory. **Categories live in
+`useBudgetCentre`/`BudgetCentreContext`, loaded current-month-only** (no `allCategories`,
+no `activeMonth`, no month nav on BudgetView). So detection needed a new path:
+
+- **`loadPrevMonthCategories(prevMonth)`** (useBudgetCentre) — fired by a BudgetView
+  `useEffect` when `categories.length === 0`; stores the result in a new
+  `prevMonthCategories` state that drives State 1 vs 2/3 and the sheet list. (OQ1
+  Option A — a targeted query, not an all-months refactor. Option B is deferred to
+  Phase 2D, logged in backlog.)
+- **`copyCategoriesToMonth(fromMonth, toMonth, categoryIds?)`** (useBudgetCentre) —
+  optimistic N-row block insert reusing `bulkAddCategories`, sourced from the loaded
+  `prevMonthCategories`; whole temp block swapped for server rows on success, removed
+  on rollback. Byte-for-byte the `copyIncomeSourcesToMonth` shape, just in the other
+  hook. `received`-equivalent fields N/A; `is_fixed` is carried (validateCategory
+  strips it but `bulkAddCategories` re-applies it from the raw row).
+
+BudgetView uses `getCurrentMonth()` directly (NOT FinanceContext's navigated
+`activeMonth`) — budget is "this month's plan," decoupled from Payday's month nav.
+
+### Dead code removed
+
+`categories.service.js copyCategoriesToMonth(centreId, fromMonth, toMonth)` — existed,
+unused, untested, non-optimistic, no subset. Deleted; the optimistic version lives in
+the hook (OQ2). No importers, no test file to update.
+
+### Other changes
+
+- **`BudgetEmptyState`** (new) — 3-state, mirrors `NoIncomeSourcesEmpty`
+  ("category"/"categories" pluralised). BudgetView's dashed "+ Add" button is now
+  hidden when empty (the empty state owns the add CTA).
+- **`CopyCategoriesSheet`** (new) — mirrors `CopyIncomeSheet` (all-checked default,
+  live count, disables at zero).
+- Success via the existing `Toast`; failure inline + retry.
+- New context values threaded through `App.jsx` → `BudgetCentreProvider`.
+- `mockCategories` gained `month`; `mockPrevMonthCategories` added.
+
+### Verification
+
+- Red-first: `copyCategoriesToMonth` / `loadPrevMonthCategories` (missing-symbol red),
+  subset + optimistic-rollback, State 1/2/3 detection. In `useBudgetCentre.test.js`,
+  `BudgetEmptyState.test.jsx`, `CopyCategoriesSheet.test.jsx`, `BudgetView.test.jsx`.
+- npm test: 1064 passed (1040 → 1064, +24). bash scripts/audit.sh: 0 failures (209 checks).
+- Triple-check (§9.5): BudgetView's `useState`s + detection `useEffect` above the
+  `loading` guard (hooks order); BudgetView destructures `prevMonthCategories` +
+  `loadPrevMonthCategories` + `copyCategoriesToMonth`, all in the context mock; error
+  destructured alongside data in `handleCopy`, `loadPrevMonthCategories`, and the
+  mutation; `data?.length` optional chaining; new components have tests; zero
+  console.log; no new permission keys. BudgetView 180 lines (< 200, no extraction).

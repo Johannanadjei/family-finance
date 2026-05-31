@@ -6,12 +6,19 @@
  * All data from FinanceContext and BudgetCentreContext — no new services.
  */
 
-import { useState }               from 'react';
+import { useState, useEffect }    from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
+import { getCurrentMonth, offsetMonth } from '../lib/finance';
 import { Skeleton }               from '../components/ui/Skeleton';
+import { Toast }                   from '../components/ui/Toast';
 import { CategoryBudgetRow }      from './budget/CategoryBudgetRow';
 import { AddCategorySheet }       from './budget/AddCategorySheet';
+import { BudgetEmptyState }       from './budget/BudgetEmptyState';
+import { CopyCategoriesSheet }    from './budget/CopyCategoriesSheet';
+
+const formatMonth = (ym) =>
+  new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 function BudgetViewSkeleton() {
   return (
@@ -35,9 +42,37 @@ function BudgetViewSkeleton() {
 }
 
 export function BudgetView() {
-  const { categories, fmt, addCategory } = useBudgetCentreContext();
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const { categories, fmt, addCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth } = useBudgetCentreContext();
   const { categorySpend, fixedTotal, fixedSpent, loading, error } = useFinanceContext();
+  const [sheetOpen,     setSheetOpen]     = useState(false);
+  const [copySheetOpen, setCopySheetOpen] = useState(false);   // 2C: multi-select rollforward sheet
+  const [copying,       setCopying]       = useState(false);
+  const [copyError,     setCopyError]     = useState(null);
+  const [copiedCount,   setCopiedCount]   = useState(0);       // >0 → success toast
+
+  // BudgetView is current-month-only (no month nav), so the rollforward source is
+  // always last month. When the current budget is empty, load it to decide State
+  // 1 vs 2/3 of the prompt. Setting prevMonthCategories doesn't change
+  // categories.length, so this can't loop.
+  const currentMonth = getCurrentMonth();
+  const prevMonth    = offsetMonth(currentMonth, -1);
+  const isEmpty      = categories.length === 0;
+  useEffect(() => {
+    if (isEmpty) loadPrevMonthCategories(prevMonth);
+  }, [isEmpty, prevMonth, loadPrevMonthCategories]);
+
+  // Roll the previous month's budget forward. `categoryIds` undefined → copy all;
+  // an array → only the sheet-selected subset. The current-month `categories`
+  // list re-derives automatically as the optimistic rows land.
+  const handleCopy = async (categoryIds) => {
+    setCopying(true);
+    setCopyError(null);
+    const { data, error: err } = await copyCategoriesToMonth(prevMonth, currentMonth, categoryIds);
+    setCopying(false);
+    if (err) { setCopyError("Couldn't copy. Try again."); return; }
+    setCopySheetOpen(false);
+    setCopiedCount(data?.length || 0);
+  };
 
   if (loading) return <BudgetViewSkeleton />;
 
@@ -79,12 +114,18 @@ export function BudgetView() {
         </div>
       )}
 
-      {/* Category list */}
+      {/* Category list — empty current month offers a rollforward from last month */}
       {categories.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-          <p style={{ fontSize: 32, margin: '0 0 8px' }}>📋</p>
-          <p style={{ fontSize: 14, color: 'var(--c-muted, #9ca3af)', fontWeight: 700 }}>No budget categories set up yet.</p>
-        </div>
+        <BudgetEmptyState
+          monthLabel={formatMonth(currentMonth)}
+          lastMonthLabel={formatMonth(prevMonth)}
+          prevCategoryCount={prevMonthCategories.length}
+          onCopyAll={() => handleCopy(undefined)}
+          onChooseWhich={() => { setCopyError(null); setCopySheetOpen(true); }}
+          onAddManually={() => setSheetOpen(true)}
+          copying={copying}
+          copyError={copyError}
+        />
       ) : (
         <div style={{ background: 'var(--c-card, #fff)', borderRadius: 16, padding: '0 16px', boxShadow: 'var(--c-shadow)' }}>
           {rows.map((row, idx) => (
@@ -100,19 +141,40 @@ export function BudgetView() {
           ))}
         </div>
       )}
-      {/* Add category button */}
-      <button
-        onClick={() => setSheetOpen(true)}
-        style={{ width: '100%', padding: '14px', borderRadius: 12, border: '2px dashed var(--c-primary, #064e3b)', background: 'transparent', color: 'var(--c-primary, #064e3b)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginTop: 24, marginBottom: 16 }}
-      >
-        + Add budget category
-      </button>
+      {/* Add category button — hidden when empty (BudgetEmptyState owns the add CTA) */}
+      {categories.length > 0 && (
+        <button
+          onClick={() => setSheetOpen(true)}
+          style={{ width: '100%', padding: '14px', borderRadius: 12, border: '2px dashed var(--c-primary, #064e3b)', background: 'transparent', color: 'var(--c-primary, #064e3b)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginTop: 24, marginBottom: 16 }}
+        >
+          + Add budget category
+        </button>
+      )}
 
       <AddCategorySheet
         isOpen={sheetOpen}
         onClose={() => setSheetOpen(false)}
         onAdd={addCategory}
       />
+
+      <CopyCategoriesSheet
+        isOpen={copySheetOpen}
+        onClose={() => setCopySheetOpen(false)}
+        lastMonthLabel={formatMonth(prevMonth)}
+        categories={prevMonthCategories}
+        fmt={fmt}
+        onCopy={handleCopy}
+        copying={copying}
+      />
+
+      {copiedCount > 0 && (
+        <Toast
+          message={`Copied ${copiedCount} budget ${copiedCount === 1 ? 'category' : 'categories'} to ${formatMonth(currentMonth)}`}
+          actionLabel="Done"
+          onEdit={() => setCopiedCount(0)}
+          onDismiss={() => setCopiedCount(0)}
+        />
+      )}
     </div>
   );
 }

@@ -24,7 +24,7 @@ import { can as canRole } from '../lib/roles';
 
 const BudgetCentreContext = createContext(null);
 
-export function BudgetCentreProvider({ centre, categories, members, currentMemberRole, currentUserId, addCategory, updateCentre, updateCategory, deleteCategory, archiveCentre, permanentDeleteCentre, restoreHub, inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite, centreCount, children }) {
+export function BudgetCentreProvider({ centre, categories, members, currentMemberRole, currentUserId, addCategory, updateCentre, updateCategory, deleteCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth, archiveCentre, permanentDeleteCentre, restoreHub, inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite, centreCount, children }) {
   const fmt = useMemo(
     () => makeFmt(centre?.currency || 'GHS'),
     [centre?.currency]
@@ -51,6 +51,9 @@ export function BudgetCentreProvider({ centre, categories, members, currentMembe
     updateCentre,
     updateCategory,
     deleteCategory,
+    prevMonthCategories,
+    loadPrevMonthCategories,
+    copyCategoriesToMonth,
     archiveCentre,
     permanentDeleteCentre,
     restoreHub,
@@ -62,7 +65,7 @@ export function BudgetCentreProvider({ centre, categories, members, currentMembe
     centreCount,
     fmt,
     getCatIcon,
-  }), [centre, categories, members, currentMemberRole, currentUserId, can, addCategory, updateCentre, updateCategory, deleteCategory, archiveCentre, permanentDeleteCentre, restoreHub, inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite, centreCount, fmt, getCatIcon]);
+  }), [centre, categories, members, currentMemberRole, currentUserId, can, addCategory, updateCentre, updateCategory, deleteCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth, archiveCentre, permanentDeleteCentre, restoreHub, inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite, centreCount, fmt, getCatIcon]);
 
   return (
     <BudgetCentreContext.Provider value={value}>

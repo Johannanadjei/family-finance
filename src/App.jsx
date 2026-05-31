@@ -202,6 +202,7 @@ export default function App() {
   const { centres, archivedCentres, plan: userPlan, reload: reloadCentres } = useCentres(user);
   const { centre, categories, members, currentMemberRole,
           addCategory, updateCentre, updateCategory, deleteCategory,
+          prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth,
           archiveCentre, permanentDeleteCentre, restoreHub,
           inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite,
           loading: centreLoading, needsOnboarding, removedFromHub,
@@ -350,6 +351,9 @@ export default function App() {
       updateCentre={updateCentre}
       updateCategory={updateCategory}
       deleteCategory={deleteCategory}
+      prevMonthCategories={prevMonthCategories}
+      loadPrevMonthCategories={loadPrevMonthCategories}
+      copyCategoriesToMonth={copyCategoriesToMonth}
       archiveCentre={handleArchiveHub}
       permanentDeleteCentre={handlePermanentDeleteHub}
       restoreHub={handleRestoreHub}

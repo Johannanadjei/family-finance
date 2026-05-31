@@ -54,11 +54,28 @@ data debris.
 
 ## formatMonth helper duplication — POST-MVP code quality
 
-The `formatMonth(ym)` helper is defined identically in 4 view files:
-`IncomeSourcesSection.jsx`, `LogView.jsx`, `DailyView.jsx`, `PaydayView.jsx`. Pure
-display helper (`'YYYY-MM'` → `"Month Year"` via `toLocaleDateString`), no business
-logic. Should live in `lib/dates.js` alongside the other month helpers
-(`getCurrentMonth`, `isPastMonth`).
+The `formatMonth(ym)` helper is defined identically in 5 view files:
+`IncomeSourcesSection.jsx`, `LogView.jsx`, `DailyView.jsx`, `PaydayView.jsx`,
+`BudgetView.jsx`. Pure display helper (`'YYYY-MM'` → `"Month Year"` via
+`toLocaleDateString`), no business logic. Should live in `lib/dates.js` alongside
+the other month helpers (`getCurrentMonth`, `isPastMonth`).
 
 **Schedule:** post-MVP code cleanup. Low priority — works correctly today, just
-duplicated across four files.
+duplicated across five files.
+
+---
+
+## Phase 2D — Settings categories all-months parity — POST-2C
+
+Budget categories are month-scoped (like income sources), but Settings still shows
+only the current month's categories (`SettingsView` → `CategorySettingsRow`), unlike
+income which has the all-months segmented `IncomeSourcesSection`. Build a
+`BudgetCategoriesSection` that mirrors `IncomeSourcesSection`: month-grouped,
+collapsible sections, add-to-specific-month picker.
+
+Pairs with the OQ1-B option (load all-months categories into `useBudgetCentre`,
+derive a current-month slice) — only worth doing when this Settings view lands,
+since BudgetView itself stays current-month-only.
+
+**Schedule:** post-2C. Low priority — rollforward (2C) covers the new-month gap;
+this is editing-parity polish.

@@ -22,7 +22,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getCentreById, getFirstCentre, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
-import { getCategories, addCategory as addCategoryService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
+import { getCategories, addCategory as addCategoryService, bulkAddCategories as bulkAddCategoriesService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
 import { getMembers, addMember as addMemberService, removeMember as removeMemberService, updateMemberRole as updateMemberRoleService } from '../services/members.service';
 import { createInvite as createInviteService, getHubInvites as getHubInvitesService, cancelInvite as cancelInviteService } from '../services/invites.service';
 import { getUserSession } from '../services/auth.service';
@@ -33,6 +33,10 @@ import { waitForSession } from '../lib/auth';
 export function useBudgetCentre(user, centreId) {
   const [centre,            setCentre]            = useState(null);
   const [categories,        setCategories]        = useState([]);
+  // Previous month's categories — loaded on demand (Phase 2C) when the current
+  // month's budget is empty, to drive the rollforward prompt + copy sheet. Kept
+  // separate from `categories` (current month only); see loadPrevMonthCategories.
+  const [prevMonthCategories, setPrevMonthCategories] = useState([]);
   const [members,           setMembers]           = useState([]);
   const [currentMemberRole, setCurrentMemberRole] = useState('standard');
   const [loading,           setLoading]           = useState(true);
@@ -210,6 +214,60 @@ export function useBudgetCentre(user, centreId) {
     return { error: null };
   }, [categories]);
 
+  // Load the previous month's categories into `prevMonthCategories` (Phase 2C).
+  // BudgetView fires this when the current month's budget is empty — the result
+  // drives State 1 vs 2/3 of the rollforward prompt and the copy sheet's list.
+  const loadPrevMonthCategories = useCallback(async (prevMonth) => {
+    const id = centre?.id;
+    if (!id) return { data: [], error: null };
+    const { data, error } = await getCategories(id, prevMonth);
+    if (error) {
+      console.error('[useBudgetCentre] loadPrevMonthCategories error:', error.message);
+      return { data: null, error };
+    }
+    setPrevMonthCategories(data || []);
+    return { data: data || [], error: null };
+  }, [centre?.id]);
+
+  // Roll the budget plan forward (Phase 2C). Copies the recurring shape of each
+  // previous-month category (name/icon/amount/is_fixed/sort_order) into `toMonth`
+  // as a fresh row. `categoryIds` omitted → copy all; an array → only that subset.
+  // Sources from the already-loaded `prevMonthCategories`. Optimistic N-row insert
+  // (each keyed by a tempId), the whole block swapped for server rows on success
+  // and removed on failure — mirrors useIncomeMutations.copyIncomeSourcesToMonth.
+  const copyCategoriesToMonth = useCallback(async (fromMonth, toMonth, categoryIds) => {
+    const id = centre?.id;
+    if (!id) return { data: null, error: new Error('No active centre') };
+
+    const toCopy = prevMonthCategories.filter(c =>
+      c.month === fromMonth && !c.deleted_at && (!categoryIds || categoryIds.includes(c.id))
+    );
+    if (toCopy.length === 0) return { data: [], error: null };   // nothing to copy — not an error
+
+    const newRows = toCopy.map(c => ({
+      name:          c.name,
+      icon:          c.icon,
+      budget_amount: c.budget_amount,
+      is_fixed:      c.is_fixed,
+      sort_order:    c.sort_order,
+      month:         toMonth,
+    }));
+
+    const optimistic = newRows.map(r => ({ ...r, id: crypto.randomUUID(), budget_centre_id: id, _optimistic: true }));
+    const tempIds    = new Set(optimistic.map(o => o.id));
+    setCategories(prev => [...prev, ...optimistic]);
+
+    const { data, error } = await bulkAddCategoriesService(id, newRows);
+    if (error) {
+      setCategories(prev => prev.filter(c => !tempIds.has(c.id)));
+      console.error('[useBudgetCentre] copyCategoriesToMonth rollback:', error.message);
+      return { data: null, error };
+    }
+
+    setCategories(prev => [...prev.filter(c => !tempIds.has(c.id)), ...(data || []).map(d => ({ ...d, _optimistic: false }))]);
+    return { data: data || [], error: null };
+  }, [centre?.id, prevMonthCategories]);
+
   const archiveCentre = useCallback(async (centreId) => {
     const { error } = await archiveCentreService(centreId);
     if (error) console.error('[useBudgetCentre] archiveCentre error:', error.message);
@@ -281,6 +339,9 @@ export function useBudgetCentre(user, centreId) {
     updateCentre,
     updateCategory,
     deleteCategory,
+    prevMonthCategories,
+    loadPrevMonthCategories,
+    copyCategoriesToMonth,
     archiveCentre,
     permanentDeleteCentre,
     restoreHub,
