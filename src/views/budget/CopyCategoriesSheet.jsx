@@ -51,6 +51,7 @@ export function CopyCategoriesSheet({ isOpen, onClose, lastMonthLabel, categorie
         role="dialog"
         aria-label={`Copy budget from ${lastMonthLabel}`}
         data-testid="copy-categories-sheet"
+        data-modal-scrollable="true"
         style={{
           position: 'fixed', bottom: 0, left: 'max(0px, calc(50vw - 220px))',
           width: '100%', maxWidth: 440, background: 'var(--c-card, #fff)',

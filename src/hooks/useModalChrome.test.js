@@ -177,4 +177,125 @@ describe('useModalChrome', () => {
     newHub.unmount();
     back.mockRestore();
   });
+
+  // ── iOS touchmove scroll-lock ───────────────────────────────────────────────
+  // overflow:hidden doesn't stop iOS Safari's rubber-band/momentum scroll. While
+  // a modal is open on iOS we add a non-passive touchmove listener that blocks
+  // scroll EXCEPT inside an opted-in [data-modal-scrollable] container.
+  const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15';
+  const IPAD_UA   = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15'; // iPadOS-as-Mac
+  const origUA    = window.navigator.userAgent;
+  const origMTP   = window.navigator.maxTouchPoints;
+
+  function setNavigator(ua, maxTouchPoints = 0) {
+    Object.defineProperty(window.navigator, 'userAgent',      { value: ua,             configurable: true });
+    Object.defineProperty(window.navigator, 'maxTouchPoints', { value: maxTouchPoints, configurable: true });
+  }
+  function restoreNavigator() {
+    Object.defineProperty(window.navigator, 'userAgent',      { value: origUA,  configurable: true });
+    Object.defineProperty(window.navigator, 'maxTouchPoints', { value: origMTP, configurable: true });
+  }
+  // Dispatch a cancelable touchmove from `target` (bubbles to document) and report
+  // whether the handler called preventDefault.
+  function fireTouchMove(target, touchCount = 1) {
+    const evt = new Event('touchmove', { bubbles: true, cancelable: true });
+    Object.defineProperty(evt, 'touches', { value: Array.from({ length: touchCount }, () => ({})) });
+    act(() => { target.dispatchEvent(evt); });
+    return evt.defaultPrevented;
+  }
+
+  describe('iOS touchmove scroll-lock', () => {
+    afterEach(() => restoreNavigator());
+
+    it('attaches a non-passive touchmove listener on open (iOS)', () => {
+      setNavigator(IPHONE_UA);
+      const add = vi.spyOn(document, 'addEventListener');
+      renderHook(() => useModalChrome({ isOpen: true, onClose: vi.fn() }));
+      const call = add.mock.calls.find(([type]) => type === 'touchmove');
+      expect(call).toBeTruthy();
+      expect(call[2]).toEqual({ passive: false });
+      add.mockRestore();
+    });
+
+    it('removes the touchmove listener on last close (iOS)', () => {
+      setNavigator(IPHONE_UA);
+      const remove = vi.spyOn(document, 'removeEventListener');
+      const { rerender } = renderHook(
+        ({ isOpen }) => useModalChrome({ isOpen, onClose: vi.fn() }),
+        { initialProps: { isOpen: true } }
+      );
+      rerender({ isOpen: false });
+      expect(remove.mock.calls.some(([type]) => type === 'touchmove')).toBe(true);
+      remove.mockRestore();
+    });
+
+    it('does NOT attach a touchmove listener on non-iOS', () => {
+      setNavigator('Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36');
+      const add = vi.spyOn(document, 'addEventListener');
+      renderHook(() => useModalChrome({ isOpen: true, onClose: vi.fn() }));
+      expect(add.mock.calls.some(([type]) => type === 'touchmove')).toBe(false);
+      add.mockRestore();
+    });
+
+    it('detects iPadOS-as-Mac via maxTouchPoints + Mac UA', () => {
+      setNavigator(IPAD_UA, 5);
+      const add = vi.spyOn(document, 'addEventListener');
+      renderHook(() => useModalChrome({ isOpen: true, onClose: vi.fn() }));
+      expect(add.mock.calls.some(([type]) => type === 'touchmove')).toBe(true);
+      add.mockRestore();
+    });
+
+    it('preventDefault when the touch has no scrollable ancestor', () => {
+      setNavigator(IPHONE_UA);
+      renderHook(() => useModalChrome({ isOpen: true, onClose: vi.fn() }));
+      const plain = document.createElement('div');
+      document.body.appendChild(plain);
+      expect(fireTouchMove(plain)).toBe(true);
+      plain.remove();
+    });
+
+    it('does NOT preventDefault when the touch is inside a [data-modal-scrollable] ancestor', () => {
+      setNavigator(IPHONE_UA);
+      renderHook(() => useModalChrome({ isOpen: true, onClose: vi.fn() }));
+      const scrollable = document.createElement('div');
+      scrollable.setAttribute('data-modal-scrollable', 'true');
+      const child = document.createElement('button');
+      scrollable.appendChild(child);
+      document.body.appendChild(scrollable);
+      expect(fireTouchMove(child)).toBe(false);
+      scrollable.remove();
+    });
+
+    it('ignores multi-touch (pinch-zoom) — no preventDefault', () => {
+      setNavigator(IPHONE_UA);
+      renderHook(() => useModalChrome({ isOpen: true, onClose: vi.fn() }));
+      const plain = document.createElement('div');
+      document.body.appendChild(plain);
+      expect(fireTouchMove(plain, 2)).toBe(false);
+      plain.remove();
+    });
+
+    it('ref-counts: two modals attach the listener once; removed only on last close', () => {
+      setNavigator(IPHONE_UA);
+      const add    = vi.spyOn(document, 'addEventListener');
+      const remove = vi.spyOn(document, 'removeEventListener');
+      const a = renderHook(
+        ({ isOpen }) => useModalChrome({ isOpen, onClose: vi.fn() }),
+        { initialProps: { isOpen: true } }
+      );
+      const b = renderHook(
+        ({ isOpen }) => useModalChrome({ isOpen, onClose: vi.fn() }),
+        { initialProps: { isOpen: true } }
+      );
+      expect(add.mock.calls.filter(([type]) => type === 'touchmove').length).toBe(1);
+
+      a.rerender({ isOpen: false });
+      expect(remove.mock.calls.some(([type]) => type === 'touchmove')).toBe(false); // still locked
+
+      b.rerender({ isOpen: false });
+      expect(remove.mock.calls.filter(([type]) => type === 'touchmove').length).toBe(1);
+      add.mockRestore();
+      remove.mockRestore();
+    });
+  });
 });

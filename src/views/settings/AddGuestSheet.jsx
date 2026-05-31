@@ -60,7 +60,7 @@ export function AddGuestSheet({ isOpen, onClose, onSave, categories = [], editGu
   return createPortal(
     <>
       <div onClick={onClose} aria-hidden="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 440 }} />
-      <div role="dialog" aria-label={isEditing ? 'Edit guest' : 'Add guest'} style={{ position: 'fixed', bottom: 0, left: 'max(0px, calc(50vw - 220px))', width: '100%', maxWidth: 440, background: 'var(--c-modal-bg, var(--c-card, #fff))', borderRadius: '20px 20px 0 0', padding: '24px 20px calc(24px + env(safe-area-inset-bottom))', zIndex: 450, boxShadow: '0 -8px 32px rgba(0,0,0,.12)', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div role="dialog" aria-label={isEditing ? 'Edit guest' : 'Add guest'} data-modal-scrollable="true" style={{ position: 'fixed', bottom: 0, left: 'max(0px, calc(50vw - 220px))', width: '100%', maxWidth: 440, background: 'var(--c-modal-bg, var(--c-card, #fff))', borderRadius: '20px 20px 0 0', padding: '24px 20px calc(24px + env(safe-area-inset-bottom))', zIndex: 450, boxShadow: '0 -8px 32px rgba(0,0,0,.12)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ width: 40, height: 4, background: 'var(--c-border, #e5e7eb)', borderRadius: 2, margin: '0 auto 20px' }} />
         <p style={{ fontSize: 18, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 20px' }}>
           {isEditing ? 'Edit Guest' : 'Add Guest'}

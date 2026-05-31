@@ -82,7 +82,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
         </div>
 
         {/* Centre list */}
-        <div style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
+        <div data-modal-scrollable="true" style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
           {centres.map(c => {
             const active  = c.id === activeCentreId;
             const hovered = hoveredRow === c.id && !active;

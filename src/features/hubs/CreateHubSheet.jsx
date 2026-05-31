@@ -101,7 +101,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
     <>
       <div onClick={handleClose} aria-hidden="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 500 }} />
 
-      <div role="dialog" aria-modal="true" style={{
+      <div role="dialog" aria-modal="true" data-modal-scrollable="true" style={{
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: 440, maxHeight: '92vh',
         background: 'var(--c-card, #fff)', borderRadius: '20px 20px 0 0',

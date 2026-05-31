@@ -1,4 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* iOS: kill pull-to-refresh + scroll-chaining at the root (pairs with the modal
+   touchmove lock in useModalChrome). No app surface uses native pull-to-refresh. */
+html, body { overscroll-behavior: none; }
 body { font-family: 'Nunito', sans-serif; -webkit-font-smoothing: antialiased; background: var(--c-bg, #f3f4f6); }
 input, button, select, textarea { font-family: inherit; }
 button { cursor: pointer; }

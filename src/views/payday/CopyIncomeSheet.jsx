@@ -52,6 +52,7 @@ export function CopyIncomeSheet({ isOpen, onClose, lastMonthLabel, sources = [],
         role="dialog"
         aria-label={`Copy income from ${lastMonthLabel}`}
         data-testid="copy-income-sheet"
+        data-modal-scrollable="true"
         style={{
           position: 'fixed', bottom: 0, left: 'max(0px, calc(50vw - 220px))',
           width: '100%', maxWidth: 440, background: 'var(--c-card, #fff)',

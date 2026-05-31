@@ -18,6 +18,30 @@
 import { useEffect, useRef } from 'react';
 
 const ROOT_ID = 'app-shell';
+const SCROLLABLE_ATTR = 'data-modal-scrollable';
+
+// Evaluated lazily (not a cached module const) so unit tests can stub
+// navigator.userAgent per-case. Catches iPhone/iPod/iPad plus iPadOS 13+, which
+// reports a desktop "Macintosh" UA but exposes touch via maxTouchPoints.
+const isIOS = () => {
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.maxTouchPoints > 1 && /Mac/.test(ua));
+};
+
+// While a modal is open on iOS, block touch-scroll EXCEPT inside an opted-in
+// [data-modal-scrollable] container. overflow:hidden + inert do not stop iOS
+// Safari's rubber-band/momentum scroll or pull-to-refresh; only preventing the
+// touchmove does. Must be registered non-passive ({ passive: false }) — a passive
+// listener cannot call preventDefault.
+function handleTouchMove(e) {
+  if (e.touches.length > 1) return; // pinch-zoom: let the browser handle it
+  let el = e.target;
+  while (el && el !== document.body) {
+    if (el.getAttribute?.(SCROLLABLE_ATTR) === 'true') return; // inner scroll allowed
+    el = el.parentElement;
+  }
+  e.preventDefault();
+}
 
 // Module-level coordinator — shared across every modal instance (and across
 // StrictMode's transient setup→cleanup→setup remount, where per-instance refs
@@ -45,6 +69,7 @@ export function useModalChrome({ isOpen, onClose }) {
         savedOverflow = body.style.overflow;
         body.style.overflow = 'hidden';
         if (root) root.inert = true;
+        if (isIOS()) document.addEventListener('touchmove', handleTouchMove, { passive: false });
       }
       openCount += 1;
     }
@@ -70,6 +95,7 @@ export function useModalChrome({ isOpen, onClose }) {
           body.style.overflow = savedOverflow ?? '';
           savedOverflow = null;
           if (root) root.inert = false;
+          if (isIOS()) document.removeEventListener('touchmove', handleTouchMove, { passive: false });
         }
       }
 

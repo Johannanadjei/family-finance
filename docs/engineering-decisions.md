@@ -2121,3 +2121,74 @@ headroom) rather than exactly on 200.
   (`getByText('Money B.O.S')`) threw against pre-fix code, passed after.
 - JoinView 199 lines (< 200, audit passes). New component has its own test; no
   console.log; AuthScreen untouched (no sign-in regression surface).
+
+---
+
+## [2026-05-31] iOS modal scroll-lock — touchmove preventer + overscroll-behavior
+
+**Context:**
+`useModalChrome` (4c9837e) locked background scroll with `body.style.overflow =
+'hidden'` + `inert` on `#app-shell`. That holds on Android/desktop but iOS Safari
+only partially honours `overflow: hidden`: rubber-band/momentum overscroll and
+pull-to-refresh still fire, so the background pans behind an open modal and
+pull-to-refresh triggers from inside one. `inert` is not a scroll primitive —
+it blocks pointer/focus/a11y, not WebView momentum. Touch-level prevention is the
+only thing iOS respects, and there was none.
+
+**Decision:**
+Two complementary layers, shipped together:
+
+1. **CSS baseline (not gated):** `html, body { overscroll-behavior: none; }` in
+   index.css. Kills pull-to-refresh and scroll-chaining at the root on every
+   browser that supports it (iOS Safari 16+, all evergreen). No app surface uses
+   native pull-to-refresh, so this is safe globally. Because it is NOT iOS-gated,
+   it also protects iPadOS even when UA detection misses it.
+
+2. **iOS touchmove preventer (gated, ref-counted):** while any modal is open on
+   iOS, a non-passive `touchmove` listener on `document` calls `preventDefault()`
+   UNLESS the touch target has a `[data-modal-scrollable="true"]` ancestor — an
+   explicit opt-in that preserves inner scroll. Wired into the existing `openCount`
+   coordinator: attached on the first open (0→1), removed on the last close (1→0),
+   same lifecycle as the overflow lock. `{ passive: false }` is mandatory — a
+   passive listener cannot preventDefault.
+
+**Key design choices:**
+- **`isIOS()` is a lazy function, not a cached module const.** A const evaluated at
+  import freezes before tests can stub `navigator.userAgent`; a function re-reads it
+  at each `openCount` transition (negligible cost, rare) and is trivially testable.
+- **iPadOS-as-Mac detection:** `/iPad|iPhone|iPod/.test(ua) || (maxTouchPoints > 1
+  && /Mac/.test(ua))` — iPad 13+ reports a desktop Macintosh UA but shares the iOS
+  scroll-lock problem. Avoids a detection-asymmetry bug.
+- **Opt-in via data attribute, not heuristic scroll-detection.** Walking ancestors
+  for `data-modal-scrollable` is deterministic and cheap; "can this element scroll
+  this direction right now?" math is fiddly and error-prone. 6 sheets opted in:
+  AddTransactionSheet, AddGuestSheet, CreateHubSheet, CopyIncomeSheet,
+  CopyCategoriesSheet, and SidePanel (attr on its inner scroll div, not the dialog
+  root). The 5 non-scrolling sheets (AddCategorySheet, UpdateReceivedSheet,
+  ConfirmSheet, ArchiveHubSheet, InstallBanners) need nothing.
+- **Pinch-zoom guard:** `e.touches.length > 1` bails so native pinch works.
+  `e.scale` is a non-standard iOS-only GestureEvent property — not used.
+
+iOS keyboard-focus viewport shift is a SEPARATE issue, deferred to backlog.
+
+**Rules derived:**
+- Body scroll-lock on iOS requires a non-passive touchmove preventer; `overflow:
+  hidden` alone is insufficient. Pair it with `overscroll-behavior` for
+  pull-to-refresh.
+- Gate platform checks behind lazily-evaluated functions, never import-time consts,
+  so they remain unit-testable.
+- Allow inner modal scroll via explicit `data-modal-scrollable` opt-in, not runtime
+  scroll-capability heuristics.
+
+### Verification
+
+- Red-first: wiring (listener attach/remove, iPad detection, ref-count) and handler
+  logic (preventDefault with no scrollable ancestor) all failed against the
+  touch-less hook, passed after. The negative guards (non-iOS no-attach,
+  preventDefault skipped inside scrollable, multi-touch bypass) stay green. In
+  useModalChrome.test.js (9 → 17 tests).
+- jsdom cannot exercise real iOS momentum or the CSS layer — those require device
+  verification (Phase 6: real iPhone AND iPad, given the augmented detection):
+  background doesn't pan behind any modal, inner scroll still works in the 6
+  opted-in sheets, pull-to-refresh inside a modal does nothing, normal scroll
+  resumes on close.

@@ -95,3 +95,20 @@ the sign-in path as part of that change.
 
 **Schedule:** post-MVP code cleanup. Low priority — both copies render identically
 today; this removes the duplication.
+
+---
+
+## iOS keyboard focus pushes modal under the keyboard — POST-MVP
+
+On iOS Safari, focusing an `input`/`textarea` inside a bottom-sheet modal opens the
+on-screen keyboard, which shifts the visual viewport up and can slide the
+`position: fixed` modal partly under the keyboard (the focused field ends up
+obscured). Distinct from the scroll-lock work (touchmove + overscroll-behavior,
+commit branding the join flow's successor) — that prevents background scroll, not
+keyboard-driven viewport shift.
+
+**What:** Likely a `visualViewport` resize listener that re-anchors the sheet above
+the keyboard, or `scrollIntoView` on focus. Needs real-device iteration.
+
+**Schedule:** post-MVP. Not blocking — fields are reachable; the field can just be
+briefly obscured on small screens.
