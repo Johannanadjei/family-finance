@@ -1698,3 +1698,79 @@ So at ~75% spend the per-category Budget bars were amber while the Home aggregat
 - npm test: 981 passed (974 → 981, +7 net).
 - bash scripts/audit.sh: 192/192 passed.
 - Triple-check (§9.5): new `CategorySettingsRow` `useState`s declared with the others before any return (no conditional hooks; component uses ternary, not early return); props-only components, no context/Supabase/permission changes; `cat.icon` guarded with `|| '💸'`; `CategoryBudgetRow` stays pure-display (imports a pure lib fn, `pctUsed` still arrives as a prop); zero console.log.
+
+---
+
+## 2026-05-31 — income-source-fk: durable FK from income txs to their source
+
+Batch fix for three combined defects, all rooted in the same fragile link between
+an `income_sources` row and the income transaction `markReceived` creates for it.
+Pre-fix, the only link was a **string match** — `tx.category_name === income.label`
+AND `tx.source === 'main_app'`. That string is mutable, so it broke three ways:
+
+- **Bug A — edit amount duplicated income.** `SettingsView` edited income sources
+  via `updateIncomeSource` sourced from **`BudgetCentreContext`**, a thin pass-through
+  to the service with **no optimistic state and no tx reconciliation**. Editing a
+  *received* source's amount left the linked income tx at the old amount, so Home's
+  transaction-derived `allIncome` showed the stale figure (and any flow that re-derived
+  could read new+old).
+- **Bug A2 — label edit orphaned the tx.** Renaming a source changed `label` but not
+  the already-written `tx.category_name`. The string match then missed its own tx:
+  `markPending` couldn't find it to remove, and a re-confirm inserted a second tx →
+  **doubled income**.
+- **Bug B — delete left stale tx.** `deleteIncomeSource` soft-deleted only the source
+  row. Its income tx survived, so `allIncome` never dropped — phantom income.
+
+**Decision (locked with user): replace the string match with a real foreign key.**
+Add `transactions.income_source_id uuid` → `income_sources(id)`, `ON DELETE SET NULL`
+(soft-delete is the operative path; SET NULL is a defensive backstop that preserves
+the tx as audit history if a source is ever hard-deleted — CASCADE would destroy it).
+All reconciliation now matches by FK (`tx.income_source_id === sourceId`), which is
+immutable across label/amount edits.
+
+**Production migration** (`scripts/migrate_income_source_fk.sql`, applied via Supabase
+SQL Editor **before** deploying code): add nullable column → dry-run preview counts →
+backfill only unambiguous `markReceived`-style rows (`category_name = label` AND
+`description = label || ' received'`, skipping labels that map to >1 live source) →
+add FK constraint + `idx_transactions_income_source_id`. Backfill linked 7 historical
+income transactions. The column is nullable so old code kept working between migration
+and deploy (inert-column deploy ordering).
+
+**Code changes:**
+- `src/lib/validation.js` — `validateTransaction` whitelists `income_source_id`
+  (validated UUID or null), so it isn't stripped pre-insert. Null for expenses and
+  manually-logged income.
+- `src/hooks/useIncomeMutations.js` (**new**) — income mutations extracted out of
+  `useFinance` to keep that hook within its size budget. Owns no state; receives
+  `incomes/txs` + setters. `markReceived` writes the FK on the tx; `markPending`
+  finds the tx by FK; new optimistic `updateIncomeSource` reconciles the linked tx
+  amount when a received source's amount changes (two-phase, both roll back);
+  `deleteIncomeSource` is now two-phase soft-delete (source + linked tx). All follow
+  the §5 optimistic-update + rollback pattern.
+- `src/hooks/useFinance.js` — delegates the six income mutations to
+  `useIncomeMutations`; `updateIncomeSource` added to the returned value.
+- `src/views/SettingsView.jsx` — `updateIncomeSource` now sourced from
+  **`useFinanceContext`** (live, optimistic) instead of `useBudgetCentreContext`.
+- Dead `updateIncomeSource` removed from `useBudgetCentre.js`, `BudgetCentreContext.jsx`,
+  and `App.jsx` (the static-config context never owned live financial state — §2).
+- `src/test-utils/contextMocks.js` + `SettingsView.test.jsx` — added `updateIncomeSource`
+  to the finance mock.
+
+**Rule derived:** an income transaction is linked to its source by the
+`income_source_id` FK — **never** by `category_name` string match. Any new flow that
+relates the two matches by FK. Live financial mutations live in the finance hook /
+context, never in `BudgetCentreContext` (static centre config only).
+
+**Verification:**
+- 3 regression tests (`src/hooks/useFinance.income-mutations.test.js`): T1 edit-amount
+  (allIncome = new, not new+old), T2 label-rename orphan sequence (markPending+re-confirm
+  by FK = single income, not double), T3 delete (linked tx soft-deleted, allIncome → 0).
+  T2 is genuinely red on pre-fix code — it sets up the renamed-label orphan state the
+  string match cannot resolve.
+- npm test: 984 passed (981 → 984, +3).
+- bash scripts/audit.sh: 194/194 passed.
+- Triple-check (§9.5): `SettingsView` `can('settings')` guard sits after all hooks
+  (hooks-order safe); both contexts fully destructured (`updateIncomeSource` moved to
+  the finance destructure); every service call in `useIncomeMutations` destructures
+  `error`; `crypto.randomUUID()` temp-id + `_optimistic` flag preserved; no new
+  permission keys; zero console.log; finance mock carries `updateIncomeSource`.

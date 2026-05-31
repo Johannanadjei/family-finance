@@ -201,7 +201,7 @@ export default function App() {
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
   const { centres, archivedCentres, plan: userPlan, reload: reloadCentres } = useCentres(user);
   const { centre, categories, members, currentMemberRole,
-          addCategory, updateCentre, updateCategory, deleteCategory, updateIncomeSource,
+          addCategory, updateCentre, updateCategory, deleteCategory,
           archiveCentre, permanentDeleteCentre, restoreHub,
           inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite,
           loading: centreLoading, needsOnboarding, removedFromHub,
@@ -350,7 +350,6 @@ export default function App() {
       updateCentre={updateCentre}
       updateCategory={updateCategory}
       deleteCategory={deleteCategory}
-      updateIncomeSource={updateIncomeSource}
       archiveCentre={handleArchiveHub}
       permanentDeleteCentre={handlePermanentDeleteHub}
       restoreHub={handleRestoreHub}

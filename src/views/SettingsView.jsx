@@ -23,8 +23,8 @@ const inputStyle   = { width: '100%', padding: '10px 12px', borderRadius: 10, bo
 export function SettingsView() {
   const navigate  = useNavigate();
   const { signOut }                                                            = useAuth();
-  const { categories, fmt, addCategory, updateCategory, deleteCategory, updateIncomeSource, centre, can } = useBudgetCentreContext();
-  const { incomes, loading, addIncomeSource, deleteIncomeSource }             = useFinanceContext();
+  const { categories, fmt, addCategory, updateCategory, deleteCategory, centre, can } = useBudgetCentreContext();
+  const { incomes, loading, addIncomeSource, deleteIncomeSource, updateIncomeSource } = useFinanceContext();
 
   const [addCatOpen,      setAddCatOpen]      = useState(false);
   const [addingSource,    setAddingSource]    = useState(false);

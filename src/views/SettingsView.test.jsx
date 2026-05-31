@@ -15,6 +15,7 @@ const mockDeleteCategory     = vi.fn().mockResolvedValue({ error: null });
 const mockAddCategory        = vi.fn().mockResolvedValue({ error: null });
 const mockAddIncomeSource    = vi.fn().mockResolvedValue({ error: null });
 const mockDeleteIncomeSource = vi.fn().mockResolvedValue({ error: null });
+const mockUpdateIncomeSource = vi.fn().mockResolvedValue({ error: null });
 const mockSignOut            = vi.fn().mockResolvedValue(undefined);
 const mockGetInvites         = vi.fn().mockResolvedValue({ data: [], error: null });
 const mockInviteMember       = vi.fn().mockResolvedValue({ data: { token: 'tok' }, error: null });
@@ -53,6 +54,7 @@ vi.mock('../context/FinanceContext', () => ({
     saveThemeSkin:       vi.fn(),
     addIncomeSource:     mockAddIncomeSource,
     deleteIncomeSource:  mockDeleteIncomeSource,
+    updateIncomeSource:  mockUpdateIncomeSource,
     userPlan:            'free',
   }),
 }));

@@ -24,7 +24,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { getCentreById, getFirstCentre, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
 import { getCategories, addCategory as addCategoryService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
 import { getMembers, addMember as addMemberService, removeMember as removeMemberService, updateMemberRole as updateMemberRoleService } from '../services/members.service';
-import { updateIncomeSource as updateIncomeSourceService } from '../services/income.service';
 import { createInvite as createInviteService, getHubInvites as getHubInvitesService, cancelInvite as cancelInviteService } from '../services/invites.service';
 import { getUserSession } from '../services/auth.service';
 import { waitForSession } from '../lib/auth';
@@ -211,15 +210,6 @@ export function useBudgetCentre(user, centreId) {
     return { error: null };
   }, [categories]);
 
-  const updateIncomeSource = useCallback(async (sourceId, updates) => {
-    const { data, error } = await updateIncomeSourceService(sourceId, updates);
-    if (error) {
-      console.error('[useBudgetCentre] updateIncomeSource error:', error.message);
-      return { error };
-    }
-    return { data, error: null };
-  }, []);
-
   const archiveCentre = useCallback(async (centreId) => {
     const { error } = await archiveCentreService(centreId);
     if (error) console.error('[useBudgetCentre] archiveCentre error:', error.message);
@@ -291,7 +281,6 @@ export function useBudgetCentre(user, centreId) {
     updateCentre,
     updateCategory,
     deleteCategory,
-    updateIncomeSource,
     archiveCentre,
     permanentDeleteCentre,
     restoreHub,
