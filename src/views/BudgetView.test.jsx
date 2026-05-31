@@ -49,6 +49,13 @@ describe('BudgetView', () => {
     mockFinance.loading = false;
   });
 
+  it('shows the current month label at the top of the view', () => {
+    renderView();
+    const expected = new Date(getCurrentMonth() + '-01')
+      .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    expect(screen.getByTestId('budget-month-label').textContent).toContain(expected);
+  });
+
   it('shows total planned budget', () => {
     renderView();
     expect(screen.getByTestId('budget-total-planned').textContent).toBe('GHS 700');

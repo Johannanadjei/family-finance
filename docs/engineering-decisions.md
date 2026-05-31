@@ -1994,3 +1994,41 @@ the hook (OQ2). No importers, no test file to update.
   destructured alongside data in `handleCopy`, `loadPrevMonthCategories`, and the
   mutation; `data?.length` optional chaining; new components have tests; zero
   console.log; no new permission keys. BudgetView 180 lines (< 200, no extraction).
+
+---
+
+## [2026-05-31] Static month label on BudgetView (Budget/Home gap closure)
+
+**Context:**
+Payday, Daily, and Log all render a "[Month] YYYY" header (Payday/Daily/Log via
+month-nav rows). BudgetView and HomeView were the two views with no visible month
+indicator. BudgetView is the more confusing gap: users moving from Payday (which
+shows "May 2026" with nav arrows) to Budget had no month context at all, despite
+Budget being month-scoped after the 2A–2C rollforward work.
+
+**Decision:**
+Add a static, centered "[Month] YYYY" label as the first child of BudgetView's
+content root, above the Budget Overview summary card. No nav arrows and not
+tappable — BudgetView stays current-month-only (OQ4 from Phase 2C). Style mirrors
+PaydayHeader's label text exactly (fontSize 16, fontWeight 900, var(--c-text)),
+minus the arrows, so the two views read as intentionally paired.
+
+Reuses the existing module-scope `formatMonth` helper and the in-scope
+`currentMonth` (`getCurrentMonth()`); no new helper copy (the 5-file formatMonth
+duplication remains a separate backlog item).
+
+HomeView's matching gap is deferred to backlog ("Add month label to HomeView —
+POST-MVP") — Home's income card carries implicit month context, so it is
+non-blocking.
+
+**Rules derived:**
+- Month-scoped views should surface the active month explicitly; a static label is
+  sufficient where the view is single-month (no nav).
+- Mirror an existing view's label style token-for-token when pairing two screens.
+
+### Verification
+
+- Red-first: `getByTestId('budget-month-label')` threw against pre-fix BudgetView,
+  passed after. In `BudgetView.test.jsx`.
+- BudgetView 187 lines (< 200). Reuses existing helper + variable — no new hooks,
+  no context destructure change, zero console.log.
