@@ -2073,3 +2073,51 @@ helper duplication).
 - HomeView 134 lines (< 200). No new hooks; `can` already destructured; zero
   console.log. Backlog: HomeView label item removed (closed); formatMonth
   duplication count bumped 5 -> 6.
+
+---
+
+## [2026-05-31] Branded the invite-join flow with a JoinView-local BrandLockup
+
+**Context:**
+The invite-link member-join screen (`JoinView`, mounted at `/join`, bypassing all
+three startup gates) rendered through a single `JoinCard` wrapper with zero
+branding — a plain white card on the green gradient, on every one of its 7 phases.
+By contrast AuthScreen leads with the full Money B.O.S lockup (white icon +
+wordmark + tagline). New members joining a hub landed on an unbranded screen.
+
+**Decision:**
+Add the lockup to `JoinCard` so it brands all 7 phases (loading → invalid →
+wrongEmail → auth → confirm → joining → error) with one insertion. The lockup is a
+new **JoinView-local** sub-component, `src/views/join/BrandLockup.jsx` — NOT a
+shared component used by both AuthScreen and JoinView.
+
+Two forces drove the JoinView-local choice:
+- **Scope/risk:** sharing it would require refactoring AuthScreen and
+  regression-testing the entire sign-in path on launch day. The join-branding
+  change should not touch sign-in. Same principle as the formatMonth decision
+  (2026-05-31): defer the shared-helper extraction to one atomic refactor rather
+  than hoisting piecemeal mid-feature. Backlog item filed.
+- **Line cap forced a split anyway:** `JoinView` was at 199 lines against the hard
+  200-line `views/` audit cap. Inlining the ~13-line lockup → ~213, an audit fail.
+  Extracting the bulk into its own file makes the lockup a 1-line call site.
+
+The lockup hardcodes white (`#fff` / `rgba(255,255,255,…)`) rather than theme
+tokens — correct for a pre-sign-in surface on a fixed green gradient, matching the
+AuthScreen precedent and CLAUDE.md's gradient-overlay exception.
+
+To absorb the +2 net lines from the import + call site (199 → 201, over cap), two
+cosmetic blank separators were trimmed, landing JoinView at 199 (one line of
+headroom) rather than exactly on 200.
+
+**Rules derived:**
+- Brand pre-auth/invite surfaces consistently with AuthScreen's lockup.
+- When a view sits on the 200-line cap, a new visual block goes in its own
+  sub-component file, not inline — the cap is a forcing function for extraction.
+
+### Verification
+
+- Red-first: `BrandLockup.test.jsx` failed on the missing module, then passed
+  (icon/wordmark/tagline). The `JoinView.test.jsx` invalid-phase assertion
+  (`getByText('Money B.O.S')`) threw against pre-fix code, passed after.
+- JoinView 199 lines (< 200, audit passes). New component has its own test; no
+  console.log; AuthScreen untouched (no sign-in regression surface).

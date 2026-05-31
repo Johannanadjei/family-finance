@@ -79,3 +79,19 @@ since BudgetView itself stays current-month-only.
 
 **Schedule:** post-2C. Low priority — rollforward (2C) covers the new-month gap;
 this is editing-parity polish.
+
+---
+
+## Hoist BrandLockup to a shared component (AuthScreen + JoinView duplication) — POST-MVP
+
+`src/views/join/BrandLockup.jsx` duplicates AuthScreen's inline brand lockup
+(`AuthScreen.jsx` — white icon + "Money B.O.S" wordmark + tagline) verbatim. The
+duplication was deliberate: the join-branding commit kept the AuthScreen sign-in
+path untouched to avoid launch-day regression risk.
+
+**What:** Extract one shared lockup (likely `components/ui/BrandLockup.jsx`) and have
+both AuthScreen and JoinView consume it in a single atomic commit. Regression-test
+the sign-in path as part of that change.
+
+**Schedule:** post-MVP code cleanup. Low priority — both copies render identically
+today; this removes the duplication.

@@ -62,6 +62,8 @@ describe('JoinView — invalid invite states', () => {
     vi.stubGlobal('location', { search: '', href: '', pathname: '/join' });
     render(<JoinView />);
     await waitFor(() => expect(screen.getByText(/invalid or expired invite/i)).toBeTruthy());
+    // Brand lockup is rendered by JoinCard on every phase, including invalid
+    expect(screen.getByText('Money B.O.S')).toBeTruthy();
   });
 
   it('renders invalid when getInviteByToken returns null (RLS-blocked or not found)', async () => {

@@ -3,10 +3,11 @@ import { saveActiveCentreId }   from '../lib/storage';
 import { getUserSession, waitForSession, signUpUser, signInUser, signOutUser } from '../services/auth.service';
 import { getInviteByToken, acceptInvite } from '../services/invites.service';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS } from '../lib/roles';
-
+import { BrandLockup } from './join/BrandLockup';
 function JoinCard({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg, var(--c-header-from, #064e3b), var(--c-header-to, #0d7060))', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <BrandLockup />
       <div style={{ width: '100%', maxWidth: 400, background: 'var(--c-card, #fff)', borderRadius: 20, padding: 28, boxShadow: '0 8px 40px rgba(0,0,0,0.2)', fontFamily: "'Nunito', sans-serif" }}>
         {children}
       </div>
@@ -16,7 +17,6 @@ function JoinCard({ children }) {
 
 const inputStyle = { width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 15, fontWeight: 700, marginBottom: 10, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
 const primaryBtn = { width: '100%', padding: 14, borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginBottom: 8 };
-
 export function JoinView() {
   const [token]  = useState(() => new URLSearchParams(window.location.search).get('token'));
 
