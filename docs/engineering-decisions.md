@@ -2347,3 +2347,37 @@ with every prior migration.
 - DB-level invariants (non-overlap, range validity) belong in constraints, not app code.
 - Schema migrations ship as committed `scripts/*.sql` files and are applied manually;
   code commit and live-DB application are decoupled steps.
+
+---
+
+## [2026-06-01] Commit 2 — Budget Cycles FK columns + backfill (irreversible gate #1)
+
+**Context:**
+Second Cycles commit and the first irreversible gate (v1.2 F2). Adds nullable
+cycle_id FK columns (ON DELETE SET NULL) + indexes to transactions, income_sources,
+and budget_categories, then backfills them from a one-time calendar-cycle backfill.
+Production diagnostics (run pre-design) confirmed it safe: zero NULL months in live
+data, 77/325 live transactions, date span 2026-02-08 → 2026-06-01, one orphan tx.
+
+**Decisions:**
+- Cycles are seeded from income_sources ∪ budget_categories ∪ transactions (live
+  rows) so EVERY live transaction gets a cycle — including the one orphan tx whose
+  month had no income/category. Expected: 22 cycles.
+- Backfill is atomic (single BEGIN/COMMIT) with hard pre/post-flight DO-block
+  asserts that RAISE EXCEPTION on any anomaly (missing cycle_id columns, NULL months,
+  non-empty table, or any live orphan after backfill) — so the entire migration,
+  cycle inserts included, rolls back on the slightest deviation. Fail-loud, all-or-nothing.
+- Non-overlap holds without special handling: discrete daterange('[]') canonicalizes
+  to '[)', so adjacent calendar months don't overlap and the Commit-1 exclusion
+  constraint never fires during seeding.
+- Soft-deleted rows also receive cycle_id (audit symmetry) but do NOT seed cycles;
+  deleted-only-month rows stay NULL by design.
+- Two files: migrate_cycles_fk_columns.sql (additive, idempotent, safe anytime) and
+  migrate_cycles_backfill.sql (single-run, guarded against re-run, with a documented
+  manual-rollback header and a pre-flight column-existence check). Code commit and
+  live-DB application stay decoupled; AJ runs file 1 then file 2 manually.
+
+**Rules derived:**
+- Irreversible data migrations are wrapped in one transaction with RAISE EXCEPTION
+  pre/post asserts so an anomaly aborts cleanly rather than half-applying.
+- Seed-from-all-sources guarantees no live row is left unattributed after a backfill.
