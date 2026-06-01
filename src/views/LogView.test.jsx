@@ -3,7 +3,7 @@
  * Written before LogView.jsx — TDD.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen }           from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { LogView }                  from './LogView';
@@ -35,7 +35,14 @@ const renderView = (props = {}) =>
 const standardCan = (p) => p === 'log';
 
 describe('LogView', () => {
-  beforeEach(() => { mockCan = () => true; });
+  // Freeze the clock to mid-May so getCurrentMonth() === the mock's activeMonth
+  // ('2026-05'); month-sensitive assertions must not depend on the real date.
+  beforeEach(() => {
+    mockCan = () => true;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
+  });
+  afterEach(() => { vi.useRealTimers(); });
   it('shows skeleton when loading', () => {
     mockFinance.loading = true;
     const { container } = renderView();

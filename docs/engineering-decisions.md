@@ -2248,3 +2248,34 @@ Keeping these untouched held the commit-1 blast radius to the hook + service onl
   restores all 4 rows including LAST_MONTH (would fail if snapshotting the 2-row
   slice). The hook test was red on the unmocked `getAllCategories` until the mock
   landed (red-first on the load switch). 1084 tests pass.
+
+---
+
+## [2026-06-01] Test clocks must be frozen for date-sensitive assertions
+
+**Context:**
+On 2026-06-01 the suite showed 12 failures with no code change. Cause: view tests
+hardcoded `activeMonth: '2026-05'` in their finance mocks and asserted current-month
+behaviour (next-month nav disabled, current-week highlight, payday current-month
+totals/rollforward). Those assertions compare against `getCurrentMonth()`, which reads
+the real clock — so once the calendar rolled from May into June, `'2026-05'` became a
+*past* month and the assertions flipped. The failures were purely environmental: clean
+HEAD `fe95ac7` reproduced all 12 when run on/after June 1.
+
+**Decision:**
+Any test that makes a date-sensitive assertion freezes the clock. DailyView, LogView,
+WeeklySummaryBar and PaydayView now call `vi.useFakeTimers({ shouldAdvanceTime: true })`
++ `vi.setSystemTime(new Date('2026-05-15T00:00:00Z'))` in `beforeEach`, with
+`vi.useRealTimers()` in `afterEach`. Mid-May is chosen so `getCurrentMonth()` matches the
+mocks' default `activeMonth` of `'2026-05'`. `shouldAdvanceTime: true` lets async
+`waitFor` polling proceed while the wall-clock month stays pinned. PaydayView's existing
+per-test timer calls were hoisted into the shared `beforeEach` (single source of truth).
+
+**Rules derived:**
+- Tests must use `vi.useFakeTimers()` + `vi.setSystemTime()` when date-sensitive
+  assertions are made — never rely on the real clock.
+- When a frozen clock coexists with async `waitFor`, pass `{ shouldAdvanceTime: true }`
+  so the poller's real-time timers still fire.
+- Fixtures already derive months from `getCurrentMonth()`/`offsetMonth()` (see
+  `test-utils/fixtures.js`); the brittleness was confined to hardcoded `activeMonth`
+  strings in per-view context mocks.

@@ -3,7 +3,7 @@
  * Reads financeValues from FinanceContext — no props.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { PaydayView }               from './PaydayView';
@@ -39,6 +39,15 @@ vi.mock('../context/FinanceContext', () => ({
 const renderView = () => render(<MemoryRouter><PaydayView /></MemoryRouter>);
 
 describe('PaydayView', () => {
+  // Freeze the clock to mid-May so getCurrentMonth() === the mock's default
+  // activeMonth ('2026-05'). shouldAdvanceTime keeps async waitFor polling alive.
+  // Past/future tests still override mockFinance.activeMonth themselves.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
   it('shows skeleton when loading', () => {
     mockFinance.loading = true;
     const { container } = renderView();
@@ -68,18 +77,13 @@ describe('PaydayView', () => {
   });
 
   it('no longer shows the legacy historical-data warning on a past month', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
     mockFinance.activeMonth = '2026-04';
     renderView();
     expect(screen.queryByText(/reflects current state/)).toBeNull();
     mockFinance.activeMonth = '2026-05';
-    vi.useRealTimers();
   });
 
   it('derives the Received total from transactions on a past month (changes between months)', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
     mockFinance.activeMonth  = '2026-04';
     mockFinance.totalIncome  = 12000; // April income, from txs
     mockFinance.txs          = [{ id: 'tx-i', type: 'income', amount: 12000, category_name: 'Adjei Salary' }];
@@ -95,30 +99,23 @@ describe('PaydayView', () => {
     mockFinance.activeMonth = '2026-05';
     mockFinance.totalIncome = 0;
     mockFinance.txs         = [];
-    vi.useRealTimers();
   });
 
   it('shows empty state for a past month with no income transactions', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
     mockFinance.activeMonth = '2026-04';
     mockFinance.txs         = [];
     renderView();
     expect(screen.getByText(/No income recorded for/)).toBeTruthy();
     mockFinance.activeMonth = '2026-05';
-    vi.useRealTimers();
   });
 
   it('shows empty state and no totals for a future month', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
     mockFinance.activeMonth = '2026-06';
     renderView();
     expect(screen.getByText(/No payday data for/)).toBeTruthy();
     expect(screen.queryByTestId('payday-total-received')).toBeNull();
     expect(screen.queryByTestId('payday-total-pending')).toBeNull();
     mockFinance.activeMonth = '2026-05';
-    vi.useRealTimers();
   });
 
   it('shows empty state when no income sources', () => {

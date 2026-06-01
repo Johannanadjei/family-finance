@@ -3,7 +3,7 @@
  * Written before WeeklySummaryBar.jsx — TDD.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen }           from '@testing-library/react';
 import { WeeklySummaryBar }         from './WeeklySummaryBar';
 import { mockFmt, mockWeeklyData }  from '../../test-utils/fixtures';
@@ -19,6 +19,14 @@ const renderBar = (props = {}) =>
   );
 
 describe('WeeklySummaryBar', () => {
+  // Freeze the clock to mid-May so getCurrentMonth() === the '2026-05' activeMonth
+  // prop; the current-week highlight assertion must not depend on the real date.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
   it('shows all 5 week tabs', () => {
     renderBar();
     expect(screen.getByTestId('week-tab-Week 1')).toBeTruthy();
