@@ -112,3 +112,35 @@ the keyboard, or `scrollIntoView` on focus. Needs real-device iteration.
 
 **Schedule:** post-MVP. Not blocking — fields are reachable; the field can just be
 briefly obscured on small screens.
+
+---
+
+## Versioned migrations: introduce `supabase/migrations/` — POST-MVP
+
+**Why:** Schema changes live as ad-hoc `scripts/*.sql` files run manually in the
+Supabase SQL editor (no ordering, no applied-state tracking, no rollback scripts).
+The Budget Cycles project (Commit 1, `migrate_cycles_schema.sql`) added another. As
+the cycles migration chain grows (Commits 1, 2, 9, …) the lack of versioning becomes
+a liability — there's no record of what ran where.
+
+**What:** Introduce a `supabase/migrations/` folder for versioned, ordered migrations
+and consolidate the existing ad-hoc `scripts/` files into it (Option β, deferred at
+Cycles Commit 1). Keep the manual-apply ergonomics or adopt the Supabase CLI.
+
+**Schedule:** post-MVP / when the cycles migration chain stabilises.
+
+---
+
+## `view_only` role missing from PERMISSIONS map — POST-MVP
+
+**Why:** The DB role CHECK constraint allows four roles
+(`owner`, `full_access`, `standard`, `view_only`), but `src/lib/roles.js` PERMISSIONS
+only defines three — `view_only` falls through to `can()`'s default-false. That's
+*currently* harmless (and even desirable for `manageCycles`), but it means a
+`view_only` member is denied every permission silently rather than by design.
+
+**What:** Audit the role system and add an explicit `view_only` entry to PERMISSIONS
+(and `ROLES`/`ROLE_LABELS`/`ROLE_DESCRIPTIONS`) when the role is actually wired up,
+so its access is intentional rather than incidental.
+
+**Schedule:** post-MVP / when `view_only` is surfaced in the UI.

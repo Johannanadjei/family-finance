@@ -2310,3 +2310,40 @@ view-migration phase (Commits 5–9) deletes this mount effect entirely. Remove 
   values must reconcile the two on entry until cycles unifies them.
 - Test mocks must include every context value the component consumes (here: `activeMonth`,
   `loadMonth`) — see §9.5; the missing-mock crash was caught pre-commit, not after.
+
+---
+
+## [2026-06-01] Commit 1 — Budget Cycles schema foundation
+
+**Context:**
+First commit of the Budget Cycles project. Introduces the `budget_cycles` table and a
+`budget_centres.timezone` column, with zero app-behaviour change — no FK columns on
+tx/income/categories (Commit 2), no backfill (Commit 2), no app code reading any of it
+(Commit 3+). The table ships empty; timezone defaults to 'UTC' on all hubs. The
+migration (`scripts/migrate_cycles_schema.sql`) is committed as a file but NOT executed
+by the commit — it is run manually in the Supabase SQL editor afterward, consistent
+with every prior migration.
+
+**Decisions:**
+- Non-overlap is a DB-enforced invariant via a GiST EXCLUDE constraint (needs
+  `btree_gist`), not a unique index. A unique index only blocks identical ranges;
+  overlapping-but-distinct ranges would slip through. App-level checks race; the
+  constraint cannot. The whole migration is wrapped in BEGIN/COMMIT so a missing
+  extension (or any failure) rolls back cleanly.
+- `manageCycles` permission = true for owner AND full_access (cycles are budget config,
+  like categories), false for standard. Intentionally diverges from `manageMembers`
+  (owner-only, because membership affects billing).
+- RLS mirrors the in-repo `members_rbac.sql` precedent: direct `auth.uid()` policies,
+  no SECURITY DEFINER. Active member = `deleted_at IS NULL` — `budget_centre_members`
+  has no `status` column, so the locked draft's `status='active'` was corrected in
+  Phase 3 before any SQL was written.
+- Permission lives in `src/lib/roles.js` (role-keyed PERMISSIONS map), not a
+  `permissions.js`; the key is a per-role boolean inside each role object, not a
+  top-level entry (the v1.2 draft's shape would have failed the new tests).
+
+**Rules derived:**
+- "Active member" in any RLS policy or query is `deleted_at IS NULL`, never a status
+  flag. Verify membership-table column names against the codebase before authoring RLS.
+- DB-level invariants (non-overlap, range validity) belong in constraints, not app code.
+- Schema migrations ship as committed `scripts/*.sql` files and are applied manually;
+  code commit and live-DB application are decoupled steps.

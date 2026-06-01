@@ -32,6 +32,12 @@ describe('can()', () => {
     it('standard cannot viewBalance',() => expect(can('standard', 'viewBalance')).toBe(false));
   });
 
+  describe('manageCycles', () => {
+    it('owner can manageCycles',       () => expect(can('owner', 'manageCycles')).toBe(true));
+    it('full_access can manageCycles', () => expect(can('full_access', 'manageCycles')).toBe(true));
+    it('standard cannot manageCycles', () => expect(can('standard', 'manageCycles')).toBe(false));
+  });
+
   describe('unknown / edge cases', () => {
     it('returns false for unknown role',      () => expect(can('hacker', 'log')).toBe(false));
     it('returns false for unknown permission',() => expect(can('owner', 'deleteEverything')).toBe(false));

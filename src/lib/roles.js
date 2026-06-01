@@ -18,9 +18,9 @@ export const ROLES = {
 
 // Permission map — all keys are false unless explicitly true
 const PERMISSIONS = {
-  owner:       { log: true,  logIncome: true,  viewIncome: true,  settings: true,  manageMembers: true,  viewAllTxs: true,  viewBalance: true  },
-  full_access: { log: true,  logIncome: true,  viewIncome: true,  settings: true,  manageMembers: false, viewAllTxs: true,  viewBalance: true  },
-  standard:    { log: true,  logIncome: false, viewIncome: false, settings: false, manageMembers: false, viewAllTxs: false, viewBalance: false },
+  owner:       { log: true,  logIncome: true,  viewIncome: true,  settings: true,  manageMembers: true,  viewAllTxs: true,  viewBalance: true,  manageCycles: true  },
+  full_access: { log: true,  logIncome: true,  viewIncome: true,  settings: true,  manageMembers: false, viewAllTxs: true,  viewBalance: true,  manageCycles: true  },
+  standard:    { log: true,  logIncome: false, viewIncome: false, settings: false, manageMembers: false, viewAllTxs: false, viewBalance: false, manageCycles: false },
 };
 
 /**
@@ -28,7 +28,7 @@ const PERMISSIONS = {
  * Returns false for any unknown role or permission — safe default.
  *
  * @param {string} role
- * @param {string} permission — 'log' | 'logIncome' | 'viewIncome' | 'settings' | 'manageMembers' | 'viewAllTxs' | 'viewBalance'
+ * @param {string} permission — 'log' | 'logIncome' | 'viewIncome' | 'settings' | 'manageMembers' | 'viewAllTxs' | 'viewBalance' | 'manageCycles'
  * @returns {boolean}
  */
 export const can = (role, permission) =>
