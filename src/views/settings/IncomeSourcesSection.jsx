@@ -13,14 +13,13 @@ import { useState }               from 'react';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 import { useFinanceContext }      from '../../context/FinanceContext';
 import { getCurrentMonth, offsetMonth } from '../../lib/finance';
+import { formatMonth }            from '../../lib/dates';
 import { selectStyle }            from '../../lib/selectStyle';
 import { IncomeSourceRow }        from './IncomeSourceRow';
 
 const card         = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
 const sectionLabel = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: 0, textTransform: 'uppercase', letterSpacing: 0.8 };
 const inputStyle   = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 14, fontWeight: 700, marginBottom: 6, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
-
-const formatMonth = (ym) => new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 export function IncomeSourcesSection() {
   const { fmt, centre } = useBudgetCentreContext();

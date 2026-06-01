@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getCurrentMonth, isPastMonth } from './dates';
+import { getCurrentMonth, isPastMonth, formatMonth } from './dates';
 
 describe('getCurrentMonth', () => {
   it('returns a YYYY-MM string', () => {
@@ -24,5 +24,26 @@ describe('isPastMonth', () => {
     expect(isPastMonth(null)).toBe(false);
     expect(isPastMonth(undefined)).toBe(false);
     expect(isPastMonth('')).toBe(false);
+  });
+});
+
+describe('formatMonth', () => {
+  it('formats a mid-year month', () => {
+    expect(formatMonth('2026-05')).toBe('May 2026');
+  });
+
+  it('formats December', () => {
+    expect(formatMonth('2025-12')).toBe('December 2025');
+  });
+
+  it('formats January', () => {
+    expect(formatMonth('2026-01')).toBe('January 2026');
+  });
+
+  // Documents the preserved (surprising) edge-case behaviour: bad input is
+  // silently coerced to "January 2001" rather than throwing or "Invalid Date".
+  // Backlog: add a defensive guard if i18n lands or production input is exposed.
+  it('coerces bad input to "January 2001" rather than throwing', () => {
+    expect(formatMonth(null)).toBe('January 2001');
   });
 });

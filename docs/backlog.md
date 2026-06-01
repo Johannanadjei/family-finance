@@ -52,16 +52,16 @@ data debris.
 
 ---
 
-## formatMonth helper duplication — POST-MVP code quality
+## formatMonth → lib/dates.formatMonth — DONE (Commit 2.5)
 
-The `formatMonth(ym)` helper is defined identically in 6 view files:
-`IncomeSourcesSection.jsx`, `LogView.jsx`, `DailyView.jsx`, `PaydayView.jsx`,
-`BudgetView.jsx`, `HomeView.jsx`. Pure display helper (`'YYYY-MM'` → `"Month Year"`
-via `toLocaleDateString`), no business logic. Should live in `lib/dates.js` alongside
-the other month helpers (`getCurrentMonth`, `isPastMonth`).
+RESOLVED: `formatMonth(ym)` was hoisted from the 6 view files into `lib/dates.js`
+(alongside `getCurrentMonth`/`isPastMonth`) and the local duplicates removed. The
+Budget Cycles service layer (Commit 3) depends on this shared export for cycle-name
+generation, which is why the duplication was closed first.
 
-**Schedule:** post-MVP code cleanup. Low priority — works correctly today, just
-duplicated across six files.
+Deferred (still open): the helper silently coerces bad input to "January 2001" — add
+a defensive guard if i18n lands or production input is ever exposed; and the broader
+`lib/finance` date-helper consolidation (Option γ) remains out of scope.
 
 ---
 

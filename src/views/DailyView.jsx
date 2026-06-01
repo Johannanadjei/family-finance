@@ -12,12 +12,10 @@ import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { getCurrentMonth, offsetMonth, groupByDate } from '../lib/finance';
+import { formatMonth }            from '../lib/dates';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { TransactionRow }         from './daily/TransactionRow';
 import { WeeklySummaryBar }       from './daily/WeeklySummaryBar';
-
-const formatMonth = (ym) =>
-  new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 const formatDate = (dateStr) =>
   new Date(dateStr).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });

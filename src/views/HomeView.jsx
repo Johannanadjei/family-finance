@@ -11,6 +11,7 @@ import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { getCurrentMonth }        from '../lib/finance';
+import { formatMonth }            from '../lib/dates';
 import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { MonthlyIncomeCard }      from './home/MonthlyIncomeCard';
@@ -18,9 +19,6 @@ import { BudgetHealthBar }        from './home/BudgetHealthBar';
 import { PaydaySummaryCard }      from './home/PaydaySummaryCard';
 import { StatCard }               from './home/StatCard';
 import { RecentActivity }         from './home/RecentActivity';
-
-const formatMonth = (ym) =>
-  new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 function HomeViewSkeleton() {
   const card = { background: 'var(--c-card,#fff)', borderRadius: 16, padding: '14px 14px', marginBottom: 12 };

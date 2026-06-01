@@ -10,15 +10,13 @@ import { useState, useEffect }    from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { getCurrentMonth, offsetMonth } from '../lib/finance';
+import { formatMonth }            from '../lib/dates';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { Toast }                   from '../components/ui/Toast';
 import { CategoryBudgetRow }      from './budget/CategoryBudgetRow';
 import { AddCategorySheet }       from './budget/AddCategorySheet';
 import { BudgetEmptyState }       from './budget/BudgetEmptyState';
 import { CopyCategoriesSheet }    from './budget/CopyCategoriesSheet';
-
-const formatMonth = (ym) =>
-  new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 function BudgetViewSkeleton() {
   return (

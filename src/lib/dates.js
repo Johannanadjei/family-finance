@@ -16,3 +16,15 @@ export const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
  * Lexicographic compare is safe for zero-padded 'YYYY-MM'.
  */
 export const isPastMonth = (month) => !!month && month < getCurrentMonth();
+
+/**
+ * Format a 'YYYY-MM' string as a human-readable month label.
+ * @param {string} ym - Month string in 'YYYY-MM' format (e.g. '2026-05')
+ * @returns {string} Formatted label (e.g. "May 2026")
+ *
+ * Edge cases: bad input (null/undefined/invalid string) silently yields
+ * "January 2001" via V8's lenient Date parsing. All call sites pass real
+ * 'YYYY-MM' strings, so this never triggers in practice.
+ */
+export const formatMonth = (ym) =>
+  new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });

@@ -9,6 +9,7 @@ import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { getCurrentMonth, offsetMonth } from '../lib/finance';
+import { formatMonth }            from '../lib/dates';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { Toast }                   from '../components/ui/Toast';
 import { ConfirmSheet }           from './payday/ConfirmSheet';
@@ -19,9 +20,6 @@ import { PaydayIncomeBody }       from './payday/PaydayIncomeBody';
 // Migration-created "Other Income" buckets (engineering-decisions: income-month-
 // scoping) must never roll forward, nor count toward "N sources to copy".
 const ONE_OFF_MARKER = '__one_off_bucket__';
-
-const formatMonth = (ym) =>
-  new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 function PaydayViewSkeleton() {
   const card = { background: 'var(--c-card,#fff)', borderRadius: 16, padding: '16px 18px', marginBottom: 12 };

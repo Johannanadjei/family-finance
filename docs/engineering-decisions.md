@@ -2381,3 +2381,29 @@ data, 77/325 live transactions, date span 2026-02-08 → 2026-06-01, one orphan 
 - Irreversible data migrations are wrapped in one transaction with RAISE EXCEPTION
   pre/post asserts so an anomaly aborts cleanly rather than half-applying.
 - Seed-from-all-sources guarantees no live row is left unattributed after a backfill.
+
+---
+
+## [2026-06-01] Commit 2.5 — formatMonth hoisted to lib/dates
+
+**Context:**
+The `formatMonth(ym)` display helper ('YYYY-MM' → "Month Year" via toLocaleDateString
+'en-GB') was defined identically in 6 view files. This duplication had been implemented
+and parked in a git stash for weeks; it was pulled forward now because the Budget Cycles
+service layer (Commit 3) needs a single shared formatMonth for cycle-name generation
+(so a JS-created cycle's name matches the Commit-2 SQL backfill's to_char output).
+
+**Decision:**
+Hoist formatMonth into lib/dates.js beside getCurrentMonth/isPastMonth (Option α — only
+formatMonth; the broader lib/finance date-helper consolidation, Option γ, stays deferred).
+Each view imports it instead of declaring a local copy. Net ~zero behaviour change; the
+6 view test suites stayed green unmodified, proving the slice is behaviourally identical.
+The parked stash merged cleanly over Commit 0's BudgetView useEffect (non-overlapping
+regions: imports/helper at the top vs. the destructure+effect inside the component).
+
+**Rules derived:**
+- A pure display/format helper duplicated across views belongs in lib/ (dates.js for
+  month helpers), imported — not re-declared per file.
+- formatMonth still silently coerces bad input to "January 2001" (V8 lenient parsing);
+  acceptable while all call sites pass real 'YYYY-MM', logged in backlog for a guard if
+  i18n or external input ever lands.

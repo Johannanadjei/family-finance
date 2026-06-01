@@ -14,12 +14,10 @@ import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { getCurrentMonth, offsetMonth, groupByDate } from '../lib/finance';
+import { formatMonth }            from '../lib/dates';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { TransactionRow }         from './daily/TransactionRow';
 import { LogFilterBar }           from './log/LogFilterBar';
-
-const formatMonth = (ym) =>
-  new Date(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 const formatDate = (dateStr) =>
   new Date(dateStr).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
