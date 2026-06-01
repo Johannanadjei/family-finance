@@ -31,6 +31,8 @@ const mockFinance = {
   categorySpend: mockCategorySpend,
   fixedTotal:    700,
   fixedSpent:    200,
+  activeMonth:   getCurrentMonth(),   // matches clock → mount-reset effect is a no-op
+  loadMonth:     vi.fn(),             // Commit 0: BudgetView resets activeMonth on mount
 };
 
 vi.mock('../context/FinanceContext', () => ({
@@ -139,5 +141,21 @@ describe('BudgetView', () => {
     fireEvent.click(screen.getByTestId('choose-which-categories-btn'));
     expect(screen.getByTestId('copy-categories-sheet')).toBeTruthy();
     resetCats();
+  });
+
+  // ── Commit 0: activeMonth reset on mount (throwaway band-aid; removed when cycles ship) ──
+  it('resets activeMonth to the current month on mount when they disagree', () => {
+    mockFinance.activeMonth = offsetMonth(getCurrentMonth(), -1);   // stale, regardless of run date
+    mockFinance.loadMonth   = vi.fn();
+    renderView();
+    expect(mockFinance.loadMonth).toHaveBeenCalledWith(getCurrentMonth());
+    mockFinance.activeMonth = getCurrentMonth();                    // restore shared mock
+  });
+
+  it('does not reload when activeMonth already matches the current month', () => {
+    mockFinance.activeMonth = getCurrentMonth();
+    mockFinance.loadMonth   = vi.fn();
+    renderView();
+    expect(mockFinance.loadMonth).not.toHaveBeenCalled();
   });
 });

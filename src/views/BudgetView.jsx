@@ -43,12 +43,23 @@ function BudgetViewSkeleton() {
 
 export function BudgetView() {
   const { categories, fmt, addCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth } = useBudgetCentreContext();
-  const { categorySpend, fixedTotal, fixedSpent, loading, error } = useFinanceContext();
+  const { categorySpend, fixedTotal, fixedSpent, loading, error, activeMonth, loadMonth } = useFinanceContext();
   const [sheetOpen,     setSheetOpen]     = useState(false);
   const [copySheetOpen, setCopySheetOpen] = useState(false);   // 2C: multi-select rollforward sheet
   const [copying,       setCopying]       = useState(false);
   const [copyError,     setCopyError]     = useState(null);
   const [copiedCount,   setCopiedCount]   = useState(0);       // >0 → success toast
+
+  // Commit 0 band-aid: BudgetView reads clock-based categories but finance figures
+  // (categorySpend/fixedSpent) follow the shared, mutable activeMonth. If another
+  // view (Payday/Daily/Log) navigated to a past month, Budget would show that month's
+  // spend under a current-month label. Reset activeMonth to the clock on mount so the
+  // two agree. Mount-only — empty deps intentional. Throwaway: removed when Budget
+  // Cycles unifies the active-period source of truth (Commits 5–9).
+  useEffect(() => {
+    if (activeMonth !== getCurrentMonth()) loadMonth(getCurrentMonth());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // BudgetView is current-month-only (no month nav), so the rollforward source is
   // always last month. When the current budget is empty, load it to decide State

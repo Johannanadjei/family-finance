@@ -2279,3 +2279,34 @@ per-test timer calls were hoisted into the shared `beforeEach` (single source of
 - Fixtures already derive months from `getCurrentMonth()`/`offsetMonth()` (see
   `test-utils/fixtures.js`); the brittleness was confined to hardcoded `activeMonth`
   strings in per-view context mocks.
+
+---
+
+## [2026-06-01] Commit 0 — BudgetView activeMonth reset (throwaway band-aid)
+
+**Context:**
+`useFinance.activeMonth` is mutable shared state (FinanceContext); `useBudgetCentre`
+derives its `categories` slice from the `getCurrentMonth()` clock. The two disagree
+after navigation: nav Payday → May, tap Budget → label reads "June 2026" (clock) while
+spend figures (`categorySpend`/`fixedSpent`, from activeMonth txs) show May. Two sources
+of truth for "the current month."
+
+**Decision:**
+BudgetView resets `activeMonth` to `getCurrentMonth()` on mount via a mount-only
+`useEffect`, so the shared state and clock agree whenever Budget loads. This is a
+deliberate band-aid, not the real fix.
+
+**Explicitly NOT fixed:**
+- Daily and Log may carry a sibling activeMonth/clock desync — not investigated here.
+- The root cause (two sources of truth for "current month") remains.
+
+**Throwaway notice:**
+This code is temporary. The Budget Cycles project (Commits 1–15) replaces calendar-month
+scoping with first-class cycle objects and a single active-cycle source of truth; the
+view-migration phase (Commits 5–9) deletes this mount effect entirely. Remove it then.
+
+**Rules derived:**
+- A view that reads `activeMonth`-derived finance values AND clock-derived category
+  values must reconcile the two on entry until cycles unifies them.
+- Test mocks must include every context value the component consumes (here: `activeMonth`,
+  `loadMonth`) — see §9.5; the missing-mock crash was caught pre-commit, not after.
