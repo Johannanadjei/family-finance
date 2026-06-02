@@ -1,9 +1,10 @@
 /**
  * views/LogView.jsx
  *
- * Full transaction history — all transactions for the active month.
+ * Full transaction history — all transactions for the viewed cycle.
  * Filter by type, search by category name, edit and delete transactions.
- * Month navigation consistent with DailyView and PaydayView.
+ * Cycle navigation via loadCycle + getCycleNav (the Commit-5 template), consistent
+ * with DailyView and PaydayView; the month-keyed data follows through the bridge.
  * Reuses TransactionRow from daily/ — no duplication.
  *
  * @param {function} onEditTx — (tx) => void — opens AddTransactionSheet pre-filled
@@ -13,8 +14,9 @@ import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { AccessBlocked }         from '../components/ui/AccessBlocked';
-import { getCurrentMonth, offsetMonth, groupByDate } from '../lib/finance';
-import { formatMonth }            from '../lib/dates';
+import { getCurrentMonth, groupByDate } from '../lib/finance';
+import { formatMonth, getToday }   from '../lib/dates';
+import { getCycleNav }             from '../lib/cycles';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { TransactionRow }         from './daily/TransactionRow';
 import { LogFilterBar }           from './log/LogFilterBar';
@@ -41,7 +43,7 @@ function LogViewSkeleton() {
 export function LogView({ onEditTx }) {
   const { fmt, can, currentUserId }          = useBudgetCentreContext();
   const { txs, loading, error,
-          activeMonth, loadMonth,
+          activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle,
           deleteTransaction }                = useFinanceContext();
   const [filter,      setFilter]            = useState('all');
   const [search,      setSearch]            = useState('');
@@ -51,7 +53,14 @@ export function LogView({ onEditTx }) {
   if (!can('log')) return <AccessBlocked message="The transaction log is not available for your role." />;
   if (loading) return <LogViewSkeleton />;
 
-  const isCurrentMonth = activeMonth === getCurrentMonth();
+  // Viewed period: navigated cycle → auto-resolved current cycle → month fallback
+  // (brand-new hub before Commit-4 auto-create). `nav` drives bounded prev/next.
+  const today          = getToday();
+  const currentMonth   = getCurrentMonth();
+  const viewedCycle    = cycles.find(c => c.id === activeCycleId) ?? activeCycle ?? null;
+  const nav            = getCycleNav(cycles, viewedCycle?.id ?? null);
+  const isCurrent      = viewedCycle ? (viewedCycle.start_date <= today && viewedCycle.end_date >= today) : activeMonth === currentMonth;
+  const periodLabel    = viewedCycle?.name ?? formatMonth(activeMonth);
   const showAllTxs     = can('viewAllTxs');
   const showIncome     = can('viewIncome');
 
@@ -75,18 +84,19 @@ export function LogView({ onEditTx }) {
   return (
     <div style={{ padding: '16px' }}>
 
-      {/* Month navigation */}
+      {/* Period navigation */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <button onClick={() => loadMonth(offsetMonth(activeMonth, -1))} aria-label="Previous month"
-          style={{ background: 'none', border: 'none', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-primary, #064e3b)' }}>
+        <button onClick={() => nav.prev && loadCycle(nav.prev.id)} aria-label="Previous period"
+          disabled={nav.isOldest}
+          style={{ background: 'none', border: 'none', padding: '8px', cursor: nav.isOldest ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: nav.isOldest ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <p data-testid="log-month-label" style={{ fontSize: 15, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
-          {formatMonth(activeMonth)}
+        <p data-testid="log-period-label" style={{ fontSize: 15, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
+          {periodLabel}
         </p>
-        <button onClick={() => loadMonth(offsetMonth(activeMonth, 1))} aria-label="Next month"
-          disabled={isCurrentMonth}
-          style={{ background: 'none', border: 'none', padding: '8px', cursor: isCurrentMonth ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isCurrentMonth ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}>
+        <button onClick={() => nav.next && loadCycle(nav.next.id)} aria-label="Next period"
+          disabled={nav.isLatest}
+          style={{ background: 'none', border: 'none', padding: '8px', cursor: nav.isLatest ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: nav.isLatest ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
@@ -117,7 +127,7 @@ export function LogView({ onEditTx }) {
                 <path d="M20 22h24M20 30h24M20 38h16" stroke="var(--c-primary, #064e3b)" strokeWidth="2" strokeLinecap="round"/>
               </svg>
               <p style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 6px' }}>Nothing logged yet</p>
-              {isCurrentMonth && (
+              {isCurrent && (
                 <p style={{ fontSize: 13, color: 'var(--c-muted, #9ca3af)', margin: 0, fontWeight: 600 }}>Tap + to log your first transaction</p>
               )}
             </>
@@ -130,7 +140,7 @@ export function LogView({ onEditTx }) {
               </svg>
               <p style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 6px' }}>No results found</p>
               <p style={{ fontSize: 13, color: 'var(--c-muted, #9ca3af)', margin: 0, fontWeight: 600 }}>
-                {search ? `No transactions matching "${search}"` : `No ${filter} transactions this month`}
+                {search ? `No transactions matching "${search}"` : `No ${filter} transactions this period`}
               </p>
             </>
           )}
@@ -148,7 +158,7 @@ export function LogView({ onEditTx }) {
                   tx={tx}
                   fmt={fmt}
                   onDelete={handleDelete}
-                  disabled={deletingId === tx.id || !isCurrentMonth}
+                  disabled={deletingId === tx.id || !isCurrent}
                   deleting={deletingId === tx.id}
                   isLast={idx === grouped[date].length - 1}
                 />

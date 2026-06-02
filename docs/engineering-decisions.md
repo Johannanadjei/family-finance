@@ -2632,3 +2632,36 @@ getCycleNav + viewedCycle fallback) to DailyView. Smallest migration so far —
 **Backlog:**
 - No new debt (mechanical reuse). Commit-5's cycle_id-not-stamped-on-insert still
   applies. WeeklySummaryBar variable-length tracked for Commit 14.
+
+---
+
+## [2026-06-02] Commit 7 — LogView migrated to cycles (third view migration)
+
+**Context:**
+Third per-view migration. LogView is structurally a twin of DailyView (inline nav,
+same txs/groupByDate data path), so this was pure mechanical reuse of the Commit-5/6
+template — 3 files, no hook/lib changes.
+
+**Decisions:**
+- Inline nav reshape (no LogHeader component), identical to DailyView: Next →
+  nav.isLatest, Prev → nav.isOldest (bounded), label → viewedCycle.name, aria →
+  "Previous/Next period", testid log-month-label → log-period-label, viewedCycle/
+  isCurrent derivation + month fallback verbatim.
+- LogView is LEANER than DailyView: it has no past-period warning banner, so isPast
+  is not derived at all. The only gates are isCurrent (delete-disable + empty-state
+  hint) and the nav bounds. A view only derives the period flags it actually uses.
+- Vocabulary lock (v1.2 E0) extended to the filter empty-state: "No {filter}
+  transactions this month" → "...this period" (the search-branch string was already
+  period-agnostic). No test asserted this string, so it was a safe copy change.
+- Role/income gating (viewIncome / viewAllTxs / currentUserId "my transactions"
+  filter), per-day grouping, search, and soft-delete display are all untouched —
+  the migration only swapped the month nav for cycle nav.
+
+**Rules derived:**
+- Derive only the period flags a view consumes. DailyView needs isPast (past warning);
+  LogView doesn't, so it omits it. Copy the template, then delete what this view
+  doesn't use — don't carry dead derivations for symmetry.
+
+**Backlog:**
+- No new debt. Commit-5's cycle_id-not-stamped-on-insert and the Commit-14
+  WeeklySummaryBar variable-length item still apply.
