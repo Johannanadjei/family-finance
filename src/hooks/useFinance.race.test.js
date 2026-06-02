@@ -28,7 +28,7 @@ vi.mock('../lib/auth', () => ({
   sessionAgeMs:       vi.fn(() => 0),
 }));
 vi.mock('../services/transactions.service', () => ({
-  getTransactionsByMonth: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn(),
+  getTransactionsByCycle: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn(),
 }));
 vi.mock('../services/income.service', () => ({
   getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(),
@@ -44,20 +44,26 @@ vi.mock('../lib/storage', () => ({
 }));
 
 import { waitForSession } from '../lib/auth';
-import { getTransactionsByMonth } from '../services/transactions.service';
+import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
+import { getCyclesForCentre } from '../services/cycles.service';
 
 const C    = { id: 'centre-1', currency: 'GHS', surplus_target: 4500 };
 const CATS = [{ id: 'cat-1', name: 'Groceries', budget_amount: 500, is_fixed: true }];
+// A cycle whose range always contains today (run-date-independent), so the Commit-11
+// gated loader resolves a cid and load() proceeds. When the session never readies,
+// loadCycles bails before fetching cycles — so this is never reached and the gate
+// still holds (test 4), exactly as the cold-load guard requires.
+const CURRENT = { id: 'cyc-cur', budget_centre_id: 'centre-1', name: 'Current', start_date: '2000-01-01', end_date: '2999-12-31', anchor_type: 'calendar', deleted_at: null };
 
 describe('useFinance — auth-readiness gate (data-loss-on-refresh)', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); getCyclesForCentre.mockResolvedValue({ data: [CURRENT], error: null }); });
 
   it('does NOT query Supabase until waitForSession resolves', async () => {
     let release;
     const gate = new Promise((r) => { release = r; });
     waitForSession.mockReturnValue(gate);
-    getTransactionsByMonth.mockResolvedValue({ data: [], error: null });
+    getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
     getIncomeSources.mockResolvedValue({ data: [], error: null });
 
     renderHook(() => useFinance({ centre: C, categories: CATS }));
@@ -65,17 +71,17 @@ describe('useFinance — auth-readiness gate (data-loss-on-refresh)', () => {
     // Flush microtasks — the fetch must STILL be blocked behind the gate.
     await Promise.resolve();
     await Promise.resolve();
-    expect(getTransactionsByMonth).not.toHaveBeenCalled();
+    expect(getTransactionsByCycle).not.toHaveBeenCalled();
     expect(getIncomeSources).not.toHaveBeenCalled();
 
     // Open the gate — now the fetch is allowed to fire.
     release({ data: { session: { expires_at: 9_999_999_999 } }, error: null });
-    await waitFor(() => expect(getTransactionsByMonth).toHaveBeenCalled());
+    await waitFor(() => expect(getTransactionsByCycle).toHaveBeenCalled());
   });
 
   it('surfaces an error (not a silent empty) when the fetch fails', async () => {
     waitForSession.mockResolvedValue({ data: { session: { expires_at: 9_999_999_999 } }, error: null });
-    getTransactionsByMonth.mockResolvedValue({ data: null, error: { message: 'permission denied' } });
+    getTransactionsByCycle.mockResolvedValue({ data: null, error: { message: 'permission denied' } });
     getIncomeSources.mockResolvedValue({ data: [], error: null });
 
     const { result } = renderHook(() => useFinance({ centre: C, categories: CATS }));
@@ -87,7 +93,7 @@ describe('useFinance — auth-readiness gate (data-loss-on-refresh)', () => {
 
   it('marks loaded=true on a genuine empty result', async () => {
     waitForSession.mockResolvedValue({ data: { session: { expires_at: 9_999_999_999 } }, error: null });
-    getTransactionsByMonth.mockResolvedValue({ data: [], error: null });
+    getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
     getIncomeSources.mockResolvedValue({ data: [], error: null });
 
     const { result } = renderHook(() => useFinance({ centre: C, categories: CATS }));
@@ -102,7 +108,7 @@ describe('useFinance — auth-readiness gate (data-loss-on-refresh)', () => {
 
     const { result } = renderHook(() => useFinance({ centre: C, categories: CATS }));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(getTransactionsByMonth).not.toHaveBeenCalled();
+    expect(getTransactionsByCycle).not.toHaveBeenCalled();
     expect(result.current.error).toBeTruthy();
     expect(result.current.loaded).toBe(false);
   });

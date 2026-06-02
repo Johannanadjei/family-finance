@@ -21,16 +21,20 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { useFinance } from './useFinance';
 
 vi.mock('../lib/auth', () => ({ waitForSession: vi.fn().mockResolvedValue({ data: { session: { expires_at: 9999999999 } }, error: null }), warnOnEmptyColdLoad: vi.fn(), sessionAgeMs: vi.fn(() => 0) }));
-vi.mock('../services/transactions.service', () => ({ getTransactionsByMonth: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn() }));
+vi.mock('../services/transactions.service', () => ({ getTransactionsByCycle: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn() }));
 vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn(), addIncomeSource: vi.fn(), bulkAddIncomeSources: vi.fn(), deleteIncomeSource: vi.fn(), updateIncomeSource: vi.fn() }));
 vi.mock('../services/cycles.service', () => ({ getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }), createCalendarCycle: vi.fn().mockResolvedValue({ data: null, error: null }) }));
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
 
-import { getTransactionsByMonth, addTransaction, updateTransaction, deleteTransaction } from '../services/transactions.service';
+import { getTransactionsByCycle, addTransaction, updateTransaction, deleteTransaction } from '../services/transactions.service';
 import { getIncomeSources, markReceived, markPending, bulkAddIncomeSources, deleteIncomeSource, updateIncomeSource } from '../services/income.service';
+import { getCyclesForCentre } from '../services/cycles.service';
 
 const C    = { id: 'centre-1', currency: 'GHS', surplus_target: 0 };
 const CATS = [{ id: 'cat-1', name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true }];
+// Wide-range cycle that always contains today, so the Commit-11 gated loader
+// resolves a cid and load() fetches txs (these tests assert on tx-derived allIncome).
+const CURRENT = { id: 'cyc-cur', budget_centre_id: 'centre-1', name: 'Current', start_date: '2000-01-01', end_date: '2999-12-31', anchor_type: 'calendar', deleted_at: null };
 
 // A single received income source and the income transaction it created via
 // markReceived, linked by income_source_id (the FK this migration introduces).
@@ -38,8 +42,9 @@ const SOURCE = { id: 'inc-1', label: 'Salary', expected_amount: 5000, received: 
 const INCOME_TX = { id: 'tx-1', type: 'income', amount: 5000, category_name: 'Salary', description: 'Salary received', source: 'main_app', income_source_id: 'inc-1', date: '2026-05-19', week: 'Week 3', currency: 'GHS', _optimistic: false };
 
 const mount = (txs, inc) => {
-  getTransactionsByMonth.mockResolvedValue({ data: txs, error: null });
+  getTransactionsByCycle.mockResolvedValue({ data: txs, error: null });
   getIncomeSources.mockResolvedValue({ data: inc, error: null });
+  getCyclesForCentre.mockResolvedValue({ data: [CURRENT], error: null });
   return renderHook(() => useFinance({ centre: C, categories: CATS }));
 };
 

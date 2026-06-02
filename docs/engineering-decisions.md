@@ -2888,3 +2888,89 @@ the file header and the inline comment both explain why, so a future reader does
 
 **Scope:** SQL only. No changes to services, hooks, views, or JS tests — `cycle_id`
 remains absent from `src/` entirely, which is the point.
+
+---
+
+## [2026-06-02] Commit 11 — switch the transaction read from month → cycle_id
+
+**Context:**
+Commit 10 made `cycle_id` a trustworthy, always-populated column. This commit is where
+the read layer starts trusting it. The plan was "migrate all three period reads
+(transactions, budget_categories, income_sources) from month to cycle_id." Phase 1
+diagnosis showed the three reads are **not** uniform — they live in two hooks and have
+three different shapes — so the scope tightened to **transactions only**.
+
+**Decision — transactions only; categories and income defer.**
+Only `transactions` uses a server-side period filter (`getTransactionsByMonth`, a
+`date` range). `income_sources` and `budget_categories` are fetched **all-months once**
+(`getIncomeSources(centreId)` with no filter; `getAllCategories`) and sliced
+**client-side** (`allIncomes.filter(i => i.month === activeMonth)`;
+`allCategories.filter(c => c.month === getCurrentMonth())`). A client-side slice is a
+different layer from a SQL read, and `allIncomes` is a load-bearing **all-months**
+contract (Settings' all-months view, PaydayView's prev-cycle lookup, the find-by-id
+mutation source-of-truth) — switching its fetch to cycle-scoped would break all three.
+So income's slice migrates **with** categories in a later "client-slice cycle-awareness"
+commit, not here. `income.service.js` (246/250 lines) stays untouched; no
+`getIncomeSourcesByCycle` this commit.
+
+**Decisions:**
+- **`getTransactionsByCycle(centreId, cycleId)`** filters `.eq('cycle_id', cycleId)` —
+  cleaner and indexed vs the date-range. `getTransactionsByMonth` is kept `@deprecated`
+  for one cycle (no live caller remains) and removed in the Commit 13 month-drop cleanup.
+  Closed the pre-existing **`transactions.service.test.js` gap** (CLAUDE.md §8) with
+  success + error coverage for the new fn.
+- **Gated loader is the SOLE trigger of `load()`.** Transactions read by `cycle_id`, so
+  `load()` must not fire until cycles have settled and a cycle id resolves. A single
+  `useEffect` gates on `cyclesLoading` + `centreId` + cid resolution and is the only
+  caller of `load()`. `loadMonth`/`loadCycle`/`reload` became **state-setters only** —
+  if they also called `load()` the page would double-fetch on every navigation (Phase 3
+  caught this). `loadMonth` still sets `activeMonth` because the income `incomes` slice
+  (deferred) still keys on it.
+- **cid via the viewedCycle fallback: `activeCycleId ?? activeCycle?.id`.** `activeCycleId`
+  is `null` until the user navigates; the auto-resolved `activeCycle` covers mount.
+  Bare `activeCycleId` would leave transactions unloaded on first render (Phase 3 catch).
+  Same fallback the views use for `viewedCycle`.
+- **Preserve the full `load()` guard stack.** Only the signature (`month`→`cycleId`) and
+  the tx call (`getTransactionsByMonth`→`getTransactionsByCycle`) changed inside `load()`;
+  the `!centreId` clear branch, the `waitForSession` auth gate, and the stale-clear all
+  stay verbatim. One **additive** guard was introduced — `if (!cycleId) { setLoading(false);
+  return; }` after the session gate — so a cycles-not-ready render holds **without**
+  flipping `loaded` (a successful-empty there would be a phantom, violating §12). This is
+  what keeps `race.test.js`'s "session never readies → error surfaces" green: when the
+  session fails, `loadCycles` bails, cid stays undefined, the effect still routes through
+  `load()`, and `load()`'s own session gate surfaces the error.
+- **`month` dropped from `load()`'s signature** (the locked design said `load(cycleId,
+  month)`). Income is deferred, so `month` is unused inside `load` — the income slice
+  reads `activeMonth` state, not a param. Carrying an unused param would only invite an
+  unused-var lint; `load(cycleId)` is the honest shape for the transactions-only scope.
+- **Fixtures:** in-place augmentation — added a `mockCycles` array and `cycle_id` to
+  `mockTxs`/`mockIncomes` (kept `month` until Commit 13). Each `useFinance` test file
+  seeds a current cycle so the gate opens (the cold-load race file uses a wide-range
+  cycle that always contains today; its session-never-readies test deliberately leaves
+  cid unresolved).
+
+**Rules derived:**
+- **When migrating reads across mixed patterns, isolate the SQL-layer migration first.
+  Client-side slice changes that look superficially similar are a separate-layer concern.**
+  A `.eq('month')` server filter and an `allIncomes.filter(i => i.month === …)` client
+  slice are not the same change, even though both "filter by month."
+- **When refactoring a unified loader into a gated effect, ALL direct callers of the
+  loader must become state-setters and the effect must be the sole trigger** — otherwise
+  every navigation double-fetches.
+- **Refactoring a `load()` signature must preserve its existing guards (auth, centre
+  validity, stale-data clear).** They protect behaviours pinned by tests like
+  `race.test.js`; a sketch that drops them silently regresses the §12 cold-load fix.
+- **Cycle-gated effects resolve cid via the `activeCycleId ?? activeCycle?.id` fallback**,
+  matching the views' `viewedCycle` pattern — bare `activeCycleId` is null on mount.
+
+**Phase-3 catches that shaped the final code:** (1) income reads are client-sliced, not
+server — scope cut to transactions; (2) the gated-effect/load split would have raced the
+`loaded`/`loading`/`error` state machine — folded into one orchestrator with an additive
+cid-guard; (3) bare `activeCycleId` would skip the mount load — fallback added.
+
+**Backlog:** income + categories client slices migrate to `cycle_id` together (closes the
+`useBudgetCentre.categories` clock-keyed latent bug); `getTransactionsByMonth` removed in
+the Commit 13 cleanup after the month columns drop.
+
+**Scope:** transactions read path only. No changes to `useBudgetCentre`, `income.service`,
+`categories.service`, or any view — views already navigate via `loadCycle`.

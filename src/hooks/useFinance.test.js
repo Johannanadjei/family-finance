@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { useFinance } from './useFinance';
 vi.mock('../lib/auth', () => ({ waitForSession: vi.fn().mockResolvedValue({ data: { session: { expires_at: 9999999999 } }, error: null }), warnOnEmptyColdLoad: vi.fn(), sessionAgeMs: vi.fn(() => 0) }));
-vi.mock('../services/transactions.service', () => ({ getTransactionsByMonth: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn() }));
+vi.mock('../services/transactions.service', () => ({ getTransactionsByCycle: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn() }));
 vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn() }));
 vi.mock('../services/cycles.service', () => ({ getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }), createCalendarCycle: vi.fn().mockResolvedValue({ data: null, error: null }) }));
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
-import { getTransactionsByMonth } from '../services/transactions.service';
+import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
 import { getCyclesForCentre, createCalendarCycle } from '../services/cycles.service';
 import { getCurrentMonth, getToday } from '../lib/dates';
@@ -15,9 +15,12 @@ const CATS = [{ id:'cat-1', name:'Groceries', icon:'🛒', budget_amount:500, is
 // Sources are month-scoped (Phase 2A); useFinance derives `incomes` for the
 // active month (defaults to current), so fixtures must carry the current month.
 const M = getCurrentMonth();
+// Transactions read by cycle_id (Commit 11) via a gated loader — load() only fires
+// once a current cycle resolves. Tests that expect a fetch must seed this cycle.
+const CUR_CYCLE = { id:'cyc-cur', budget_centre_id:'centre-1', name:'Current', start_date: M+'-01', end_date: M+'-31', anchor_type:'calendar', deleted_at:null };
 const INC = [{ id:'inc-1', label:'Adjei Salary', expected_amount:30000, received:true, received_amount:30000, pay_day:31, pay_day_type:'last_working_day', currency:'GHS', month:M },{ id:'inc-2', label:'Dita Salary', expected_amount:15000, received:false, received_amount:0, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:M }];
 const TXS = [{ id:'tx-1', type:'expense', amount:200, category_name:'Groceries', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false },{ id:'tx-2', type:'income', amount:30000, category_name:'Adjei Salary', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false }];
-const go = (txs=TXS, inc=INC) => { getTransactionsByMonth.mockResolvedValue({data:txs,error:null}); getIncomeSources.mockResolvedValue({data:inc,error:null}); return renderHook(()=>useFinance({centre:C,categories:CATS})); };
+const go = (txs=TXS, inc=INC) => { getTransactionsByCycle.mockResolvedValue({data:txs,error:null}); getIncomeSources.mockResolvedValue({data:inc,error:null}); getCyclesForCentre.mockResolvedValue({data:[CUR_CYCLE],error:null}); return renderHook(()=>useFinance({centre:C,categories:CATS})); };
 describe('useFinance — derived values', () => {
   beforeEach(()=>{ vi.clearAllMocks(); });
   it('loads txs and incomes on mount', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.txs).toHaveLength(2); expect(result.current.incomes).toHaveLength(2); });
@@ -35,8 +38,8 @@ describe('useFinance — derived values', () => {
   it('from_spare:true tx does not affect Budget Health numerator', async()=>{ const extra=[...TXS,{id:'tx-3',type:'expense',amount:5000,category_name:'Groceries',date:'2026-05-20',week:'Week 3',currency:'GHS',source:'main_app',from_spare:true,_optimistic:false}]; const{result}=go(extra); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.healthPct).toBe(Math.round((200/700)*100)); });
   it('mixed from_spare flags partition correctly', async()=>{ const extra=[...TXS,{id:'tx-3',type:'expense',amount:300,category_name:'Other',date:'2026-05-20',week:'Week 3',currency:'GHS',source:'main_app',from_spare:false,_optimistic:false},{id:'tx-4',type:'expense',amount:400,category_name:'Other',date:'2026-05-20',week:'Week 3',currency:'GHS',source:'main_app',from_spare:true,_optimistic:false}]; const{result}=go(extra); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.budgetSpend).toBe(500); expect(result.current.spareSpend).toBe(400); });
   it('nextUnpaid returns first unpaid income', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.nextUnpaid.label).toBe('Dita Salary'); });
-  it('returns empty arrays when no centreId', async()=>{ getTransactionsByMonth.mockResolvedValue({data:[],error:null}); getIncomeSources.mockResolvedValue({data:[],error:null}); const{result}=renderHook(()=>useFinance({centre:null,categories:[]})); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.txs).toEqual([]); });
-  it('sets error when tx load fails', async()=>{ getTransactionsByMonth.mockResolvedValue({data:[],error:{message:'DB error'}}); getIncomeSources.mockResolvedValue({data:[],error:null}); const{result}=renderHook(()=>useFinance({centre:C,categories:CATS})); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.error).toBe('DB error'); });
+  it('returns empty arrays when no centreId', async()=>{ getTransactionsByCycle.mockResolvedValue({data:[],error:null}); getIncomeSources.mockResolvedValue({data:[],error:null}); const{result}=renderHook(()=>useFinance({centre:null,categories:[]})); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.txs).toEqual([]); });
+  it('sets error when tx load fails', async()=>{ getTransactionsByCycle.mockResolvedValue({data:[],error:{message:'DB error'}}); getIncomeSources.mockResolvedValue({data:[],error:null}); getCyclesForCentre.mockResolvedValue({data:[CUR_CYCLE],error:null}); const{result}=renderHook(()=>useFinance({centre:C,categories:CATS})); await waitFor(()=>expect(result.current.error).toBe('DB error')); });
 
   // T2 (Phase 2A) — red-first anchor. allIncomes holds every month; `incomes`
   // is the active-month slice. Pre-2A `incomes` returned ALL rows → this is RED
@@ -70,7 +73,7 @@ describe('useFinance — cycles', () => {
   const PAST    = { id:'cyc-old', budget_centre_id:'centre-1', name:'Old',     start_date:'2000-01-01', end_date:'2000-01-31', anchor_type:'calendar', deleted_at:null };
 
   const goCycles = (cyclesData) => {
-    getTransactionsByMonth.mockResolvedValue({ data: [], error: null });
+    getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
     getIncomeSources.mockResolvedValue({ data: [], error: null });
     getCyclesForCentre.mockResolvedValue({ data: cyclesData, error: null });
     return renderHook(() => useFinance({ centre: C, categories: CATS }));
@@ -102,7 +105,7 @@ describe('useFinance — cycles', () => {
   });
 
   it('handles a CYC01 race by refetching without surfacing an error', async () => {
-    getTransactionsByMonth.mockResolvedValue({ data: [], error: null });
+    getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
     getIncomeSources.mockResolvedValue({ data: [], error: null });
     getCyclesForCentre
       .mockResolvedValueOnce({ data: [PAST], error: null })          // gap → triggers auto-create
@@ -125,16 +128,16 @@ describe('useFinance — cycles', () => {
     await waitFor(() => expect(result.current.cycles).toHaveLength(2));
   });
 
-  it('loadCycle selects the cycle AND bridges the month-keyed load to its month', async () => {
+  it('loadCycle selects the cycle AND the gated loader fetches that cycle by id', async () => {
     const APR = { id:'cyc-apr', budget_centre_id:'centre-1', name:'April 2026', start_date:'2026-04-01', end_date:'2026-04-30', anchor_type:'calendar', deleted_at:null };
     const { result } = goCycles([CURRENT, APR]);
     await waitFor(() => expect(result.current.cycles).toHaveLength(2));
-    getTransactionsByMonth.mockClear();
+    getTransactionsByCycle.mockClear();
 
     await act(async () => { result.current.loadCycle('cyc-apr'); });
     await waitFor(() => expect(result.current.activeCycleId).toBe('cyc-apr'));
-    expect(result.current.activeMonth).toBe('2026-04');                       // bridged
-    expect(getTransactionsByMonth).toHaveBeenCalledWith('centre-1', '2026-04'); // data followed
+    expect(result.current.activeMonth).toBe('2026-04');                            // activeMonth still bridged (income slice)
+    await waitFor(() => expect(getTransactionsByCycle).toHaveBeenCalledWith('centre-1', 'cyc-apr')); // read by cycle id
   });
 
   it('loadCycle is a no-op returning null for an unknown id', async () => {

@@ -19,7 +19,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { getTransactionsByMonth, addTransaction as dbAddTransaction, updateTransaction as dbUpdateTransaction, deleteTransaction as dbDeleteTransaction } from '../services/transactions.service';
+import { getTransactionsByCycle, addTransaction as dbAddTransaction, updateTransaction as dbUpdateTransaction, deleteTransaction as dbDeleteTransaction } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
 import { getCyclesForCentre, createCalendarCycle } from '../services/cycles.service';
 import { getActiveCycle } from '../lib/cycles';
@@ -62,9 +62,9 @@ export function useFinance({ centre, categories }) {
 
   // ── Load functions ────────────────────────────────────────────────────────
 
-  const loadTxs = useCallback(async (month) => {
+  const loadTxs = useCallback(async (cycleId) => {
     if (!centreId) return { data: [], error: null };
-    const result = await getTransactionsByMonth(centreId, month);
+    const result = await getTransactionsByCycle(centreId, cycleId);
     if (result.error) console.error('[useFinance] loadTxs error:', result.error.message);
     return result;
   }, [centreId]);
@@ -79,7 +79,13 @@ export function useFinance({ centre, categories }) {
     return result;
   }, [centreId]);
 
-  const load = useCallback(async (month) => {
+  // Transactions are read by cycle_id (Commit 11). `cycleId` is resolved by the
+  // gated loader effect below (after activeCycle is derived) — never undefined once
+  // we reach the Promise.all. Income still loads all-months (deferred to the
+  // client-slice migration); activeMonth state drives its `incomes` slice, so load
+  // needs only the cycle id. The full guard stack (centre validity, waitForSession,
+  // stale-clear) is preserved exactly — see useFinance.race.test.js.
+  const load = useCallback(async (cycleId) => {
     if (!centreId) { setTxs([]); setAllIncomes([]); setLoaded(true); setLoading(false); return; }
 
     setLoading(true);
@@ -98,8 +104,12 @@ export function useFinance({ centre, categories }) {
       return;
     }
 
+    // Cycles settled but none resolved yet (brand-new hub, auto-create in flight).
+    // Hold WITHOUT flipping `loaded` — a successful-empty here would be a phantom.
+    if (!cycleId) { setLoading(false); return; }
+
     const [txResult, incomeResult] = await Promise.all([
-      loadTxs(month),
+      loadTxs(cycleId),
       loadIncomes(),
     ]);
 
@@ -113,10 +123,6 @@ export function useFinance({ centre, categories }) {
     if (ok) setLoaded(true);
     setLoading(false);
   }, [centreId, loadTxs, loadIncomes]);
-
-  useEffect(() => {
-    load(activeMonth);
-  }, [load, activeMonth]);
 
   // ── Cycles ──────────────────────────────────────────────────────────────────
   // Loaded once per centre (keyed on centreId, NOT activeMonth) — cycles span the
@@ -144,6 +150,21 @@ export function useFinance({ centre, categories }) {
   useEffect(() => { setActiveCycleId(null); }, [centreId]);
 
   const activeCycle = useMemo(() => getActiveCycle(cycles, getToday()), [cycles]);
+
+  // Gated loader (Commit 11) — the SOLE trigger of load(). Transactions read by
+  // cycle_id, so we must wait for cycles to settle, then resolve the cycle id via
+  // the viewedCycle fallback (activeCycleId is null until the user navigates; the
+  // auto-resolved activeCycle covers mount). loadMonth/loadCycle/reload are
+  // state-setters only — never call load() directly, or the page double-fetches.
+  // The !centreId branch still routes through load() so its clear/loaded handling
+  // runs; the cyclesLoading gate plus load()'s own cid-guard cover the in-flight
+  // cases without ever presenting a phantom empty. See useFinance.race.test.js.
+  useEffect(() => {
+    if (!centreId)      { load(null); return; }
+    if (cyclesLoading)  return;
+    const cid = activeCycleId ?? activeCycle?.id;
+    load(cid);
+  }, [centreId, cyclesLoading, activeCycleId, activeCycle?.id, load]);
 
   // Auto-create the current calendar cycle when today falls in a gap (no cycle
   // covers it). Silent in Commit 4 — the "new period" toast lands with the view
@@ -298,14 +319,17 @@ export function useFinance({ centre, categories }) {
 
   // ── Month navigation ──────────────────────────────────────────────────────
 
-  const loadMonth = useCallback(async (month) => {
+  // State-setter only (Commit 11). The gated loader effect is the sole trigger of
+  // load() — calling load() here too would double-fetch on every navigation.
+  // activeMonth still drives the income `incomes` client slice (income read is
+  // deferred), so navigation keeps setting it.
+  const loadMonth = useCallback((month) => {
     setActiveMonth(month);
-    await load(month);
-  }, [load]);
+  }, []);
 
-  // Cycle navigation (Budget Cycles). Selects a cycle AND bridges to the
-  // month-keyed data layer (loadMonth) so the loaded month tracks the cycle —
-  // calendar cycles are 1:1 with months. Both state updates batch into one render.
+  // Cycle navigation (Budget Cycles). Selects a cycle AND bridges activeMonth to
+  // it (income slice follows) — calendar cycles are 1:1 with months. Both state
+  // updates batch into one render; the gated effect then loads the new cycle.
   const loadCycle = useCallback((cycleId) => {
     const cycle = cycles.find(c => c.id === cycleId);
     if (!cycle) return null;
@@ -316,7 +340,12 @@ export function useFinance({ centre, categories }) {
 
   // ── Reload ────────────────────────────────────────────────────────────────
 
-  const reload = useCallback(() => load(activeMonth), [load, activeMonth]);
+  // Re-fetch the currently-viewed cycle. Resolves the cid via the same viewedCycle
+  // fallback the gated effect uses (activeCycleId is null until the user navigates).
+  const reload = useCallback(
+    () => load(activeCycleId ?? activeCycle?.id),
+    [load, activeCycleId, activeCycle?.id],
+  );
 
   // ── Preferences ───────────────────────────────────────────────────────────
 

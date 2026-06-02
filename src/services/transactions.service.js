@@ -39,7 +39,34 @@ export const getTransactions = async (centreId) => {
 };
 
 /**
- * Fetch transactions for a specific month.
+ * Fetch transactions for a specific cycle (Budget Cycles, Commit 11).
+ *
+ * Filters on cycle_id — the storage-layer invariant stamped by the Commit 10
+ * trigger (scripts/migrate_cycle_id_trigger.sql) guarantees every live row carries
+ * the id of the cycle containing its date, so this replaces the old date-range read.
+ *
+ * @param {string} centreId
+ * @param {string} cycleId — budget_cycles.id
+ */
+export const getTransactionsByCycle = async (centreId, cycleId) => {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('budget_centre_id', centreId)
+    .eq('cycle_id', cycleId)
+    .is('deleted_at', null)
+    .order('date', { ascending: false });
+
+  if (error) console.error('[transactions.service] getTransactionsByCycle error:', error.message);
+  if (!error) warnOnEmptyColdLoad('transactions', data);
+  // Never mask a failure as []: error → data null; success → always an array. See CLAUDE.md §12.
+  return { data: error ? null : (data || []), error };
+};
+
+/**
+ * @deprecated Commit 11 — superseded by getTransactionsByCycle (cycle_id read).
+ * Retained for one commit cycle; removed in the Commit 13 post-month-drop cleanup.
+ * No live caller remains — useFinance reads by cycle. Do not wire into new code.
  *
  * @param {string} centreId
  * @param {string} month — 'YYYY-MM'

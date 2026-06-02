@@ -53,9 +53,18 @@ export const mockMembers = [
   { id: 'mem-2', user_id: 'user-2', role: 'standard', joined_at: '2026-02-15T00:00:00Z', users: { name: 'Dita',     email: 'dita@test.com' } },
 ];
 
+// Budget cycles (Commit 4+). THIS_CYCLE contains today (string-compared ISO dates
+// with a '-31' upper bound, matching getActiveCycle's containment test); LAST_CYCLE
+// backs cross-cycle fixtures. cycle_id on the rows below references these ids — the
+// storage-layer invariant (Commit 10 trigger) means every live row carries one.
+export const mockCycles = [
+  { id: 'cyc-this', budget_centre_id: 'c1', name: 'This Cycle', start_date: THIS_MONTH + '-01', end_date: THIS_MONTH + '-31', anchor_type: 'calendar', deleted_at: null },
+  { id: 'cyc-last', budget_centre_id: 'c1', name: 'Last Cycle', start_date: LAST_MONTH + '-01', end_date: LAST_MONTH + '-31', anchor_type: 'calendar', deleted_at: null },
+];
+
 export const mockIncomes = [
-  { id: 'inc-1', label: 'Adjei Salary', expected_amount: 30000, received: true,  received_amount: 30000, currency: 'GHS', pay_day: 31, pay_day_type: 'last_working_day', month: THIS_MONTH },
-  { id: 'inc-2', label: 'Dita Salary',  expected_amount: 15000, received: false, received_amount: 0,     currency: 'GHS', pay_day: 25, pay_day_type: 'fixed_date',       month: THIS_MONTH },
+  { id: 'inc-1', label: 'Adjei Salary', expected_amount: 30000, received: true,  received_amount: 30000, currency: 'GHS', pay_day: 31, pay_day_type: 'last_working_day', month: THIS_MONTH, cycle_id: 'cyc-this' },
+  { id: 'inc-2', label: 'Dita Salary',  expected_amount: 15000, received: false, received_amount: 0,     currency: 'GHS', pay_day: 25, pay_day_type: 'fixed_date',       month: THIS_MONTH, cycle_id: 'cyc-this' },
 ];
 
 export const mockTxs = [
@@ -71,6 +80,7 @@ export const mockTxs = [
     logged_by_name:      'Johannan',
     logged_by_user_id:   'user-1',
     description:         'Weekly shop',
+    cycle_id:            'cyc-this',
     _optimistic:         false,
   },
   {
@@ -84,6 +94,7 @@ export const mockTxs = [
     source:          'main_app',
     logged_by_name:  'Johannan',
     description:     '',
+    cycle_id:        'cyc-this',
     _optimistic:     false,
   },
 ];
