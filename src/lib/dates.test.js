@@ -1,9 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { getCurrentMonth, isPastMonth, formatMonth } from './dates';
+import { getCurrentMonth, getToday, isPastMonth, formatMonth } from './dates';
 
 describe('getCurrentMonth', () => {
   it('returns a YYYY-MM string', () => {
     expect(getCurrentMonth()).toMatch(/^\d{4}-\d{2}$/);
+  });
+});
+
+describe('getToday', () => {
+  it('returns a YYYY-MM-DD string', () => {
+    expect(getToday()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('matches the UTC date (and shares the YYYY-MM prefix with getCurrentMonth)', () => {
+    expect(getToday()).toBe(new Date().toISOString().slice(0, 10));
+    expect(getToday().slice(0, 7)).toBe(getCurrentMonth());
   });
 });
 

@@ -34,6 +34,10 @@ vi.mock('../services/income.service', () => ({
   getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(),
   updateExpectedAmount: vi.fn(), addIncomeSource: vi.fn(), deleteIncomeSource: vi.fn(),
 }));
+vi.mock('../services/cycles.service', () => ({
+  getCyclesForCentre:  vi.fn().mockResolvedValue({ data: [], error: null }),
+  createCalendarCycle: vi.fn().mockResolvedValue({ data: null, error: null }),
+}));
 vi.mock('../lib/storage', () => ({
   loadPrefs: () => ({ themeSkin: 'family_warmth' }),
   saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn(),

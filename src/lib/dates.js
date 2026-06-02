@@ -12,6 +12,12 @@
 export const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
 /**
+ * Today's date as 'YYYY-MM-DD' (UTC, matching DATE columns and getCurrentMonth).
+ * Hub-timezone-aware "today" (Intl conversion) is deferred — v1 assumes UTC parity.
+ */
+export const getToday = () => new Date().toISOString().slice(0, 10);
+
+/**
  * True if `month` ('YYYY-MM') is strictly before the current month.
  * Lexicographic compare is safe for zero-padded 'YYYY-MM'.
  */

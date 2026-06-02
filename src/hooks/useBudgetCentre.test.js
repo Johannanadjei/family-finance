@@ -2,7 +2,7 @@
  * hooks/useBudgetCentre.test.js
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act }              from '@testing-library/react';
 import { useBudgetCentre }                      from './useBudgetCentre';
 
@@ -60,7 +60,7 @@ vi.mock('../services/auth.service', () => ({
   getUserSession: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null }),
 }));
 
-import { getCentreById, archiveCentre, deleteCentre, unarchiveCentre } from '../services/centres.service';
+import { getCentreById, updateCentre, archiveCentre, deleteCentre, unarchiveCentre } from '../services/centres.service';
 import { getCategories, getAllCategories, addCategory, bulkAddCategories, updateCategory, deleteCategory } from '../services/categories.service';
 import { getMembers } from '../services/members.service';
 import { getCurrentMonth, offsetMonth } from '../lib/finance';
@@ -417,5 +417,45 @@ describe('useBudgetCentre — all-months categories (Phase 2D)', () => {
     await act(async () => { await result.current.deleteCategory('cat-1'); });
     expect(result.current.allCategories.some(c => c.id === 'cat-1')).toBe(false);
     expect(result.current.allCategories).toHaveLength(3);   // acat-3, acat-4, cat-2 remain
+  });
+});
+
+// ── Timezone self-correction (Budget Cycles, Commit 4) ────────────────────────
+// Intl resolves to the test environment's zone (usually UTC in CI), so the
+// effect's "browser zone" must be stubbed to a non-UTC value to observe a write.
+describe('useBudgetCentre — timezone self-correct', () => {
+  let tzSpy;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tzSpy = vi.spyOn(Intl, 'DateTimeFormat').mockReturnValue({
+      resolvedOptions: () => ({ timeZone: 'Africa/Accra' }),
+    });
+  });
+  afterEach(() => { tzSpy.mockRestore(); });
+
+  it("writes the browser zone when the hub timezone is still 'UTC'", async () => {
+    getCentreById.mockResolvedValue({ data: { ...mockCentre, timezone: 'UTC' }, error: null });
+    updateCentre.mockResolvedValue({ data: { ...mockCentre, timezone: 'Africa/Accra' }, error: null });
+
+    renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(updateCentre).toHaveBeenCalledWith('c-1', { timezone: 'Africa/Accra' }));
+  });
+
+  it('does NOT write when the hub timezone is already set', async () => {
+    getCentreById.mockResolvedValue({ data: { ...mockCentre, timezone: 'Europe/London' }, error: null });
+
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(updateCentre).not.toHaveBeenCalled();
+  });
+
+  it('swallows an RLS/update failure (does not throw, hub stays usable)', async () => {
+    getCentreById.mockResolvedValue({ data: { ...mockCentre, timezone: 'UTC' }, error: null });
+    updateCentre.mockResolvedValue({ data: null, error: { message: 'permission denied' } });
+
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(updateCentre).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.centre?.id).toBe('c-1');   // still usable; error swallowed
   });
 });

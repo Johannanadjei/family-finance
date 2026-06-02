@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { useFinance } from './useFinance';
 vi.mock('../lib/auth', () => ({ waitForSession: vi.fn().mockResolvedValue({ data: { session: { expires_at: 9999999999 } }, error: null }), warnOnEmptyColdLoad: vi.fn(), sessionAgeMs: vi.fn(() => 0) }));
 vi.mock('../services/transactions.service', () => ({ getTransactionsByMonth: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn() }));
 vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn() }));
+vi.mock('../services/cycles.service', () => ({ getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }), createCalendarCycle: vi.fn().mockResolvedValue({ data: null, error: null }) }));
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
 import { getTransactionsByMonth } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
-import { getCurrentMonth } from '../lib/dates';
+import { getCyclesForCentre, createCalendarCycle } from '../services/cycles.service';
+import { getCurrentMonth, getToday } from '../lib/dates';
 const C = { id:'centre-1', currency:'GHS', surplus_target:4500 };
 const CATS = [{ id:'cat-1', name:'Groceries', icon:'🛒', budget_amount:500, is_fixed:true },{ id:'cat-2', name:'Transport', icon:'🚗', budget_amount:200, is_fixed:true }];
 // Sources are month-scoped (Phase 2A); useFinance derives `incomes` for the
@@ -51,5 +53,75 @@ describe('useFinance — derived values', () => {
     expect(result.current.incomes).toHaveLength(1);                    // only the active month
     expect(result.current.incomes[0].id).toBe('cur-1');
     expect(result.current.totalReceived).toBe(30000);                  // not 50000 — other months excluded
+  });
+});
+
+// ── Cycles (Budget Cycles, Commit 4) ──────────────────────────────────────────
+// Runs after the derived-values describe, so its per-test getCyclesForCentre
+// overrides never leak backwards into those (which use the factory default []).
+describe('useFinance — cycles', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  const TODAY = getToday();
+  const MONTH = TODAY.slice(0, 7);
+  // start_date '-01' <= today and end_date '-31' >= today for any day this month
+  // (lexicographic string compare on zero-padded ISO dates).
+  const CURRENT = { id:'cyc-cur', budget_centre_id:'centre-1', name:'Current', start_date: MONTH + '-01', end_date: MONTH + '-31', anchor_type:'calendar', deleted_at:null };
+  const PAST    = { id:'cyc-old', budget_centre_id:'centre-1', name:'Old',     start_date:'2000-01-01', end_date:'2000-01-31', anchor_type:'calendar', deleted_at:null };
+
+  const goCycles = (cyclesData) => {
+    getTransactionsByMonth.mockResolvedValue({ data: [], error: null });
+    getIncomeSources.mockResolvedValue({ data: [], error: null });
+    getCyclesForCentre.mockResolvedValue({ data: cyclesData, error: null });
+    return renderHook(() => useFinance({ centre: C, categories: CATS }));
+  };
+
+  it('loads cycles on mount via getCyclesForCentre(centreId)', async () => {
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
+    expect(getCyclesForCentre).toHaveBeenCalledWith('centre-1');
+  });
+
+  it('derives activeCycle as the cycle containing today', async () => {
+    const { result } = goCycles([PAST, CURRENT]);
+    await waitFor(() => expect(result.current.activeCycle).toBeTruthy());
+    expect(result.current.activeCycle.id).toBe('cyc-cur');
+  });
+
+  it('auto-creates the current cycle when today falls in a gap', async () => {
+    createCalendarCycle.mockResolvedValue({ data: CURRENT, error: null });
+    const { result } = goCycles([PAST]);   // no cycle covers today
+    await waitFor(() => expect(createCalendarCycle).toHaveBeenCalledWith('centre-1', MONTH));
+    expect(result.current.error).toBeNull();   // auto-create never surfaces to the UI
+  });
+
+  it('does NOT auto-create when a current cycle already exists', async () => {
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
+    expect(createCalendarCycle).not.toHaveBeenCalled();
+  });
+
+  it('handles a CYC01 race by refetching without surfacing an error', async () => {
+    getTransactionsByMonth.mockResolvedValue({ data: [], error: null });
+    getIncomeSources.mockResolvedValue({ data: [], error: null });
+    getCyclesForCentre
+      .mockResolvedValueOnce({ data: [PAST], error: null })          // gap → triggers auto-create
+      .mockResolvedValue({ data: [PAST, CURRENT], error: null });    // another client won → refetch sees current
+    createCalendarCycle.mockResolvedValue({ data: null, error: { code: 'CYC01', message: 'A cycle already exists' } });
+
+    const { result } = renderHook(() => useFinance({ centre: C, categories: CATS }));
+    await waitFor(() => expect(createCalendarCycle).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.activeCycle?.id).toBe('cyc-cur'));
+    expect(result.current.error).toBeNull();
+  });
+
+  it('exposes a working reloadCycles', async () => {
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
+    expect(typeof result.current.reloadCycles).toBe('function');
+
+    getCyclesForCentre.mockResolvedValue({ data: [CURRENT, PAST], error: null });
+    await act(async () => { await result.current.reloadCycles(); });
+    await waitFor(() => expect(result.current.cycles).toHaveLength(2));
   });
 });

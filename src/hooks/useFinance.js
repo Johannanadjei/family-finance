@@ -18,9 +18,12 @@
  * - txs always reflects current month unless loadMonth() is called
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getTransactionsByMonth, addTransaction as dbAddTransaction, updateTransaction as dbUpdateTransaction, deleteTransaction as dbDeleteTransaction } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
+import { getCyclesForCentre, createCalendarCycle } from '../services/cycles.service';
+import { getActiveCycle } from '../lib/cycles';
+import { getToday } from '../lib/dates';
 import {
   calcTotalIncome, calcTotalSpent, calcBudgetUsedPct,
   getBudgetStatusFromBudget, calcTotalFixed, calcFixedSpent,
@@ -45,6 +48,10 @@ export function useFinance({ centre, categories }) {
   // activeMonth slice derived from it — Payday/Home read the slice.
   const [allIncomes,     setAllIncomes]     = useState([]);
   const [activeMonth,    setActiveMonth]    = useState(getCurrentMonth());
+  // Cycles are hub-scoped (not month-scoped) — loaded once per centre, never on
+  // month navigation. activeCycle is derived; auto-create fills a gap silently.
+  const [cycles,         setCycles]         = useState([]);
+  const [cyclesLoading,  setCyclesLoading]  = useState(true);
   const [loading,        setLoading]        = useState(true);
   const [loaded,         setLoaded]         = useState(false);
   const [error,          setError]          = useState(null);
@@ -107,6 +114,49 @@ export function useFinance({ centre, categories }) {
   useEffect(() => {
     load(activeMonth);
   }, [load, activeMonth]);
+
+  // ── Cycles ──────────────────────────────────────────────────────────────────
+  // Loaded once per centre (keyed on centreId, NOT activeMonth) — cycles span the
+  // whole hub, so month navigation must not refetch them.
+  const loadCycles = useCallback(async () => {
+    if (!centreId) { setCycles([]); setCyclesLoading(false); return; }
+    setCyclesLoading(true);
+    const { error: sessionErr } = await waitForSession();
+    if (sessionErr) {
+      console.error('[useFinance] loadCycles session not ready:', sessionErr.message);
+      setCyclesLoading(false);
+      return;
+    }
+    const { data, error } = await getCyclesForCentre(centreId);
+    if (error) console.error('[useFinance] loadCycles error:', error.message);
+    setCycles(data || []);
+    setCyclesLoading(false);
+  }, [centreId]);
+
+  useEffect(() => { loadCycles(); }, [loadCycles]);
+
+  const activeCycle = useMemo(() => getActiveCycle(cycles, getToday()), [cycles]);
+
+  // Auto-create the current calendar cycle when today falls in a gap (no cycle
+  // covers it). Silent in Commit 4 — the "new period" toast lands with the view
+  // migrations (Commits 5-9). The ref guards one attempt per hub so a benign
+  // failure or a CYC01 race can't loop (cyclesLoading toggling re-runs this).
+  const autoCreateRef = useRef(null);
+  useEffect(() => {
+    if (cyclesLoading || !centreId || cycles.length === 0) return;
+    const today = getToday();
+    const hasCurrent = cycles.some(c => !c.deleted_at && c.start_date <= today && c.end_date >= today);
+    if (hasCurrent) { autoCreateRef.current = centreId; return; }
+    if (autoCreateRef.current === centreId) return;   // already attempted for this hub
+    autoCreateRef.current = centreId;
+    createCalendarCycle(centreId, today.slice(0, 7)).then(({ error }) => {
+      if (error && error.code !== 'CYC01') {
+        console.error('[useFinance] auto-create cycle error:', error.message);
+        return;
+      }
+      loadCycles();   // success or lost-the-race (CYC01) → refetch to pick up the cycle
+    });
+  }, [cycles, cyclesLoading, centreId]);
 
   // ── Derived values ────────────────────────────────────────────────────────
 
@@ -274,6 +324,11 @@ export function useFinance({ centre, categories }) {
     incomes,        // activeMonth slice — Payday / Home / totals
     allIncomes,     // every month — Settings' all-months view
     activeMonth,
+
+    // Cycles (Budget Cycles) — hub-scoped; views migrate to these in Commits 5-9
+    cycles,
+    activeCycle,
+    reloadCycles: loadCycles,
 
     // Derived financial values
     monthlyIncome,

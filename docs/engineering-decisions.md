@@ -2452,3 +2452,76 @@ the privileged create; the pure date-window picker stays deferred to Commit 4.
   the mocked error shape (incl. SQLSTATE). They do NOT exercise the RPC; the RPC is
   validated manually in the Supabase SQL editor — noted in both the test header and here
   so the coverage boundary is explicit, not silent (§12 spirit).
+
+---
+
+## [2026-06-02] Commit 4 — Budget Cycles picker + hook layer
+
+**Context:**
+Fourth Cycles commit: the pure date-window pickers and the hook-layer wiring that
+makes a cycle "active". This is the first commit where cycles drive runtime state.
+Scope was deliberately limited to the picker + hooks; view-layer consumption (nav
+labels, the "new period" toast) is deferred to the per-view migrations (Commits
+5-9). activeMonth/loadMonth are left fully intact so existing views keep working
+unchanged until each is migrated.
+
+**Decisions:**
+- lib/cycles.js holds the pickers as PURE functions (getActiveCycle,
+  getCycleContainingDate) — not in the service, not inline in the hook. Pure means
+  unit-tested with no mocks and reused later by views without React coupling.
+- Date windows compare as STRINGS. budget_cycles.start_date/end_date are 'YYYY-MM-DD';
+  for zero-padded ISO dates lexicographic order equals chronological, so containment
+  (start <= d && end >= d) and ordering (.localeCompare) need no Date parsing.
+- getActiveCycle priority: cycle containing today → most recently ended (gap day) →
+  earliest upcoming (brand-new hub) → null. The gap-day fallback is what keeps the UI
+  on the last real cycle between cycles instead of going blank.
+- Cycle state lives in useFinance (NOT a new dedicated hook). FinanceProvider is a
+  pass-through (value={value}) and App.jsx spreads the hook result, so cycles /
+  activeCycle / reloadCycles auto-propagate through context with zero App/Context
+  edits. useFinance lands at 384/450 lines — extraction wasn't needed.
+- The cycle loader is keyed on centreId ONLY (separate useEffect), never folded into
+  load(month). Cycles are hub-scoped, not month-scoped — month navigation must not
+  refetch them. The loader still awaits waitForSession() like every other first fetch
+  (§12 cold-load gate).
+- Auto-create is SILENT in Commit 4. When today falls in a gap, useFinance calls the
+  create_calendar_cycle RPC and refetches. The "Started a new period — [name]" toast
+  is inherently view-layer (Toast state is owned by DashboardShell, there is no global
+  showToast), so it lands with the view migrations (5-9), not here.
+- Auto-create is guarded by a useRef (one attempt per hub). loadCycles toggles
+  cyclesLoading, which is an effect dependency, so without the guard a benign failure
+  or a CYC01 race (where the refetch still shows no current cycle) would re-trigger the
+  effect on every cyclesLoading flip and loop. The ref pins it to one attempt per
+  centreId; a hub switch re-arms it.
+- Timezone self-correct lives in useBudgetCentre (it owns `centre` + the only centre
+  write path). It is best-effort: when the hub timezone is still 'UTC', write the
+  browser zone (Intl.DateTimeFormat().resolvedOptions().timeZone). It calls the
+  centres service DIRECTLY (not the optimistic updateCentre wrapper) so the effect
+  deps stay stable primitives [centre?.id, centre?.timezone]. A standard member's
+  RLS-blocked write is swallowed and logged — the hub self-heals on the next
+  owner/full_access load. UTC remains a safe fallback meanwhile.
+- getToday() (lib/dates) returns UTC 'YYYY-MM-DD', mirroring getCurrentMonth's UTC
+  slice. Hub-timezone-aware "today" (Intl conversion) is deferred until cross-timezone
+  audiences are active.
+- centres.service updateCentre gained 'timezone' in its field whitelist
+  (String-coerced). One line; no dedicated updateCentreTimezone — extract only if a
+  second caller appears.
+
+**Scope grew 8 → 10 (→ 11 with this log):**
+useFinance.race.test.js and useFinance.income-mutations.test.js both render useFinance
+but mocked neither cycles.service nor lib/supabase. The new
+`import { getCyclesForCentre } from cycles.service` would have made them hit the real
+client on mount and break. Both needed the cycles.service mock added. (The locked
+8-file list also omitted useBudgetCentre.test.js, which the test plan required — so the
+true code/test touch was 11, plus this entry.)
+
+**Rules derived:**
+- When a hook gains a new service import, EVERY test file that renders that hook needs
+  the mock — including sibling suites that test unrelated behaviour. A new import is a
+  cross-cutting change to the hook's whole test surface, not just its own test file.
+- Vitest mock-factory defaults (`vi.fn().mockResolvedValue(...)` inside vi.mock)
+  SURVIVE vi.clearAllMocks() — clearAllMocks resets call history, not implementations.
+  Use factory-level defaults for "sticky" mocks that must stay valid across a suite's
+  beforeEach without being re-stubbed per test.
+- Auto-create / self-healing effects need a ref guard when the create's side effect
+  (here: toggling a loading flag that is itself a dependency) can re-enter the effect.
+  Gate on a stable key (centreId) so the attempt fires once per context, not in a loop.

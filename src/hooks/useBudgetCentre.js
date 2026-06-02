@@ -197,6 +197,21 @@ export function useBudgetCentre(user, centreId) {
     return { data, error: null };
   }, [centre]);
 
+  // Self-correct the hub timezone from its 'UTC' default to the browser's zone on
+  // first cycle-aware load (Budget Cycles). Best-effort, fire-and-forget: a standard
+  // member's write is RLS-blocked and swallowed — the hub self-heals on the next
+  // owner/full_access load. Calls the service directly so the dep array stays
+  // stable primitives (the optimistic updateCentre wrapper recreates per render).
+  useEffect(() => {
+    if (!centre?.id || centre.timezone !== 'UTC') return;
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!browserTz || browserTz === 'UTC') return;
+    updateCentreService(centre.id, { timezone: browserTz }).then(({ data, error }) => {
+      if (error) { console.error('[useBudgetCentre] timezone self-correct failed:', error.message); return; }
+      if (data) setCentre(prev => (prev && prev.id === data.id ? data : prev));
+    });
+  }, [centre?.id, centre?.timezone]);
+
   const updateCategory = useCallback(async (categoryId, updates) => {
     const prevAll = allCategories;
     setAllCategories(cats => cats.map(c => c.id === categoryId ? { ...c, ...updates } : c));

@@ -142,6 +142,7 @@ export const updateCentre = async (centreId, updates) => {
     if (updates.icon     !== undefined) cleaned.icon           = updates.icon || '🏠';
     if (updates.skin_id  !== undefined) cleaned.skin_id        = updates.skin_id;
     if (updates.type     !== undefined) cleaned.type           = updates.type;
+    if (updates.timezone !== undefined) cleaned.timezone       = String(updates.timezone);
   } catch (e) {
     console.error('[centres.service] updateCentre validation error:', e.message);
     return { data: null, error: e };
