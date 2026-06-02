@@ -10,8 +10,8 @@ import { getCurrentMonth, offsetMonth } from '../lib/finance';
 import { mockCentre, mockFmt, mockCategories, mockPrevMonthCategories, mockTxs } from '../test-utils/fixtures';
 
 // Mutable so tests can flip `allCategories` empty to exercise the rollforward state.
-// BudgetView now reads allCategories (filters the viewed cycle's month locally) and
-// recomputes spend from txs — so the mock provides those, not pre-derived totals.
+// BudgetView reads allCategories and filters the viewed cycle locally by cycle_id
+// (Commit 11.5), recomputing spend from txs — so the mock provides those, not totals.
 const mockBudgetCentre = {
   centre:                  mockCentre,
   fmt:                     mockFmt,
@@ -27,14 +27,21 @@ vi.mock('../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => mockBudgetCentre,
 }));
 
+// Categories slice by cycle_id now (Commit 11.5); mockCategories carry cycle_id
+// 'cyc-this', so the default finance state must expose a current cycle of that id.
+// Its name is the current-month label so the period-label assertion is unchanged.
+const CM       = getCurrentMonth();
+const CM_LABEL = new Date(CM + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+const THIS_CYCLE = { id: 'cyc-this', name: CM_LABEL, start_date: CM + '-01', end_date: CM + '-31', deleted_at: null };
+
 const mockFinance = {
   loading:       false,
   error:         null,
   txs:           mockTxs,             // one Groceries expense (200) + one income
   activeMonth:   getCurrentMonth(),
-  cycles:        [],                  // default empty → month-based fallback path
-  activeCycle:   null,
-  activeCycleId: null,
+  cycles:        [THIS_CYCLE],
+  activeCycle:   THIS_CYCLE,
+  activeCycleId: null,                // null → follows the auto-resolved current cycle
   loadCycle:     vi.fn(),
 };
 
@@ -132,7 +139,7 @@ describe('BudgetView', () => {
     fireEvent.click(screen.getByTestId('copy-all-categories-btn'));
     const currentMonth = getCurrentMonth();
     const prevMonth    = offsetMonth(currentMonth, -1);
-    await waitFor(() => expect(copyFn).toHaveBeenCalledWith(prevMonth, currentMonth, undefined));
+    await waitFor(() => expect(copyFn).toHaveBeenCalledWith(prevMonth, currentMonth, undefined, 'cyc-this'));
     mockBudgetCentre.copyCategoriesToMonth = vi.fn().mockResolvedValue({ data: [], error: null });
     resetCats();
   });
@@ -161,14 +168,14 @@ describe('BudgetView — cycles', () => {
   afterEach(reset);
 
   it('labels the header with the viewed cycle name', () => {
-    mockBudgetCentre.allCategories = [{ id: 'm1', name: 'Rent', icon: '🏠', budget_amount: 1000, is_fixed: true, sort_order: 0, month: '2026-05' }];
+    mockBudgetCentre.allCategories = [{ id: 'm1', name: 'Rent', icon: '🏠', budget_amount: 1000, is_fixed: true, sort_order: 0, month: '2026-05', cycle_id: 'cyc-may' }];
     setFinance({ cycles: [MAY, APR], activeCycle: MAY });
     renderView();
     expect(screen.getByTestId('budget-period-label').textContent).toBe('May 2026');
   });
 
   it('Next disabled on the latest cycle; Prev navigates to the older cycle', () => {
-    mockBudgetCentre.allCategories = [{ id: 'm1', name: 'Rent', icon: '🏠', budget_amount: 1000, is_fixed: true, sort_order: 0, month: '2026-05' }];
+    mockBudgetCentre.allCategories = [{ id: 'm1', name: 'Rent', icon: '🏠', budget_amount: 1000, is_fixed: true, sort_order: 0, month: '2026-05', cycle_id: 'cyc-may' }];
     setFinance({ cycles: [MAY, APR], activeCycle: MAY });
     renderView();
     expect(screen.getByLabelText('Next period').disabled).toBe(true);
@@ -178,9 +185,9 @@ describe('BudgetView — cycles', () => {
 
   it('viewedCategories is the viewed cycle\'s slice — filters other months and soft-deleted rows', () => {
     mockBudgetCentre.allCategories = [
-      { id: 'm-may',  name: 'May Rent',   icon: '🏠', budget_amount: 1000, is_fixed: true, sort_order: 0, month: '2026-05' },
-      { id: 'm-apr',  name: 'April Rent', icon: '🏠', budget_amount: 900,  is_fixed: true, sort_order: 0, month: '2026-04' },
-      { id: 'm-del',  name: 'Deleted',    icon: '🗑️', budget_amount: 50,   is_fixed: true, sort_order: 1, month: '2026-05', deleted_at: '2026-05-02' },
+      { id: 'm-may',  name: 'May Rent',   icon: '🏠', budget_amount: 1000, is_fixed: true, sort_order: 0, month: '2026-05', cycle_id: 'cyc-may' },
+      { id: 'm-apr',  name: 'April Rent', icon: '🏠', budget_amount: 900,  is_fixed: true, sort_order: 0, month: '2026-04', cycle_id: 'cyc-apr' },
+      { id: 'm-del',  name: 'Deleted',    icon: '🗑️', budget_amount: 50,   is_fixed: true, sort_order: 1, month: '2026-05', cycle_id: 'cyc-may', deleted_at: '2026-05-02' },
     ];
     setFinance({ cycles: [MAY, APR], activeCycleId: 'cyc-may', activeCycle: MAY });
     renderView();
@@ -194,8 +201,8 @@ describe('BudgetView — cycles', () => {
   // cycle must show THAT cycle's plan, not the current month's, and must not reset.
   it('viewing a past cycle shows that cycle\'s plan, not the current month (band-aid gone)', () => {
     mockBudgetCentre.allCategories = [
-      { id: 'm-may',  name: 'May Only',  icon: '🏠', budget_amount: 1000, is_fixed: true, sort_order: 0, month: '2026-05' },
-      { id: 'm-jun',  name: 'June Only', icon: '🏠', budget_amount: 1200, is_fixed: true, sort_order: 0, month: '2026-06' },
+      { id: 'm-may',  name: 'May Only',  icon: '🏠', budget_amount: 1000, is_fixed: true, sort_order: 0, month: '2026-05', cycle_id: 'cyc-may' },
+      { id: 'm-jun',  name: 'June Only', icon: '🏠', budget_amount: 1200, is_fixed: true, sort_order: 0, month: '2026-06', cycle_id: 'cyc-jun' },
     ];
     // today is June; viewing May (a past cycle)
     setFinance({ cycles: [{ id: 'cyc-jun', name: 'June 2026', start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null }, MAY], activeCycleId: 'cyc-may', activeCycle: { id: 'cyc-jun', name: 'June 2026', start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null } });
@@ -207,7 +214,7 @@ describe('BudgetView — cycles', () => {
 
   // ── Past-period mutation guard ──────────────────────────────────────────────
   it('adding on a past cycle opens the confirm modal instead of the add sheet', () => {
-    mockBudgetCentre.allCategories = [{ id: 'p1', name: 'Old Cat', icon: '🏠', budget_amount: 100, is_fixed: true, sort_order: 0, month: '2020-01' }];
+    mockBudgetCentre.allCategories = [{ id: 'p1', name: 'Old Cat', icon: '🏠', budget_amount: 100, is_fixed: true, sort_order: 0, month: '2020-01', cycle_id: 'cyc-2020' }];
     setFinance({ cycles: [PAST], activeCycleId: 'cyc-2020', activeCycle: PAST });
     renderView();
     fireEvent.click(screen.getByText('+ Add budget category'));
@@ -218,7 +225,7 @@ describe('BudgetView — cycles', () => {
   });
 
   it('Cancel on the guard aborts — no sheet, no mutation', () => {
-    mockBudgetCentre.allCategories = [{ id: 'p1', name: 'Old Cat', icon: '🏠', budget_amount: 100, is_fixed: true, sort_order: 0, month: '2020-01' }];
+    mockBudgetCentre.allCategories = [{ id: 'p1', name: 'Old Cat', icon: '🏠', budget_amount: 100, is_fixed: true, sort_order: 0, month: '2020-01', cycle_id: 'cyc-2020' }];
     setFinance({ cycles: [PAST], activeCycleId: 'cyc-2020', activeCycle: PAST });
     renderView();
     fireEvent.click(screen.getByText('+ Add budget category'));
@@ -228,7 +235,7 @@ describe('BudgetView — cycles', () => {
   });
 
   it('Continue on the guard proceeds — opens the add sheet', () => {
-    mockBudgetCentre.allCategories = [{ id: 'p1', name: 'Old Cat', icon: '🏠', budget_amount: 100, is_fixed: true, sort_order: 0, month: '2020-01' }];
+    mockBudgetCentre.allCategories = [{ id: 'p1', name: 'Old Cat', icon: '🏠', budget_amount: 100, is_fixed: true, sort_order: 0, month: '2020-01', cycle_id: 'cyc-2020' }];
     setFinance({ cycles: [PAST], activeCycleId: 'cyc-2020', activeCycle: PAST });
     renderView();
     fireEvent.click(screen.getByText('+ Add budget category'));

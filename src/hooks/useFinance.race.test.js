@@ -66,7 +66,7 @@ describe('useFinance — auth-readiness gate (data-loss-on-refresh)', () => {
     getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
     getIncomeSources.mockResolvedValue({ data: [], error: null });
 
-    renderHook(() => useFinance({ centre: C, categories: CATS }));
+    renderHook(() => useFinance({ centre: C, allCategories: CATS }));
 
     // Flush microtasks — the fetch must STILL be blocked behind the gate.
     await Promise.resolve();
@@ -84,7 +84,7 @@ describe('useFinance — auth-readiness gate (data-loss-on-refresh)', () => {
     getTransactionsByCycle.mockResolvedValue({ data: null, error: { message: 'permission denied' } });
     getIncomeSources.mockResolvedValue({ data: [], error: null });
 
-    const { result } = renderHook(() => useFinance({ centre: C, categories: CATS }));
+    const { result } = renderHook(() => useFinance({ centre: C, allCategories: CATS }));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe('permission denied');
     expect(result.current.loaded).toBe(false); // did not present a successful-empty
@@ -96,7 +96,7 @@ describe('useFinance — auth-readiness gate (data-loss-on-refresh)', () => {
     getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
     getIncomeSources.mockResolvedValue({ data: [], error: null });
 
-    const { result } = renderHook(() => useFinance({ centre: C, categories: CATS }));
+    const { result } = renderHook(() => useFinance({ centre: C, allCategories: CATS }));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe(null);
     expect(result.current.loaded).toBe(true);
@@ -106,7 +106,7 @@ describe('useFinance — auth-readiness gate (data-loss-on-refresh)', () => {
   it('blocks the fetch and surfaces an error when the session never readies', async () => {
     waitForSession.mockResolvedValue({ data: null, error: new Error('Session not established') });
 
-    const { result } = renderHook(() => useFinance({ centre: C, categories: CATS }));
+    const { result } = renderHook(() => useFinance({ centre: C, allCategories: CATS }));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(getTransactionsByCycle).not.toHaveBeenCalled();
     expect(result.current.error).toBeTruthy();

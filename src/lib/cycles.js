@@ -72,3 +72,36 @@ export function getCycleNav(cycles, currentCycleId) {
     isOldest: idx === -1 || idx === live.length - 1,             // last (or not found) → no older
   };
 }
+
+/**
+ * Slice cycle-keyed rows (categories, income sources) to one cycle. The canonical
+ * client-side period filter post-Commit-11: every live row carries a cycle_id
+ * (Commit 10 trigger + backfill), so membership is an id match — never a month
+ * string. A falsy cycleId returns [] (the loading-window contract — see
+ * docs/engineering-decisions.md), which also prevents null-cycle_id rows from
+ * leaking via a null === null match.
+ *
+ * @param {Array<{ cycle_id?: string|null }>} rows
+ * @param {string|null|undefined} cycleId
+ * @returns {Array}
+ */
+export function sliceByCycle(rows, cycleId) {
+  if (!cycleId) return [];
+  return rows.filter(r => r.cycle_id === cycleId);
+}
+
+/**
+ * Resolve the cycle id a 'YYYY-MM' month maps to, mirroring the resolve_cycle_id()
+ * database trigger (Commit 10): match on the cycle's start-month
+ * (to_char(start_date,'YYYY-MM') = month). Client and server share the cycles
+ * table as the single source of truth. Returns null when no live cycle covers the
+ * month — callers stamp on the result and refuse the write rather than insert a
+ * NULL cycle_id (the CYC02 invariant).
+ *
+ * @param {Array<{ id: string, start_date: string, deleted_at?: string|null }>} cycles
+ * @param {string} month — 'YYYY-MM'
+ * @returns {string|null}
+ */
+export function cycleIdForMonth(cycles, month) {
+  return cycles.find(c => !c.deleted_at && c.start_date.startsWith(month))?.id ?? null;
+}

@@ -62,14 +62,13 @@ export function BudgetView() {
   const isPast       = viewedCycle ? viewedCycle.end_date < today : viewedMonth < getCurrentMonth();
   const periodLabel  = viewedCycle?.name ?? formatMonth(activeMonth);
 
-  // Plan AND spend derive from the viewed cycle, not the clock. Plan = local filter
-  // of allCategories (Option B); spend = the lib functions recomputed against that
-  // plan + the bridged txs (which follow the viewed cycle's month). useFinance's
-  // categorySpend/fixedTotal/fixedSpent assume the current month, so we don't read
-  // them here — they would be wrong for a past cycle.
+  // Plan + spend derive from the VIEWED cycle. Local filter of allCategories by
+  // cycle_id (Commit 11.5 — month is dropped in Commit 13); spend recomputed from txs.
+  // useFinance's slices track activeCycle (current), which differs from viewedCycle when
+  // navigating past periods — so BudgetView keeps its own viewedCycle-scoped slice.
   const viewedCategories = useMemo(
-    () => allCategories.filter(c => c.month === viewedMonth && !c.deleted_at),
-    [allCategories, viewedMonth]
+    () => allCategories.filter(c => c.cycle_id === viewedCycle?.id && !c.deleted_at),
+    [allCategories, viewedCycle?.id]
   );
   const fixedTotal    = useMemo(() => calcTotalFixed(viewedCategories),         [viewedCategories]);
   const categorySpend = useMemo(() => calcCategorySpend(txs, viewedCategories), [txs, viewedCategories]);
@@ -89,7 +88,8 @@ export function BudgetView() {
   const handleCopy = async (categoryIds) => {
     setCopying(true);
     setCopyError(null);
-    const { data, error: err } = await copyCategoriesToMonth(prevMonth, viewedMonth, categoryIds);
+    // viewedCycle.id stamps the optimistic rows; the mutation refuses a NULL-cycle insert (CYC02).
+    const { data, error: err } = await copyCategoriesToMonth(prevMonth, viewedMonth, categoryIds, viewedCycle?.id);
     setCopying(false);
     if (err) { setCopyError("Couldn't copy. Try again."); return; }
     setCopySheetOpen(false);

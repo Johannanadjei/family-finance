@@ -26,26 +26,28 @@ export const mockCentre = {
 
 export const mockFmt = (n) => `GHS ${Math.round(n || 0).toLocaleString()}`;
 
+// cycle_id mirrors the Commit-10 trigger (stamped from month); the slice layer keys
+// on it (Commit 11.5). cyc-this / cyc-last reference mockCycles below.
 export const mockCategories = [
-  { id: 'cat-1', name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true,  sort_order: 0, month: THIS_MONTH },
-  { id: 'cat-2', name: 'Transport', icon: '🚗', budget_amount: 200, is_fixed: true,  sort_order: 1, month: THIS_MONTH },
+  { id: 'cat-1', name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true,  sort_order: 0, month: THIS_MONTH, cycle_id: 'cyc-this' },
+  { id: 'cat-2', name: 'Transport', icon: '🚗', budget_amount: 200, is_fixed: true,  sort_order: 1, month: THIS_MONTH, cycle_id: 'cyc-this' },
 ];
 
 // Previous month's categories — drives the Phase 2C budget-rollforward prompt.
 export const mockPrevMonthCategories = [
-  { id: 'pcat-1', name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true, sort_order: 0, month: LAST_MONTH },
-  { id: 'pcat-2', name: 'Transport', icon: '🚗', budget_amount: 200, is_fixed: true, sort_order: 1, month: LAST_MONTH },
-  { id: 'pcat-3', name: 'Fun',       icon: '🎉', budget_amount: 150, is_fixed: false, sort_order: 2, month: LAST_MONTH },
+  { id: 'pcat-1', name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true, sort_order: 0, month: LAST_MONTH, cycle_id: 'cyc-last' },
+  { id: 'pcat-2', name: 'Transport', icon: '🚗', budget_amount: 200, is_fixed: true, sort_order: 1, month: LAST_MONTH, cycle_id: 'cyc-last' },
+  { id: 'pcat-3', name: 'Fun',       icon: '🎉', budget_amount: 150, is_fixed: false, sort_order: 2, month: LAST_MONTH, cycle_id: 'cyc-last' },
 ];
 
 // All-months categories (Phase 2D) — spans THIS_MONTH + LAST_MONTH so tests can
-// assert the current-month slice vs the full all-months array. Month-desc then
+// assert the current-cycle slice vs the full all-months array. Month-desc then
 // sort_order-asc, matching getAllCategories' ordering.
 export const mockAllCategories = [
-  { id: 'cat-1',  name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true,  sort_order: 0, month: THIS_MONTH },
-  { id: 'cat-2',  name: 'Transport', icon: '🚗', budget_amount: 200, is_fixed: true,  sort_order: 1, month: THIS_MONTH },
-  { id: 'acat-3', name: 'Groceries', icon: '🛒', budget_amount: 480, is_fixed: true,  sort_order: 0, month: LAST_MONTH },
-  { id: 'acat-4', name: 'Holiday',   icon: '✈️', budget_amount: 300, is_fixed: false, sort_order: 1, month: LAST_MONTH },
+  { id: 'cat-1',  name: 'Groceries', icon: '🛒', budget_amount: 500, is_fixed: true,  sort_order: 0, month: THIS_MONTH, cycle_id: 'cyc-this' },
+  { id: 'cat-2',  name: 'Transport', icon: '🚗', budget_amount: 200, is_fixed: true,  sort_order: 1, month: THIS_MONTH, cycle_id: 'cyc-this' },
+  { id: 'acat-3', name: 'Groceries', icon: '🛒', budget_amount: 480, is_fixed: true,  sort_order: 0, month: LAST_MONTH, cycle_id: 'cyc-last' },
+  { id: 'acat-4', name: 'Holiday',   icon: '✈️', budget_amount: 300, is_fixed: false, sort_order: 1, month: LAST_MONTH, cycle_id: 'cyc-last' },
 ];
 
 export const mockMembers = [

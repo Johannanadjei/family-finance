@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getActiveCycle, getCycleContainingDate, getCycleNav } from './cycles';
+import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth } from './cycles';
 
 // Three non-overlapping calendar cycles. Dates are 'YYYY-MM-DD' strings.
 const APR = { id: 'apr', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
@@ -94,5 +94,38 @@ describe('getCycleNav', () => {
     expect(nav.current).toBeNull();
     expect(nav.isLatest).toBe(true);
     expect(nav.isOldest).toBe(true);
+  });
+});
+
+describe('sliceByCycle', () => {
+  const ROWS = [
+    { id: 'a', cycle_id: 'may' },
+    { id: 'b', cycle_id: 'may' },
+    { id: 'c', cycle_id: 'jun' },
+    { id: 'd', cycle_id: null },
+  ];
+
+  it('returns only the rows matching the cycle id', () => {
+    expect(sliceByCycle(ROWS, 'may').map(r => r.id)).toEqual(['a', 'b']);
+  });
+
+  it('returns [] for a falsy cycleId — never matching null cycle_id rows', () => {
+    expect(sliceByCycle(ROWS, null)).toEqual([]);
+    expect(sliceByCycle(ROWS, undefined)).toEqual([]);
+  });
+});
+
+describe('cycleIdForMonth', () => {
+  it('returns the id of the cycle whose start-month matches (trigger parity)', () => {
+    expect(cycleIdForMonth([APR, MAY, JUN], '2026-05')).toBe('may');
+  });
+
+  it('returns null when no live cycle covers the month', () => {
+    expect(cycleIdForMonth([APR, JUN], '2026-05')).toBeNull();
+  });
+
+  it('ignores soft-deleted cycles', () => {
+    const deletedMay = { ...MAY, deleted_at: '2026-05-02T00:00:00Z' };
+    expect(cycleIdForMonth([deletedMay], '2026-05')).toBeNull();
   });
 });

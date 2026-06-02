@@ -20,8 +20,7 @@
  * when no centreId is provided.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { getCurrentMonth } from '../lib/dates';
+import { useState, useEffect, useCallback } from 'react';
 import { getCentreById, getFirstCentre, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
 import { getCategories, getAllCategories, addCategory as addCategoryService, bulkAddCategories as bulkAddCategoriesService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
 import { getMembers, addMember as addMemberService, removeMember as removeMemberService, updateMemberRole as updateMemberRoleService } from '../services/members.service';
@@ -35,13 +34,9 @@ import { can } from '../lib/roles';
 export function useBudgetCentre(user, centreId) {
   const [centre,            setCentre]            = useState(null);
   // All months' categories live in one array (mirrors useFinance.allIncomes).
-  // `categories` is the current-month slice — every existing consumer reads this
-  // and sees no behaviour change; the all-months Settings view reads allCategories.
+  // The current-cycle `categories` slice is derived in useFinance (Commit 11.5) —
+  // it owns every cycle-aware slice and has the cycle state this hook lacks.
   const [allCategories,     setAllCategories]     = useState([]);
-  const categories = useMemo(
-    () => allCategories.filter(c => c.month === getCurrentMonth()),
-    [allCategories]
-  );
   // Previous month's categories — loaded on demand (Phase 2C) when the current
   // month's budget is empty, to drive the rollforward prompt + copy sheet. Kept
   // separate from `categories` (current month only); see loadPrevMonthCategories.
@@ -271,7 +266,10 @@ export function useBudgetCentre(user, centreId) {
   // Sources from the already-loaded `prevMonthCategories`. Optimistic N-row insert
   // (each keyed by a tempId), the whole block swapped for server rows on success
   // and removed on failure — mirrors useIncomeMutations.copyIncomeSourcesToMonth.
-  const copyCategoriesToMonth = useCallback(async (fromMonth, toMonth, categoryIds) => {
+  // `targetCycleId` is resolved by the caller (BudgetView has the cycles list this
+  // hook lacks) and stamped on the optimistic rows so they appear in useFinance's
+  // cycle_id slice immediately. Refuse rather than insert NULL-cycle rows (CYC02).
+  const copyCategoriesToMonth = useCallback(async (fromMonth, toMonth, categoryIds, targetCycleId) => {
     const id = centre?.id;
     if (!id) return { data: null, error: new Error('No active centre') };
 
@@ -279,6 +277,7 @@ export function useBudgetCentre(user, centreId) {
       c.month === fromMonth && !c.deleted_at && (!categoryIds || categoryIds.includes(c.id))
     );
     if (toCopy.length === 0) return { data: [], error: null };   // nothing to copy — not an error
+    if (!targetCycleId) return { data: null, error: new Error(`No cycle for month ${toMonth} (CYC02)`) };
 
     const newRows = toCopy.map(c => ({
       name:          c.name,
@@ -289,7 +288,7 @@ export function useBudgetCentre(user, centreId) {
       month:         toMonth,
     }));
 
-    const optimistic = newRows.map(r => ({ ...r, id: crypto.randomUUID(), budget_centre_id: id, _optimistic: true }));
+    const optimistic = newRows.map(r => ({ ...r, id: crypto.randomUUID(), budget_centre_id: id, cycle_id: targetCycleId, _optimistic: true }));
     const tempIds    = new Set(optimistic.map(o => o.id));
     setAllCategories(prev => [...prev, ...optimistic]);
 
@@ -365,7 +364,6 @@ export function useBudgetCentre(user, centreId) {
   return {
     centre,
     centreId:            centre?.id || null,
-    categories,
     allCategories,
     members,
     currentMemberRole,

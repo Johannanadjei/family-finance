@@ -7,7 +7,8 @@
  * Handles all financial mutations with optimistic updates and rollbacks.
  *
  * PARAMETERS:
- *   { centre, categories } — from useBudgetCentre
+ *   { centre, allCategories } — from useBudgetCentre. This hook owns ALL
+ *   cycle-aware slices (transactions, income, categories), keyed on cycle_id.
  *
  * RULES:
  * - Never imports from mockData or constants for financial values
@@ -22,7 +23,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getTransactionsByCycle, addTransaction as dbAddTransaction, updateTransaction as dbUpdateTransaction, deleteTransaction as dbDeleteTransaction } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
 import { getCyclesForCentre, createCalendarCycle } from '../services/cycles.service';
-import { getActiveCycle } from '../lib/cycles';
+import { getActiveCycle, sliceByCycle } from '../lib/cycles';
 import { getToday } from '../lib/dates';
 import {
   calcTotalIncome, calcTotalSpent, calcBudgetUsedPct,
@@ -36,7 +37,7 @@ import { loadPrefs, saveThemeSkin as persistSkin, saveThemeAccent as persistAcce
 import { waitForSession } from '../lib/auth';
 import { useIncomeMutations } from './useIncomeMutations';
 
-export function useFinance({ centre, categories }) {
+export function useFinance({ centre, allCategories }) {
   const centreId      = centre?.id           || null;
   const surplusTarget = centre?.surplus_target || 0;
   const currency      = centre?.currency      || 'GHS';
@@ -189,9 +190,16 @@ export function useFinance({ centre, categories }) {
 
   // ── Derived values ────────────────────────────────────────────────────────
 
-  // Active-month slice of allIncomes. Payday/Home and every income total below
-  // read THIS, not allIncomes — so they stay scoped to the month being viewed.
-  const incomes        = useMemo(() => allIncomes.filter(i => i.month === activeMonth),         [allIncomes, activeMonth]);
+  // The cycle whose data is loaded: the navigable selection, else the auto-resolved
+  // current cycle. The single key for all client slices below (Commit 11.5).
+  const viewedCycleId  = activeCycleId ?? activeCycle?.id ?? null;
+
+  // Cycle slices of the all-rows arrays. Income, categories, and (via the gated
+  // loader) transactions all scope to viewedCycleId — never the month string, which
+  // Commit 13 drops. Categories was clock-derived in useBudgetCentre (Commit 8 bug);
+  // it lives here now so one hook owns every cycle-aware slice.
+  const incomes        = useMemo(() => sliceByCycle(allIncomes, viewedCycleId),                 [allIncomes, viewedCycleId]);
+  const categories     = useMemo(() => sliceByCycle(allCategories || [], viewedCycleId),        [allCategories, viewedCycleId]);
 
   const monthlyIncome  = useMemo(() => calcTotalExpected(incomes),                              [incomes]);
   const totalIncome    = useMemo(() => calcTotalIncome(txs),                                    [txs]);
@@ -315,7 +323,7 @@ export function useFinance({ centre, categories }) {
     deleteIncomeSource,
     // Mutations operate on the full cross-month list (find-by-id is month-agnostic);
     // the activeMonth `incomes` slice re-derives automatically.
-  } = useIncomeMutations({ centreId, currency, incomes: allIncomes, txs, setIncomes: setAllIncomes, setTxs });
+  } = useIncomeMutations({ centreId, currency, cycles, incomes: allIncomes, txs, setIncomes: setAllIncomes, setTxs });
 
   // ── Month navigation ──────────────────────────────────────────────────────
 
@@ -369,8 +377,9 @@ export function useFinance({ centre, categories }) {
   return {
     // Raw data
     txs,
-    incomes,        // activeMonth slice — Payday / Home / totals
+    incomes,        // viewed-cycle slice — Payday / Home / totals
     allIncomes,     // every month — Settings' all-months view
+    categories,     // viewed-cycle slice — feeds BudgetCentreContext + the totals below
     activeMonth,
 
     // Cycles (Budget Cycles) — hub-scoped; views migrate to these in Commits 5-9

@@ -17,13 +17,14 @@ import { useCallback } from 'react';
 import { markReceived as dbMarkReceived, markPending as dbMarkPending, updateExpectedAmount as dbUpdateExpectedAmount, updateIncomeSource as dbUpdateIncomeSource, addIncomeSource as dbAddIncomeSource, bulkAddIncomeSources as dbBulkAddIncomeSources, deleteIncomeSource as dbDeleteIncomeSource } from '../services/income.service';
 import { addTransaction as dbAddTransaction, deleteTransaction as dbDeleteTransaction, updateTransaction as dbUpdateTransaction } from '../services/transactions.service';
 import { getWeekForDate } from '../lib/finance';
+import { cycleIdForMonth } from '../lib/cycles';
 
 // Load-bearing marker on migration-created "Other Income" buckets (see
 // docs/engineering-decisions.md income-month-scoping). One-off buckets are
 // already-received, ad-hoc catch-alls — they must NEVER roll forward.
 const ONE_OFF_MARKER = '__one_off_bucket__';
 
-export function useIncomeMutations({ centreId, currency, incomes, txs, setIncomes, setTxs }) {
+export function useIncomeMutations({ centreId, currency, cycles, incomes, txs, setIncomes, setTxs }) {
 
   const markReceived = useCallback(async (sourceId, receivedAmount, actualPayDate) => {
     const income = incomes.find(i => i.id === sourceId);
@@ -201,8 +202,13 @@ export function useIncomeMutations({ centreId, currency, incomes, txs, setIncome
 
   const addIncomeSource = useCallback(async (source) => {
     if (!centreId) return { data: null, error: new Error('No active budget centre') };
+    // Stamp cycle_id client-side from the source month (same resolution as the
+    // Commit-10 trigger) so the optimistic row appears in the cycle_id slice
+    // immediately. Refuse rather than insert a NULL-cycle row (CYC02 invariant).
+    const cycleId = cycleIdForMonth(cycles, source.month);
+    if (!cycleId) return { data: null, error: new Error(`No cycle for month ${source.month} (CYC02)`) };
     const tempId     = crypto.randomUUID();
-    const optimistic = { ...source, id: tempId, budget_centre_id: centreId, received: false, received_amount: 0, _optimistic: true };
+    const optimistic = { ...source, id: tempId, budget_centre_id: centreId, cycle_id: cycleId, received: false, received_amount: 0, _optimistic: true };
     setIncomes(prev => [...prev, optimistic]);
     const { data, error } = await dbAddIncomeSource(centreId, source);
     if (error) {
@@ -212,7 +218,7 @@ export function useIncomeMutations({ centreId, currency, incomes, txs, setIncome
     }
     setIncomes(prev => prev.map(i => i.id === tempId ? { ...data, _optimistic: false } : i));
     return { data, error: null };
-  }, [centreId, setIncomes]);
+  }, [centreId, cycles, setIncomes]);
 
   // Roll forward income sources from one month to another (Phase 2B). Copies the
   // recurring "shape" of each source (label, icon, amount, schedule) into the new
@@ -235,6 +241,11 @@ export function useIncomeMutations({ centreId, currency, incomes, txs, setIncome
     );
     if (toCopy.length === 0) return { data: [], error: null };   // nothing to copy — not an error
 
+    // Resolve the target cycle once (same logic as the Commit-10 trigger). Refuse
+    // rather than insert NULL-cycle rows (CYC02). Stamped on the optimistic rows below.
+    const cycleId = cycleIdForMonth(cycles, toMonth);
+    if (!cycleId) return { data: null, error: new Error(`No cycle for month ${toMonth} (CYC02)`) };
+
     // Only the fields a recurring source carries forward. received / received_amount
     // are intentionally omitted — the DB defaults them (pending in the new month),
     // matching the normal add path. notes cleared (buckets already excluded above).
@@ -250,7 +261,7 @@ export function useIncomeMutations({ centreId, currency, incomes, txs, setIncome
     }));
 
     // Optimistic — N temp rows, each keyed so rollback/replace targets exactly them.
-    const optimistic = newRows.map(r => ({ ...r, id: crypto.randomUUID(), budget_centre_id: centreId, received: false, received_amount: 0, _optimistic: true }));
+    const optimistic = newRows.map(r => ({ ...r, id: crypto.randomUUID(), budget_centre_id: centreId, cycle_id: cycleId, received: false, received_amount: 0, _optimistic: true }));
     const tempIds    = new Set(optimistic.map(o => o.id));
     setIncomes(prev => [...prev, ...optimistic]);
 
@@ -264,7 +275,7 @@ export function useIncomeMutations({ centreId, currency, incomes, txs, setIncome
     // Swap the whole temp block for server rows (can't map temp→server by id).
     setIncomes(prev => [...prev.filter(i => !tempIds.has(i.id)), ...(data || []).map(d => ({ ...d, _optimistic: false }))]);
     return { data: data || [], error: null };
-  }, [centreId, incomes, setIncomes]);
+  }, [centreId, cycles, incomes, setIncomes]);
 
   const deleteIncomeSource = useCallback(async (sourceId) => {
     const prev = incomes.find(i => i.id === sourceId);

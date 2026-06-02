@@ -3167,3 +3167,74 @@ The state machine has since changed; the guard now follows it.
 `views/HomeView.test.jsx` (drift test #2 now models `activeCycleId` mismatch; shared-mock
 default + `restoreCycle` carry `activeCycleId: null`), this entry. No changes to
 `useFinance`, `lib/cycles`, or sub-components.
+
+---
+
+## [2026-06-02] Categories + income client slices key on cycle_id, not month (Commit 11.5)
+
+**Context:**
+Transactions migrated to a `cycle_id` read path in Commit 11. Categories and income
+still sliced client-side by month string — and categories had a latent bug logged
+since Commit 8: `useBudgetCentre` derived the current-month slice as
+`allCategories.filter(c => c.month === getCurrentMonth())`, **clock-derived** and with
+`getCurrentMonth()` omitted from the memo deps (frozen to the last `allCategories`
+change). It never followed cycle navigation. BudgetView had worked around it by reading
+`allCategories` and re-slicing locally by the viewed month — but that local filter was
+itself month-keyed. Income sliced by `activeMonth` (the bridge proxy): correct, but
+month-keyed. Commit 13 drops the `month` column, so every month-keyed read is debt.
+
+The blocker was architectural: the categories slice lived in `useBudgetCentre`, but the
+cycle state (`cycles`, `activeCycle`, `activeCycleId`) lives in `useFinance`, which
+*depends on* `useBudgetCentre` (it receives categories as a prop). `useBudgetCentre`
+cannot read `useFinance` without a circular dependency.
+
+**Decision:**
+Architecture **(d)** — move the categories slice into `useFinance`, the single hook that
+owns cycle state and already owns the income slice. `useBudgetCentre` now exposes only
+`allCategories` (+ the mutations, which still operate on its `allCategories` state);
+`useFinance({ centre, allCategories })` derives the cycle-keyed `categories` slice; App
+passes `financeValues.categories` to `BudgetCentreProvider`. Both slices use one key —
+`viewedCycleId = activeCycleId ?? activeCycle?.id` — via a new pure helper
+`sliceByCycle(rows, cycleId)` in `lib/cycles.js` (a falsy id returns `[]`, never matching
+null-cycle rows). BudgetView's local slice re-keys to `c.cycle_id === viewedCycle?.id`.
+
+**(a)** — lifting cycle state into a shared provider above both hooks — is the correct
+long-term decoupling, but it rewrites `useFinance`'s gated loader / auto-create / race
+guards and warrants its own refactor commit. (d) is the minimal change that fixes the bug
+and pre-positions for Commit 13. (b) (duplicate cycle-load in `useBudgetCentre`) can't
+follow navigation — it would see only the auto-resolved cycle, not `activeCycleId`. (c)
+(cross-hook read) is circular and was rejected outright.
+
+Optimistic rows are stamped with `cycle_id` client-side at the create sites
+(`addIncomeSource`, `copyIncomeSourcesToMonth`, `copyCategoriesToMonth`) so they appear
+in the cycle_id slice immediately rather than flickering out until the server trigger
+round-trips. Income mutations resolve the target cycle internally (they receive `cycles`
+from `useFinance`); category mutations live in `useBudgetCentre`, which has no cycles, so
+**BudgetView resolves `targetCycleId` and passes it in** — the only caller, and it already
+holds the viewed cycle. Resolution mirrors the Commit-10 `resolve_cycle_id()` trigger
+(`cycleIdForMonth` matches on the cycle's start-month). On a resolution miss the mutation
+**refuses** the write (returns `{ error }`, never inserts a NULL cycle_id) — the
+client-side form of the trigger's CYC02 invariant.
+
+**Rules derived:**
+- **When the client renders cycle-keyed data, the slice predicate must use `cycle_id`,
+  not `month`.** The `month` column is a transitional artifact pending Commit 13 — every
+  read path that uses it is technical debt.
+- **Optimistic mutations stamp `cycle_id` at the create site using the same resolution as
+  the database trigger** (`cycleIdForMonth` ↔ `resolve_cycle_id()`), sharing the cycles
+  table as the single source of truth. If resolution fails, refuse rather than insert a
+  NULL cycle_id — client and server share the CYC02 invariant.
+- **Loading-window contract:** the slice returns `[]` when `viewedCycleId` is falsy. Views
+  gate on `loading` separately; categories vanishing mid-load is the correct invariant —
+  never fall back to "all" (stale dump) or "current month" (the clock-derived bug).
+
+**Files (11):** `lib/cycles.js` (+`sliceByCycle`, +`cycleIdForMonth`) & `lib/cycles.test.js`;
+`hooks/useFinance.js` (owns both slices, `allCategories` param, passes `cycles` to income
+mutations); `hooks/useBudgetCentre.js` (drops the slice + dead `getCurrentMonth`/`useMemo`
+imports; `copyCategoriesToMonth` gains `targetCycleId`); `hooks/useIncomeMutations.js`
+(stamps `cycle_id`); `views/BudgetView.jsx` (cycle_id self-slice + resolves `targetCycleId`
++ comment); `App.jsx` (wiring); `test-utils/fixtures.js` (`cycle_id` on category fixtures);
+`useFinance.test.js` (cycle-keyed slice + parity regression), `useBudgetCentre.test.js`
+(slice test moved out, mutation tests retarget `allCategories`), this entry.
+`useFinance.income-mutations.test.js` was not in the original 10-file plan but the cycle_id
+stamp forced it (rollforward tests must seed a target cycle) — folded in.

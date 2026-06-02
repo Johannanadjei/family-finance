@@ -10,17 +10,18 @@ import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
 import { getCyclesForCentre, createCalendarCycle } from '../services/cycles.service';
 import { getCurrentMonth, getToday } from '../lib/dates';
+import { calcTotalFixed } from '../lib/finance';
 const C = { id:'centre-1', currency:'GHS', surplus_target:4500 };
-const CATS = [{ id:'cat-1', name:'Groceries', icon:'🛒', budget_amount:500, is_fixed:true },{ id:'cat-2', name:'Transport', icon:'🚗', budget_amount:200, is_fixed:true }];
-// Sources are month-scoped (Phase 2A); useFinance derives `incomes` for the
-// active month (defaults to current), so fixtures must carry the current month.
 const M = getCurrentMonth();
+// Income + categories slice by cycle_id (Commit 11.5), not month. CATS carry the
+// current cycle's id so they land in the `categories` slice useFinance now derives.
+const CATS = [{ id:'cat-1', name:'Groceries', icon:'🛒', budget_amount:500, is_fixed:true, month:M, cycle_id:'cyc-cur' },{ id:'cat-2', name:'Transport', icon:'🚗', budget_amount:200, is_fixed:true, month:M, cycle_id:'cyc-cur' }];
 // Transactions read by cycle_id (Commit 11) via a gated loader — load() only fires
 // once a current cycle resolves. Tests that expect a fetch must seed this cycle.
 const CUR_CYCLE = { id:'cyc-cur', budget_centre_id:'centre-1', name:'Current', start_date: M+'-01', end_date: M+'-31', anchor_type:'calendar', deleted_at:null };
-const INC = [{ id:'inc-1', label:'Adjei Salary', expected_amount:30000, received:true, received_amount:30000, pay_day:31, pay_day_type:'last_working_day', currency:'GHS', month:M },{ id:'inc-2', label:'Dita Salary', expected_amount:15000, received:false, received_amount:0, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:M }];
+const INC = [{ id:'inc-1', label:'Adjei Salary', expected_amount:30000, received:true, received_amount:30000, pay_day:31, pay_day_type:'last_working_day', currency:'GHS', month:M, cycle_id:'cyc-cur' },{ id:'inc-2', label:'Dita Salary', expected_amount:15000, received:false, received_amount:0, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:M, cycle_id:'cyc-cur' }];
 const TXS = [{ id:'tx-1', type:'expense', amount:200, category_name:'Groceries', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false },{ id:'tx-2', type:'income', amount:30000, category_name:'Adjei Salary', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false }];
-const go = (txs=TXS, inc=INC) => { getTransactionsByCycle.mockResolvedValue({data:txs,error:null}); getIncomeSources.mockResolvedValue({data:inc,error:null}); getCyclesForCentre.mockResolvedValue({data:[CUR_CYCLE],error:null}); return renderHook(()=>useFinance({centre:C,categories:CATS})); };
+const go = (txs=TXS, inc=INC) => { getTransactionsByCycle.mockResolvedValue({data:txs,error:null}); getIncomeSources.mockResolvedValue({data:inc,error:null}); getCyclesForCentre.mockResolvedValue({data:[CUR_CYCLE],error:null}); return renderHook(()=>useFinance({centre:C,allCategories:CATS})); };
 describe('useFinance — derived values', () => {
   beforeEach(()=>{ vi.clearAllMocks(); });
   it('loads txs and incomes on mount', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.txs).toHaveLength(2); expect(result.current.incomes).toHaveLength(2); });
@@ -38,24 +39,50 @@ describe('useFinance — derived values', () => {
   it('from_spare:true tx does not affect Budget Health numerator', async()=>{ const extra=[...TXS,{id:'tx-3',type:'expense',amount:5000,category_name:'Groceries',date:'2026-05-20',week:'Week 3',currency:'GHS',source:'main_app',from_spare:true,_optimistic:false}]; const{result}=go(extra); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.healthPct).toBe(Math.round((200/700)*100)); });
   it('mixed from_spare flags partition correctly', async()=>{ const extra=[...TXS,{id:'tx-3',type:'expense',amount:300,category_name:'Other',date:'2026-05-20',week:'Week 3',currency:'GHS',source:'main_app',from_spare:false,_optimistic:false},{id:'tx-4',type:'expense',amount:400,category_name:'Other',date:'2026-05-20',week:'Week 3',currency:'GHS',source:'main_app',from_spare:true,_optimistic:false}]; const{result}=go(extra); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.budgetSpend).toBe(500); expect(result.current.spareSpend).toBe(400); });
   it('nextUnpaid returns first unpaid income', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.nextUnpaid.label).toBe('Dita Salary'); });
-  it('returns empty arrays when no centreId', async()=>{ getTransactionsByCycle.mockResolvedValue({data:[],error:null}); getIncomeSources.mockResolvedValue({data:[],error:null}); const{result}=renderHook(()=>useFinance({centre:null,categories:[]})); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.txs).toEqual([]); });
-  it('sets error when tx load fails', async()=>{ getTransactionsByCycle.mockResolvedValue({data:[],error:{message:'DB error'}}); getIncomeSources.mockResolvedValue({data:[],error:null}); getCyclesForCentre.mockResolvedValue({data:[CUR_CYCLE],error:null}); const{result}=renderHook(()=>useFinance({centre:C,categories:CATS})); await waitFor(()=>expect(result.current.error).toBe('DB error')); });
+  it('returns empty arrays when no centreId', async()=>{ getTransactionsByCycle.mockResolvedValue({data:[],error:null}); getIncomeSources.mockResolvedValue({data:[],error:null}); const{result}=renderHook(()=>useFinance({centre:null,allCategories:[]})); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.txs).toEqual([]); });
+  it('sets error when tx load fails', async()=>{ getTransactionsByCycle.mockResolvedValue({data:[],error:{message:'DB error'}}); getIncomeSources.mockResolvedValue({data:[],error:null}); getCyclesForCentre.mockResolvedValue({data:[CUR_CYCLE],error:null}); const{result}=renderHook(()=>useFinance({centre:C,allCategories:CATS})); await waitFor(()=>expect(result.current.error).toBe('DB error')); });
 
-  // T2 (Phase 2A) — red-first anchor. allIncomes holds every month; `incomes`
-  // is the active-month slice. Pre-2A `incomes` returned ALL rows → this is RED
-  // (incomes would be length 3, totalReceived would include the other months).
-  it('incomes scopes to activeMonth while allIncomes keeps every month', async () => {
+  // Commit 11.5 — `incomes` is the viewed-CYCLE slice (cycle_id), not month. Rows
+  // from other cycles stay in allIncomes but are excluded from the slice + totals.
+  it('incomes scopes to the viewed cycle while allIncomes keeps every cycle', async () => {
     const mixed = [
-      { id:'cur-1', label:'This Month Salary', expected_amount:30000, received:true, received_amount:30000, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:M },
-      { id:'old-1', label:'Last Month Salary', expected_amount:20000, received:true, received_amount:20000, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:'2020-01' },
-      { id:'old-2', label:'Older Other',        expected_amount:5000,  received:false, received_amount:0,    pay_day:null, pay_day_type:'flexible',  currency:'GHS', month:'2019-12' },
+      { id:'cur-1', label:'This Cycle Salary', expected_amount:30000, received:true, received_amount:30000, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:M,         cycle_id:'cyc-cur' },
+      { id:'old-1', label:'Last Cycle Salary', expected_amount:20000, received:true, received_amount:20000, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:'2020-01', cycle_id:'cyc-2020' },
+      { id:'old-2', label:'Older Other',        expected_amount:5000,  received:false, received_amount:0,    pay_day:null, pay_day_type:'flexible',  currency:'GHS', month:'2019-12', cycle_id:'cyc-2019' },
     ];
     const { result } = go(TXS, mixed);
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.allIncomes).toHaveLength(3);                 // every month retained
-    expect(result.current.incomes).toHaveLength(1);                    // only the active month
+    expect(result.current.allIncomes).toHaveLength(3);                 // every cycle retained
+    expect(result.current.incomes).toHaveLength(1);                    // only the viewed cycle
     expect(result.current.incomes[0].id).toBe('cur-1');
-    expect(result.current.totalReceived).toBe(30000);                  // not 50000 — other months excluded
+    expect(result.current.totalReceived).toBe(30000);                  // not 50000 — other cycles excluded
+  });
+
+  // Commit 11.5 — categories slice moved here from useBudgetCentre, keyed on the
+  // viewed cycle (was clock-derived month — the Commit-8 bug).
+  it('categories scopes to the viewed cycle', async () => {
+    const mixed = [
+      ...CATS,                                                                                   // cyc-cur
+      { id:'cat-old', name:'Old', icon:'📦', budget_amount:99, is_fixed:true, month:'2020-01', cycle_id:'cyc-2020' },
+    ];
+    getTransactionsByCycle.mockResolvedValue({ data: TXS, error: null });
+    getIncomeSources.mockResolvedValue({ data: INC, error: null });
+    getCyclesForCentre.mockResolvedValue({ data: [CUR_CYCLE], error: null });
+    const { result } = renderHook(() => useFinance({ centre: C, allCategories: mixed }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.categories.map(c => c.id)).toEqual(['cat-1', 'cat-2']);  // only the viewed cycle
+  });
+
+  // Regression (Decision 7) — for the current cycle, the new cycle_id predicate
+  // returns the SAME rows as the old month predicate, so HomeView totals don't shift
+  // after deploy. cycle_id was stamped from month (Commit-10 backfill), so they agree.
+  it('current-cycle slice has parity with the old month predicate (fixedTotal unchanged)', async () => {
+    const { result } = go();   // CATS: month M + cycle_id cyc-cur, both name the current cycle
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const oldPredicate = CATS.filter(c => c.month === getCurrentMonth());
+    expect(result.current.categories.map(c => c.id)).toEqual(oldPredicate.map(c => c.id));
+    expect(result.current.categories).toHaveLength(oldPredicate.length);
+    expect(result.current.fixedTotal).toBe(calcTotalFixed(oldPredicate));   // 700, identical both ways
   });
 });
 
@@ -76,7 +103,7 @@ describe('useFinance — cycles', () => {
     getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
     getIncomeSources.mockResolvedValue({ data: [], error: null });
     getCyclesForCentre.mockResolvedValue({ data: cyclesData, error: null });
-    return renderHook(() => useFinance({ centre: C, categories: CATS }));
+    return renderHook(() => useFinance({ centre: C, allCategories: CATS }));
   };
 
   it('loads cycles on mount via getCyclesForCentre(centreId)', async () => {
@@ -112,7 +139,7 @@ describe('useFinance — cycles', () => {
       .mockResolvedValue({ data: [PAST, CURRENT], error: null });    // another client won → refetch sees current
     createCalendarCycle.mockResolvedValue({ data: null, error: { code: 'CYC01', message: 'A cycle already exists' } });
 
-    const { result } = renderHook(() => useFinance({ centre: C, categories: CATS }));
+    const { result } = renderHook(() => useFinance({ centre: C, allCategories: CATS }));
     await waitFor(() => expect(createCalendarCycle).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(result.current.activeCycle?.id).toBe('cyc-cur'));
     expect(result.current.error).toBeNull();

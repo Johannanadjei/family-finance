@@ -200,14 +200,16 @@ export default function App() {
   const [pinSkipped, setPinSkipped]                        = useState(false);
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
   const { centres, archivedCentres, plan: userPlan, reload: reloadCentres } = useCentres(user);
-  const { centre, categories, allCategories, members, currentMemberRole,
+  const { centre, allCategories, members, currentMemberRole,
           addCategory, updateCentre, updateCategory, deleteCategory,
           prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth,
           archiveCentre, permanentDeleteCentre, restoreHub,
           inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite,
           loading: centreLoading, needsOnboarding, removedFromHub,
           error, onOnboardingComplete }                   = useBudgetCentre(user, activeCentreId);
-  const financeValues                                     = useFinance({ centre, categories });
+  // useFinance owns the current-cycle `categories` slice (Commit 11.5) — it has the
+  // cycle state useBudgetCentre lacks. The Provider's categories prop sources from here.
+  const financeValues                                     = useFinance({ centre, allCategories });
 
   // Persist the active centre ID once the first centre resolves
   useEffect(() => {
@@ -343,7 +345,7 @@ export default function App() {
     <PinProvider value={{ hasPinSetup, pinLoading, pinUnlocked, attempts, lockedUntil, verifyPin, setupPin, removePin }}>
     <BudgetCentreProvider
       centre={centre}
-      categories={categories}
+      categories={financeValues.categories}
       allCategories={allCategories}
       members={members}
       currentMemberRole={currentMemberRole}

@@ -41,11 +41,11 @@ const CURRENT = { id: 'cyc-cur', budget_centre_id: 'centre-1', name: 'Current', 
 const SOURCE = { id: 'inc-1', label: 'Salary', expected_amount: 5000, received: true, received_amount: 5000, currency: 'GHS', pay_day: 25, pay_day_type: 'fixed_date' };
 const INCOME_TX = { id: 'tx-1', type: 'income', amount: 5000, category_name: 'Salary', description: 'Salary received', source: 'main_app', income_source_id: 'inc-1', date: '2026-05-19', week: 'Week 3', currency: 'GHS', _optimistic: false };
 
-const mount = (txs, inc) => {
+const mount = (txs, inc, cycles = [CURRENT]) => {
   getTransactionsByCycle.mockResolvedValue({ data: txs, error: null });
   getIncomeSources.mockResolvedValue({ data: inc, error: null });
-  getCyclesForCentre.mockResolvedValue({ data: [CURRENT], error: null });
-  return renderHook(() => useFinance({ centre: C, categories: CATS }));
+  getCyclesForCentre.mockResolvedValue({ data: cycles, error: null });
+  return renderHook(() => useFinance({ centre: C, allCategories: CATS }));
 };
 
 describe('useFinance — income mutation reconciliation', () => {
@@ -117,6 +117,10 @@ describe('useFinance — income mutation reconciliation', () => {
 // allIncomes spans two months; May has two recurring sources plus one migration
 // "Other Income" bucket that must never carry forward.
 const PREV = '2026-04', FROM = '2026-05', TO = '2026-06';
+// Rollforward stamps cycle_id on the optimistic rows by resolving the TARGET month
+// (Commit 11.5, mirroring the Commit-10 trigger). Tests that insert must seed a cycle
+// whose start-month is TO, alongside CURRENT (which the gated loader needs for today).
+const CYC_TO = { id: 'cyc-jun', budget_centre_id: 'centre-1', name: 'Jun', start_date: TO + '-01', end_date: TO + '-30', anchor_type: 'calendar', deleted_at: null };
 const ALL_INCOMES = [
   { id: 'inc-1',   label: 'Adjei Salary', icon: '💰', expected_amount: 30000, currency: 'GHS', pay_day: 31,   pay_day_type: 'last_working_day', received: true,  received_amount: 30000, month: FROM, notes: '' },
   { id: 'inc-2',   label: 'Dita Salary',  icon: '💼', expected_amount: 15000, currency: 'GHS', pay_day: 25,   pay_day_type: 'fixed_date',       received: false, received_amount: 0,     month: FROM, notes: '' },
@@ -128,7 +132,7 @@ describe('useFinance — copyIncomeSourcesToMonth (Phase 2B rollforward)', () =>
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('copies ALL non-bucket sources when no ids are passed, into the target month', async () => {
-    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })));
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), [CURRENT, CYC_TO]);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-1', 'Adjei Salary', TO), serverRow('new-2', 'Dita Salary', TO)], error: null });
@@ -146,7 +150,7 @@ describe('useFinance — copyIncomeSourcesToMonth (Phase 2B rollforward)', () =>
   });
 
   it('copies only the explicitly selected subset', async () => {
-    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })));
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), [CURRENT, CYC_TO]);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-2', 'Dita Salary', TO)], error: null });
@@ -158,7 +162,7 @@ describe('useFinance — copyIncomeSourcesToMonth (Phase 2B rollforward)', () =>
   });
 
   it('excludes one-off buckets even when their id is passed explicitly (data-layer backstop)', async () => {
-    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })));
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), [CURRENT, CYC_TO]);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-1', 'Adjei Salary', TO)], error: null });
@@ -182,7 +186,7 @@ describe('useFinance — copyIncomeSourcesToMonth (Phase 2B rollforward)', () =>
   });
 
   it('inserts optimistic rows immediately, then rolls them ALL back when the bulk insert fails', async () => {
-    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })));
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), [CURRENT, CYC_TO]);
     await waitFor(() => expect(result.current.loading).toBe(false));
     const before = result.current.allIncomes.length;
 

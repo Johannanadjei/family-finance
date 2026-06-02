@@ -76,7 +76,7 @@ describe('useBudgetCentre', () => {
     const { result } = renderHook(() => useBudgetCentre(null, null));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.centre).toBeNull();
-    expect(result.current.categories).toEqual([]);
+    expect(result.current.allCategories).toEqual([]);
     expect(result.current.needsOnboarding).toBe(false);
   });
 
@@ -281,7 +281,7 @@ describe('useBudgetCentre — budget rollforward (Phase 2C)', () => {
 
   it('loadPrevMonthCategories fetches the previous month and stores it', async () => {
     const { result } = await mountEmpty();
-    expect(result.current.categories).toEqual([]);
+    expect(result.current.allCategories).toEqual([]);
 
     getCategories.mockResolvedValue({ data: mockPrevMonthCategories, error: null });
     await act(async () => { await result.current.loadPrevMonthCategories(FROM); });
@@ -296,7 +296,8 @@ describe('useBudgetCentre — budget rollforward (Phase 2C)', () => {
     await act(async () => { await result.current.loadPrevMonthCategories(FROM); });
 
     bulkAddCategories.mockResolvedValue({ data: mockPrevMonthCategories.map(c => ({ ...c, id: 'new-' + c.id, month: TO })), error: null });
-    await act(async () => { await result.current.copyCategoriesToMonth(FROM, TO); });
+    // 4th arg = targetCycleId, resolved by the caller (BudgetView) — Commit 11.5.
+    await act(async () => { await result.current.copyCategoriesToMonth(FROM, TO, undefined, 'cyc-this'); });
 
     expect(bulkAddCategories).toHaveBeenCalledTimes(1);
     const [cid, rows] = bulkAddCategories.mock.calls[0];
@@ -304,7 +305,7 @@ describe('useBudgetCentre — budget rollforward (Phase 2C)', () => {
     expect(rows).toHaveLength(3);
     expect(rows.every(r => r.month === TO)).toBe(true);
     expect(rows.map(r => r.name).sort()).toEqual(['Fun', 'Groceries', 'Transport']);
-    expect(result.current.categories).toHaveLength(3);   // server rows landed
+    expect(result.current.allCategories).toHaveLength(3);   // server rows landed
   });
 
   it('copyCategoriesToMonth copies only the explicitly selected subset', async () => {
@@ -313,7 +314,7 @@ describe('useBudgetCentre — budget rollforward (Phase 2C)', () => {
     await act(async () => { await result.current.loadPrevMonthCategories(FROM); });
 
     bulkAddCategories.mockResolvedValue({ data: [{ id: 'new-2', name: 'Transport', month: TO }], error: null });
-    await act(async () => { await result.current.copyCategoriesToMonth(FROM, TO, ['pcat-2']); });
+    await act(async () => { await result.current.copyCategoriesToMonth(FROM, TO, ['pcat-2'], 'cyc-this'); });
 
     const [, rows] = bulkAddCategories.mock.calls[0];
     expect(rows).toHaveLength(1);
@@ -334,20 +335,20 @@ describe('useBudgetCentre — budget rollforward (Phase 2C)', () => {
     const { result } = await mountEmpty();
     getCategories.mockResolvedValue({ data: mockPrevMonthCategories, error: null });
     await act(async () => { await result.current.loadPrevMonthCategories(FROM); });
-    expect(result.current.categories).toHaveLength(0);
+    expect(result.current.allCategories).toHaveLength(0);
 
     let resolveBulk;
     bulkAddCategories.mockReturnValue(new Promise(res => { resolveBulk = res; }));
 
     let pending;
-    await act(async () => { pending = result.current.copyCategoriesToMonth(FROM, TO); });
-    // Optimistic: all 3 rows present before the service settles.
-    expect(result.current.categories).toHaveLength(3);
-    expect(result.current.categories.every(c => c._optimistic)).toBe(true);
+    await act(async () => { pending = result.current.copyCategoriesToMonth(FROM, TO, undefined, 'cyc-this'); });
+    // Optimistic: all 3 rows present before the service settles, each stamped cycle_id.
+    expect(result.current.allCategories).toHaveLength(3);
+    expect(result.current.allCategories.every(c => c._optimistic && c.cycle_id === 'cyc-this')).toBe(true);
 
     await act(async () => { resolveBulk({ data: null, error: new Error('network') }); await pending; });
     // Rolled back — every optimistic row removed.
-    expect(result.current.categories).toHaveLength(0);
+    expect(result.current.allCategories).toHaveLength(0);
   });
 });
 
@@ -372,19 +373,15 @@ describe('useBudgetCentre — all-months categories (Phase 2D)', () => {
     expect(result.current.allCategories).toHaveLength(4);
   });
 
-  it('exposes categories as the current-month slice of allCategories', async () => {
-    const { result } = await mountLoaded();
-    expect(result.current.categories).toHaveLength(2);
-    expect(result.current.categories.every(c => c.month === THIS_M)).toBe(true);
-    expect(result.current.categories.map(c => c.id)).toEqual(['cat-1', 'cat-2']);   // sort_order preserved
-  });
+  // The current-cycle `categories` slice moved to useFinance (Commit 11.5) — its
+  // cycle-keyed derivation is covered in useFinance.test.js. useBudgetCentre owns
+  // only allCategories + the mutations below.
 
-  it('addCategory writes to allCategories and surfaces in the current-month slice', async () => {
+  it('addCategory writes the server row into allCategories', async () => {
     const { result } = await mountLoaded();
-    addCategory.mockResolvedValue({ data: { id: 'cat-9', name: 'Health', budget_amount: 100, month: THIS_M }, error: null });
+    addCategory.mockResolvedValue({ data: { id: 'cat-9', name: 'Health', budget_amount: 100, month: THIS_M, cycle_id: 'cyc-this' }, error: null });
     await act(async () => { await result.current.addCategory({ name: 'Health', budget_amount: 100, month: THIS_M }); });
     expect(result.current.allCategories.some(c => c.id === 'cat-9')).toBe(true);
-    expect(result.current.categories.some(c => c.id === 'cat-9')).toBe(true);
   });
 
   it('updateCategory rollback restores the row AND preserves other months (snapshot is allCategories, not the slice)', async () => {
