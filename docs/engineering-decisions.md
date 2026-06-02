@@ -2974,3 +2974,82 @@ the Commit 13 cleanup after the month columns drop.
 
 **Scope:** transactions read path only. No changes to `useBudgetCentre`, `income.service`,
 `categories.service`, or any view — views already navigate via `loadCycle`.
+
+---
+
+## [2026-06-02] Auth-refresh refetch storm + the .maybeSingle() write contract
+
+**Context:**
+Live-app verification of Commit 11 surfaced three coupled production symptoms in a single
+session: the auth canary logged `budget_centres (by id) returned empty 1155ms after session
+established`; a `PATCH budget_centres` returned **406 "Cannot coerce the result to a single
+JSON object"**; and the network panel showed **2,118 requests / 33.9 MB transferred** in one
+session.
+
+**Root cause chain:**
+`useAuth`'s `onAuthStateChange` handler called `setUser(session?.user ?? null)` on *every*
+event — `TOKEN_REFRESHED`, the `SIGNED_IN` Supabase re-fires on tab focus/visibility, etc.
+Each `session.user` is a **fresh object reference** even when the identity is unchanged. Every
+consumer hook keyed on `[user]` (`useCentres`, `useBudgetCentre`, …) recreated its `load`
+callback and re-ran its `useEffect` → a refetch on every refresh/focus → the request storm and
+the canary's "empty after established" reads. Separately, the timezone self-correct in
+`useBudgetCentre` fired an `updateCentre` PATCH for **standard members**, whose write RLS blocks
+— `.single()` coerced the zero-row result into the 406.
+
+**Decisions (three fixes):**
+
+**Fix 1 — stabilise the user reference at the source, not at every consumer.**
+`useAuth` now returns the previous `user` ref when the identity is unchanged:
+```js
+setUser(prev => (prev?.id === (session?.user?.id ?? null) ? prev : (session?.user ?? null)));
+```
+applied to both the `getSession()` restore and the `onAuthStateChange` paths. Token
+refreshes / focus events keep the same object → `[user]` dependency arrays stop recomputing
+→ the cascade dies once, upstream. The alternative — rekeying every consumer from `[user]`
+to `[user?.id]` — was rejected: same behaviour, but churn across N hooks and a standing
+invitation to miss the next new consumer. **Fix it where the reference is produced.**
+
+**Fix 2 — `updateCentre` `.single()` → `.maybeSingle()`, with a LOAD-BEARING null-guard.**
+A zero-row UPDATE (RLS-blocked) now returns `{ data: null, error: null }` instead of a 406.
+This is **not** a cosmetic swap: without a guard, the optimistic wrapper in `useBudgetCentre`
+would hit `setCentre(null)` on that response and **blank the user's entire view**. The guard
+restores `prev` and reports a no-op:
+```js
+if (!data) { setCentre(prev); return { data: prev, error: null }; }
+```
+This is data-preservation logic, not documentation hygiene. (`createCentre`'s INSERT keeps
+`.single()` — an insert always returns its row to the writer; only UPDATE can match zero rows.)
+
+The swap formalises a **three-state contract** for `.maybeSingle()` writes:
+- `{ data, error: null }` — **success with data**.
+- `{ data: null, error: <e> }` — **explicit failure**, with a diagnostic.
+- `{ data: null, error: null }` — **permission-denied-without-exception**: the write matched
+  zero rows (RLS rejected it). A consumer must distinguish this from success-with-data and
+  **never** treat it as "success with no data."
+
+**Fix 3 — gate the timezone self-correct on write permission, via the canonical `can()` helper.**
+The effect now early-returns unless `can(currentMemberRole, 'settings')`. Standard members
+never attempt the RLS-blocked write — the 406 is removed **at source** rather than swallowed
+after the fact. We chose `can(role, 'settings')` over a new `ROLE_CAN_WRITE_CENTRE` array
+because `can(role, scope)` is the established single source of truth for role-permission logic
+(`lib/roles.js`); `'settings'` already encodes exactly `owner`+`full_access`, and future role
+additions automatically inherit the rule. Defence-in-depth with Fix 2: any future direct write
+that slips past the gate still meets the null-guard.
+
+**Rules derived:**
+- **Stabilise reference identity at the source.** New object refs minted by auth (or any
+  upstream producer) propagate through every consumer keyed on the object. Fix it once where
+  it is produced — not at every consumption site.
+- **When a write target requires elevated permissions, gate the WRITE at the caller.** RLS is
+  the security boundary; the application should respect that invariant without testing it on
+  every render. Use the canonical `can(role, scope)` helper, not an ad-hoc role list.
+- **`{ data: null, error: null }` from a `.maybeSingle()` write is permission-denied-without-
+  exception.** Honour the three-state contract — distinguish it from success-with-data AND from
+  error-with-error. A consumer that collapses null-data into its success path will corrupt state
+  (here: blank the centre).
+
+**Files (7):** `useAuth.js` (+ new `useAuth.test.js`), `centres.service.js` (+ new
+`centres.service.test.js`), `useBudgetCentre.js` (+ `useBudgetCentre.test.js`), this entry.
+
+**Scope:** auth ref stabilisation + the `updateCentre` write contract. Consumer hooks keep
+their existing `[user]` / `[centre?.id]` dependencies unchanged — the fix is upstream.

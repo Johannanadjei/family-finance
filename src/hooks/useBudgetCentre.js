@@ -28,6 +28,7 @@ import { getMembers, addMember as addMemberService, removeMember as removeMember
 import { createInvite as createInviteService, getHubInvites as getHubInvitesService, cancelInvite as cancelInviteService } from '../services/invites.service';
 import { getUserSession } from '../services/auth.service';
 import { waitForSession } from '../lib/auth';
+import { can } from '../lib/roles';
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -193,16 +194,28 @@ export function useBudgetCentre(user, centreId) {
       console.error('[useBudgetCentre] updateCentre rollback:', error.message);
       return { error };
     }
+    // Load-bearing null-guard: updateCentreService uses .maybeSingle(), so an
+    // RLS-blocked write returns { data: null, error: null } — permission-denied-
+    // without-exception, distinct from success-with-data. Without this guard the
+    // optimistic wrapper would setCentre(null) and blank the user's view. Restore
+    // prev and report a no-op. See docs/engineering-decisions.md (three-state contract).
+    if (!data) {
+      setCentre(prev);
+      return { data: prev, error: null };
+    }
     setCentre(data);
     return { data, error: null };
   }, [centre]);
 
   // Self-correct the hub timezone from its 'UTC' default to the browser's zone on
-  // first cycle-aware load (Budget Cycles). Best-effort, fire-and-forget: a standard
-  // member's write is RLS-blocked and swallowed — the hub self-heals on the next
-  // owner/full_access load. Calls the service directly so the dep array stays
-  // stable primitives (the optimistic updateCentre wrapper recreates per render).
+  // first cycle-aware load (Budget Cycles). Best-effort, fire-and-forget. Gated on
+  // write permission: only owner/full_access may write centre settings, so standard
+  // members never attempt the RLS-blocked write — removing the 406 at source rather
+  // than swallowing it. The hub self-heals on the next owner/full_access load. Calls
+  // the service directly so the dep array stays stable primitives (the optimistic
+  // updateCentre wrapper recreates per render).
   useEffect(() => {
+    if (!can(currentMemberRole, 'settings')) return;
     if (!centre?.id || centre.timezone !== 'UTC') return;
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (!browserTz || browserTz === 'UTC') return;
@@ -210,7 +223,7 @@ export function useBudgetCentre(user, centreId) {
       if (error) { console.error('[useBudgetCentre] timezone self-correct failed:', error.message); return; }
       if (data) setCentre(prev => (prev && prev.id === data.id ? data : prev));
     });
-  }, [centre?.id, centre?.timezone]);
+  }, [centre?.id, centre?.timezone, currentMemberRole]);
 
   const updateCategory = useCallback(async (categoryId, updates) => {
     const prevAll = allCategories;

@@ -148,13 +148,17 @@ export const updateCentre = async (centreId, updates) => {
     return { data: null, error: e };
   }
 
+  // .maybeSingle() — an UPDATE can match zero rows when RLS blocks the write, which
+  // returns { data: null, error: null } (permission-denied-without-exception), not a
+  // 406. .single() would coerce that to a 406 "Cannot coerce the result to a single
+  // JSON object". The wrapper in useBudgetCentre treats a null data here as a no-op.
   const { data, error } = await supabase
     .from('budget_centres')
     .update(cleaned)
     .eq('id', centreId)
     .is('deleted_at', null)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) console.error('[centres.service] updateCentre error:', error.message);
   return { data, error };

@@ -420,6 +420,40 @@ describe('useBudgetCentre — all-months categories (Phase 2D)', () => {
   });
 });
 
+// ── updateCentre wrapper — load-bearing null-guard ────────────────────────────
+// updateCentreService uses .maybeSingle(): an RLS-blocked write returns
+// { data: null, error: null }. Without the guard the wrapper would setCentre(null)
+// and blank the user's view. The guard restores prev and reports a no-op.
+describe('useBudgetCentre — updateCentre wrapper null-guard', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('does NOT blank the centre when the write returns { data: null, error: null }', async () => {
+    const { result } = await mountLoaded();
+    updateCentre.mockResolvedValue({ data: null, error: null });   // RLS-blocked, no exception
+    let ret;
+    await act(async () => { ret = await result.current.updateCentre({ name: 'New name' }); });
+    expect(result.current.centre?.id).toBe('c-1');   // centre preserved, not nulled
+    expect(ret.error).toBeNull();
+    expect(ret.data?.id).toBe('c-1');                // no-op returns prev
+  });
+
+  it('replaces the centre with the server row on success', async () => {
+    const { result } = await mountLoaded();
+    updateCentre.mockResolvedValue({ data: { ...mockCentre, name: 'Renamed' }, error: null });
+    await act(async () => { await result.current.updateCentre({ name: 'Renamed' }); });
+    expect(result.current.centre?.name).toBe('Renamed');
+  });
+
+  it('rolls back to prev on an explicit error', async () => {
+    const { result } = await mountLoaded();
+    updateCentre.mockResolvedValue({ data: null, error: { message: 'boom' } });
+    let ret;
+    await act(async () => { ret = await result.current.updateCentre({ name: 'Nope' }); });
+    expect(result.current.centre?.name).toBe(mockCentre.name);   // rolled back
+    expect(ret.error).toBeTruthy();
+  });
+});
+
 // ── Timezone self-correction (Budget Cycles, Commit 4) ────────────────────────
 // Intl resolves to the test environment's zone (usually UTC in CI), so the
 // effect's "browser zone" must be stubbed to a non-UTC value to observe a write.
@@ -433,8 +467,9 @@ describe('useBudgetCentre — timezone self-correct', () => {
   });
   afterEach(() => { tzSpy.mockRestore(); });
 
-  it("writes the browser zone when the hub timezone is still 'UTC'", async () => {
+  it("writes the browser zone when the hub timezone is still 'UTC' (writer role)", async () => {
     getCentreById.mockResolvedValue({ data: { ...mockCentre, timezone: 'UTC' }, error: null });
+    getMembers.mockResolvedValue({ data: [{ user_id: 'user-1', role: 'owner' }], error: null });
     updateCentre.mockResolvedValue({ data: { ...mockCentre, timezone: 'Africa/Accra' }, error: null });
 
     renderHook(() => useBudgetCentre(mockUser, 'c-1'));
@@ -443,15 +478,26 @@ describe('useBudgetCentre — timezone self-correct', () => {
 
   it('does NOT write when the hub timezone is already set', async () => {
     getCentreById.mockResolvedValue({ data: { ...mockCentre, timezone: 'Europe/London' }, error: null });
+    getMembers.mockResolvedValue({ data: [{ user_id: 'user-1', role: 'owner' }], error: null });
 
     const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(updateCentre).not.toHaveBeenCalled();
   });
 
-  it('swallows an RLS/update failure (does not throw, hub stays usable)', async () => {
+  it('a standard member never attempts the write (gate blocks it at source)', async () => {
     getCentreById.mockResolvedValue({ data: { ...mockCentre, timezone: 'UTC' }, error: null });
-    updateCentre.mockResolvedValue({ data: null, error: { message: 'permission denied' } });
+    getMembers.mockResolvedValue({ data: [{ user_id: 'user-1', role: 'standard' }], error: null });
+
+    const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(updateCentre).not.toHaveBeenCalled();   // no RLS-blocked write fired — no 406
+  });
+
+  it('swallows a server error for a writer (does not throw, hub stays usable)', async () => {
+    getCentreById.mockResolvedValue({ data: { ...mockCentre, timezone: 'UTC' }, error: null });
+    getMembers.mockResolvedValue({ data: [{ user_id: 'user-1', role: 'owner' }], error: null });
+    updateCentre.mockResolvedValue({ data: null, error: { message: 'server error' } });
 
     const { result } = renderHook(() => useBudgetCentre(mockUser, 'c-1'));
     await waitFor(() => expect(updateCentre).toHaveBeenCalled());
