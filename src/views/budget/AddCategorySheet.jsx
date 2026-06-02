@@ -7,7 +7,11 @@
  *
  * @param {boolean}  isOpen
  * @param {function} onClose
- * @param {function} onAdd   — (category) => void
+ * @param {function} onAdd        — (category) => void
+ * @param {string}   [targetMonth] — 'YYYY-MM' the category is added to; defaults to
+ *                                   the current clock month so legacy callers
+ *                                   (SettingsView) are unaffected. BudgetView passes
+ *                                   the viewed cycle's month for cycle-aware adds.
  */
 
 import { useState, useEffect }    from 'react';
@@ -24,7 +28,7 @@ const inputStyle = {
   fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
 };
 
-export function AddCategorySheet({ isOpen, onClose, onAdd }) {
+export function AddCategorySheet({ isOpen, onClose, onAdd, targetMonth = getCurrentMonth() }) {
   const { fmt } = useBudgetCentreContext();
   const [name,   setName]   = useState('');
   const [amount, setAmount] = useState('');
@@ -44,7 +48,7 @@ export function AddCategorySheet({ isOpen, onClose, onAdd }) {
     if (!name.trim()) { setError('Please enter a category name'); return; }
     const n = Math.round(parseFloat(amount) || 0);
     setSaving(true);
-    const { error: err } = await onAdd({ name: name.trim(), icon, budget_amount: n, is_fixed: true, month: getCurrentMonth(), sort_order: 0 });
+    const { error: err } = await onAdd({ name: name.trim(), icon, budget_amount: n, is_fixed: true, month: targetMonth, sort_order: 0 });
     if (err) { setError('Could not save category. Please try again.'); }
     else     { onClose(); }
     setSaving(false);

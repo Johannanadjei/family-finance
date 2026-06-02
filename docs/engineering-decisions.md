@@ -2665,3 +2665,70 @@ template — 3 files, no hook/lib changes.
 **Backlog:**
 - No new debt. Commit-5's cycle_id-not-stamped-on-insert and the Commit-14
   WeeklySummaryBar variable-length item still apply.
+
+---
+
+## [2026-06-02] Commit 8 — BudgetView migrated to cycles (the non-mechanical one)
+
+**Context:**
+Fourth view migration, and the one that broke the mechanical mould. BudgetView was
+current-month-only with NO nav and a Commit-0 band-aid (a mount effect resetting
+activeMonth to the clock) papering over a cross-view sync bug. Migrating it meant
+adding navigation that never existed, removing the band-aid, deriving BOTH the
+category plan and the spend from the viewed cycle, and gating past-period mutations.
+
+**Decisions:**
+- CATEGORIES BY CYCLE = Option B: BudgetView reads allCategories and filters the
+  viewed cycle's month locally (useMemo). Other views unchanged — no cross-context
+  coupling, no change to useFinance's shared current-month `categories`.
+- SPEND RECOMPUTE (the subtle part): useFinance computes categorySpend/fixedTotal/
+  fixedSpent against the CURRENT-month categories. On a past cycle those are wrong
+  (current plan vs past spend — exactly what the band-aid masked). So BudgetView no
+  longer reads them from useFinance; it recomputes them locally from viewedCategories
+  + the bridged txs via the existing pure lib functions (calcTotalFixed/
+  calcCategorySpend/calcFixedSpent), memoized. Option B's category filter alone is
+  necessary but NOT sufficient — the spend must follow the viewed period too.
+- COMMIT-0 BAND-AID removed atomically with the nav addition. Its two tests were
+  deleted; a regression test now asserts that viewing a past cycle shows that cycle's
+  plan (not the current month) and triggers no reset.
+- PAST-PERIOD GUARD via a new usePastPeriodGuard hook (chosen over a presentational
+  body extraction, Option 1a vs 1b): it retires the logged "other views latent bug"
+  backlog item by being reusable, and is the more meaningful boundary. The hook OWNS
+  the confirm modal (returns a `guardModal` element), so it lives in a .jsx file —
+  establishing the rule: hooks that own UI are .jsx; data-only hooks stay .js. Modal
+  copy per the lock: title "Edit past period?", body "You're changing [period], which
+  has ended. Continue?", [Cancel]/[Continue]. Only add + copy/rollforward exist to
+  gate today; wrap edit/delete too when such UI lands.
+- EXTRACTIONS: BudgetHeader.jsx (period nav + planned/spent summary card, purely
+  presentational) + the generic ConfirmModal.jsx (components/ui, reusable from
+  inception) + the guard hook. Together these keep BudgetView at 198/200.
+- MUTATION ROUTING: AddCategorySheet hardcoded month: getCurrentMonth(). It now takes
+  a `targetMonth` prop defaulted to getCurrentMonth() — BudgetView passes viewedMonth;
+  SettingsView (the other render site) omits it and is unaffected. Rollforward targets
+  viewedMonth and sources the previous CYCLE (nav.prev), not the previous calendar
+  month (parallels Payday).
+
+**Rules derived:**
+- When a view gains a temporal nav, EVERYTHING it shows must derive from the viewed
+  period, not the clock — categories AND spend AND every other temporal slice.
+  Filtering the list but leaving the aggregates clock-based reintroduces the bug.
+- A shared component that gains a temporal prop must DEFAULT it to the legacy clock
+  value so existing consumers don't break; migrate consumers explicitly when their UX
+  needs cycle awareness (AddCategorySheet's targetMonth default kept SettingsView
+  untouched).
+- Hooks that own UI (return a React element) are .jsx; data-only hooks remain .js.
+- Generic UI (ConfirmModal) belongs in components/ui from inception, not refactored
+  out of a view later.
+- The 200-line view cap is a hard audit gate with no per-file waiver: clear it by
+  extraction, not by trimming comments/blanks (cosmetic gaming) and not by raising the
+  global cap (weakens it everywhere). BudgetView sits at 198/200 — the next change
+  needs another extraction.
+
+**Backlog:**
+- LATENT BUG logged: Daily/Log/Payday read the categories slice keyed off the clock
+  month (useBudgetCentre.categories), not the viewed period — wrong for users whose
+  categories vary across months. Out of scope here; fix when those views need
+  cycle-aware categories (they'll adopt usePastPeriodGuard + the local-filter pattern).
+- When category edit/delete UI is added, route those handlers through requestMutation.
+- Commit-5's cycle_id-not-stamped-on-insert and the Commit-14 WeeklySummaryBar
+  variable-length item still apply.

@@ -6,6 +6,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { AddCategorySheet }              from './AddCategorySheet';
+import { getCurrentMonth }              from '../../lib/finance';
 import { mockFmt }                       from '../../test-utils/fixtures';
 
 vi.mock('../../context/BudgetCentreContext', () => ({
@@ -72,5 +73,22 @@ describe('AddCategorySheet', () => {
     renderSheet({ onClose });
     screen.getByText('Cancel').click();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('defaults month to the current clock month when no targetMonth prop', async () => {
+    renderSheet();
+    fireEvent.change(screen.getByTestId('add-cat-name-input'), { target: { value: 'Groceries' } });
+    fireEvent.change(screen.getByTestId('add-cat-amount-input'), { target: { value: '500' } });
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(mockAddCategory).toHaveBeenCalledWith(expect.objectContaining({ month: getCurrentMonth() }));
+  });
+
+  it('adds to the supplied targetMonth (cycle-aware) when passed', async () => {
+    mockAddCategory.mockClear();
+    renderSheet({ targetMonth: '2026-04' });
+    fireEvent.change(screen.getByTestId('add-cat-name-input'), { target: { value: 'Groceries' } });
+    fireEvent.change(screen.getByTestId('add-cat-amount-input'), { target: { value: '500' } });
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(mockAddCategory).toHaveBeenCalledWith(expect.objectContaining({ month: '2026-04' }));
   });
 });
