@@ -1,11 +1,11 @@
 /**
  * views/payday/PaydayIncomeBody.jsx
  *
- * The month-aware income list for the Payday screen:
- *   • future month → "nothing yet" placeholder
- *   • past month   → read-only income transactions (or an empty placeholder)
- *   • current month, no sources → the rollforward empty state (NoIncomeSourcesEmpty)
- *   • current month, with sources → editable IncomeCard list
+ * The period-aware income list for the Payday screen:
+ *   • future period → "nothing yet" placeholder
+ *   • past period   → read-only income transactions (or an empty placeholder)
+ *   • current period, no sources → the rollforward empty state (NoIncomeSourcesEmpty)
+ *   • current period, with sources → editable IncomeCard list
  *
  * Pure orchestration of already-built sub-components — owns no state. Extracted
  * from PaydayView to keep that orchestrator within the 200-line audit limit once
@@ -18,24 +18,24 @@ import { MonthEmptyState }      from './MonthEmptyState';
 import { NoIncomeSourcesEmpty } from './NoIncomeSourcesEmpty';
 
 export function PaydayIncomeBody({
-  isFutureMonth, isPastMonth, monthLabel, lastMonthLabel,
+  isFuture, isPast, periodLabel, prevPeriodLabel,
   pastIncomeTxs, incomes, fmt, mutating,
   prevSourceCount, copying, copyError,
   onCopyAll, onChooseWhich, onAddManually,
   onConfirm, onMarkPending, onUpdateExpected,
 }) {
-  if (isFutureMonth) {
+  if (isFuture) {
     return (
       <MonthEmptyState
-        title={`No payday data for ${monthLabel} yet`}
-        subtitle="Income will appear here once this month arrives."
+        title={`No payday data for ${periodLabel} yet`}
+        subtitle="Income will appear here once this period arrives."
       />
     );
   }
 
-  if (isPastMonth) {
+  if (isPast) {
     if (pastIncomeTxs.length === 0) {
-      return <MonthEmptyState title={`No income recorded for ${monthLabel}`} />;
+      return <MonthEmptyState title={`No income recorded for ${periodLabel}`} />;
     }
     return pastIncomeTxs.map(tx => (
       <PastIncomeCard key={tx.id} name={tx.category_name} amount={fmt(tx.amount)} />
@@ -45,8 +45,8 @@ export function PaydayIncomeBody({
   if (incomes.length === 0) {
     return (
       <NoIncomeSourcesEmpty
-        monthLabel={monthLabel}
-        lastMonthLabel={lastMonthLabel}
+        monthLabel={periodLabel}
+        lastMonthLabel={prevPeriodLabel}
         prevSourceCount={prevSourceCount}
         onCopyAll={onCopyAll}
         onChooseWhich={onChooseWhich}

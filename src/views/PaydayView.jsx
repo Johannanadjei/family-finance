@@ -9,7 +9,8 @@ import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { getCurrentMonth, offsetMonth } from '../lib/finance';
-import { formatMonth }            from '../lib/dates';
+import { formatMonth, getToday }   from '../lib/dates';
+import { getCycleNav }             from '../lib/cycles';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { Toast }                   from '../components/ui/Toast';
 import { ConfirmSheet }           from './payday/ConfirmSheet';
@@ -60,21 +61,26 @@ export function PaydayView() {
 
   const {
     incomes, allIncomes = [], error, totalReceived, totalExpected, totalPending, totalIncome, txs,
-    activeMonth, loadMonth, markReceived, markPending, updateExpectedAmount, copyIncomeSourcesToMonth,
+    activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle,
+    markReceived, markPending, updateExpectedAmount, copyIncomeSourcesToMonth,
   } = financeValues;
 
+  // Viewed period: navigated cycle → auto-resolved current cycle → month fallback
+  // (brand-new hub before Commit-4 auto-create). `nav` drives bounded prev/next.
+  const today          = getToday();
   const currentMonth   = getCurrentMonth();
-  const isCurrentMonth = activeMonth === currentMonth;
-  const isPastMonth    = activeMonth < currentMonth;   // 'YYYY-MM' compares lexicographically
-  const isFutureMonth  = activeMonth > currentMonth;
-
-  // Past months are read-only — income derived from month-scoped txs, not live sources.
-  const pastIncomeTxs  = isPastMonth ? txs.filter(t => t.type === 'income') : [];
-
-  // Rollforward source: previous month's non-bucket sources (already in memory —
-  // allIncomes holds every month). Drives the empty-state CTA + the sheet list.
-  const prevMonth      = offsetMonth(activeMonth, -1);
+  const viewedCycle    = cycles.find(c => c.id === activeCycleId) ?? activeCycle ?? null;
+  const nav            = getCycleNav(cycles, viewedCycle?.id ?? null);
+  const isCurrent      = viewedCycle ? (viewedCycle.start_date <= today && viewedCycle.end_date >= today) : activeMonth === currentMonth;
+  const isPast         = viewedCycle ? viewedCycle.end_date   < today : activeMonth < currentMonth;
+  const isFuture       = viewedCycle ? viewedCycle.start_date > today : activeMonth > currentMonth;
+  const viewedMonth    = viewedCycle ? viewedCycle.start_date.slice(0, 7) : activeMonth;
+  const periodLabel    = viewedCycle?.name ?? formatMonth(activeMonth);
+  const pastIncomeTxs  = isPast ? txs.filter(t => t.type === 'income') : [];   // past = read-only, tx-derived
+  // Rollforward source = the PREVIOUS CYCLE (not prev calendar month; cycles can gap).
+  const prevMonth      = nav.prev ? nav.prev.start_date.slice(0, 7) : offsetMonth(activeMonth, -1);
   const prevSources    = allIncomes.filter(i => i.month === prevMonth && i.notes !== ONE_OFF_MARKER && !i.deleted_at);
+  const prevPeriodLabel = nav.prev?.name ?? formatMonth(prevMonth);
 
   const handleOpenSheet = (income) => {
     setSelectedIncome(income);
@@ -102,13 +108,12 @@ export function PaydayView() {
     setMutating(false);
   };
 
-  // Roll income forward from the previous month. `sourceIds` undefined → copy all
-  // non-bucket sources; an array → only the sheet-selected subset. The incomes
-  // slice re-derives automatically once allIncomes updates (no manual refetch).
+  // Roll income forward from the previous cycle. sourceIds undefined → copy all
+  // non-bucket sources; an array → the sheet-selected subset. incomes re-derives.
   const handleCopy = async (sourceIds) => {
     setCopying(true);
     setCopyError(null);
-    const { data, error: err } = await copyIncomeSourcesToMonth(prevMonth, activeMonth, sourceIds);
+    const { data, error: err } = await copyIncomeSourcesToMonth(prevMonth, viewedMonth, sourceIds);
     setCopying(false);
     if (err) { setCopyError("Couldn't copy. Try again."); return; }
     setCopySheetOpen(false);
@@ -119,15 +124,17 @@ export function PaydayView() {
     <div style={{ padding: '16px 16px 0' }}>
 
       <PaydayHeader
-        monthLabel={formatMonth(activeMonth)}
-        isCurrentMonth={isCurrentMonth}
-        isFutureMonth={isFutureMonth}
+        periodLabel={periodLabel}
+        isCurrent={isCurrent}
+        isFuture={isFuture}
+        isLatest={nav.isLatest}
+        isOldest={nav.isOldest}
         totalReceived={totalReceived}
         totalPending={totalPending}
         totalIncome={totalIncome}
         fmt={fmt}
-        onPrev={() => loadMonth(offsetMonth(activeMonth, -1))}
-        onNext={() => loadMonth(offsetMonth(activeMonth, 1))}
+        onPrev={() => nav.prev && loadCycle(nav.prev.id)}
+        onNext={() => nav.next && loadCycle(nav.next.id)}
       />
 
       {/* Error state */}
@@ -141,10 +148,10 @@ export function PaydayView() {
 
       {/* Income list — current month editable, past months read-only, future months empty */}
       <PaydayIncomeBody
-        isFutureMonth={isFutureMonth}
-        isPastMonth={isPastMonth}
-        monthLabel={formatMonth(activeMonth)}
-        lastMonthLabel={formatMonth(prevMonth)}
+        isFuture={isFuture}
+        isPast={isPast}
+        periodLabel={periodLabel}
+        prevPeriodLabel={prevPeriodLabel}
         pastIncomeTxs={pastIncomeTxs}
         incomes={incomes}
         fmt={fmt}
@@ -173,7 +180,7 @@ export function PaydayView() {
       <CopyIncomeSheet
         isOpen={copySheetOpen}
         onClose={() => setCopySheetOpen(false)}
-        lastMonthLabel={formatMonth(prevMonth)}
+        lastMonthLabel={prevPeriodLabel}
         sources={prevSources}
         fmt={fmt}
         onCopy={handleCopy}
@@ -182,7 +189,7 @@ export function PaydayView() {
 
       {copiedCount > 0 && (
         <Toast
-          message={`Copied ${copiedCount} income ${copiedCount === 1 ? 'source' : 'sources'} to ${formatMonth(activeMonth)}`}
+          message={`Copied ${copiedCount} income ${copiedCount === 1 ? 'source' : 'sources'} to ${periodLabel}`}
           actionLabel="Done"
           onEdit={() => setCopiedCount(0)}
           onDismiss={() => setCopiedCount(0)}

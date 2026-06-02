@@ -26,6 +26,11 @@ const mockFinance = {
   totalIncome:    0,
   activeMonth:    '2026-05',
   loadMonth:      vi.fn(),
+  // Cycle state — default empty so existing tests ride the month-based fallback.
+  cycles:         [],
+  activeCycle:    null,
+  activeCycleId:  null,
+  loadCycle:      vi.fn(),
   markReceived:   vi.fn().mockResolvedValue({ error: null }),
   markPending:    vi.fn().mockResolvedValue({ error: null }),
   updateExpectedAmount: vi.fn().mockResolvedValue({ error: null }),
@@ -55,9 +60,9 @@ describe('PaydayView', () => {
     mockFinance.loading = false;
   });
 
-  it('shows month label', () => {
+  it('shows period label', () => {
     renderView();
-    expect(screen.getByTestId('payday-month-label').textContent).toContain('2026');
+    expect(screen.getByTestId('payday-period-label').textContent).toContain('2026');
   });
 
   it('shows total received', () => {
@@ -180,13 +185,62 @@ describe('PaydayView', () => {
     mockFinance.error = null;
   });
 
-  it('shows previous month navigation button', () => {
+  it('shows previous period navigation button', () => {
     renderView();
-    expect(screen.getByLabelText('Previous month')).toBeTruthy();
+    expect(screen.getByLabelText('Previous period')).toBeTruthy();
   });
 
-  it('shows next month navigation button disabled when current month', () => {
+  it('disables next-period navigation on the latest period', () => {
     renderView();
-    expect(screen.getByLabelText('Next month').disabled).toBe(true);
+    expect(screen.getByLabelText('Next period').disabled).toBe(true);
+  });
+});
+
+// ── Cycle navigation (Commit 5) ───────────────────────────────────────────────
+// Exercises the cycle path (vs the month-based fallback the suite above uses).
+describe('PaydayView — cycle navigation', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const MAY = { id: 'cyc-may', name: 'May 2026',   start_date: '2026-05-01', end_date: '2026-05-31', deleted_at: null };
+  const APR = { id: 'cyc-apr', name: 'April 2026', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
+
+  const withCycles = (over) => {
+    mockFinance.cycles        = [MAY, APR];   // newest first
+    mockFinance.activeCycle   = MAY;
+    mockFinance.activeCycleId = null;          // → falls back to activeCycle (MAY)
+    mockFinance.loadCycle     = vi.fn();
+    Object.assign(mockFinance, over);
+  };
+  const reset = () => {
+    mockFinance.cycles = []; mockFinance.activeCycle = null;
+    mockFinance.activeCycleId = null; mockFinance.loadCycle = vi.fn();
+  };
+
+  it('labels the header with the viewed cycle name', () => {
+    withCycles();
+    renderView();
+    expect(screen.getByTestId('payday-period-label').textContent).toBe('May 2026');
+    reset();
+  });
+
+  it('Next is disabled on the latest cycle; Prev navigates to the older cycle', () => {
+    withCycles();
+    renderView();
+    expect(screen.getByLabelText('Next period').disabled).toBe(true);   // MAY is latest
+    fireEvent.click(screen.getByLabelText('Previous period'));
+    expect(mockFinance.loadCycle).toHaveBeenCalledWith('cyc-apr');
+    reset();
+  });
+
+  it('Prev is disabled on the oldest cycle', () => {
+    withCycles({ activeCycleId: 'cyc-apr' });   // viewing April (oldest)
+    renderView();
+    expect(screen.getByLabelText('Previous period').disabled).toBe(true);
+    expect(screen.getByLabelText('Next period').disabled).toBe(false);
+    reset();
   });
 });

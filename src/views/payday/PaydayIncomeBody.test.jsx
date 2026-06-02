@@ -11,10 +11,10 @@ import { PaydayIncomeBody }     from './PaydayIncomeBody';
 import { mockFmt, mockIncomes } from '../../test-utils/fixtures';
 
 const base = {
-  isFutureMonth: false,
-  isPastMonth: false,
-  monthLabel: 'May 2026',
-  lastMonthLabel: 'April 2026',
+  isFuture: false,
+  isPast: false,
+  periodLabel: 'May 2026',
+  prevPeriodLabel: 'April 2026',
   pastIncomeTxs: [],
   incomes: mockIncomes,
   fmt: mockFmt,
@@ -31,18 +31,18 @@ const base = {
 };
 
 describe('PaydayIncomeBody', () => {
-  it('future month: shows the "no payday data yet" placeholder', () => {
-    render(<PaydayIncomeBody {...base} isFutureMonth incomes={[]} />);
+  it('future period: shows the "no payday data yet" placeholder', () => {
+    render(<PaydayIncomeBody {...base} isFuture incomes={[]} />);
     expect(screen.getByText(/No payday data for May 2026 yet/)).toBeTruthy();
   });
 
-  it('past month with no income: shows the "no income recorded" placeholder', () => {
-    render(<PaydayIncomeBody {...base} isPastMonth incomes={[]} pastIncomeTxs={[]} />);
+  it('past period with no income: shows the "no income recorded" placeholder', () => {
+    render(<PaydayIncomeBody {...base} isPast incomes={[]} pastIncomeTxs={[]} />);
     expect(screen.getByText(/No income recorded for May 2026/)).toBeTruthy();
   });
 
-  it('past month with income txs: renders read-only past income cards', () => {
-    render(<PaydayIncomeBody {...base} isPastMonth incomes={[]}
+  it('past period with income txs: renders read-only past income cards', () => {
+    render(<PaydayIncomeBody {...base} isPast incomes={[]}
       pastIncomeTxs={[{ id: 'tx-i', category_name: 'Adjei Salary', amount: 12000 }]} />);
     expect(screen.getByText('Adjei Salary')).toBeTruthy();
     expect(screen.getByText('GHS 12,000')).toBeTruthy();

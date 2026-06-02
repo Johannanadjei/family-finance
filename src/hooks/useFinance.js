@@ -52,6 +52,9 @@ export function useFinance({ centre, categories }) {
   // month navigation. activeCycle is derived; auto-create fills a gap silently.
   const [cycles,         setCycles]         = useState([]);
   const [cyclesLoading,  setCyclesLoading]  = useState(true);
+  // Navigable selection for cycle-migrated views (Payday in Commit 5). Null →
+  // falls back to the auto-resolved activeCycle at the read site. Reset per hub.
+  const [activeCycleId,  setActiveCycleId]  = useState(null);
   const [loading,        setLoading]        = useState(true);
   const [loaded,         setLoaded]         = useState(false);
   const [error,          setError]          = useState(null);
@@ -134,6 +137,11 @@ export function useFinance({ centre, categories }) {
   }, [centreId]);
 
   useEffect(() => { loadCycles(); }, [loadCycles]);
+
+  // Drop the navigable selection on hub switch so it re-follows the new hub's
+  // auto-resolved cycle (the read-site `?? activeCycle` fallback also covers a
+  // stale id, but resetting keeps the stored value honest).
+  useEffect(() => { setActiveCycleId(null); }, [centreId]);
 
   const activeCycle = useMemo(() => getActiveCycle(cycles, getToday()), [cycles]);
 
@@ -295,6 +303,17 @@ export function useFinance({ centre, categories }) {
     await load(month);
   }, [load]);
 
+  // Cycle navigation (Budget Cycles). Selects a cycle AND bridges to the
+  // month-keyed data layer (loadMonth) so the loaded month tracks the cycle —
+  // calendar cycles are 1:1 with months. Both state updates batch into one render.
+  const loadCycle = useCallback((cycleId) => {
+    const cycle = cycles.find(c => c.id === cycleId);
+    if (!cycle) return null;
+    setActiveCycleId(cycleId);
+    loadMonth(cycle.start_date.slice(0, 7));
+    return cycle;
+  }, [cycles, loadMonth]);
+
   // ── Reload ────────────────────────────────────────────────────────────────
 
   const reload = useCallback(() => load(activeMonth), [load, activeMonth]);
@@ -328,6 +347,8 @@ export function useFinance({ centre, categories }) {
     // Cycles (Budget Cycles) — hub-scoped; views migrate to these in Commits 5-9
     cycles,
     activeCycle,
+    activeCycleId,
+    loadCycle,
     reloadCycles: loadCycles,
 
     // Derived financial values

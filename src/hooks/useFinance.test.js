@@ -124,4 +124,25 @@ describe('useFinance — cycles', () => {
     await act(async () => { await result.current.reloadCycles(); });
     await waitFor(() => expect(result.current.cycles).toHaveLength(2));
   });
+
+  it('loadCycle selects the cycle AND bridges the month-keyed load to its month', async () => {
+    const APR = { id:'cyc-apr', budget_centre_id:'centre-1', name:'April 2026', start_date:'2026-04-01', end_date:'2026-04-30', anchor_type:'calendar', deleted_at:null };
+    const { result } = goCycles([CURRENT, APR]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(2));
+    getTransactionsByMonth.mockClear();
+
+    await act(async () => { result.current.loadCycle('cyc-apr'); });
+    await waitFor(() => expect(result.current.activeCycleId).toBe('cyc-apr'));
+    expect(result.current.activeMonth).toBe('2026-04');                       // bridged
+    expect(getTransactionsByMonth).toHaveBeenCalledWith('centre-1', '2026-04'); // data followed
+  });
+
+  it('loadCycle is a no-op returning null for an unknown id', async () => {
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
+    let ret;
+    await act(async () => { ret = result.current.loadCycle('nope'); });
+    expect(ret).toBeNull();
+    expect(result.current.activeCycleId).toBeNull();
+  });
 });

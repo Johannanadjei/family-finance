@@ -48,3 +48,27 @@ export function getActiveCycle(cycles, today) {
 export function getCycleContainingDate(cycles, dateStr) {
   return cycles.find(c => !c.deleted_at && c.start_date <= dateStr && c.end_date >= dateStr) ?? null;
 }
+
+/**
+ * Navigation neighbours for a cycle list, for prev/next period traversal.
+ * Cycles are sorted newest-first internally, so order-independent. "next" is the
+ * newer cycle, "prev" is the older — matching forward/back arrows on a timeline.
+ * A missing/empty id yields nulls with both ends flagged (nav disabled).
+ *
+ * @param {Array<{ id: string, start_date: string, deleted_at?: string|null }>} cycles
+ * @param {string|null} currentCycleId
+ * @returns {{ current: object|null, prev: object|null, next: object|null, isLatest: boolean, isOldest: boolean }}
+ */
+export function getCycleNav(cycles, currentCycleId) {
+  const live = cycles
+    .filter(c => !c.deleted_at)
+    .sort((a, b) => b.start_date.localeCompare(a.start_date));   // newest first
+  const idx = live.findIndex(c => c.id === currentCycleId);
+  return {
+    current: idx >= 0 ? live[idx] : null,
+    next:    idx > 0 ? live[idx - 1] : null,                     // newer
+    prev:    idx >= 0 && idx < live.length - 1 ? live[idx + 1] : null,  // older
+    isLatest: idx <= 0,                                          // idx 0 (or not found) → no newer
+    isOldest: idx === -1 || idx === live.length - 1,             // last (or not found) → no older
+  };
+}

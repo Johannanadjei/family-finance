@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getActiveCycle, getCycleContainingDate } from './cycles';
+import { getActiveCycle, getCycleContainingDate, getCycleNav } from './cycles';
 
 // Three non-overlapping calendar cycles. Dates are 'YYYY-MM-DD' strings.
 const APR = { id: 'apr', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
@@ -48,5 +48,51 @@ describe('getCycleContainingDate', () => {
   it('ignores soft-deleted cycles', () => {
     const deletedJun = { ...JUN, deleted_at: '2026-06-02T00:00:00Z' };
     expect(getCycleContainingDate([deletedJun], '2026-06-15')).toBeNull();
+  });
+});
+
+describe('getCycleNav', () => {
+  // Pass DESC (as the service returns) to also prove order-independence via the sort.
+  const LIST = [JUN, MAY, APR];
+
+  it('returns older/newer neighbours for a middle cycle', () => {
+    const nav = getCycleNav(LIST, 'may');
+    expect(nav.current).toBe(MAY);
+    expect(nav.next).toBe(JUN);    // newer
+    expect(nav.prev).toBe(APR);    // older
+    expect(nav.isLatest).toBe(false);
+    expect(nav.isOldest).toBe(false);
+  });
+
+  it('flags isLatest with no newer cycle at the front', () => {
+    const nav = getCycleNav(LIST, 'jun');
+    expect(nav.next).toBeNull();
+    expect(nav.prev).toBe(MAY);
+    expect(nav.isLatest).toBe(true);
+    expect(nav.isOldest).toBe(false);
+  });
+
+  it('flags isOldest with no older cycle at the end', () => {
+    const nav = getCycleNav(LIST, 'apr');
+    expect(nav.prev).toBeNull();
+    expect(nav.next).toBe(MAY);
+    expect(nav.isLatest).toBe(false);
+    expect(nav.isOldest).toBe(true);
+  });
+
+  it('returns all-null and both ends flagged for an unknown id', () => {
+    const nav = getCycleNav(LIST, 'nope');
+    expect(nav.current).toBeNull();
+    expect(nav.prev).toBeNull();
+    expect(nav.next).toBeNull();
+    expect(nav.isLatest).toBe(true);
+    expect(nav.isOldest).toBe(true);
+  });
+
+  it('handles an empty list (nav fully disabled)', () => {
+    const nav = getCycleNav([], null);
+    expect(nav.current).toBeNull();
+    expect(nav.isLatest).toBe(true);
+    expect(nav.isOldest).toBe(true);
   });
 });

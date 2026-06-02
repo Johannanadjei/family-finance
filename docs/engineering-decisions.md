@@ -2525,3 +2525,65 @@ true code/test touch was 11, plus this entry.)
 - Auto-create / self-healing effects need a ref guard when the create's side effect
   (here: toggling a loading flag that is itself a dependency) can re-enter the effect.
   Gate on a stable key (centreId) so the attempt fires once per context, not in a loop.
+
+---
+
+## [2026-06-02] Commit 5 — PaydayView migrated to cycles (first view migration)
+
+**Context:**
+First of the five per-view migrations (v1.2 H). Payday went first because it had
+the most period-aware logic. It sets the template every later view (Daily, Log,
+Budget, Home — Commits 6-9) will copy.
+
+**Decisions:**
+- THE SHARED-STATE BRIDGE PATTERN (the template). The view's data (incomes, txs,
+  totals) all derive from the single, shared, month-keyed useFinance state. A view
+  cannot navigate cycles with purely local state without desyncing its label from
+  its numbers. So useFinance gained a navigable `activeCycleId` + `loadCycle(cycleId)`,
+  where loadCycle BOTH sets activeCycleId AND bridges to the month layer via
+  loadMonth(cycle.start_date.slice(0,7)). Calendar cycles are 1:1 with months, so the
+  month-keyed load still returns the right rows; month stays the internal data key
+  while the cycle is the presentation/nav layer. activeMonth/loadMonth are untouched —
+  un-migrated views keep working. Later commits reuse loadCycle verbatim.
+- activeCycleId is stored separately (not derived from the auto-resolved activeCycle)
+  so a cycle reload (e.g. after auto-create) doesn't snap the user back to today. It
+  defaults to null and the read site resolves `cycles.find(id) ?? activeCycle`, so a
+  null/stale id self-heals to today's cycle. It resets to null on centreId change so a
+  hub switch re-follows the new hub's cycle.
+- getCycleNav(cycles, currentCycleId) → { current, prev, next, isLatest, isOldest } is
+  a pure, order-independent helper in lib/cycles.js (sorts newest-first internally),
+  unit-tested, and reused by all five view migrations. Keeping the index math out of
+  the view also held PaydayView at the 200-line cap.
+- NEW UX — backward navigation is now BOUNDED. Month nav let you page into the
+  infinite past (months that never existed); cycle nav only traverses cycles that
+  exist, so Prev disables on the oldest cycle and Next on the newest. This is
+  intentional and better — you navigate real periods, not empty calendar slots.
+- Vocabulary lock (v1.2 E0): user-facing nav says "period", not "month" — aria-labels
+  "Previous period"/"Next period", testid `payday-period-label`. Internal month keys
+  keep their names; the lock is about user-facing language only.
+- PaydayHeader was RESHAPED, not just renamed. The old single `isCurrentMonth` flag
+  did double duty — disabling Next AND choosing the received/pending card split. Cycle
+  nav decouples these: `isCurrent` (card: today's cycle → received+pending split),
+  `isLatest` (disable Next), `isOldest` (disable Prev). monthLabel→periodLabel,
+  isFutureMonth→isFuture.
+- Categories-by-cycle is OUT OF SCOPE here — PaydayView renders no category grid. That
+  crux (useBudgetCentre.categories keys off getCurrentMonth(), the Commit-0 band-aid)
+  is deferred to Commit 8 (BudgetView).
+- Rollforward stays `copyIncomeSourcesToMonth(fromMonth, toMonth, ids)` but is fed the
+  PREVIOUS CYCLE's month (nav.prev), not the previous calendar month — cycles can gap.
+- Empty-cycles fallback: when cycles=[] (brand-new hub before auto-create), viewedCycle
+  resolves null and the view renders its original month-based behaviour (label via
+  formatMonth(activeMonth), both nav arrows disabled). No spinner, no crash.
+
+**Rules derived:**
+- A per-view cycle migration cannot use purely local nav state while the data layer is
+  shared and month-keyed — navigation must drive the shared data (the loadCycle bridge),
+  or the label and the numbers desync.
+- A boolean doing double duty (nav-enable AND display-mode) must be split when the two
+  concerns decouple, rather than renamed — renaming hides the conflation.
+
+**Backlog logged:**
+- Insert paths don't stamp cycle_id — copied incomes/categories and new transactions
+  insert with cycle_id NULL. Must stamp cycle_id on insert before the month columns are
+  dropped (Commit 13). Harmless now (Payday reads by month via the bridge).
+- PaydayView sits exactly at the 200-line cap; any further change needs an extraction.
