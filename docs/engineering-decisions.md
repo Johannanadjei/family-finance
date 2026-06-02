@@ -2794,3 +2794,97 @@ behind the loadCycle bridge until the month-columns drop (~Commit 13).
   "period budget"; StatCard tooltip "monthly budget" → "period budget".
 - Daily/Log/Payday clock-keyed categories slice (latent bug) still applies; cycle_id
   not stamped on insert (~Commit 13); WeeklySummaryBar variable-length (Commit 14).
+
+---
+
+## [2026-06-02] Commit 10 — stamp cycle_id at the storage layer (DB trigger + backfill)
+
+**Context:**
+Every transaction, budget_category, and income_source carries a `cycle_id` FK to
+budget_cycles. It was filled once by the Commit 2b backfill, but nothing has kept it
+populated since: Commits 3–9 were JS-only and never write `cycle_id`, so every row the
+app inserted after 2b has `cycle_id = NULL`. We needed the invariant — "cycle_id always
+equals the id of the cycle containing this row's date (transactions) or matching its
+month (categories, income_sources)" — to hold for all future writes, on INSERT and on
+UPDATE, with no JS involvement.
+
+**Decision — enforce it with a database trigger, not client-side resolution.**
+Way 1 (resolve in the JS service before insert) would have to be added to every insert
+path and re-added to every future one: the React services, the guest-portal RPC
+(`submit_guest_transaction`), onboarding bulk inserts, any future webhook or admin SQL.
+Miss one and the invariant silently breaks. Way 2 (a `BEFORE INSERT OR UPDATE` trigger)
+enforces it at the lowest layer — it cannot be bypassed, survives future maintainers and
+unknown insert paths, and keeps `cycle_id` out of the application's concern entirely. We
+chose Way 2. `cycle_id` is now a derived, DB-owned column; JS neither reads nor writes it.
+
+> **For future maintainers:** if you are reading the JS services/hooks and cannot find
+> where `cycle_id` is set — it is NOT set in JS. The trigger sets it. See
+> `scripts/migrate_cycle_id_trigger.sql`. This is by design, not an omission.
+
+**Decisions:**
+- **INSERT *and* UPDATE coverage.** The trigger fires on INSERT and on
+  `UPDATE OF date` (transactions) / `UPDATE OF month` (categories, income_sources),
+  re-resolving when the keying column changes. INSERT-only would ship "can't break on
+  insert, can on edit" — and the UPDATE path is live today
+  (`income.service.updateIncomeSource` edits `month`). A June→May date edit must move
+  `cycle_id` to May's cycle, not leave it stale at June's.
+- **TG_OP-aware short-circuit (the deliberately weird-looking guard).** The
+  skip-if-already-set guard is gated on `TG_OP = 'INSERT'`:
+  `IF TG_OP = 'INSERT' AND NEW.cycle_id IS NOT NULL THEN RETURN NEW; END IF;`
+  On INSERT this honours an explicitly-supplied `cycle_id` (manual override / backfill).
+  On UPDATE the guard must NOT fire: `NEW.cycle_id` is the row's PREVIOUS value and is
+  therefore always populated, so an ungated guard would return early every time and
+  silently make the UPDATE coverage a no-op — the June→May edit would leave `cycle_id`
+  pointing at June. This is data corruption that passes every test (no JS changes to
+  test) and looks correct in code review. **Caught in Phase 3 by tracing the UPDATE
+  path**, before it shipped.
+- **SECURITY DEFINER + `SET search_path = public`**, mirroring the `create_calendar_cycle`
+  RPC (Commit 3). The trigger's job is data integrity, not authorization — authorization
+  is row-level RLS on the target table. Once an INSERT/UPDATE is permitted, the trigger
+  must ALWAYS be able to find the cycle, regardless of whether the caller can SELECT
+  budget_cycles under their own RLS. DEFINER guarantees that for every path, including
+  the anon guest RPC and any future privileged write.
+- **NULL keying column = STRICT (raise CYC02).** Phase 3 verified no legitimate runtime
+  path inserts a NULL `date` or NULL `month` (`lib/validation.js` enforces YYYY-MM-DD /
+  YYYY-MM on every service insert; the guest RPC inserts a required `p_date`). A
+  NULL-keyed live financial row is itself a bug, so the trigger surfaces it (CYC02)
+  rather than silently leaving `cycle_id` NULL. If a legitimate NULL path is ever added,
+  relax to permissive (allow NULL `cycle_id` when the keying column is NULL).
+- **CYC02 is the "no covering cycle" SQLSTATE.** CYC01 was already taken by
+  `create_calendar_cycle` ("a cycle already exists"); CYC02 is "no cycle exists for this
+  date/month". The service layer can detect it cleanly if we ever surface it in the UI.
+- **One-shot backfill in this commit** (`scripts/migrate_backfill_cycle_ids.sql`) fills
+  the post-2b NULL window. Same join logic as the proven 2b backfill, plus
+  `c.deleted_at IS NULL` (cycles are soft-deletable now) and keying-column NOT NULL
+  guards. Idempotent (gated on `cycle_id IS NULL`); post-flight aborts if any live keyed
+  row is left unattributed.
+- **NOT NULL constraint deferred to Commit 13.** The trigger + backfill make NULL
+  `cycle_id` unreachable for new live rows; a column-level NOT NULL here would be
+  belt-and-braces. It becomes essential — not optional — alongside the month-column drop
+  in Commit 13, so it ships there.
+
+**Rules derived:**
+- **Data-integrity invariants belong at the storage layer when possible. Application
+  code should rely on, not duplicate, them.** A trigger enforces the rule for every
+  writer, present and future; a per-service check enforces it only for the writers you
+  remembered.
+- **When adding UPDATE coverage to an existing INSERT-only short-circuit, gate the
+  `... IS NOT NULL → RETURN` guard on `TG_OP = 'INSERT'`.** Without that gate the
+  trigger never re-resolves on UPDATE, because `NEW.<col>` is the previous (always
+  populated) value. "Allow manual override" shortcuts only make sense for the operation
+  that has no prior value — i.e. INSERT.
+
+**Phase-3 catch:** the locked Phase-2 draft used an ungated
+`IF NEW.cycle_id IS NOT NULL THEN RETURN NEW` guard. Tracing the UPDATE path showed it
+would defeat the entire UPDATE-coverage decision silently. The guard is now TG_OP-aware;
+the file header and the inline comment both explain why, so a future reader doesn't
+"simplify" it back into the bug.
+
+**Deployment (manual, AJ in Supabase SQL editor, after the commit lands):**
+1. Run `scripts/migrate_cycle_id_trigger.sql` (trigger first).
+2. Run `scripts/migrate_backfill_cycle_ids.sql` (backfill second).
+3. Verify zero live orphans with the three `COUNT(*) … WHERE cycle_id IS NULL` queries
+   at the foot of the backfill file.
+
+**Scope:** SQL only. No changes to services, hooks, views, or JS tests — `cycle_id`
+remains absent from `src/` entirely, which is the point.
