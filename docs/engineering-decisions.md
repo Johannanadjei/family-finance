@@ -3102,3 +3102,68 @@ redundant for a stable hub but out of scope here); any transaction-fetch structu
 **Files (3):** `lib/auth.js` (the bound), `lib/auth.test.js` (upper-bound case; the existing
 1.5s in-window case stays green), this entry. `transactions.service.js` was in the original
 sketch but needed no change — it only calls the canary.
+
+---
+
+## [2026-06-02] HomeView mount-reset gates on activeCycleId truth, not the activeMonth proxy
+
+**Context:**
+The previous entry flagged HomeView's snap-to-now mount-reset for separate review: it
+re-fired `load()` on Home return even for a stable hub. Diagnosis confirmed the cause.
+The effect snapped the shared period selection back to the current cycle, guarded on
+`activeMonth !== activeCycle.start_date.slice(0,7)`. But after Commit 11, transactions
+read by `cycle_id`, and *which cycle's data is loaded* is governed by `activeCycleId`
+(`cid = activeCycleId ?? activeCycle?.id` in the gated loader) — not by `activeMonth`,
+which now only keys the income client-slice.
+
+`activeMonth` is a **derived proxy**: it is only ever set by the `loadCycle → loadMonth`
+bridge, never independently (no view calls bare `loadMonth`). `activeCycleId` is the
+**truth**: it is set solely by explicit navigation in Payday/Daily/Log/Budget and is
+`null` until the user navigates. The two diverge in exactly one case — `activeCycleId`
+null while `activeMonth` differs from the current cycle's month (e.g. a non-calendar /
+payday-anchored cycle whose start-month ≠ `getCurrentMonth()`). There the old guard saw
+"drift" and called `loadCycle(activeCycle.id)`, which flipped `activeCycleId` from
+`null → id`. That flip changed nothing about the *resolved* `cid` (both sides resolve to
+`activeCycle.id` via the `??` fallback) yet re-triggered the gated loader — a redundant
+refetch of data already loaded.
+
+**Decision:**
+Gate the reset on the canonical signal:
+```js
+useEffect(() => {
+  if (activeCycle && activeCycleId && activeCycleId !== activeCycle.id) {
+    loadCycle(activeCycle.id);
+  }
+}, [activeCycle?.id, activeCycleId]);
+```
+The `activeCycleId &&` truthiness check makes a null selection (no nav yet, already
+following the current cycle) a structural no-op — eliminating the `null → id` redundant
+`load()`. `loadCycle` stays the reset mechanism (it atomically syncs both `activeCycleId`
+and the `activeMonth` bridge in one render). `activeMonth` was dropped from the dep array
+and from HomeView's destructure (dead binding after the change). Loop-safe by the same
+fixed-point argument as the Commit 9 effect: the reset sets `activeCycleId = activeCycle.id`,
+the dep changes once, the guard is then false.
+
+The original `activeMonth` guard was reasonable in Commit 9 — that predated the
+Commit-11 cycle-id read path, so `activeMonth` was the closest available drift signal.
+The state machine has since changed; the guard now follows it.
+
+**Rules derived:**
+- **When gating an effect on "has state X drifted from current?", compare the canonical
+  source of X — the field set explicitly by the action that creates drift — not a
+  derived/synced proxy.** A proxy can carry different null-handling (here, `activeMonth`
+  always has a value while `activeCycleId` is null pre-navigation), making the guard fire
+  on absence rather than on genuine drift.
+- **Test fixtures mutated in place between ordered tests need every drift-relevant field
+  reset, not just the surface ones.** `restoreCycle` reset `activeCycle`/`activeMonth` but
+  not `activeCycleId`; once test #2 drove drift via `activeCycleId`, the stale value would
+  have leaked into test #3 and mis-fired the guard. The shared-mock default and the
+  per-test restore must both carry the new field.
+- **When tightening a guard's signal, audit the destructure for newly dead bindings.**
+  Dropping `activeMonth` from the effect left it unused in the view; it was removed in the
+  same edit.
+
+**Files (3):** `views/HomeView.jsx` (guard + dep array + destructure, comment), 
+`views/HomeView.test.jsx` (drift test #2 now models `activeCycleId` mismatch; shared-mock
+default + `restoreCycle` carry `activeCycleId: null`), this entry. No changes to
+`useFinance`, `lib/cycles`, or sub-components.

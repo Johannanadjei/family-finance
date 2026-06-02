@@ -33,8 +33,10 @@ const mockFinance = {
   surplusTarget: 4500,
   spareMoney:    19600,
   // Cycle state — default no cycle so the label falls back to the current month and
-  // the mount-reset is a no-op (existing tests unaffected).
+  // the mount-reset is a no-op (existing tests unaffected). activeCycleId defaults null
+  // (no navigation yet) — the guard's truthiness check makes the reset a no-op.
   activeCycle:   null,
+  activeCycleId: null,
   activeMonth:   getCurrentMonth(),
   loadCycle:     vi.fn(),
   txs: [
@@ -156,7 +158,7 @@ describe('HomeView', () => {
   });
 
   // ── Cycles: current-cycle label + "now"-dashboard mount-reset (Commit 9) ──────
-  const restoreCycle = () => { mockFinance.activeCycle = null; mockFinance.activeMonth = getCurrentMonth(); mockFinance.loadCycle = vi.fn(); };
+  const restoreCycle = () => { mockFinance.activeCycle = null; mockFinance.activeCycleId = null; mockFinance.activeMonth = getCurrentMonth(); mockFinance.loadCycle = vi.fn(); };
 
   it('labels the header with the active cycle name when one exists', () => {
     mockFinance.activeCycle = { id: 'cyc-may', name: 'May 2026', start_date: '2026-05-01', end_date: '2026-05-31' };
@@ -167,8 +169,10 @@ describe('HomeView', () => {
   });
 
   it('snaps the shared selection to the current cycle when loaded data has drifted', () => {
-    mockFinance.activeCycle = { id: 'cyc-jun', name: 'June 2026', start_date: '2026-06-01', end_date: '2026-06-30' };
-    mockFinance.activeMonth = '2026-04';   // another view navigated away → drifted
+    // Another view navigated to a past cycle → activeCycleId points away from the
+    // current (auto-resolved) activeCycle. Drift is the activeCycleId mismatch, not month.
+    mockFinance.activeCycle   = { id: 'cyc-jun', name: 'June 2026', start_date: '2026-06-01', end_date: '2026-06-30' };
+    mockFinance.activeCycleId = 'cyc-may';   // explicit past-cycle selection → drifted
     const loadCycle = vi.fn();
     mockFinance.loadCycle = loadCycle;
     renderHome();
@@ -177,8 +181,8 @@ describe('HomeView', () => {
   });
 
   it('does NOT reset when the loaded data already matches the current cycle', () => {
-    mockFinance.activeCycle = { id: 'cyc-apr', name: 'April 2026', start_date: '2026-04-01', end_date: '2026-04-30' };
-    mockFinance.activeMonth = '2026-04';   // matches
+    mockFinance.activeCycle   = { id: 'cyc-apr', name: 'April 2026', start_date: '2026-04-01', end_date: '2026-04-30' };
+    mockFinance.activeCycleId = 'cyc-apr';   // selection matches the active cycle
     const loadCycle = vi.fn();
     mockFinance.loadCycle = loadCycle;
     renderHome();

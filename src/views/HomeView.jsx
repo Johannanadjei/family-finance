@@ -62,20 +62,24 @@ export function HomeView() {
     totalReceived, monthlyIncome, totalSpent, allIncome,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
     fixedTotal, spareMoney, budgetRemaining, txs,
-    loading, activeCycle, activeMonth, loadCycle,
+    loading, activeCycle, activeCycleId, loadCycle,
   } = financeValues;
 
   // Home is the "now" dashboard — snap the shared period selection back to the
   // current cycle when the loaded data has drifted (e.g. another view navigated to a
   // past cycle). This mount-reset is INTENTIONAL design — Home's role IS the current
   // period — NOT the Commit-0 band-aid (which masked an inability to render other
-  // periods). It guards on DATA equality (activeMonth), not selection equality, so it
-  // never fires when the data is already current (no first-load skeleton flicker).
+  // periods). It gates on activeCycleId — the TRUTH of which cycle's transactions are
+  // loaded (set only by explicit navigation in Payday/Daily/Log/Budget), not the
+  // activeMonth proxy that the loadCycle→loadMonth bridge derives. The `activeCycleId &&`
+  // truthiness guard means a null selection (no nav yet, already following the current
+  // cycle) never fires — which also avoids the null→id redundant load() the gated loader
+  // would otherwise re-trigger. See docs/engineering-decisions.md (proxy-vs-truth drift).
   useEffect(() => {
-    if (activeCycle && activeMonth !== activeCycle.start_date.slice(0, 7)) {
+    if (activeCycle && activeCycleId && activeCycleId !== activeCycle.id) {
       loadCycle(activeCycle.id);
     }
-  }, [activeCycle?.id, activeMonth]);
+  }, [activeCycle?.id, activeCycleId]);
 
   if (loading) return <HomeViewSkeleton />;
 
