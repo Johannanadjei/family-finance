@@ -32,6 +32,11 @@ const mockFinance = {
   budgetRemaining: 23000,
   surplusTarget: 4500,
   spareMoney:    19600,
+  // Cycle state — default no cycle so the label falls back to the current month and
+  // the mount-reset is a no-op (existing tests unaffected).
+  activeCycle:   null,
+  activeMonth:   getCurrentMonth(),
+  loadCycle:     vi.fn(),
   txs: [
     { id: 'tx-1', type: 'expense', amount: 200,   category_name: 'Groceries',    date: '2026-05-19', logged_by_name: 'Johannan' },
     { id: 'tx-2', type: 'income',  amount: 30000, category_name: 'Adjei Salary', date: '2026-05-19', logged_by_name: 'Johannan' },
@@ -148,5 +153,45 @@ describe('HomeView', () => {
     mockFinance.txs = [
       { id: 'tx-1', type: 'expense', amount: 200, category_name: 'Groceries', date: '2026-05-19', logged_by_name: 'Johannan' },
     ];
+  });
+
+  // ── Cycles: current-cycle label + "now"-dashboard mount-reset (Commit 9) ──────
+  const restoreCycle = () => { mockFinance.activeCycle = null; mockFinance.activeMonth = getCurrentMonth(); mockFinance.loadCycle = vi.fn(); };
+
+  it('labels the header with the active cycle name when one exists', () => {
+    mockFinance.activeCycle = { id: 'cyc-may', name: 'May 2026', start_date: '2026-05-01', end_date: '2026-05-31' };
+    mockFinance.activeMonth = '2026-05';   // matches → no reset
+    renderHome();
+    expect(screen.getByTestId('home-month-label').textContent).toBe('May 2026');
+    restoreCycle();
+  });
+
+  it('snaps the shared selection to the current cycle when loaded data has drifted', () => {
+    mockFinance.activeCycle = { id: 'cyc-jun', name: 'June 2026', start_date: '2026-06-01', end_date: '2026-06-30' };
+    mockFinance.activeMonth = '2026-04';   // another view navigated away → drifted
+    const loadCycle = vi.fn();
+    mockFinance.loadCycle = loadCycle;
+    renderHome();
+    expect(loadCycle).toHaveBeenCalledWith('cyc-jun');
+    restoreCycle();
+  });
+
+  it('does NOT reset when the loaded data already matches the current cycle', () => {
+    mockFinance.activeCycle = { id: 'cyc-apr', name: 'April 2026', start_date: '2026-04-01', end_date: '2026-04-30' };
+    mockFinance.activeMonth = '2026-04';   // matches
+    const loadCycle = vi.fn();
+    mockFinance.loadCycle = loadCycle;
+    renderHome();
+    expect(loadCycle).not.toHaveBeenCalled();
+    restoreCycle();
+  });
+
+  it('does NOT reset when there are no cycles (brand-new hub)', () => {
+    mockFinance.activeCycle = null;
+    const loadCycle = vi.fn();
+    mockFinance.loadCycle = loadCycle;
+    renderHome();
+    expect(loadCycle).not.toHaveBeenCalled();
+    restoreCycle();
   });
 });

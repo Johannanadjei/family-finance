@@ -7,7 +7,7 @@
  * Sub-components live in src/views/home/
  */
 
-import { useState }               from 'react';
+import { useState, useEffect }    from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { getCurrentMonth }        from '../lib/finance';
@@ -58,25 +58,38 @@ export function HomeView() {
   const financeValues   = useFinanceContext();
   const [activeInfo, setActiveInfo] = useState(null);
 
-  if (financeValues.loading) return <HomeViewSkeleton />;
-
   const {
     totalReceived, monthlyIncome, totalSpent, allIncome,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
     fixedTotal, spareMoney, budgetRemaining, txs,
+    loading, activeCycle, activeMonth, loadCycle,
   } = financeValues;
+
+  // Home is the "now" dashboard — snap the shared period selection back to the
+  // current cycle when the loaded data has drifted (e.g. another view navigated to a
+  // past cycle). This mount-reset is INTENTIONAL design — Home's role IS the current
+  // period — NOT the Commit-0 band-aid (which masked an inability to render other
+  // periods). It guards on DATA equality (activeMonth), not selection equality, so it
+  // never fires when the data is already current (no first-load skeleton flicker).
+  useEffect(() => {
+    if (activeCycle && activeMonth !== activeCycle.start_date.slice(0, 7)) {
+      loadCycle(activeCycle.id);
+    }
+  }, [activeCycle?.id, activeMonth]);
+
+  if (loading) return <HomeViewSkeleton />;
 
   const showIncome  = can('viewIncome');
   const showBalance = can('viewBalance');
-  const currentMonth = getCurrentMonth();
 
   return (
     <div style={{ padding: '16px' }}>
 
-      {/* Month label — static, ungated (visible without viewIncome); mirrors BudgetView (5e430d2) */}
+      {/* Period label — the current cycle's name, ungated (visible without viewIncome).
+          Home always shows "now", so this is the active cycle, never a navigable label. */}
       <div style={{ marginBottom: 16, textAlign: 'center' }}>
         <p data-testid="home-month-label" style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
-          {formatMonth(currentMonth)}
+          {activeCycle?.name ?? formatMonth(getCurrentMonth())}
         </p>
       </div>
 

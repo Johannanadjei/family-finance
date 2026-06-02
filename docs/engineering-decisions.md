@@ -2732,3 +2732,65 @@ category plan and the spend from the viewed cycle, and gating past-period mutati
 - When category edit/delete UI is added, route those handlers through requestMutation.
 - Commit-5's cycle_id-not-stamped-on-insert and the Commit-14 WeeklySummaryBar
   variable-length item still apply.
+
+---
+
+## [2026-06-02] Commit 9 — HomeView migrated to cycles (closes the 5-view milestone)
+
+**Context:**
+Last view migration. Home is the "now" dashboard, not a period view — so unlike the
+other four it does NOT gain navigation. The work was to (a) label with the current
+cycle's name and (b) keep Home coherent given the shared, now-navigable activeMonth.
+
+**Decisions:**
+- NO NAV on Home. Period browsing belongs to the four history/management views
+  (Payday/Daily/Log/Budget). Home shows the current period only.
+- MOUNT-RESET, and why it is NOT the Commit-0 band-aid. Home reads a mix of
+  activeMonth-scoped aggregates and clock-derived ones (fixedTotal/spareMoney/
+  budgetRemaining/healthPct/budgetStatus, via the current-month categories slice).
+  Because activeMonth is shared and four views now navigate it, landing on Home after
+  navigating elsewhere could show a current label over stale data. Home snaps the
+  shared selection back to the current cycle on mount. This is INTENTIONAL design —
+  Home's ROLE is the current period — whereas Commit-0's band-aid forced the current
+  month because the architecture could not render other months correctly (it masked a
+  bug). Same shape, opposite status: one expresses the view's purpose, the other hid a
+  defect. Budget removed its reset because it gained the ability to render any period;
+  Home keeps a reset because it deliberately renders only "now".
+- DATA-based guard, not selection-based. The reset fires on
+  `activeMonth !== activeCycle.start_date.slice(0,7)`, NOT on
+  `activeCycleId !== activeCycle.id`. The selection-based guard fires even when the
+  data is already current (activeCycleId starts null), causing a redundant loadMonth
+  and a first-load skeleton flicker. The data guard fires only when the data has
+  actually drifted. Loop-safe: the reset changes activeMonth → effect re-fires → guard
+  now false. Trade-off: visiting Home resets the cross-view selection to current —
+  acceptable given Home's role.
+- LABEL: `activeCycle?.name ?? formatMonth(getCurrentMonth())` — identical output for
+  calendar cycles, cycle-vocabulary-consistent, safe on a brand-new hub (no cycles).
+- NO MUTATIONS on Home → no usePastPeriodGuard.
+
+**Phase-1 miss caught in Phase 3:** the Phase-1 claim "sub-components render no period
+text" was wrong — three sites carry "month/monthly" microcopy (PaydaySummaryCard
+"received this month", BudgetHealthBar "monthly budget used", StatCard tooltip "your
+monthly budget"). Decision: LEAVE them — they are literally accurate while every cycle
+is a calendar month, and the v1.2 E0 vocabulary lock targeted navigable period labels,
+not descriptive microcopy in display components. Batch the fix into Commit 14 (custom
+cycles), when "monthly" actually becomes wrong.
+
+**Rules derived:**
+- A mount-reset effect is legitimate when the view's PURPOSE is to show "now"; it is a
+  band-aid only when used to mask an architectural inability to render other states.
+  Judge the effect by intent, not by shape.
+- When a "now" dashboard resets to current on mount, guard on DATA equality
+  (activeMonth), not SELECTION equality (activeCycleId) — a selection guard can fire
+  when the data is already correct, causing redundant fetches/flicker.
+
+**Milestone:** all five views (Payday, Daily, Log, Budget, Home) now cycle-aware. The
+month→cycle presentation layer is complete; activeMonth remains the internal data key
+behind the loadCycle bridge until the month-columns drop (~Commit 13).
+
+**Backlog:**
+- Commit 14 (custom cycles) must also update display-component microcopy:
+  PaydaySummaryCard "this month" → "this period"; BudgetHealthBar "monthly budget" →
+  "period budget"; StatCard tooltip "monthly budget" → "period budget".
+- Daily/Log/Payday clock-keyed categories slice (latent bug) still applies; cycle_id
+  not stamped on insert (~Commit 13); WeeklySummaryBar variable-length (Commit 14).
