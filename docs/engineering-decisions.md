@@ -2407,3 +2407,48 @@ regions: imports/helper at the top vs. the destructure+effect inside the compone
 - formatMonth still silently coerces bad input to "January 2001" (V8 lenient parsing);
   acceptable while all call sites pass real 'YYYY-MM', logged in backlog for a guard if
   i18n or external input ever lands.
+
+---
+
+## [2026-06-02] Commit 3 — Budget Cycles service layer + create RPC
+
+**Context:**
+Third Cycles commit: the read/write service over budget_cycles, plus the
+server-side calendar-cycle creator. Schema (Commit 1), FK columns + backfill
+(Commit 2) and the formatMonth hoist (Commit 2.5) are all live; this commit is the
+first app code that reads/writes cycles. Thin service + a SECURITY DEFINER RPC for
+the privileged create; the pure date-window picker stays deferred to Commit 4.
+
+**Decisions:**
+- Four service functions: getCyclesForCentre (newest-first list, §12 array-coercion),
+  getCycleForDate (date-containment lookup via lte(start)/gte(end), maybeSingle),
+  getCycleById (maybeSingle), createCalendarCycle (RPC wrapper). maybeSingle (not
+  single) on both getters — "no cycle for this date/id" is a legitimate null result,
+  not an error, and must not throw the PGRST116 single-row error.
+- createCalendarCycle goes through a SECURITY DEFINER RPC (create_calendar_cycle),
+  never a direct client insert (§9.6). The RPC authorizes the caller as an active
+  member via auth.uid(), so ANY member may auto-create the calendar cycle for a month
+  they're viewing — this resolves (and removes) the parked "cycle auto-creation
+  permission boundary" backlog item rather than relying on the owner/full_access
+  row-level INSERT policy.
+- The cycle NAME is generated server-side in the RPC via to_char(start,'FMMonth YYYY'),
+  byte-identical to the Commit 2 backfill. Consequence: the service does NOT use
+  lib/dates.formatMonth — the stale "createCalendarCycle uses formatMonth" design note
+  was dropped. The Commit 2.5 hoist is still earned: Commit 4's hook/view layer consumes
+  formatMonth for nav-header labels.
+- Overlap (a cycle already covering the month) is trapped from the Commit-1 GiST
+  exclusion constraint inside the RPC and re-raised under custom SQLSTATE 'CYC01' with
+  a friendly message. 'CYC01' is a valid 5-char custom code; the originally proposed
+  'cycle_already_exists' is NOT a valid ERRCODE (not a known condition name, >5 chars)
+  and would have failed at runtime. The service surfaces it as error.code === 'CYC01'.
+- Month-format validation is an inlined /^\d{4}-\d{2}$/ guard in the service (returns
+  {data:null,error}, never throws — §6), mirrored by the RPC's POSIX '^[0-9]{4}-[0-9]{2}$'
+  as defence-in-depth. Not extracted to lib/validation until a second caller appears.
+
+**Rules derived:**
+- A custom PL/pgSQL ERRCODE must be a recognized condition name OR a 5-character
+  SQLSTATE — arbitrary descriptive strings raise "unrecognized exception condition".
+- Service tests mock supabase at '../lib/supabase' and assert RPC call signature +
+  the mocked error shape (incl. SQLSTATE). They do NOT exercise the RPC; the RPC is
+  validated manually in the Supabase SQL editor — noted in both the test header and here
+  so the coverage boundary is explicit, not silent (§12 spirit).
