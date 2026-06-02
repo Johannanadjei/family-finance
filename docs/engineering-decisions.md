@@ -2587,3 +2587,48 @@ Budget, Home — Commits 6-9) will copy.
   insert with cycle_id NULL. Must stamp cycle_id on insert before the month columns are
   dropped (Commit 13). Harmless now (Payday reads by month via the bridge).
 - PaydayView sits exactly at the 200-line cap; any further change needs an extraction.
+
+---
+
+## [2026-06-02] Commit 6 — DailyView migrated to cycles (second view migration)
+
+**Context:**
+Second per-view migration, applying the Commit-5 template (loadCycle bridge +
+getCycleNav + viewedCycle fallback) to DailyView. Smallest migration so far —
+3 files, no hook/lib changes — because the proof from Commit 5 made it mechanical.
+
+**Decisions:**
+- DailyView's nav is INLINE (no DailyHeader component), so the reshape happened in
+  the view itself rather than a sub-component. Same logic as PaydayHeader's reshape:
+  Next disabled → nav.isLatest, Prev disabled → nav.isOldest (backward nav now
+  bounded), label → viewedCycle.name, aria → "Previous/Next period", testid
+  daily-month-label → daily-period-label.
+- The editable gate is isCurrent = "viewed cycle contains today" (start <= today <=
+  end), NOT isLatest (newest list position). The two differ for a future cycle (newest
+  but not editable) and on a gap day (getActiveCycle returns the most-recently-ended
+  past cycle, which must be read-only). Auto-create makes them coincide in normal
+  operation; the gap window degrades safely to read-only rather than writing today's
+  tx into a closed cycle. Delete-disable + empty-state hint gate on isCurrent; the
+  past-period warning gates on isPast.
+- WeeklySummaryBar is UNCHANGED. It already renders weeklyData.map (not a hardcoded
+  5 tabs); the 5-week calendar assumption lives upstream in lib/finance
+  (WEEKS/getWeekForDate/calcWeeklyData), is shared by all views, and only matters for
+  custom-length cycles that don't exist yet. It still takes activeMonth, which the
+  loadCycle→loadMonth bridge keeps equal to the viewed cycle's month for calendar
+  cycles, so the current-week highlight stays correct with zero change. Variable-length
+  weeks (Math.ceil(cycleDays/7), buckets relative to start_date) deferred to the
+  custom-cycle commit (Commit 14).
+- Visible-string vocabulary lock (v1.2 E0): "Total spent this month" → "…this period";
+  "Viewing a past month…" → "Viewing a past period…".
+
+**Rules derived:**
+- A proven view-migration template makes subsequent views mechanical: reuse loadCycle
+  + getCycleNav + the viewedCycle/isCurrent/isPast derivation verbatim; the only
+  per-view work is wiring the existing gates (delete, warnings, empty state) to
+  isCurrent/isPast/nav instead of isCurrentMonth.
+- Defer shared-helper changes (lib/finance week calc) out of a per-view migration when
+  they only matter for data shapes that don't exist yet — keep the migration to nav.
+
+**Backlog:**
+- No new debt (mechanical reuse). Commit-5's cycle_id-not-stamped-on-insert still
+  applies. WeeklySummaryBar variable-length tracked for Commit 14.
