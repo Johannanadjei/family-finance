@@ -3053,3 +3053,52 @@ that slips past the gate still meets the null-guard.
 
 **Scope:** auth ref stabilisation + the `updateCentre` write contract. Consumer hooks keep
 their existing `[user]` / `[centre?.id]` dependencies unchanged — the fix is upstream.
+
+---
+
+## [2026-06-02] Bound the cold-load canary to its actual hypothesis window
+
+**Context:**
+Live verification of commit 425edc0 (logged in as a different user, on a brand-new hub with
+no transactions) flooded the console with **22 `[auth canary]` fires** in one session — 13 in
+the first 12s, a ~200s quiet gap, then 9 more from 210s to 263s. The Log view read "Nothing
+logged yet": the hub is **genuinely empty**, not RLS-blocked.
+
+**Diagnosis:**
+`warnOnEmptyColdLoad` (lib/auth.js) fired on `count === 0 && age > 1000` — a lower bound with
+**no upper bound**. `_sessionSeenAt` is set once and never reset, so `sessionAgeMs()` grows for
+the whole page-load. Every empty `getTransactionsByCycle` read more than 1s into the session
+tripped it — including fires **210s+** in, which are provably **not** a cold-load auth race.
+The race the canary exists to catch is a sub-second cold-load phenomenon (`session.user`
+populates before the RLS token propagates); it cannot manifest minutes into a held session.
+The fires tracked legitimate `load()` calls (mount, cycle auto-create, HomeView's snap-to-now
+mount-reset, and cycle navigation) against an empty hub — each a normal empty result, each
+mislabelled "possible RLS/auth race." Note: `useFinance`'s transaction loader is keyed on
+cycle state, **not** `user`, so 425edc0's stable-user-ref fix never governed this path and was
+not the relevant lever — the canary's unbounded window was.
+
+**Decision:**
+Bound the canary to `AUTH_RACE_LOWER_MS (1000) < age < AUTH_RACE_UPPER_MS (5000)`. The lower
+bound (unchanged) skips the auth-ready interval; the new upper bound (5s — generous for slow
+3G / transit) excludes empty fetches that are presumed legitimate (empty hub, or navigation to
+an empty period). Fixed **centrally in `lib/auth.js`**, the single home of the canary, so all
+four call sites inherit the window: `transactions` (×2) and `budget_centres` (×2). A
+`budget_centres` empty read at 210s is equally not-a-race, so it gets the bound intentionally.
+
+**NOT changed:** 425edc0's stable user ref (separate, sound); HomeView's snap-to-now
+mount-reset (flagged for separate review — it re-fires `load()` on every Home return, which is
+redundant for a stable hub but out of scope here); any transaction-fetch structure.
+
+**Rules derived:**
+- **A diagnostic warning's trigger must match its hypothesis.** If a warning named for a "race
+  condition" fires on every empty result for the life of the page, it is not a canary — it is
+  noise. Bound the trigger to the window where the hypothesis can actually be true. A
+  cold-load race is detectable only in the cold-load window; outside it, an empty result is
+  data, not a race.
+- **Fix a shared diagnostic at its definition, not at each call site.** One bounded
+  `warnOnEmptyColdLoad` covers transactions and budget_centres consistently; per-service
+  duplication would drift and leave some callers unbounded.
+
+**Files (3):** `lib/auth.js` (the bound), `lib/auth.test.js` (upper-bound case; the existing
+1.5s in-window case stays green), this entry. `transactions.service.js` was in the original
+sketch but needed no change — it only calls the canary.

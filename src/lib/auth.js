@@ -24,6 +24,15 @@ import { supabase } from './supabase';
 const RETRY_GAP_MS  = 500;
 const EXPIRY_SKEW_S = 30; // treat a token expiring within 30s as stale → refresh
 
+// Cold-load auth-race detection window (warnOnEmptyColdLoad). The race is a
+// sub-second cold-load phenomenon — session.user populates before the RLS token
+// propagates — so a genuine racy-empty fetch lands in the first ~1-2s (5s allows
+// slow 3G / transit). An empty fetch OUTSIDE this window is presumed legitimate
+// (a hub with no data for the viewed period, or navigation to an empty cycle),
+// NOT a race — firing there is the false-positive noise this bound removes.
+const AUTH_RACE_LOWER_MS = 1000;
+const AUTH_RACE_UPPER_MS = 5000;
+
 const isExpired = (session) => {
   if (!session?.expires_at) return false;
   const nowS = Math.floor(Date.now() / 1000);
@@ -67,10 +76,15 @@ export const waitForSession = async (maxAttempts = 3) => {
 
 /**
  * Cold-load smoke detector. Logs a console.warn when a fetch comes back empty
- * for a user who has held a session for >1s — the signature of a residual
- * RLS/auth race (the data-loss-on-refresh class). Cheap canary, dev-only signal.
+ * within the cold-load auth-race window (AUTH_RACE_LOWER_MS..AUTH_RACE_UPPER_MS
+ * after the session was first observed) — the signature of a residual RLS/auth
+ * race (the data-loss-on-refresh class). Cheap canary, dev-only signal.
  *
- * Genuinely-empty accounts can also trip this; the message says "possible".
+ * The window is bounded at BOTH ends: a fetch under the lower bound is presumed
+ * safe (the auth-ready interval), and one past the upper bound is presumed a
+ * legitimate empty result (empty hub / navigated to an empty period) — a race
+ * cannot manifest minutes into a held session. A genuinely-empty account can
+ * still trip it inside the window; the message says "possible".
  *
  * @param {string} label — table / query name for the log line
  * @param {Array|null} data — the rows returned by the query
@@ -78,7 +92,7 @@ export const waitForSession = async (maxAttempts = 3) => {
 export const warnOnEmptyColdLoad = (label, data) => {
   const count = data?.length ?? 0;
   const age   = sessionAgeMs();
-  if (count === 0 && age > 1000) {
+  if (count === 0 && age > AUTH_RACE_LOWER_MS && age < AUTH_RACE_UPPER_MS) {
     console.warn(`[auth canary] ${label} returned empty ${age}ms after session established — possible RLS/auth race (data-loss-on-refresh class).`);
   }
 };
