@@ -147,7 +147,13 @@ function anchoredDay(anchorType, anchorDay, inMonth) {
  * @returns {{ start_date: string, end_date: string }}
  */
 export function anchorToDateRange(anchorType, anchorDay, referenceDate, prevEndDate = null) {
-  const ref = new Date(referenceDate + 'T00:00:00Z');
+  // Effective reference (dual-basis fix): never build a range behind an existing
+  // cycle's end. referenceDate is a hint; force it to at least prevEnd+1 — the twin
+  // of create_cycle_by_anchor's GREATEST(p_reference_date, max_end+1). This keeps the
+  // Settings preview identical to what the RPC will actually create.
+  const clampStart = prevEndDate ? addDays(new Date(prevEndDate + 'T00:00:00Z'), 1) : null;
+  let ref = new Date(referenceDate + 'T00:00:00Z');
+  if (clampStart && ref < clampStart) ref = clampStart;
   const y = ref.getUTCFullYear();
   const m = ref.getUTCMonth();
   let start, end;
@@ -166,10 +172,9 @@ export function anchorToDateRange(anchorType, anchorDay, referenceDate, prevEndD
     }
   }
 
-  if (prevEndDate) {
-    const clampStart = addDays(new Date(prevEndDate + 'T00:00:00Z'), 1);
-    if (start < clampStart) start = clampStart;
-  }
+  // Start-clamp for anchored periods that began before prevEnd+1 (M1 short cycle).
+  // v_end is already past prevEnd via the effective ref, so this can't invert.
+  if (clampStart && start < clampStart) start = clampStart;
 
   return { start_date: iso(start), end_date: iso(end) };
 }

@@ -3512,3 +3512,78 @@ whitelist in create + update) + test; `hooks/useFinance.js` (+ `.test.js`,
 
 **Migration:** `scripts/migrate_14b_anchor.sql` runs separately in the Supabase SQL
 editor (like Commits 10 & 12) — surfaced at handoff, not run by the app.
+
+---
+
+## [2026-06-03] Commit 14b fix — create_cycle_by_anchor dual-basis bug (CYC03 on auto-create)
+
+**Context:**
+Live verification of 14b surfaced a 400 on the dashboard:
+`create_cycle_by_anchor ... Computed cycle range is empty after clamp (start 2026-07-01 > end 2026-06-30)`.
+Auto-create fired, the RPC raised CYC03, and the cycle was not created.
+
+**The bug — a dual-basis inconsistency:**
+The RPC built the cycle range from `p_reference_date` — which `useFinance` /
+`computeNextCycleParams` derive **client-side** from the latest cycle in the JS
+`cycles` array — but applied the forward-only clamp from a **different** basis:
+`max(end_date)` read live from the DB. When the client's view lagged the DB (the DB
+already held a cycle the client hadn't loaded), `p_reference_date` pointed *into* an
+already-covered month. The calendar branch built that covered month
+(`2026-06-01..2026-06-30`); the clamp then advanced `v_start` to `max_end + 1`
+(`2026-07-01`) **without re-deriving `v_end`**, so `v_start > v_end` → CYC03.
+
+**Why it passed every test but failed live:**
+Every existing `anchorToDateRange` / `computeNextCycleParams` test passes either no
+`prevEnd` or `referenceDate == prevEnd + 1` — i.e. the two bases agree. The bug only
+appears when `reference < prevEnd + 1` (client behind DB), which no test exercised.
+The defect lived precisely at the RPC boundary, where the two bases are independent;
+the JS twin never inverted because its callers pass a self-consistent
+`(reference = prevEnd+1, prevEnd)` pair.
+
+**The fix (Option A — make the RPC authoritative):**
+Derive an effective reference up front that can never sit behind the DB's coverage:
+`v_ref := GREATEST(p_reference_date, COALESCE(v_prev_end + 1, p_reference_date))`,
+and build the entire range from `v_ref`. Now `v_end >= v_ref >= max_end + 1 > max_end`,
+so the range can never invert; the start-clamp still yields the M1 short transition
+cycle for anchored periods that began before `max_end+1`, and CYC03 reverts to a
+genuine never-should-happen guard. The JS twin `anchorToDateRange` gets the same
+`GREATEST` (reusing its `clampStart`) so the Settings preview matches what the RPC
+will actually create. `computeNextCycleParams` is unchanged — it still passes
+`reference_date = prevEnd+1` through; the authority now lives in the RPC.
+
+**Why Option A over B/C:**
+- A fixes the crash at the authoritative layer (the DB), where the no-overlap
+  invariant must hold. B (post-hoc recompute when inverted) is equivalent but branchy
+  and computes the range twice. C (fix the skew client-side) is impossible purely in
+  JS — the client can't know the DB max without a round-trip, and a race remains.
+- A is a strict **no-op on every currently-passing test** (all have
+  `reference >= prevEnd+1`), so it carries no regression risk.
+- A is the smallest change: ~6 lines in the RPC (a small reorder so `max(end_date)`
+  is read before the range is built), ~3 in the JS twin.
+
+**Rule derived:**
+- **When the client computes a value the server consumes as input, the server must
+  treat that input as a HINT, not as truth. The server is authoritative for any
+  invariant that depends on server state.** Here the no-overlap invariant depends on
+  the live set of cycles, so the RPC — not the client's possibly-stale `cycles`
+  array — owns the reference used to place the new cycle.
+
+**Deferred / backlog (separate concern, NOT in scope):**
+Auto-create fired in production when a covering cycle may have already existed in the
+DB — i.e. the JS `cycles` array lagged the DB max. Option A makes this benign
+post-fix (the RPC creates the legit next-free cycle instead of 400-ing), so it is not
+blocking. The underlying staleness — *why* the client view lagged — is unresolved.
+Possible causes: a cycles-fetch race, an optimistic update not reflecting
+trigger-created rows, or another session/tab. Investigate only if auto-create
+continues firing unexpectedly. Sits in the operational backlog alongside the other
+deferred items.
+
+**Files (4):** `scripts/migrate_14b_fix_dual_basis.sql` (NEW — `CREATE OR REPLACE`
+of `create_cycle_by_anchor` only, re-issues GRANT, verification queries inline);
+`src/lib/cycles.js` (`anchorToDateRange` effective reference) + `src/lib/cycles.test.js`
+(+2 regression tests: calendar + fixed_day with `reference < prevEnd`); this entry.
+
+**Migration:** `scripts/migrate_14b_fix_dual_basis.sql` runs in the Supabase SQL
+editor BEFORE this commit deploys (SQL first, code second — same sequencing as 14b).
+`CREATE OR REPLACE` preserves the existing grant; signature, columns, CHECKs, and the
+`cycle_anchored_day` / `cycle_majority_name` helpers are untouched.

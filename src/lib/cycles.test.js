@@ -185,6 +185,19 @@ describe('anchorToDateRange', () => {
     expect(anchorToDateRange('fixed_day', 29, '2026-06-29', '2026-06-28'))
       .toEqual({ start_date: '2026-06-29', end_date: '2026-07-28' });
   });
+
+  // Dual-basis regression (CYC03): a stale client reference can point INTO an
+  // already-covered period (referenceDate < prevEnd+1). The effective reference must
+  // roll the whole range forward to the next free period — never invert start > end.
+  it('rolls a stale calendar reference forward instead of inverting the range', () => {
+    expect(anchorToDateRange('calendar', null, '2026-06-01', '2026-06-30'))
+      .toEqual({ start_date: '2026-07-01', end_date: '2026-07-31' });
+  });
+
+  it('rolls a stale fixed_day reference forward instead of inverting the range', () => {
+    expect(anchorToDateRange('fixed_day', 29, '2026-06-01', '2026-06-30'))
+      .toEqual({ start_date: '2026-07-01', end_date: '2026-07-28' });
+  });
 });
 
 describe('cycleDefaultName', () => {
