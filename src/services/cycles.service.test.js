@@ -171,6 +171,26 @@ describe('createCycleByAnchor', () => {
     expect(mockRpc).toHaveBeenCalledWith('create_cycle_by_anchor', expect.objectContaining({ p_name: null }));
   });
 
+  it('returns the server-computed name even when a stale/wrong p_name is sent — RPC is authoritative (Bug 4)', async () => {
+    // Post-fix, create_cycle_by_anchor IGNORES p_name and names the row from its own
+    // server-clamped range. The service still FORWARDS `name` (a harmless no-op drop),
+    // so the mock RPC stands in for that authority: it is handed the wrong name but
+    // returns a row named for the actual marched-forward range. The persisted name
+    // must be the server's, never the caller's stale basis.
+    const WRONG = { anchor_type: 'calendar', anchor_day: null, reference_date: '2026-06-03', name: 'June 2026' };
+    const serverRow = { ...mockCycle, name: 'July 2026', start_date: '2026-07-01', end_date: '2026-07-31' };
+    mockRpc.mockResolvedValueOnce({ data: serverRow, error: null });
+
+    const { data, error } = await createCycleByAnchor('c-1', WRONG);
+
+    // The service still forwards the (now-ignored) name — proving this test exercises
+    // the RPC's authority, not merely a service that stopped sending p_name.
+    expect(mockRpc).toHaveBeenCalledWith('create_cycle_by_anchor', expect.objectContaining({ p_name: 'June 2026' }));
+    // …but the row that comes back carries the server-computed name, not the wrong one.
+    expect(data.name).toBe('July 2026');
+    expect(error).toBeNull();
+  });
+
   it('surfaces the CYC01 overlap error from the rpc (already exists)', async () => {
     mockRpc.mockResolvedValueOnce({
       data: null,

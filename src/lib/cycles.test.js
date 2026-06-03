@@ -212,6 +212,13 @@ describe('cycleDefaultName', () => {
   it('ties break toward the later month (15 days each → July)', () => {
     expect(cycleDefaultName('2026-06-16', '2026-07-15')).toBe('July 2026');
   });
+
+  it('remains the display-preview source of truth — a forward-marched range names its own month', () => {
+    // The Bug 4 fix made the RPC server-authoritative for the PERSISTED name; the JS
+    // twin is intentionally UNCHANGED and still drives the Settings next-cycle preview
+    // (a display-only estimate). This guards against accidentally regressing it.
+    expect(cycleDefaultName('2026-07-01', '2026-07-31')).toBe('July 2026');
+  });
 });
 
 describe('computeNextCycleParams', () => {

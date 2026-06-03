@@ -3587,3 +3587,93 @@ of `create_cycle_by_anchor` only, re-issues GRANT, verification queries inline);
 editor BEFORE this commit deploys (SQL first, code second — same sequencing as 14b).
 `CREATE OR REPLACE` preserves the existing grant; signature, columns, CHECKs, and the
 `cycle_anchored_day` / `cycle_majority_name` helpers are untouched.
+
+---
+
+## [2026-06-03] Cycle NAME corruption — the sibling of the dual-basis range bug (Bug 4)
+
+**Context:**
+Lived-use surfaced a P0 data-integrity bug: the "Move to period" sheet (and every
+cycle label) showed wrong names. DB inspection of The Adjei household confirmed
+stored corruption — cycles for Jul 2026 … Feb 2027 were all named `'June 2026'`
+despite correct date ranges. May and June were correct; only the forward-marched
+cycles were wrong. The display layer was innocent: `MoveCycleSheet` reads
+`cycle.name` straight from the row (Decision 14 holds). The corruption was in the
+stored `name`.
+
+**Root cause — the dual-basis fix only fixed HALF the problem:**
+The earlier dual-basis fix made the cycle RANGE server-authoritative
+(`v_ref := GREATEST(p_reference_date, max_end+1)`) but left the NAME
+client-authoritative:
+`v_name := COALESCE(NULLIF(btrim(p_name), ''), cycle_majority_name(v_start, v_end));`
+The client computes `p_name` (`lib/cycles.cycleDefaultName`) from ITS OWN, possibly
+STALE, `cycles` array. When that view lagged the DB, the client sent a stale-basis
+name (`'June 2026'`, computed from today's month / a May-or-null prev) while the
+server marched the RANGE forward to the next free slot (July, Aug, …). `COALESCE`
+preferred the non-null stale `p_name`, so each forward-marched cycle was stored with
+the wrong name; the correct `cycle_majority_name(v_start, v_end)` fallback was never
+reached. Range = server basis; name = client basis; they diverge exactly when the
+client lags the DB — the **same dual-basis pattern** as the earlier reference_date
+bug, on a sibling field.
+
+**Why it passed every test AND the SQL verification:**
+Every JS test exercises `cycleDefaultName` / `computeNextCycleParams` in isolation,
+where client and server agree. None exercised the divergence (stale client basis vs.
+server-marched range). Worse, the dual-basis fix's own SQL verification queries all
+called the RPC with `p_name = NULL` — exercising the correct *fallback* path, never
+the `p_name`-supplied path that production actually uses. Green tests + green SQL
+verify both missed it because both tested the path the bug doesn't live on.
+
+**Decision (Option 1 — server-authoritative naming):**
+The RPC now ALWAYS computes `v_name := cycle_majority_name(v_start, v_end)`. The
+client's `p_name` is ignored for the persisted name. Shipped WITH a data-repair
+migration in the same file: `UPDATE budget_cycles SET name = cycle_majority_name(...)
+WHERE name <> cycle_majority_name(...)` — idempotent, single-column, all hubs.
+
+**Why Option 1 over Option 2 (client always sends NULL):**
+Option 1 enforces correctness at the boundary forever — no current or future caller
+can reintroduce the bug. Option 2 relies on every caller cooperating; one future
+caller passing a name brings the bug back. `p_name` is KEPT in the signature
+(vestigial, silently dropped) so the service and all callers are untouched — and the
+service deliberately still SENDS it, so the service test proves the RPC *ignores* it
+rather than merely that the client stopped sending. The JS twin `cycleDefaultName` is
+unchanged: it still drives the Settings next-cycle preview (display-only estimate).
+
+**Why same commit (code fix + data repair):**
+Code-first would self-heal names only as cycles are touched; repair-first would let
+corruption recreate. Together, production goes from broken-with-corruption to
+fixed-with-clean-data in one step.
+
+**Bug clustering:**
+Bugs 1 (forward nav) and 2 (rollforward source=dest) are the same upstream `cycles`-
+lags-DB staleness surfacing in the nav/rollforward read paths; server-authoritative
+naming makes the persisted symptom benign. Bug 3(b) (preview said "November") is
+downstream of the surplus forward-marched cycles (the preview's `latestCycle` was a
+corrupt cycle) and is expected to auto-resolve once the data is repaired. Bug 3(a)
+(suggest-pills wiring) is independent — separate commit. The surplus future cycles
+themselves are LEFT in place (now correctly named); soft-deleting them risks orphaning
+attached rows for no benefit once labelled.
+
+**Rule derived:**
+- **Server authority extends to ALL fields that depend on server state, not just the
+  most obvious one. If the dual-basis pattern emerges once (client computes a value the
+  server consumes as a hint), audit every related field for the same exposure.** The
+  range fix should have triggered an audit of the name, which shares the identical
+  client-computed-then-trusted shape.
+- **Verify the path production uses.** The SQL verification that passed `p_name = NULL`
+  proved the fallback, not the live path. A verification query must exercise the actual
+  caller inputs (here: a non-null, deliberately-wrong `p_name`).
+
+**Files (5):** `scripts/migrate_14b_fix_naming.sql` (NEW — `CREATE OR REPLACE` of
+`create_cycle_by_anchor` with the one-line server-authoritative `v_name` change +
+data-repair `UPDATE` + verification queries, single BEGIN/COMMIT); `src/services/
+cycles.service.js` (NO change — keeps the now-ignored `p_name` send for the meaningful
+test); `src/services/cycles.service.test.js` (+1 test: wrong `p_name` in → server name
+out); `src/lib/cycles.test.js` (+1 regression test: `cycleDefaultName` unchanged for the
+preview); this entry.
+
+**Migration:** `scripts/migrate_14b_fix_naming.sql` runs in the Supabase SQL editor
+BEFORE this commit deploys (SQL first, code second — same sequencing as 14b). File
+order is RPC re-create → data-repair UPDATE → verification; `cycle_majority_name`
+already exists from 14b, so the UPDATE can call it. `CREATE OR REPLACE` preserves the
+grant; signature, columns, CHECKs, and helpers are untouched.
