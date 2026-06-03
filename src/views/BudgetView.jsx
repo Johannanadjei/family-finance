@@ -169,7 +169,7 @@ export function BudgetView() {
       <AddCategorySheet
         isOpen={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        onAdd={addCategory}
+        onAdd={(cat) => addCategory(cat, viewedCycle?.id)}
         targetMonth={viewedMonth}
       />
 

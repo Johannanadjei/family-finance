@@ -169,10 +169,14 @@ export function useBudgetCentre(user, centreId) {
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
-  const addCategory = async (category) => {
+  // `targetCycleId` is resolved by the caller (the view has the cycles list this
+  // hook lacks — same cut as copyCategoriesToMonth, Commit 11.5) and stamped into
+  // the insert so the trigger short-circuits on it (Commit 14a). Non-optimistic:
+  // the server row (carrying the stamped cycle_id) is appended on success.
+  const addCategory = async (category, targetCycleId) => {
     const id = centre?.id;
     if (!id) return { error: new Error('No active centre') };
-    const { data, error } = await addCategoryService(id, category);
+    const { data, error } = await addCategoryService(id, category, targetCycleId);
     if (error) return { error };
     setAllCategories(prev => [...prev, data]);
     return { data, error: null };
@@ -292,7 +296,9 @@ export function useBudgetCentre(user, centreId) {
     const tempIds    = new Set(optimistic.map(o => o.id));
     setAllCategories(prev => [...prev, ...optimistic]);
 
-    const { data, error } = await bulkAddCategoriesService(id, newRows);
+    // Stamp cycle_id into the DB insert too (Commit 14a) — the optimistic rows
+    // already carry it; this makes the persisted write explicit, not trigger-resolved.
+    const { data, error } = await bulkAddCategoriesService(id, newRows, targetCycleId);
     if (error) {
       setAllCategories(prev => prev.filter(c => !tempIds.has(c.id)));
       console.error('[useBudgetCentre] copyCategoriesToMonth rollback:', error.message);

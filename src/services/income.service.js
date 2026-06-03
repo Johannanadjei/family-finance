@@ -53,8 +53,9 @@ export const getIncomeSourceById = async (sourceId) => {
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-/** Add a new income source. `source` is validated (month required) before insert. */
-export const addIncomeSource = async (centreId, source) => {
+/** Add a new income source. `source` is validated (month required) before insert.
+ * `cycleId` (optional, Commit 14a): stamped client-side; the trigger resolves from month if omitted. */
+export const addIncomeSource = async (centreId, source, cycleId) => {
   let validated;
   try {
     validated = validateIncomeSource(source);
@@ -68,6 +69,7 @@ export const addIncomeSource = async (centreId, source) => {
     .insert({
       budget_centre_id: centreId,
       ...validated,
+      ...(cycleId && { cycle_id: cycleId }),
     })
     .select()
     .single();
@@ -76,14 +78,15 @@ export const addIncomeSource = async (centreId, source) => {
   return { data, error };
 };
 
-/** Bulk insert income sources — used during onboarding / hub creation. */
-export const bulkAddIncomeSources = async (centreId, sources) => {
+/** Bulk insert income sources — used during onboarding / hub creation. `cycleId`
+ * (optional) stamped when supplied; onboarding omits it (no cycle yet → trigger resolves). */
+export const bulkAddIncomeSources = async (centreId, sources, cycleId) => {
   const rows = [];
 
   for (const source of sources) {
     try {
       const validated = validateIncomeSource(source);
-      rows.push({ budget_centre_id: centreId, ...validated });
+      rows.push({ budget_centre_id: centreId, ...validated, ...(cycleId && { cycle_id: cycleId }) });
     } catch (e) {
       console.error('[income.service] bulkAddIncomeSources validation error:', e.message, source);
       return { data: null, error: e };

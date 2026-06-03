@@ -210,7 +210,8 @@ export function useIncomeMutations({ centreId, currency, cycles, incomes, txs, s
     const tempId     = crypto.randomUUID();
     const optimistic = { ...source, id: tempId, budget_centre_id: centreId, cycle_id: cycleId, received: false, received_amount: 0, _optimistic: true };
     setIncomes(prev => [...prev, optimistic]);
-    const { data, error } = await dbAddIncomeSource(centreId, source);
+    // Stamp cycle_id into the DB insert too (Commit 14a) — explicit write, not trigger-resolved.
+    const { data, error } = await dbAddIncomeSource(centreId, source, cycleId);
     if (error) {
       setIncomes(prev => prev.filter(i => i.id !== tempId));
       console.error('[useIncomeMutations] addIncomeSource rollback:', error.message);
@@ -265,7 +266,8 @@ export function useIncomeMutations({ centreId, currency, cycles, incomes, txs, s
     const tempIds    = new Set(optimistic.map(o => o.id));
     setIncomes(prev => [...prev, ...optimistic]);
 
-    const { data, error } = await dbBulkAddIncomeSources(centreId, newRows);
+    // Stamp cycle_id into the DB insert too (Commit 14a) — explicit write, not trigger-resolved.
+    const { data, error } = await dbBulkAddIncomeSources(centreId, newRows, cycleId);
     if (error) {
       setIncomes(prev => prev.filter(i => !tempIds.has(i.id)));
       console.error('[useIncomeMutations] copyIncomeSourcesToMonth rollback:', error.message);

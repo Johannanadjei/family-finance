@@ -51,6 +51,7 @@ vi.mock('../context/FinanceContext', () => ({
   useFinanceContext: () => ({
     incomes:             mockIncomes,
     allIncomes:          mockIncomes,
+    viewedCycleId:       'cyc-this',
     loading:             false,
     prefs:               { themeSkin: 'family_warmth' },
     saveThemeSkin:       vi.fn(),
@@ -100,6 +101,7 @@ describe('SettingsView', () => {
   beforeEach(() => {
     mockAddIncomeSource.mockClear();
     mockDeleteIncomeSource.mockClear();
+    mockAddCategory.mockClear();
   });
 
   it('renders Settings heading', () => {
@@ -201,6 +203,23 @@ describe('SettingsView', () => {
     });
     await act(async () => { screen.getByTestId('save-income-source-btn').click(); });
     expect(screen.queryByTestId('new-source-label')).toBeNull();
+  });
+
+  // Commit 14a — adding a category from Settings threads the viewed cycle id
+  // (from FinanceContext) to addCategory as the second arg, so the DB write
+  // stamps cycle_id explicitly rather than relying on the trigger.
+  it('passes viewedCycleId to addCategory when a category is added', async () => {
+    renderSettings();
+    await act(async () => { screen.getByTestId('add-category-btn').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('add-cat-name-input'),   { target: { value: 'School Fees' } });
+      fireEvent.change(screen.getByTestId('add-cat-amount-input'), { target: { value: '300' } });
+    });
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(mockAddCategory).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'School Fees' }),
+      'cyc-this',
+    );
   });
 
   it('shows error when fixed_date pay day is out of range', async () => {

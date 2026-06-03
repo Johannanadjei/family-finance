@@ -1,6 +1,7 @@
 import { useState }                   from 'react';
 import { useNavigate }                from 'react-router-dom';
 import { useBudgetCentreContext }      from '../context/BudgetCentreContext';
+import { useFinanceContext }           from '../context/FinanceContext';
 import { useAuth }                    from '../hooks/useAuth';
 import { AccessBlocked }              from '../components/ui/AccessBlocked';
 import { CentreSettingsSection }      from './settings/CentreSettingsSection';
@@ -20,6 +21,7 @@ export function SettingsView() {
   const navigate  = useNavigate();
   const { signOut }                                                            = useAuth();
   const { categories, fmt, addCategory, updateCategory, deleteCategory, can } = useBudgetCentreContext();
+  const { viewedCycleId }                                                     = useFinanceContext();
 
   const [addCatOpen,      setAddCatOpen]      = useState(false);
 
@@ -49,7 +51,7 @@ export function SettingsView() {
       <div style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <p style={{ ...sectionLabel, margin: 0 }}>Budget Categories</p>
-          <button onClick={() => setAddCatOpen(true)}
+          <button data-testid="add-category-btn" onClick={() => setAddCatOpen(true)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}>
             + Add
           </button>
@@ -87,7 +89,7 @@ export function SettingsView() {
         </button>
       </div>
 
-      <AddCategorySheet isOpen={addCatOpen} onClose={() => setAddCatOpen(false)} onAdd={addCategory} />
+      <AddCategorySheet isOpen={addCatOpen} onClose={() => setAddCatOpen(false)} onAdd={(cat) => addCategory(cat, viewedCycleId)} />
     </div>
   );
 }

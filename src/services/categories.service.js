@@ -83,8 +83,10 @@ export const getCategoryById = async (categoryId) => {
  *
  * @param {string} centreId
  * @param {{ name, icon, budget_amount, month, is_fixed, sort_order }} category
+ * @param {string} [cycleId] — stamped client-side (Commit 14a) when supplied; the
+ *   resolve_cycle_id trigger short-circuits on it. Omit it → trigger resolves from month.
  */
-export const addCategory = async (centreId, category) => {
+export const addCategory = async (centreId, category, cycleId) => {
   let validated;
   try {
     validated = validateCategory(category);
@@ -99,6 +101,7 @@ export const addCategory = async (centreId, category) => {
       budget_centre_id: centreId,
       ...validated,
       is_fixed: category.is_fixed ?? true,
+      ...(cycleId && { cycle_id: cycleId }),
     })
     .select()
     .single();
@@ -108,12 +111,14 @@ export const addCategory = async (centreId, category) => {
 };
 
 /**
- * Bulk insert categories — used during onboarding.
+ * Bulk insert categories — used during onboarding and budget rollforward.
  *
  * @param {string} centreId
  * @param {Array} categories
+ * @param {string} [cycleId] — stamped when supplied (rollforward); onboarding omits
+ *   it (no cycle exists yet) and the resolve_cycle_id trigger resolves from month.
  */
-export const bulkAddCategories = async (centreId, categories) => {
+export const bulkAddCategories = async (centreId, categories, cycleId) => {
   const rows = [];
 
   for (const cat of categories) {
@@ -123,6 +128,7 @@ export const bulkAddCategories = async (centreId, categories) => {
         budget_centre_id: centreId,
         ...validated,
         is_fixed: cat.is_fixed ?? true,
+        ...(cycleId && { cycle_id: cycleId }),
       });
     } catch (e) {
       console.error('[categories.service] bulkAddCategories validation error:', e.message, cat);

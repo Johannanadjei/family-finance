@@ -3327,3 +3327,92 @@ a ref for one-dispatch-per-move). The kebab deliberately ignores the row's past-
 (NEW — picker) & its test; `views/daily/TransactionRow.jsx` (+kebab) & its test;
 `views/LogView.jsx` & `views/DailyView.jsx` (wire kebab + move flow) & their tests; this entry.
 1225 tests.
+
+---
+
+## [2026-06-03] Commit 14a — client-side cycle_id stamping for categories + income (prep for non-calendar anchors)
+
+**Context — why this is a separate commit (14a) split out of the anchor feature (14b):**
+The original Commit 14 was "custom / payday-anchored cycles." Phase 1 diagnosis surfaced a
+structural blocker that has to be fixed *first*. Commit 10's `resolve_cycle_id()` trigger
+resolves a category's / income source's `cycle_id` by matching the cycle whose **start-month**
+equals the row's `month` (`to_char(start_date,'YYYY-MM') = NEW.month`). That assumption —
+"a cycle's start-month equals its budget month" — holds for **calendar** cycles only. A
+non-calendar cycle starting **May 29** has `start_date` in May but its N2 display name resolves
+to **"June 2026"**; a June budget category (`month = '2026-06'`) would fail to resolve (CYC02)
+or match the wrong cycle. The anchor feature cannot ship on top of a month-keyed resolver.
+
+**Decision — migrate categories + income to explicit client-side `cycle_id` stamping, mirroring
+the transactions pattern (Commits 11/12):** the mutation site resolves `cycle_id` from
+already-loaded cycles and passes it into the insert. The trigger stays as a **fallback safety
+net** — its existing `IF TG_OP = 'INSERT' AND NEW.cycle_id IS NOT NULL THEN RETURN NEW`
+short-circuit (Commit 10) means an explicitly-supplied `cycle_id` is honoured and never
+re-resolved from `month`. So: explicit stamp when the client can resolve it; trigger resolves
+only when `cycle_id IS NULL` (legacy / direct-DB / onboarding paths). **No SQL change in 14a.**
+14b's non-calendar date math + N2 majority-month naming then build on a resolver-independent
+write path.
+
+**Decision — `cycleIdForMonth` rule stays `start_date.startsWith(month)` for 14a:** the helper
+already exists (`lib/cycles.js`, Commit 11.5) with the calendar rule, which is identical to the
+trigger's. For calendar cycles, "majority-month" and "starts-with" produce the same id;
+switching the rule now is foreshadowing without payoff. The majority-month rule + `cycleDefaultName`
+land in 14b, when non-calendar cycles exist and the difference is real.
+
+**Decision — pass `targetCycleId` from the view, not own cycle state in `useBudgetCentre`:**
+`addCategory` lives in `useBudgetCentre`, which does **not** own the cycles list (it lives in
+`useFinance`/`FinanceContext`). Rather than pipe cycle state across the context boundary,
+`addCategory(category, targetCycleId)` takes the id as a second arg — the same cut already used
+by `copyCategoriesToMonth` (Commit 11.5). Views resolve it from the cycle in scope. Keeps
+`useBudgetCentre` out of cycle-state ownership — a clean architectural boundary.
+
+**Decision — view-layer wrapping preserves `AddCategorySheet`'s arity:** `AddCategorySheet` calls
+`onAdd(category)` with one argument. Threading the cycle id by changing `addCategory`'s signature
+alone would leave `targetCycleId` undefined. The views wrap instead —
+`onAdd={(cat) => addCategory(cat, viewedCycle?.id)}` (BudgetView) and
+`onAdd={(cat) => addCategory(cat, viewedCycleId)}` (SettingsView) — so the sheet stays untouched
+and the threading is localized to the two call sites.
+
+**Decision — expose `viewedCycleId` from `useFinance`:** it was already computed internally
+(`activeCycleId ?? activeCycle?.id ?? null`) but not returned. SettingsView (which had no
+`FinanceContext` read at all) now reads it as the single source of truth for the cycle-id
+fallback, instead of re-deriving the `??` chain at the call site.
+
+**Decision — `addCategory` stays non-optimistic:** 14a's value is the explicit DB `cycle_id`,
+not introducing optimism. It still awaits the service and appends the server row (which carries
+the stamped `cycle_id`). Converting it to the optimistic pattern is a separate concern.
+
+**Decision — services forward `cycle_id` by spread, only when present:**
+`.insert({ ...validated, budget_centre_id, ...(cycleId && { cycle_id: cycleId }) })`. `cycle_id`
+is a resolved foreign key, not user input — it does not belong in `validateCategory`/
+`validateIncomeSource` (which stay focused on user-input validation and would otherwise strip it).
+Mirrors how `budget_centre_id` is already added outside `...validated`. The **only-when-present**
+guard is load-bearing for onboarding (below).
+
+**Separate concern, NOT fixed here — onboarding's latent CYC02 risk:** Onboarding calls
+`bulkAddCategories`/`bulkAddIncomeSources` directly (not via the hooks), at a point where no
+cycle row exists yet — the first cycle is auto-created later by `useFinance` at dashboard mount
+(gate 3), *after* onboarding's bulk inserts commit. Onboarding predates the entire cycles
+project and was never reconciled with Commit 10's trigger. If the trigger is live, a brand-new
+onboarding's first bulk insert may raise CYC02. **Phase 3 confirmed this is orthogonal to 14a's
+stamping migration — the path remains unchanged (no `cycleId` supplied → falls through to the
+trigger as before). Investigate as a separate commit if it manifests.** 14a's "forward only when
+present" rule neither fixes nor worsens it; a test locks the no-regression contract (the bulk
+inserts OMIT `cycle_id` when no `cycleId` is given).
+
+**Rules derived:**
+- **When a derived foreign key is resolvable client-side from already-loaded state, prefer
+  explicit stamping at the mutation site. The DB trigger then becomes a safety net for legacy /
+  direct-DB paths** (it fires only when the column is NULL).
+- **Forward resolved FKs by spread (`...(id && { col: id })`), not through validators** —
+  validators are for user input; a resolved id is added alongside, like `budget_centre_id`.
+- **Localize prop threading at the call site, not by widening a shared component's contract** —
+  wrapping `onAdd` kept `AddCategorySheet`'s one-arg API intact.
+
+**Files (10):** `services/categories.service.js` & `services/categories.service.test.js` (NEW —
+no prior service test); `services/income.service.js` & `services/income.service.test.js`;
+`hooks/useBudgetCentre.js` (`addCategory(category, targetCycleId)`; `copyCategoriesToMonth` stamps
+the DB insert too) & `useBudgetCentre.test.js`; `hooks/useIncomeMutations.js` (both insert paths
+forward `cycle_id`) & `useFinance.income-mutations.test.js`; `hooks/useFinance.js` (exposes
+`viewedCycleId`); `views/BudgetView.jsx` & `views/SettingsView.jsx` (wrap `onAdd`; SettingsView
+reads `viewedCycleId`; +`add-category-btn` test id); this entry. `income.service.js` held at
+249/250 (cap-tight, per the Phase 3 budget). 1240 tests.

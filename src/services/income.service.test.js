@@ -3,13 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 let mockRows;     // rows returned by a terminal .order()/.then()
 let mockSingle;   // row returned by a terminal .single()
 let eqCalls;      // [col, val] pairs passed to .eq()
+let insertArgs;   // payloads passed to .insert()
 
 vi.mock('../lib/supabase', () => {
   const make = () => {
     const q = {
       from:   () => q,
       select: () => q,
-      insert: () => q,
+      insert: (payload) => { insertArgs.push(payload); return q; },
       update: () => q,
       is:     () => q,
       eq:     (col, val) => { eqCalls.push([col, val]); return q; },
@@ -22,12 +23,13 @@ vi.mock('../lib/supabase', () => {
   return { supabase: { from: () => make() } };
 });
 
-import { getIncomeSources, addIncomeSource } from './income.service';
+import { getIncomeSources, addIncomeSource, bulkAddIncomeSources } from './income.service';
 
 beforeEach(() => {
   mockRows   = [];
   mockSingle = { data: null, error: null };
   eqCalls    = [];
+  insertArgs = [];
 });
 
 // ── getIncomeSources — T1 red-first: month filtering ──────────────────────────
@@ -70,5 +72,36 @@ describe('addIncomeSource', () => {
     expect(data).toBeNull();
     expect(error).toBeTruthy();
     expect(error.message).toMatch(/month/i);
+  });
+
+  // Commit 14a — client-side cycle_id stamping. When a cycleId is supplied it is
+  // forwarded into the insert so the resolve_cycle_id trigger short-circuits on it.
+  it('forwards cycle_id into the insert when supplied', async () => {
+    mockSingle = { data: { id: 's-1' }, error: null };
+    await addIncomeSource('c-1', { ...base, month: '2026-05' }, 'cyc-9');
+    expect(insertArgs[0]).toMatchObject({ budget_centre_id: 'c-1', cycle_id: 'cyc-9' });
+  });
+
+  // No-regression contract for onboarding: no cycle exists yet, so no cycleId is
+  // passed → the payload must OMIT cycle_id and let the trigger resolve from month.
+  it('OMITS cycle_id from the insert when no cycleId supplied', async () => {
+    mockSingle = { data: { id: 's-1' }, error: null };
+    await addIncomeSource('c-1', { ...base, month: '2026-05' });
+    expect('cycle_id' in insertArgs[0]).toBe(false);
+  });
+});
+
+describe('bulkAddIncomeSources (cycle_id stamping)', () => {
+  const base = { label: 'Salary', expected_amount: 5000, currency: 'GHS', pay_day: 25, pay_day_type: 'fixed_date', month: '2026-05' };
+
+  it('forwards cycle_id onto every row when supplied', async () => {
+    await bulkAddIncomeSources('c-1', [base, { ...base, label: 'Bonus' }], 'cyc-9');
+    expect(insertArgs[0]).toHaveLength(2);
+    expect(insertArgs[0].every(r => r.cycle_id === 'cyc-9')).toBe(true);
+  });
+
+  it('OMITS cycle_id from every row when no cycleId supplied (onboarding path)', async () => {
+    await bulkAddIncomeSources('c-1', [base]);
+    expect(insertArgs[0].every(r => !('cycle_id' in r))).toBe(true);
   });
 });

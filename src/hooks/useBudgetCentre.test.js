@@ -300,8 +300,9 @@ describe('useBudgetCentre — budget rollforward (Phase 2C)', () => {
     await act(async () => { await result.current.copyCategoriesToMonth(FROM, TO, undefined, 'cyc-this'); });
 
     expect(bulkAddCategories).toHaveBeenCalledTimes(1);
-    const [cid, rows] = bulkAddCategories.mock.calls[0];
+    const [cid, rows, cycleId] = bulkAddCategories.mock.calls[0];
     expect(cid).toBe('c-1');
+    expect(cycleId).toBe('cyc-this');   // Commit 14a — cycle_id stamped into the DB insert too
     expect(rows).toHaveLength(3);
     expect(rows.every(r => r.month === TO)).toBe(true);
     expect(rows.map(r => r.name).sort()).toEqual(['Fun', 'Groceries', 'Transport']);
@@ -382,6 +383,15 @@ describe('useBudgetCentre — all-months categories (Phase 2D)', () => {
     addCategory.mockResolvedValue({ data: { id: 'cat-9', name: 'Health', budget_amount: 100, month: THIS_M, cycle_id: 'cyc-this' }, error: null });
     await act(async () => { await result.current.addCategory({ name: 'Health', budget_amount: 100, month: THIS_M }); });
     expect(result.current.allCategories.some(c => c.id === 'cat-9')).toBe(true);
+  });
+
+  // Commit 14a — the caller (view) resolves the cycle id and passes it as the 2nd
+  // arg; addCategory threads it to the service so the DB insert stamps cycle_id.
+  it('addCategory threads targetCycleId to the service', async () => {
+    const { result } = await mountLoaded();
+    addCategory.mockResolvedValue({ data: { id: 'cat-9', name: 'Health', budget_amount: 100, month: THIS_M, cycle_id: 'cyc-this' }, error: null });
+    await act(async () => { await result.current.addCategory({ name: 'Health', budget_amount: 100, month: THIS_M }, 'cyc-this'); });
+    expect(addCategory).toHaveBeenCalledWith('c-1', expect.objectContaining({ name: 'Health' }), 'cyc-this');
   });
 
   it('updateCategory rollback restores the row AND preserves other months (snapshot is allCategories, not the slice)', async () => {

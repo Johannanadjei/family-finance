@@ -27,7 +27,7 @@ vi.mock('../services/cycles.service', () => ({ getCyclesForCentre: vi.fn().mockR
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
 
 import { getTransactionsByCycle, addTransaction, updateTransaction, deleteTransaction } from '../services/transactions.service';
-import { getIncomeSources, markReceived, markPending, bulkAddIncomeSources, deleteIncomeSource, updateIncomeSource } from '../services/income.service';
+import { getIncomeSources, markReceived, markPending, addIncomeSource, bulkAddIncomeSources, deleteIncomeSource, updateIncomeSource } from '../services/income.service';
 import { getCyclesForCentre } from '../services/cycles.service';
 
 const C    = { id: 'centre-1', currency: 'GHS', surplus_target: 0 };
@@ -139,8 +139,9 @@ describe('useFinance — copyIncomeSourcesToMonth (Phase 2B rollforward)', () =>
     await act(async () => { await result.current.copyIncomeSourcesToMonth(FROM, TO); });
 
     expect(bulkAddIncomeSources).toHaveBeenCalledTimes(1);
-    const [cid, rows] = bulkAddIncomeSources.mock.calls[0];
+    const [cid, rows, cycleId] = bulkAddIncomeSources.mock.calls[0];
     expect(cid).toBe('centre-1');
+    expect(cycleId).toBe('cyc-jun');   // Commit 14a — TARGET cycle_id stamped into the DB insert too
     expect(rows).toHaveLength(2);                                  // the bucket is excluded
     expect(rows.map(r => r.label).sort()).toEqual(['Adjei Salary', 'Dita Salary']);
     expect(rows.every(r => r.month === TO)).toBe(true);
@@ -202,5 +203,33 @@ describe('useFinance — copyIncomeSourcesToMonth (Phase 2B rollforward)', () =>
     // Rolled back — every optimistic row removed, list back to its original size.
     expect(result.current.allIncomes.length).toBe(before);
     expect(result.current.allIncomes.filter(i => i.month === TO)).toHaveLength(0);
+  });
+});
+
+// Commit 14a — addIncomeSource forwards the resolved cycle_id into the DB insert.
+describe('useFinance — addIncomeSource (cycle_id stamping)', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('threads the cycle_id resolved from the source month to the DB insert', async () => {
+    const { result } = mount([], [], [CURRENT, CYC_TO]);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    addIncomeSource.mockResolvedValue({ data: serverRow('new-1', 'Freelance', TO), error: null });
+    const newSource = { label: 'Freelance', icon: '💰', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', month: TO, notes: '' };
+    await act(async () => { await result.current.addIncomeSource(newSource); });
+
+    expect(addIncomeSource).toHaveBeenCalledWith('centre-1', newSource, 'cyc-jun');
+  });
+
+  it('refuses (no insert) when no cycle covers the source month — CYC02 invariant', async () => {
+    const { result } = mount([], [], [CURRENT]);   // CURRENT starts 2000-01 — no cycle for TO
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const newSource = { label: 'Freelance', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', month: TO, notes: '' };
+    let res;
+    await act(async () => { res = await result.current.addIncomeSource(newSource); });
+
+    expect(res.error).toBeTruthy();
+    expect(addIncomeSource).not.toHaveBeenCalled();
   });
 });

@@ -332,6 +332,7 @@ export function useFinance({ centre, allCategories }) {
     cycles,
     activeCycle,
     activeCycleId,
+    viewedCycleId,  // activeCycleId ?? activeCycle?.id — single source for the cycle-id fallback (Commit 14a)
     loadCycle,
     reloadCycles: loadCycles,
 
