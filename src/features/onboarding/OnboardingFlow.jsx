@@ -18,9 +18,6 @@ import { makeFmt, getCurrentMonth } from '../../lib/finance';
 import { createCentre }       from '../../services/centres.service';
 import { bulkAddCategories }  from '../../services/categories.service';
 import { bulkAddIncomeSources } from '../../services/income.service';
-import { createCycleByAnchor, getCyclesForCentre } from '../../services/cycles.service';
-import { computeNextCycleParams, getActiveCycle }  from '../../lib/cycles';
-import { getToday }           from '../../lib/dates';
 import { STEPS, DEFAULT_CATEGORIES } from './onboarding.constants';
 import { OnboardingProgress } from './OnboardingProgress';
 import { StepCentre }         from './steps/StepCentre';
@@ -77,12 +74,10 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
     // Step 1 — create centre only if not already created
     if (!activeCentreId) {
       const { data, error: centreErr } = await createCentre({
-        name:              centreData.name,
-        currency:          centreData.currency,
-        icon:              centreData.icon,
-        surplus_target:    surplusTarget,
-        cycle_anchor_type: centreData.cycle_anchor_type,
-        cycle_anchor_day:  centreData.cycle_anchor_day,
+        name:           centreData.name,
+        currency:       centreData.currency,
+        icon:           centreData.icon,
+        surplus_target: surplusTarget,
       });
       if (centreErr) {
         setError('We could not create your BOS Hub. Please check your connection and try again.');
@@ -93,26 +88,14 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
       setCentreId(activeCentreId);
     }
 
-    // Step 1.5 — create the hub's FIRST cycle BEFORE any cycle-keyed bulk insert,
-    // so categories/income stamp a real cycle_id (closes the latent onboarding
-    // CYC02 — without a cycle, the storage-layer trigger rejects the insert, and a
-    // non-calendar anchor's month never matches by the trigger's month rule). The
-    // reference date is today (brand-new hub, no prev cycle — decision 11).
+    // Step 1.5 — create the hub's FIRST budget period BEFORE any period-keyed bulk
+    // insert, so categories/income stamp a real cycle_id. Phase A of the pivot
+    // removed the anchor-types scaffolding (create_cycle_by_anchor); the user-driven
+    // replacement lands in Phase B. Until then this path throws deliberately — new
+    // hub creation is expected to fail (see engineering-decisions.md, anchor pivot).
     let activeCycleId = firstCycleId;
     if (!activeCycleId) {
-      const { data: cyc } = await createCycleByAnchor(activeCentreId, computeNextCycleParams(centreData, null, getToday()));
-      activeCycleId = cyc?.id ?? null;
-      if (!activeCycleId) {
-        // CYC01 race (or a null response): resolve the cycle that now exists.
-        const { data: list } = await getCyclesForCentre(activeCentreId);
-        activeCycleId = getActiveCycle(list || [], getToday())?.id ?? null;
-      }
-      if (!activeCycleId) {
-        setError('We could not set up your budget cycle. Please try again.');
-        setLoading(false);
-        return;
-      }
-      setFirstCycleId(activeCycleId);
+      throw new Error('Phase B not yet implemented: create_budget_period RPC + UI is the planned replacement for create_cycle_by_anchor');
     }
 
     // Step 2 — bulk insert categories, stamped with the first cycle's id

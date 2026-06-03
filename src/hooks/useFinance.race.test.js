@@ -36,7 +36,6 @@ vi.mock('../services/income.service', () => ({
 }));
 vi.mock('../services/cycles.service', () => ({
   getCyclesForCentre:  vi.fn().mockResolvedValue({ data: [], error: null }),
-  createCycleByAnchor: vi.fn().mockResolvedValue({ data: null, error: null }),
 }));
 vi.mock('../lib/storage', () => ({
   loadPrefs: () => ({ themeSkin: 'family_warmth' }),

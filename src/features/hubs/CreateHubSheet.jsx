@@ -14,9 +14,6 @@ import { selectStyle }           from '../../lib/selectStyle';
 import { createCentre }          from '../../services/centres.service';
 import { bulkAddCategories }     from '../../services/categories.service';
 import { bulkAddIncomeSources }  from '../../services/income.service';
-import { createCycleByAnchor, getCyclesForCentre } from '../../services/cycles.service';
-import { computeNextCycleParams, getActiveCycle }  from '../../lib/cycles';
-import { getToday }              from '../../lib/dates';
 import { StepIncome }            from '../onboarding/steps/StepIncome';
 import { getDefaultCategories, getHubType } from '../../lib/hubTypes';
 import { makeFmt, getCurrentMonth }          from '../../lib/finance';
@@ -81,17 +78,15 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
     });
     if (centreErr) { setError('Could not create hub. Please try again.'); setLoading(false); return; }
 
-    // Create the hub's FIRST cycle before any cycle-keyed bulk insert, so
-    // categories/income stamp a real cycle_id (closes CYC02 for this path too —
-    // mirrors OnboardingFlow). New hubs default to the calendar anchor.
-    const { data: cyc } = await createCycleByAnchor(data.id, computeNextCycleParams(data, null, getToday()));
-    let cycleId = cyc?.id ?? null;
-    if (!cycleId) {
-      const { data: list } = await getCyclesForCentre(data.id);   // CYC01 race / null response
-      cycleId = getActiveCycle(list || [], getToday())?.id ?? null;
-    }
-    if (!cycleId) { setError('Could not set up the budget cycle. Please try again.'); setLoading(false); return; }
+    // Create the hub's FIRST budget period before any period-keyed bulk insert.
+    // Phase A of the pivot removed the anchor-types scaffolding; the user-driven
+    // replacement lands in Phase B. Until then this path throws deliberately —
+    // new hub creation is expected to fail (see engineering-decisions.md).
+    throw new Error('Phase B not yet implemented: create_budget_period RPC + UI is the planned replacement for create_cycle_by_anchor');
 
+    // Unreachable until Phase B restores period creation above. Left intact so the
+    // category/income bulk-insert wiring is ready to reconnect to the new cycleId.
+    const cycleId = null;
     const catRows = categories.map(({ id: _id, ...c }) => ({ ...c, month: getCurrentMonth() }));
     const { error: catErr } = await bulkAddCategories(data.id, catRows, cycleId);
     if (catErr) { setError('Could not save categories. Please try again.'); setLoading(false); return; }

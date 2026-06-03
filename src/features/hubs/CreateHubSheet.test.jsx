@@ -159,7 +159,11 @@ describe('CreateHubSheet', () => {
     expect(screen.getByText('Ready to create?')).toBeTruthy();
   });
 
-  it('calls onComplete with new centre id after successful creation', async () => {
+  // TODO(Phase B): Phase A of the anchor pivot replaced first-cycle creation
+  // (createCycleByAnchor) with a deliberate "Phase B not yet implemented" throw, so
+  // the hub-creation confirm path cannot complete. Re-enable + rewrite these once the
+  // user-driven create_budget_period flow lands. See engineering-decisions.md.
+  it.skip('calls onComplete with new centre id after successful creation', async () => {
     const onComplete = vi.fn();
     renderSheet({ onComplete });
     goToConfirm();
@@ -167,7 +171,7 @@ describe('CreateHubSheet', () => {
     await vi.waitFor(() => expect(onComplete).toHaveBeenCalledWith('new-c-1'));
   });
 
-  it('creates the first cycle and stamps categories with its id (CYC02 closure)', async () => {
+  it.skip('creates the first cycle and stamps categories with its id (CYC02 closure)', async () => {
     renderSheet();
     goToConfirm();
     fireEvent.click(screen.getByText('Create Hub 🎉'));

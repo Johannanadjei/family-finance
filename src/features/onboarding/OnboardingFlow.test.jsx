@@ -46,7 +46,11 @@ const walkToConfirm = () => {
   fireEvent.click(screen.getByText('Continue →'));     // step 3 (target) → 4
 };
 
-describe('OnboardingFlow — first-cycle CYC02 closure', () => {
+// TODO(Phase B): Phase A of the anchor pivot replaced the first-cycle creation
+// (createCycleByAnchor) with a deliberate "Phase B not yet implemented" throw, so
+// onboarding cannot complete the hub-creation path. Re-enable + rewrite these once
+// the user-driven create_budget_period flow lands. See engineering-decisions.md.
+describe.skip('OnboardingFlow — first-cycle CYC02 closure', () => {
   it('creates the first cycle before bulk-inserting, stamped with its id', async () => {
     render(<OnboardingFlow onComplete={vi.fn()} />);
     walkToConfirm();

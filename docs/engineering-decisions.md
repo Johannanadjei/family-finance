@@ -3677,3 +3677,78 @@ BEFORE this commit deploys (SQL first, code second — same sequencing as 14b). 
 order is RPC re-create → data-repair UPDATE → verification; `cycle_majority_name`
 already exists from 14b, so the UPDATE can call it. `CREATE OR REPLACE` preserves the
 grant; signature, columns, CHECKs, and helpers are untouched.
+
+---
+
+## [2026-06-03] Anchor pivot, Phase A — remove the budget-cycle anchor-types scaffolding
+
+**Context:**
+Commit 14b introduced configurable budget-cycle *anchor types* — `calendar`,
+`fixed_day`, `last_working_day`, `last_day_of_month` — so a hub's cycles could be
+pinned to a payday rather than the calendar month. It shipped working (1289 tests),
+but it took three follow-up bug fixes to stabilise (dual-basis range CYC03, the
+naming corruption Bug 4, and the anchor RPC dual-basis fix). After actually living in
+the app, the conclusion was that the whole model was overengineered. AJ's framing:
+**"the app is about budgeting, not about when someone gets paid."** A household sets a
+monthly budget; the *period* it runs over is a simple thing the user should state
+directly, not a four-way anchor taxonomy with month-boundary arithmetic, forward-only
+clamps, leap-year edge cases, and a server/client twin to keep in lockstep. The
+complexity existed to model a need the user never expressed in those terms.
+
+**Decision:**
+Pivot to user-driven budget periods. Phase A (this commit) strips the anchor-types
+scaffolding back to the stable cycle core. Phase B will add a simple user-driven
+creation flow. We keep everything the cycle system is genuinely built on and cut only
+the anchor layer bolted on top.
+
+**What's KEPT (the cycle core is sound — only the anchor layer was wrong):**
+- `budget_cycles` table + all rows; `cycle_id` stamping triggers (Commit 10)
+- GiST no-overlap exclusion constraint; soft-delete columns
+- `budget_cycles.anchor_type` column (historical/audit — a *different* column on a
+  different table from the dropped `budget_centres.cycle_anchor_type`)
+- `cycle_majority_name()` SQL helper (Phase B naming will reuse it)
+- Move-transaction-to-cycle (Commit 12), budget rollforward + selective copy,
+  per-view cycle-keyed reads (`sliceByCycle` / `getCycleNav` / `cycleIdForMonth`)
+- Every bug fix shipped along the 14a/14b path (dual-basis, Bug 4, etc.) and all
+  prior engineering-decisions entries
+
+**What's CUT:**
+- DB: `budget_centres.cycle_anchor_type` + `cycle_anchor_day` columns and their CHECK
+  constraints; `create_cycle_by_anchor()` RPC; `cycle_anchored_day()` helper
+- JS: `anchorToDateRange` / `cycleDefaultName` / `computeNextCycleParams` +
+  their private helpers in `lib/cycles.js`; `createCycleByAnchor` in
+  `cycles.service.js`; the anchor whitelist in `centres.service.js`; the **auto-create
+  cycle effect** in `useFinance.js` (no more silent gap-filling); `CYCLE_ANCHOR_OPTIONS`
+- UI: `BudgetCycleSection` (Settings) deleted; the "Configure budget cycle" disclosure
+  removed from onboarding `StepCentre`
+
+**Deferred to Phase B:**
+- A user-driven `create_budget_period` RPC + UI (the named replacement for
+  `create_cycle_by_anchor`)
+- An end-of-period prompt to roll into the next period
+- A quick-create shortcut
+
+**Known, intentional breakage (Phase A only):** with `createCycleByAnchor` gone, the
+first-period step in both `OnboardingFlow` and `CreateHubSheet` now throws
+`'Phase B not yet implemented: create_budget_period RPC + UI ...'` on purpose — a
+deliberate, greppable failure. **New-hub creation and onboarding therefore cannot
+complete until Phase B.** Acceptable pre-launch (existing test hub already set up, no
+real users). The app loads cleanly otherwise; the throw fires only on attempted period
+creation. Affected tests are `.skip`ped with a `TODO(Phase B)` pointing here.
+
+**Migration:** `scripts/migrate_15_remove_anchor_columns.sql` is committed to `dev`
+alongside this code but is **NOT executed in Supabase yet**. Under the new branch model
+(dev → staging → main), running the drops now would break production, which still runs
+the 14b code off `main` that references the dropped objects. Execution is deferred to
+the promotion: run the SQL in Supabase, then dev → staging → verify → staging → main.
+The migration self-verifies (single BEGIN/COMMIT, idempotent `IF EXISTS` drops, a
+final assertion block that rolls back on any wrong post-state, and a `budget_cycles`
+row-count guard).
+
+**Rule derived:**
+- **Architectural complexity should match the user's mental model. When users describe
+  their need in simpler terms than the architecture, the architecture is wrong** — not
+  the user. The anchor taxonomy was a sophisticated answer to a question
+  ("budget monthly") that was never that complicated. Tests passing and bugs fixed do
+  not redeem a model the user doesn't think in. Strip back to the core; let the real
+  need (stated plainly) drive Phase B.
