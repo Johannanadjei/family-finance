@@ -33,7 +33,7 @@ vi.mock('../lib/supabase', () => {
 });
 
 import {
-  getCyclesForCentre, getCycleForDate, getCycleById, createCalendarCycle,
+  getCyclesForCentre, getCycleForDate, getCycleById, createCycleByAnchor,
 } from './cycles.service';
 
 const mockCycle = {
@@ -114,33 +114,69 @@ describe('getCycleById', () => {
   });
 });
 
-// ── createCalendarCycle ───────────────────────────────────────────────────────
-describe('createCalendarCycle', () => {
-  it('rejects a malformed month with a validation error and never calls rpc', async () => {
-    const { data, error } = await createCalendarCycle('c-1', '2026-6');
+// ── createCycleByAnchor ───────────────────────────────────────────────────────
+describe('createCycleByAnchor', () => {
+  const CAL = { anchor_type: 'calendar', anchor_day: null, reference_date: '2026-06-01', name: 'June 2026' };
+
+  it('rejects an unknown anchor type with a validation error and never calls rpc', async () => {
+    const { data, error } = await createCycleByAnchor('c-1', { ...CAL, anchor_type: 'weekly' });
     expect(data).toBeNull();
     expect(error).toBeTruthy();
-    expect(error.message).toMatch(/YYYY-MM/);
+    expect(error.message).toMatch(/anchor type/i);
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  it('calls rpc create_calendar_cycle with centre id and month, returns the row', async () => {
+  it('rejects a malformed reference date and never calls rpc', async () => {
+    const { data, error } = await createCycleByAnchor('c-1', { ...CAL, reference_date: '2026-6-1' });
+    expect(data).toBeNull();
+    expect(error.message).toMatch(/YYYY-MM-DD/);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('calls rpc create_cycle_by_anchor with mapped params, returns the row', async () => {
     mockRpc.mockResolvedValueOnce({ data: mockCycle, error: null });
-    const { data, error } = await createCalendarCycle('c-1', '2026-06');
-    expect(mockRpc).toHaveBeenCalledWith('create_calendar_cycle', {
-      p_centre_id: 'c-1',
-      p_month_string: '2026-06',
+    const { data, error } = await createCycleByAnchor('c-1', CAL);
+    expect(mockRpc).toHaveBeenCalledWith('create_cycle_by_anchor', {
+      p_centre_id:      'c-1',
+      p_anchor_type:    'calendar',
+      p_anchor_day:     null,
+      p_reference_date: '2026-06-01',
+      p_name:           'June 2026',
     });
     expect(data).toEqual(mockCycle);
     expect(error).toBeNull();
   });
 
+  it('passes anchor_day through only for fixed_day anchors', async () => {
+    mockRpc.mockResolvedValueOnce({ data: mockCycle, error: null });
+    await createCycleByAnchor('c-1', { anchor_type: 'fixed_day', anchor_day: 25, reference_date: '2026-06-25' });
+    expect(mockRpc).toHaveBeenCalledWith('create_cycle_by_anchor', expect.objectContaining({
+      p_anchor_type: 'fixed_day',
+      p_anchor_day:  25,
+    }));
+  });
+
+  it('nulls a stray anchor_day for non-fixed_day anchors', async () => {
+    mockRpc.mockResolvedValueOnce({ data: mockCycle, error: null });
+    await createCycleByAnchor('c-1', { anchor_type: 'last_working_day', anchor_day: 25, reference_date: '2026-06-25' });
+    expect(mockRpc).toHaveBeenCalledWith('create_cycle_by_anchor', expect.objectContaining({
+      p_anchor_type: 'last_working_day',
+      p_anchor_day:  null,
+    }));
+  });
+
+  it('defaults a missing name to null (server computes the majority-month name)', async () => {
+    mockRpc.mockResolvedValueOnce({ data: mockCycle, error: null });
+    await createCycleByAnchor('c-1', { anchor_type: 'calendar', anchor_day: null, reference_date: '2026-06-01' });
+    expect(mockRpc).toHaveBeenCalledWith('create_cycle_by_anchor', expect.objectContaining({ p_name: null }));
+  });
+
   it('surfaces the CYC01 overlap error from the rpc (already exists)', async () => {
     mockRpc.mockResolvedValueOnce({
       data: null,
-      error: { code: 'CYC01', message: 'A cycle already exists for 2026-06 in this hub' },
+      error: { code: 'CYC01', message: 'A cycle overlapping 2026-06-01 already exists in this hub' },
     });
-    const { data, error } = await createCalendarCycle('c-1', '2026-06');
+    const { data, error } = await createCycleByAnchor('c-1', CAL);
     expect(data).toBeNull();
     expect(error.code).toBe('CYC01');
     expect(error.message).toMatch(/already exists/i);
@@ -148,7 +184,7 @@ describe('createCalendarCycle', () => {
 
   it('surfaces a generic rpc error in { data: null, error } shape', async () => {
     mockRpc.mockResolvedValueOnce({ data: null, error: { code: '42501', message: 'not a member' } });
-    const { data, error } = await createCalendarCycle('c-1', '2026-06');
+    const { data, error } = await createCycleByAnchor('c-1', CAL);
     expect(data).toBeNull();
     expect(error.code).toBe('42501');
   });

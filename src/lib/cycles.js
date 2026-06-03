@@ -3,11 +3,15 @@
  *
  * Pure budget-cycle pickers. A "cycle" is a row from budget_cycles with
  * `start_date`/`end_date` as 'YYYY-MM-DD' strings (Postgres DATE). For zero-padded
- * ISO dates, lexicographic comparison equals chronological order, so date windows
- * are resolved with plain string `<=`/`>=` and `.localeCompare` — no Date parsing.
+ * ISO dates, lexicographic comparison equals chronological order, so the PICKERS
+ * below resolve date windows with plain string `<=`/`>=` and `.localeCompare` — no
+ * Date parsing. The ANCHOR helpers (Commit 14b, bottom of file) need real calendar
+ * arithmetic, so they use UTC Date math (v1 is UTC — CLAUDE.md decision 13).
  *
- * Pure functions only — no React, no app imports, no side effects.
+ * Pure functions only — no React, no app imports beyond lib/dates, no side effects.
  */
+
+import { formatMonth } from './dates';
 
 /**
  * Resolve the cycle that should be "active" for a given date.
@@ -104,4 +108,113 @@ export function sliceByCycle(rows, cycleId) {
  */
 export function cycleIdForMonth(cycles, month) {
   return cycles.find(c => !c.deleted_at && c.start_date.startsWith(month))?.id ?? null;
+}
+
+// ── Anchor-aware cycle boundaries (Commit 14b) ─────────────────────────────────
+// JS twins of cycle_anchored_day / cycle_majority_name / create_cycle_by_anchor in
+// scripts/migrate_14b_anchor.sql — keep both sides in lockstep. UTC throughout.
+
+const iso         = (d) => d.toISOString().slice(0, 10);
+const addDays     = (d, n) => new Date(d.getTime() + n * 86400000);
+const daysInMonth = (y, m) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+
+/** The anchored boundary date (a Date) for the month containing `inMonth`. */
+function anchoredDay(anchorType, anchorDay, inMonth) {
+  const y = inMonth.getUTCFullYear();
+  const m = inMonth.getUTCMonth();
+  const dim = daysInMonth(y, m);
+  if (anchorType === 'fixed_day')         return new Date(Date.UTC(y, m, Math.min(anchorDay, dim)));
+  if (anchorType === 'last_day_of_month') return new Date(Date.UTC(y, m, dim));
+  if (anchorType === 'last_working_day') {
+    let d = new Date(Date.UTC(y, m, dim));
+    while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d = addDays(d, -1);   // back off Sat/Sun
+    return d;
+  }
+  return new Date(Date.UTC(y, m, 1));   // calendar — anchors to the 1st
+}
+
+/**
+ * The cycle date range [start_date, end_date] CONTAINING referenceDate for a hub
+ * anchor. 'calendar' = the whole calendar month. The other three are start-anchored:
+ * the cycle runs from one month's anchor day to the day before the next month's.
+ * `prevEndDate` applies the forward-only clamp (M1) — the start never reaches back
+ * to or before an existing cycle's end (mirrors create_cycle_by_anchor's clamp).
+ *
+ * @param {string} anchorType — 'calendar'|'fixed_day'|'last_working_day'|'last_day_of_month'
+ * @param {number|null} anchorDay — 1..31, only for 'fixed_day'
+ * @param {string} referenceDate — 'YYYY-MM-DD' the cycle must contain
+ * @param {string|null} prevEndDate — 'YYYY-MM-DD' latest existing cycle end, or null
+ * @returns {{ start_date: string, end_date: string }}
+ */
+export function anchorToDateRange(anchorType, anchorDay, referenceDate, prevEndDate = null) {
+  const ref = new Date(referenceDate + 'T00:00:00Z');
+  const y = ref.getUTCFullYear();
+  const m = ref.getUTCMonth();
+  let start, end;
+
+  if (anchorType === 'calendar') {
+    start = new Date(Date.UTC(y, m, 1));
+    end   = new Date(Date.UTC(y, m + 1, 0));
+  } else {
+    const cand = anchoredDay(anchorType, anchorDay, ref);
+    if (ref >= cand) {
+      start = cand;
+      end   = addDays(anchoredDay(anchorType, anchorDay, new Date(Date.UTC(y, m + 1, 1))), -1);
+    } else {
+      start = anchoredDay(anchorType, anchorDay, new Date(Date.UTC(y, m - 1, 1)));
+      end   = addDays(cand, -1);
+    }
+  }
+
+  if (prevEndDate) {
+    const clampStart = addDays(new Date(prevEndDate + 'T00:00:00Z'), 1);
+    if (start < clampStart) start = clampStart;
+  }
+
+  return { start_date: iso(start), end_date: iso(end) };
+}
+
+/**
+ * The default display name for a cycle, by the majority-month rule (N2): the
+ * calendar month with the most days in [startDate, endDate] wins; ties break toward
+ * the LATER month. Server twin: cycle_majority_name(). Used at CREATE time only —
+ * the stored cycle.name is the display source of truth (views never recompute it).
+ *
+ * @param {string} startDate — 'YYYY-MM-DD'
+ * @param {string} endDate   — 'YYYY-MM-DD'
+ * @returns {string} e.g. 'June 2026'
+ */
+export function cycleDefaultName(startDate, endDate) {
+  const end = new Date(endDate + 'T00:00:00Z');
+  const tally = {};                                  // 'YYYY-MM' → day count, ascending insertion order
+  for (let d = new Date(startDate + 'T00:00:00Z'); d <= end; d = addDays(d, 1)) {
+    const key = iso(d).slice(0, 7);
+    tally[key] = (tally[key] || 0) + 1;
+  }
+  let bestKey = null, bestCount = -1;
+  for (const [key, count] of Object.entries(tally)) {
+    if (count >= bestCount) { bestCount = count; bestKey = key; }   // >= → later month wins ties
+  }
+  return formatMonth(bestKey);
+}
+
+/**
+ * Resolve the parameters for the NEXT cycle to create for a hub, given its most
+ * recent cycle (or null for a brand-new hub). Reference date = prev.end_date + 1,
+ * else `today` (decision 11). Returns everything create_cycle_by_anchor needs PLUS
+ * the computed range + name, so callers (useFinance auto-create, the Settings
+ * preview) don't each re-derive them — and useFinance stays under its line cap.
+ *
+ * @param {{ cycle_anchor_type?: string, cycle_anchor_day?: number|null }} centre
+ * @param {{ end_date: string }|null} prevCycle
+ * @param {string} today — 'YYYY-MM-DD'
+ * @returns {{ anchor_type: string, anchor_day: number|null, reference_date: string, start_date: string, end_date: string, name: string }}
+ */
+export function computeNextCycleParams(centre, prevCycle, today) {
+  const anchor_type = centre?.cycle_anchor_type || 'calendar';
+  const anchor_day  = anchor_type === 'fixed_day' ? (centre?.cycle_anchor_day ?? null) : null;
+  const prevEnd     = prevCycle?.end_date ?? null;
+  const reference_date = prevEnd ? iso(addDays(new Date(prevEnd + 'T00:00:00Z'), 1)) : today;
+  const { start_date, end_date } = anchorToDateRange(anchor_type, anchor_day, reference_date, prevEnd);
+  return { anchor_type, anchor_day, reference_date, start_date, end_date, name: cycleDefaultName(start_date, end_date) };
 }

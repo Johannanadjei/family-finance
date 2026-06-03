@@ -12,7 +12,7 @@
 import { useState } from 'react';
 import { selectStyle }    from '../../../lib/selectStyle';
 import { validateCentreStep } from '../onboarding.validation';
-import { CURRENCIES, CENTRE_ICONS } from '../onboarding.constants';
+import { CURRENCIES, CENTRE_ICONS, CYCLE_ANCHOR_OPTIONS } from '../onboarding.constants';
 
 const inputStyle = {
   width: '100%', padding: '14px 16px', borderRadius: 12,
@@ -22,16 +22,25 @@ const inputStyle = {
 };
 
 export function StepCentre({ data, onNext }) {
-  const [name,     setName]     = useState(data.name);
-  const [currency, setCurrency] = useState(data.currency);
-  const [icon,     setIcon]     = useState(data.icon);
-  const [error,    setError]    = useState(null);
+  const [name,       setName]       = useState(data.name);
+  const [currency,   setCurrency]   = useState(data.currency);
+  const [icon,       setIcon]       = useState(data.icon);
+  const [error,      setError]      = useState(null);
+  // Budget-cycle anchor (Commit 14b). Most hubs use the calendar month; the
+  // "Configure" path is an optional advanced disclosure (decision 5).
+  const [showCycle,  setShowCycle]  = useState(false);
+  const [anchorType, setAnchorType] = useState(data.cycle_anchor_type || 'calendar');
+  const [anchorDay,  setAnchorDay]  = useState(data.cycle_anchor_day || 1);
 
   const handleNext = () => {
     const err = validateCentreStep({ name, currency });
     if (err) { setError(err); return; }
     setError(null);
-    onNext({ name: name.trim(), currency, icon });
+    onNext({
+      name: name.trim(), currency, icon,
+      cycle_anchor_type: anchorType,
+      cycle_anchor_day:  anchorType === 'fixed_day' ? Number(anchorDay) || 1 : null,
+    });
   };
 
   return (
@@ -99,6 +108,42 @@ export function StepCentre({ data, onNext }) {
             <option key={c.code} value={c.code}>{c.label}</option>
           ))}
         </select>
+      </div>
+
+      {/* Budget cycle — optional advanced configuration */}
+      <div>
+        <button
+          type="button"
+          data-testid="configure-cycle-toggle"
+          onClick={() => setShowCycle(s => !s)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0d7060', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}
+        >
+          {showCycle ? 'Use calendar month ▴' : 'Configure budget cycle ▾'}
+        </button>
+        {showCycle && (
+          <div style={{ marginTop: 10 }}>
+            <select
+              data-testid="cycle-anchor-select"
+              value={anchorType}
+              onChange={e => setAnchorType(e.target.value)}
+              style={{ ...inputStyle, ...selectStyle }}
+            >
+              {CYCLE_ANCHOR_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            {anchorType === 'fixed_day' && (
+              <input
+                data-testid="cycle-anchor-day"
+                type="number" min={1} max={31}
+                value={anchorDay}
+                onChange={e => setAnchorDay(e.target.value)}
+                placeholder="Day of month (1–31)"
+                style={{ ...inputStyle, marginTop: 8 }}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Error */}

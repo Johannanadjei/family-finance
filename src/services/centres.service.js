@@ -16,6 +16,13 @@ import { supabase } from '../lib/supabase';
 import { validateString, validateCurrency } from '../lib/validation';
 import { warnOnEmptyColdLoad } from '../lib/auth';
 
+// Hub cycle-anchor fields (Commit 14b). anchor_day is kept only for fixed_day
+// (1..31), nulled otherwise — mirrors the DB CHECK + the lib/cycles twin.
+const cleanAnchor = (type, day) => {
+  const t = ['calendar', 'fixed_day', 'last_working_day', 'last_day_of_month'].includes(type) ? type : 'calendar';
+  return { cycle_anchor_type: t, cycle_anchor_day: t === 'fixed_day' ? Math.min(31, Math.max(1, Number(day) || 1)) : null };
+};
+
 // ── Budget Centres ────────────────────────────────────────────────────────────
 
 /**
@@ -73,9 +80,9 @@ export const getFirstCentre = async () => {
 /**
  * Create a new budget centre and its owner member row.
  *
- * @param {{ name, currency, surplus_target, icon, type, skin_id }} opts
+ * @param {{ name, currency, surplus_target, icon, type, skin_id, cycle_anchor_type, cycle_anchor_day }} opts
  */
-export const createCentre = async ({ name, currency, surplus_target = 0, icon = '🏠', type = 'family_home', skin_id = null }) => {
+export const createCentre = async ({ name, currency, surplus_target = 0, icon = '🏠', type = 'family_home', skin_id = null, cycle_anchor_type, cycle_anchor_day }) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: null, error: new Error('Not authenticated') };
 
@@ -98,6 +105,7 @@ export const createCentre = async ({ name, currency, surplus_target = 0, icon = 
     type:           type || 'family_home',
   };
   if (skin_id) payload.skin_id = skin_id;
+  if (cycle_anchor_type) Object.assign(payload, cleanAnchor(cycle_anchor_type, cycle_anchor_day));
 
   const { data: centre, error: centreErr } = await supabase
     .from('budget_centres')
@@ -143,6 +151,7 @@ export const updateCentre = async (centreId, updates) => {
     if (updates.skin_id  !== undefined) cleaned.skin_id        = updates.skin_id;
     if (updates.type     !== undefined) cleaned.type           = updates.type;
     if (updates.timezone !== undefined) cleaned.timezone       = String(updates.timezone);
+    if (updates.cycle_anchor_type !== undefined) Object.assign(cleaned, cleanAnchor(updates.cycle_anchor_type, updates.cycle_anchor_day));
   } catch (e) {
     console.error('[centres.service] updateCentre validation error:', e.message);
     return { data: null, error: e };

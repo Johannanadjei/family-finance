@@ -16,12 +16,14 @@ const THIS_MONTH = getCurrentMonth();
 const LAST_MONTH = offsetMonth(THIS_MONTH, -1);
 
 export const mockCentre = {
-  id:             'c1',
-  name:           "The Adjei's",
-  icon:           '🏠',
-  currency:       'GHS',
-  surplus_target: 4500,
-  owner_id:       'user-1',
+  id:                'c1',
+  name:              "The Adjei's",
+  icon:              '🏠',
+  currency:          'GHS',
+  surplus_target:    4500,
+  owner_id:          'user-1',
+  cycle_anchor_type: 'calendar',   // Commit 14b — hubs default to calendar-month cycles
+  cycle_anchor_day:  null,
 };
 
 export const mockFmt = (n) => `GHS ${Math.round(n || 0).toLocaleString()}`;

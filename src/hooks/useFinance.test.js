@@ -4,11 +4,11 @@ import { useFinance } from './useFinance';
 vi.mock('../lib/auth', () => ({ waitForSession: vi.fn().mockResolvedValue({ data: { session: { expires_at: 9999999999 } }, error: null }), warnOnEmptyColdLoad: vi.fn(), sessionAgeMs: vi.fn(() => 0) }));
 vi.mock('../services/transactions.service', () => ({ getTransactionsByCycle: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn(), moveTransactionToCycle: vi.fn() }));
 vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn() }));
-vi.mock('../services/cycles.service', () => ({ getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }), createCalendarCycle: vi.fn().mockResolvedValue({ data: null, error: null }) }));
+vi.mock('../services/cycles.service', () => ({ getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }), createCycleByAnchor: vi.fn().mockResolvedValue({ data: null, error: null }) }));
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
 import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
-import { getCyclesForCentre, createCalendarCycle } from '../services/cycles.service';
+import { getCyclesForCentre, createCycleByAnchor } from '../services/cycles.service';
 import { getCurrentMonth, getToday } from '../lib/dates';
 import { calcTotalFixed } from '../lib/finance';
 const C = { id:'centre-1', currency:'GHS', surplus_target:4500 };
@@ -118,17 +118,30 @@ describe('useFinance — cycles', () => {
     expect(result.current.activeCycle.id).toBe('cyc-cur');
   });
 
-  it('auto-creates the current cycle when today falls in a gap', async () => {
-    createCalendarCycle.mockResolvedValue({ data: CURRENT, error: null });
-    const { result } = goCycles([PAST]);   // no cycle covers today
-    await waitFor(() => expect(createCalendarCycle).toHaveBeenCalledWith('centre-1', MONTH));
+  it('auto-creates the next cycle (anchor-aware) when today falls in a gap', async () => {
+    createCycleByAnchor.mockResolvedValue({ data: CURRENT, error: null });
+    const { result } = goCycles([PAST]);   // no cycle covers today; PAST is the most recent
+    // calendar anchor (C has no cycle_anchor_type), reference = PAST.end + 1.
+    await waitFor(() => expect(createCycleByAnchor).toHaveBeenCalledWith(
+      'centre-1',
+      expect.objectContaining({ anchor_type: 'calendar', reference_date: '2000-02-01' }),
+    ));
     expect(result.current.error).toBeNull();   // auto-create never surfaces to the UI
+  });
+
+  it('auto-creates the first cycle for a hub with NO cycles (relaxed guard, reference = today)', async () => {
+    createCycleByAnchor.mockResolvedValue({ data: CURRENT, error: null });
+    goCycles([]);   // brand-new hub, zero cycles — the dropped length===0 guard lets this fire
+    await waitFor(() => expect(createCycleByAnchor).toHaveBeenCalledWith(
+      'centre-1',
+      expect.objectContaining({ anchor_type: 'calendar', reference_date: TODAY }),
+    ));
   });
 
   it('does NOT auto-create when a current cycle already exists', async () => {
     const { result } = goCycles([CURRENT]);
     await waitFor(() => expect(result.current.cycles).toHaveLength(1));
-    expect(createCalendarCycle).not.toHaveBeenCalled();
+    expect(createCycleByAnchor).not.toHaveBeenCalled();
   });
 
   it('handles a CYC01 race by refetching without surfacing an error', async () => {
@@ -137,10 +150,10 @@ describe('useFinance — cycles', () => {
     getCyclesForCentre
       .mockResolvedValueOnce({ data: [PAST], error: null })          // gap → triggers auto-create
       .mockResolvedValue({ data: [PAST, CURRENT], error: null });    // another client won → refetch sees current
-    createCalendarCycle.mockResolvedValue({ data: null, error: { code: 'CYC01', message: 'A cycle already exists' } });
+    createCycleByAnchor.mockResolvedValue({ data: null, error: { code: 'CYC01', message: 'A cycle already exists' } });
 
     const { result } = renderHook(() => useFinance({ centre: C, allCategories: CATS }));
-    await waitFor(() => expect(createCalendarCycle).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(createCycleByAnchor).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(result.current.activeCycle?.id).toBe('cyc-cur'));
     expect(result.current.error).toBeNull();
   });

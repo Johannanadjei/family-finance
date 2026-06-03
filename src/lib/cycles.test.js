@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth } from './cycles';
+import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth,
+         anchorToDateRange, cycleDefaultName, computeNextCycleParams } from './cycles';
 
 // Three non-overlapping calendar cycles. Dates are 'YYYY-MM-DD' strings.
 const APR = { id: 'apr', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
@@ -127,5 +128,111 @@ describe('cycleIdForMonth', () => {
   it('ignores soft-deleted cycles', () => {
     const deletedMay = { ...MAY, deleted_at: '2026-05-02T00:00:00Z' };
     expect(cycleIdForMonth([deletedMay], '2026-05')).toBeNull();
+  });
+});
+
+// ── Anchor-aware boundaries (Commit 14b) ───────────────────────────────────────
+describe('anchorToDateRange', () => {
+  it('calendar — the whole calendar month containing the reference date', () => {
+    expect(anchorToDateRange('calendar', null, '2026-06-15'))
+      .toEqual({ start_date: '2026-06-01', end_date: '2026-06-30' });
+  });
+
+  it('fixed_day — anchor day to the day before next month\'s anchor', () => {
+    // reference on the anchor day starts the cycle there
+    expect(anchorToDateRange('fixed_day', 29, '2026-05-29'))
+      .toEqual({ start_date: '2026-05-29', end_date: '2026-06-28' });
+    // reference before this month's anchor belongs to the previous window
+    expect(anchorToDateRange('fixed_day', 29, '2026-06-15'))
+      .toEqual({ start_date: '2026-05-29', end_date: '2026-06-28' });
+  });
+
+  it('fixed_day 31 clamps to the short month (Feb 28, non-leap)', () => {
+    expect(anchorToDateRange('fixed_day', 31, '2026-02-10'))
+      .toEqual({ start_date: '2026-01-31', end_date: '2026-02-27' });
+  });
+
+  it('fixed_day 31 clamps to Feb 29 in a leap year', () => {
+    expect(anchorToDateRange('fixed_day', 31, '2028-02-10'))
+      .toEqual({ start_date: '2028-01-31', end_date: '2028-02-28' });
+  });
+
+  it('last_working_day — anchors to the last weekday of the month', () => {
+    // May 2026: 31st is a Sunday → last working day is Fri May 29
+    expect(anchorToDateRange('last_working_day', null, '2026-05-15'))
+      .toEqual({ start_date: '2026-04-30', end_date: '2026-05-28' });
+  });
+
+  it('last_working_day in February — last weekday', () => {
+    // Feb 2026: 28th is a Saturday → last working day is Fri Feb 27
+    expect(anchorToDateRange('last_working_day', null, '2026-02-15'))
+      .toEqual({ start_date: '2026-01-30', end_date: '2026-02-26' });
+  });
+
+  it('last_day_of_month — anchors to the final calendar day', () => {
+    expect(anchorToDateRange('last_day_of_month', null, '2026-05-15'))
+      .toEqual({ start_date: '2026-04-30', end_date: '2026-05-30' });
+  });
+
+  it('forward-only clamp — start never reaches back over the previous cycle', () => {
+    // fixed_day 29, reference Jul 1, prev cycle ended Jun 30: raw start would be
+    // Jun 29 → clamped forward to Jul 1 (a short transition cycle, M1).
+    expect(anchorToDateRange('fixed_day', 29, '2026-07-01', '2026-06-30'))
+      .toEqual({ start_date: '2026-07-01', end_date: '2026-07-28' });
+  });
+
+  it('no clamp applied when the anchor start is already past the previous end', () => {
+    expect(anchorToDateRange('fixed_day', 29, '2026-06-29', '2026-06-28'))
+      .toEqual({ start_date: '2026-06-29', end_date: '2026-07-28' });
+  });
+});
+
+describe('cycleDefaultName', () => {
+  it('majority month wins (May 29 – Jun 28 → June)', () => {
+    expect(cycleDefaultName('2026-05-29', '2026-06-28')).toBe('June 2026');
+  });
+
+  it('calendar month names itself', () => {
+    expect(cycleDefaultName('2026-06-01', '2026-06-30')).toBe('June 2026');
+  });
+
+  it('ties break toward the later month (15 days each → July)', () => {
+    expect(cycleDefaultName('2026-06-16', '2026-07-15')).toBe('July 2026');
+  });
+});
+
+describe('computeNextCycleParams', () => {
+  it('brand-new hub (no prev cycle) uses today as the reference date', () => {
+    const p = computeNextCycleParams({ cycle_anchor_type: 'calendar' }, null, '2026-06-03');
+    expect(p.reference_date).toBe('2026-06-03');
+    expect(p.start_date).toBe('2026-06-01');
+    expect(p.end_date).toBe('2026-06-30');
+    expect(p.anchor_type).toBe('calendar');
+    expect(p.anchor_day).toBeNull();
+    expect(p.name).toBe('June 2026');
+  });
+
+  it('existing hub uses prev.end_date + 1 as the reference date', () => {
+    const p = computeNextCycleParams(
+      { cycle_anchor_type: 'fixed_day', cycle_anchor_day: 25 },
+      { end_date: '2026-06-24' },
+      '2026-06-03',
+    );
+    expect(p.reference_date).toBe('2026-06-25');
+    expect(p.anchor_type).toBe('fixed_day');
+    expect(p.anchor_day).toBe(25);
+    expect(p.start_date).toBe('2026-06-25');
+    expect(p.end_date).toBe('2026-07-24');
+  });
+
+  it('defaults to calendar anchor when the hub has none set', () => {
+    const p = computeNextCycleParams({}, null, '2026-06-03');
+    expect(p.anchor_type).toBe('calendar');
+    expect(p.anchor_day).toBeNull();
+  });
+
+  it('drops a stray anchor_day for non-fixed_day anchors', () => {
+    const p = computeNextCycleParams({ cycle_anchor_type: 'last_working_day', cycle_anchor_day: 25 }, null, '2026-06-03');
+    expect(p.anchor_day).toBeNull();
   });
 });

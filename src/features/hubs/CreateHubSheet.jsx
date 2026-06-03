@@ -14,6 +14,9 @@ import { selectStyle }           from '../../lib/selectStyle';
 import { createCentre }          from '../../services/centres.service';
 import { bulkAddCategories }     from '../../services/categories.service';
 import { bulkAddIncomeSources }  from '../../services/income.service';
+import { createCycleByAnchor, getCyclesForCentre } from '../../services/cycles.service';
+import { computeNextCycleParams, getActiveCycle }  from '../../lib/cycles';
+import { getToday }              from '../../lib/dates';
 import { StepIncome }            from '../onboarding/steps/StepIncome';
 import { getDefaultCategories, getHubType } from '../../lib/hubTypes';
 import { makeFmt, getCurrentMonth }          from '../../lib/finance';
@@ -78,13 +81,24 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
     });
     if (centreErr) { setError('Could not create hub. Please try again.'); setLoading(false); return; }
 
+    // Create the hub's FIRST cycle before any cycle-keyed bulk insert, so
+    // categories/income stamp a real cycle_id (closes CYC02 for this path too —
+    // mirrors OnboardingFlow). New hubs default to the calendar anchor.
+    const { data: cyc } = await createCycleByAnchor(data.id, computeNextCycleParams(data, null, getToday()));
+    let cycleId = cyc?.id ?? null;
+    if (!cycleId) {
+      const { data: list } = await getCyclesForCentre(data.id);   // CYC01 race / null response
+      cycleId = getActiveCycle(list || [], getToday())?.id ?? null;
+    }
+    if (!cycleId) { setError('Could not set up the budget cycle. Please try again.'); setLoading(false); return; }
+
     const catRows = categories.map(({ id: _id, ...c }) => ({ ...c, month: getCurrentMonth() }));
-    const { error: catErr } = await bulkAddCategories(data.id, catRows);
+    const { error: catErr } = await bulkAddCategories(data.id, catRows, cycleId);
     if (catErr) { setError('Could not save categories. Please try again.'); setLoading(false); return; }
 
     if (incomes.length > 0) {
       const srcRows = incomes.map(({ id: _id, ...src }) => ({ ...src, month: getCurrentMonth() }));
-      const { error: incErr } = await bulkAddIncomeSources(data.id, srcRows);
+      const { error: incErr } = await bulkAddIncomeSources(data.id, srcRows, cycleId);
       if (incErr) { setError('Could not save income sources. Please try again.'); setLoading(false); return; }
     }
 

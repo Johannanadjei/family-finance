@@ -18,6 +18,9 @@ import { makeFmt, getCurrentMonth } from '../../lib/finance';
 import { createCentre }       from '../../services/centres.service';
 import { bulkAddCategories }  from '../../services/categories.service';
 import { bulkAddIncomeSources } from '../../services/income.service';
+import { createCycleByAnchor, getCyclesForCentre } from '../../services/cycles.service';
+import { computeNextCycleParams, getActiveCycle }  from '../../lib/cycles';
+import { getToday }           from '../../lib/dates';
 import { STEPS, DEFAULT_CATEGORIES } from './onboarding.constants';
 import { OnboardingProgress } from './OnboardingProgress';
 import { StepCentre }         from './steps/StepCentre';
@@ -35,6 +38,7 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
   );
   const [surplusTarget, setSurplusTarget] = useState(0);
   const [centreId,      setCentreId]      = useState(existingCentreId || null);
+  const [firstCycleId,  setFirstCycleId]  = useState(null);
   const [plan,          setPlan]          = useState('free');
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState(null);
@@ -73,10 +77,12 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
     // Step 1 — create centre only if not already created
     if (!activeCentreId) {
       const { data, error: centreErr } = await createCentre({
-        name:           centreData.name,
-        currency:       centreData.currency,
-        icon:           centreData.icon,
-        surplus_target: surplusTarget,
+        name:              centreData.name,
+        currency:          centreData.currency,
+        icon:              centreData.icon,
+        surplus_target:    surplusTarget,
+        cycle_anchor_type: centreData.cycle_anchor_type,
+        cycle_anchor_day:  centreData.cycle_anchor_day,
       });
       if (centreErr) {
         setError('We could not create your BOS Hub. Please check your connection and try again.');
@@ -87,21 +93,43 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
       setCentreId(activeCentreId);
     }
 
-    // Step 2 — bulk insert categories with current month
+    // Step 1.5 — create the hub's FIRST cycle BEFORE any cycle-keyed bulk insert,
+    // so categories/income stamp a real cycle_id (closes the latent onboarding
+    // CYC02 — without a cycle, the storage-layer trigger rejects the insert, and a
+    // non-calendar anchor's month never matches by the trigger's month rule). The
+    // reference date is today (brand-new hub, no prev cycle — decision 11).
+    let activeCycleId = firstCycleId;
+    if (!activeCycleId) {
+      const { data: cyc } = await createCycleByAnchor(activeCentreId, computeNextCycleParams(centreData, null, getToday()));
+      activeCycleId = cyc?.id ?? null;
+      if (!activeCycleId) {
+        // CYC01 race (or a null response): resolve the cycle that now exists.
+        const { data: list } = await getCyclesForCentre(activeCentreId);
+        activeCycleId = getActiveCycle(list || [], getToday())?.id ?? null;
+      }
+      if (!activeCycleId) {
+        setError('We could not set up your budget cycle. Please try again.');
+        setLoading(false);
+        return;
+      }
+      setFirstCycleId(activeCycleId);
+    }
+
+    // Step 2 — bulk insert categories, stamped with the first cycle's id
     const categoryRows = categories.map(({ id, ...cat }) => ({
       ...cat,
       month: getCurrentMonth(),
     }));
-    const { error: catErr } = await bulkAddCategories(activeCentreId, categoryRows);
+    const { error: catErr } = await bulkAddCategories(activeCentreId, categoryRows, activeCycleId);
     if (catErr) {
       setError('We could not save your budget categories. Please try again.');
       setLoading(false);
       return;
     }
 
-    // Step 3 — bulk insert income sources
+    // Step 3 — bulk insert income sources, stamped with the first cycle's id
     const incomeRows = incomes.map(({ id, ...income }) => ({ ...income, month: getCurrentMonth() }));
-    const { error: incomeErr } = await bulkAddIncomeSources(activeCentreId, incomeRows);
+    const { error: incomeErr } = await bulkAddIncomeSources(activeCentreId, incomeRows, activeCycleId);
     if (incomeErr) {
       setError('We could not save your income streams. Please try again.');
       setLoading(false);

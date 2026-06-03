@@ -11,12 +11,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let mockResult;   // resolved by the terminal .maybeSingle()
 let usedSingle;   // true if .single() was called (should never happen for updateCentre)
+let updateArg;    // payload passed to .update() — asserts the column whitelist
 
 vi.mock('../lib/supabase', () => {
   const make = () => {
     const q = {
       from:        () => q,
-      update:      () => q,
+      update:      (arg) => { updateArg = arg; return q; },
       select:      () => q,
       is:          () => q,
       eq:          () => q,
@@ -35,6 +36,7 @@ import { updateCentre } from './centres.service';
 beforeEach(() => {
   mockResult = { data: null, error: null };
   usedSingle = false;
+  updateArg  = undefined;
 });
 
 describe('updateCentre — three-state contract', () => {
@@ -69,5 +71,39 @@ describe('updateCentre — three-state contract', () => {
     const { data, error } = await updateCentre('c-1', { name: '' });
     expect(data).toBeNull();
     expect(error).toBeTruthy();
+  });
+});
+
+// ── Cycle-anchor whitelist (Commit 14b) ────────────────────────────────────────
+// createCentre persists the same fields via the identical cleanAnchor() helper.
+describe('updateCentre — cycle-anchor whitelist', () => {
+  it('persists fixed_day with its anchor_day', async () => {
+    mockResult = { data: { id: 'c-1' }, error: null };
+    await updateCentre('c-1', { cycle_anchor_type: 'fixed_day', cycle_anchor_day: 25 });
+    expect(updateArg).toEqual({ cycle_anchor_type: 'fixed_day', cycle_anchor_day: 25 });
+  });
+
+  it('nulls anchor_day for non-fixed_day anchors', async () => {
+    mockResult = { data: { id: 'c-1' }, error: null };
+    await updateCentre('c-1', { cycle_anchor_type: 'last_working_day', cycle_anchor_day: 25 });
+    expect(updateArg).toEqual({ cycle_anchor_type: 'last_working_day', cycle_anchor_day: null });
+  });
+
+  it('falls back to calendar for an unknown anchor type', async () => {
+    mockResult = { data: { id: 'c-1' }, error: null };
+    await updateCentre('c-1', { cycle_anchor_type: 'weekly', cycle_anchor_day: 9 });
+    expect(updateArg).toEqual({ cycle_anchor_type: 'calendar', cycle_anchor_day: null });
+  });
+
+  it('clamps a fixed_day anchor_day into 1..31', async () => {
+    mockResult = { data: { id: 'c-1' }, error: null };
+    await updateCentre('c-1', { cycle_anchor_type: 'fixed_day', cycle_anchor_day: 99 });
+    expect(updateArg.cycle_anchor_day).toBe(31);
+  });
+
+  it('does not touch anchor columns when no anchor field is supplied', async () => {
+    mockResult = { data: { id: 'c-1' }, error: null };
+    await updateCentre('c-1', { timezone: 'UTC' });
+    expect(updateArg).toEqual({ timezone: 'UTC' });
   });
 });

@@ -22,8 +22,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
-import { getCyclesForCentre, createCalendarCycle } from '../services/cycles.service';
-import { getActiveCycle, sliceByCycle } from '../lib/cycles';
+import { getCyclesForCentre, createCycleByAnchor } from '../services/cycles.service';
+import { getActiveCycle, sliceByCycle, computeNextCycleParams } from '../lib/cycles';
 import { getToday } from '../lib/dates';
 import {
   calcTotalIncome, calcTotalSpent, calcBudgetUsedPct,
@@ -168,19 +168,23 @@ export function useFinance({ centre, allCategories }) {
     load(cid);
   }, [centreId, cyclesLoading, activeCycleId, activeCycle?.id, load]);
 
-  // Auto-create the current calendar cycle when today falls in a gap (no cycle
-  // covers it). Silent in Commit 4 — the "new period" toast lands with the view
-  // migrations (Commits 5-9). The ref guards one attempt per hub so a benign
-  // failure or a CYC01 race can't loop (cyclesLoading toggling re-runs this).
+  // Auto-create the current cycle when today falls in a gap (no cycle covers it).
+  // Anchor-aware (Commit 14b): the new cycle's range comes from the hub's anchor
+  // setting + the most recent cycle (reference = prev.end+1, else today) — lib/cycles
+  // owns the math. The cycles.length===0 guard is RELAXED so a brand-new hub with no
+  // cycles still self-heals (defence-in-depth for the CYC02 closure; onboarding +
+  // CreateHubSheet create the first cycle up front). Silent — the ref guards one
+  // attempt per hub so a benign failure or a CYC01 race can't loop.
   const autoCreateRef = useRef(null);
   useEffect(() => {
-    if (cyclesLoading || !centreId || cycles.length === 0) return;
+    if (cyclesLoading || !centreId) return;
     const today = getToday();
     const hasCurrent = cycles.some(c => !c.deleted_at && c.start_date <= today && c.end_date >= today);
     if (hasCurrent) { autoCreateRef.current = centreId; return; }
     if (autoCreateRef.current === centreId) return;   // already attempted for this hub
     autoCreateRef.current = centreId;
-    createCalendarCycle(centreId, today.slice(0, 7)).then(({ error }) => {
+    const prevCycle = cycles.filter(c => !c.deleted_at).sort((a, b) => b.end_date.localeCompare(a.end_date))[0] || null;
+    createCycleByAnchor(centreId, computeNextCycleParams(centre, prevCycle, today)).then(({ error }) => {
       if (error && error.code !== 'CYC01') {
         console.error('[useFinance] auto-create cycle error:', error.message);
         return;

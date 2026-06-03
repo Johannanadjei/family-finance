@@ -15,6 +15,13 @@ vi.mock('../../services/categories.service', () => ({
 vi.mock('../../services/income.service', () => ({
   bulkAddIncomeSources: vi.fn().mockResolvedValue({ error: null }),
 }));
+vi.mock('../../services/cycles.service', () => ({
+  createCycleByAnchor: vi.fn().mockResolvedValue({ data: { id: 'new-cyc-1' }, error: null }),
+  getCyclesForCentre:  vi.fn().mockResolvedValue({ data: [], error: null }),
+}));
+
+import { bulkAddCategories } from '../../services/categories.service';
+import { createCycleByAnchor } from '../../services/cycles.service';
 
 const renderSheet = (props = {}) =>
   render(
@@ -158,5 +165,13 @@ describe('CreateHubSheet', () => {
     goToConfirm();
     fireEvent.click(screen.getByText('Create Hub 🎉'));
     await vi.waitFor(() => expect(onComplete).toHaveBeenCalledWith('new-c-1'));
+  });
+
+  it('creates the first cycle and stamps categories with its id (CYC02 closure)', async () => {
+    renderSheet();
+    goToConfirm();
+    fireEvent.click(screen.getByText('Create Hub 🎉'));
+    await vi.waitFor(() => expect(createCycleByAnchor).toHaveBeenCalledWith('new-c-1', expect.objectContaining({ anchor_type: 'calendar' })));
+    await vi.waitFor(() => expect(bulkAddCategories).toHaveBeenCalledWith('new-c-1', expect.anything(), 'new-cyc-1'));
   });
 });

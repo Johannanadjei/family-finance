@@ -3416,3 +3416,99 @@ forward `cycle_id`) & `useFinance.income-mutations.test.js`; `hooks/useFinance.j
 `viewedCycleId`); `views/BudgetView.jsx` & `views/SettingsView.jsx` (wrap `onAdd`; SettingsView
 reads `viewedCycleId`; +`add-category-btn` test id); this entry. `income.service.js` held at
 249/250 (cap-tight, per the Phase 3 budget). 1240 tests.
+
+---
+
+## [2026-06-03] Commit 14b — budget-cycle anchor types (custom / payday-anchored cycles)
+
+**Context:**
+Through Commit 14a every cycle was a calendar month (1st → month-end). Households
+paid on the last working day, a fixed day, or the last calendar day want their
+budget cycle to start on payday, not the 1st. 14a (client-side `cycle_id` stamping)
+was the preparation; 14b adds the user-facing anchor and the creator that builds a
+cycle from it. It also closes the latent onboarding CYC02 that the 14a entry flagged
+as "a separate commit if it manifests."
+
+**Decisions:**
+
+- **Four anchor types, hub-level.** `budget_centres.cycle_anchor_type` ∈
+  `calendar | fixed_day | last_working_day | last_day_of_month`, plus
+  `cycle_anchor_day` (1..31, present IFF `fixed_day`). The anchor is a property of
+  the hub, not per-cycle. Set in Settings (a new `BudgetCycleSection`) or optionally
+  at onboarding via a "Configure budget cycle" disclosure (default stays calendar).
+
+- **Map at the boundary; do NOT widen the cycle CHECK.** `budget_cycles.anchor_type`
+  keeps its existing 3-value CHECK (`calendar | payday | custom`). The hub anchor
+  maps on insert: `calendar → calendar`, everything else → `custom`; the cycle row's
+  `anchor_day` stays NULL (the real day lives on the hub). The `'payday'` cycle value
+  is reserved/unused. Per-cycle anchor granularity is deferred — widen later only if
+  it becomes load-bearing.
+
+- **`create_cycle_by_anchor` RPC replaces `create_calendar_cycle`.** A SECURITY
+  DEFINER function (same membership gate as before) computes the cycle range
+  CONTAINING a reference date from the hub anchor, forward-only clamps the start to
+  the latest existing cycle's `end_date + 1` (M1), maps the anchor vocabulary, names
+  the cycle, and traps overlap → CYC01. `create_calendar_cycle` is dropped — its only
+  caller (useFinance auto-create) migrated. Two pure SQL helpers (`cycle_anchored_day`,
+  `cycle_majority_name`) are the server twins of the JS in `lib/cycles.js`.
+
+- **Reference date = `prev.end_date + 1`, else today (decision 11).** Auto-create and
+  the Settings preview build the cycle that follows the most recent one; only a
+  brand-new hub uses today. The forward-only clamp keeps the GiST no-overlap
+  constraint intact and produces a short transition cycle on a mid-stream anchor
+  change (M1 forward-only — existing cycles are never rewritten).
+
+- **N2 naming: JS computes at create-time, DB stores, views read the stored name.**
+  `cycleDefaultName(start, end)` picks the calendar month with the most days in the
+  range (ties → the later month) and is passed to the RPC as `p_name`; the RPC falls
+  back to its `cycle_majority_name` twin if null. The stored `cycle.name` remains the
+  single display source — view headers keep reading `viewedCycle.name` and were NOT
+  changed (an earlier plan to recompute names at display-time was dropped: it would
+  have duplicated the rule and contradicted "store the computed value").
+
+- **`computeNextCycleParams` extracted to `lib/cycles.js`.** Rather than inline the
+  anchor math in `useFinance`, the "what does the next cycle look like" computation
+  (anchor + reference date → range + name) is a pure helper, reused by useFinance
+  auto-create and the Settings preview. Keeps the hook lean and the math unit-tested.
+
+- **First-cycle CYC02 closure in BOTH hub-creation paths.** `OnboardingFlow` AND
+  `CreateHubSheet` create the hub's first cycle via `create_cycle_by_anchor`
+  immediately after `createCentre`, BEFORE bulk-inserting categories/income, and pass
+  the cycle's id into `bulkAddCategories`/`bulkAddIncomeSources`. Without a cycle the
+  Commit-10 trigger rejects the insert (CYC02); and for a non-calendar anchor the
+  trigger's month-match would never find the cycle anyway, so the explicit id is
+  required, not optional. `CreateHubSheet` shared the identical latent bug — Phase 4
+  reading found it; fixing only onboarding would have left "add another hub" broken.
+  The `useFinance` auto-create `cycles.length === 0` guard is RELAXED as
+  defence-in-depth (a zero-cycle hub still self-heals), but it does not backfill the
+  bulk-inserted rows — only up-front creation does, which is why both paths changed.
+
+**Rules derived:**
+- **When the schema enforces an invariant via a CHECK constraint, map application-level
+  enums to the constraint's vocabulary at the boundary — don't widen the constraint.**
+  Reversible: widen later if the finer granularity becomes load-bearing. (Hub's four
+  anchors → cycle's `calendar|custom`.)
+- **Helpers that compute display data at create-time must not also run at
+  display-time. Store the computed value; reads consume stored truth.** (`cycleDefaultName`
+  feeds the RPC's `p_name`; headers read `cycle.name`.)
+- **When approaching a file-size cap, extract domain logic to its natural `lib/` home
+  rather than compressing comments.** Extraction is architecture; compression is debt.
+  (`computeNextCycleParams` → `lib/cycles.js`.)
+
+**Files (~18):** `scripts/migrate_14b_anchor.sql` (NEW — columns + CHECKs +
+`cycle_anchored_day`/`cycle_majority_name`/`create_cycle_by_anchor`, drops
+`create_calendar_cycle`); `lib/cycles.js` + `lib/cycles.test.js`
+(`anchorToDateRange`/`cycleDefaultName`/`computeNextCycleParams`);
+`services/cycles.service.js` + test (`createCycleByAnchor`, removed
+`createCalendarCycle`); `services/centres.service.js` (250/250, cap-tight — `cleanAnchor`
+whitelist in create + update) + test; `hooks/useFinance.js` (+ `.test.js`,
+`.race.test.js`, `.income-mutations.test.js` — anchor-aware auto-create, relaxed guard);
+`views/settings/BudgetCycleSection.jsx` + test (NEW) & `views/SettingsView.jsx` (mount);
+`features/onboarding/steps/StepCentre.jsx` + test (Configure path);
+`features/onboarding/OnboardingFlow.jsx` + test (NEW — first-cycle creation);
+`features/hubs/CreateHubSheet.jsx` + test (first-cycle creation);
+`features/onboarding/onboarding.constants.js` (`CYCLE_ANCHOR_OPTIONS`, shared);
+`test-utils/fixtures.js` (`cycle_anchor_type` on `mockCentre`); this entry.
+
+**Migration:** `scripts/migrate_14b_anchor.sql` runs separately in the Supabase SQL
+editor (like Commits 10 & 12) — surfaced at handoff, not run by the app.
