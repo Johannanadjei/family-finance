@@ -3238,3 +3238,92 @@ imports; `copyCategoriesToMonth` gains `targetCycleId`); `hooks/useIncomeMutatio
 (slice test moved out, mutation tests retarget `allCategories`), this entry.
 `useFinance.income-mutations.test.js` was not in the original 10-file plan but the cycle_id
 stamp forced it (rollforward tests must seed a target cycle) — folded in.
+
+## [2026-06-03] Commit 12 — move a transaction to another cycle (move-by-cycle_id UX)
+
+**Context:**
+Budget Cycles made `cycle_id` the key for every financial slice (Commits 10–11.5), but
+there was no user-facing way to re-home a transaction that landed in the wrong period —
+e.g. a grocery shop on **May 31** that belongs to **June's** budget. The data model
+already carried `cycle_id`; what was missing was the UI surface and the mutation.
+
+**Decision — move by `cycle_id`, preserving the date (Path 2, NOT move-by-date):**
+A move writes `cycle_id` directly and leaves `date` untouched. The transaction's "when"
+(May 31) and its "which budget" (June) are **two independent facts**; re-homing by editing
+the date (Path 1) would conflate them and destroy the date. Consequence, by design: a moved
+tx renders under its real date *inside* the destination period's day-grouping (a "31 May"
+row showing in June). `getTransactionsByCycle` reads by `cycle_id`, so it correctly appears
+in June.
+
+**Decision — trigger branch, NOT a new RPC:**
+`cycle_id` is a trigger-owned derived field (Commit 10's `resolve_cycle_id()` resolves it
+from `date`). A naive `UPDATE SET cycle_id` would normally be re-resolved back from the
+date. We extended the trigger instead of writing a parallel RPC mutation path — single
+source of `cycle_id` truth, mirrors the existing INSERT short-circuit. Two parts, both
+required (one without the other is a no-op or dead code):
+1. **Branch:** `IF TG_OP = 'UPDATE' AND OLD.cycle_id IS DISTINCT FROM NEW.cycle_id THEN
+   RETURN NEW;` — when the caller explicitly changes `cycle_id`, trust them; don't
+   re-resolve from date. `IS DISTINCT FROM` is null-safe and false on a date-only edit
+   (where `cycle_id` is untouched), which still re-resolves — preserving Commit-10 behaviour.
+2. **Widened scope:** the transactions trigger fires on `BEFORE INSERT OR UPDATE OF date,
+   cycle_id` (was `date` only). Without the `cycle_id` column in the scope, the branch is
+   unreachable dead code and a future combined date+cycle_id edit would re-resolve from
+   date and discard the move. categories/income triggers stay at `UPDATE OF month` — there
+   is no move-category/move-income feature; the shared function's branch is inert for them
+   (a month edit never changes `cycle_id` within its SET list).
+
+Four cases, all correct: INSERT-null→resolve; INSERT-set→trust; UPDATE-date-only→re-resolve;
+UPDATE-cycle_id (or both)→trust. Known latent interaction, out of scope: a *future* date-edit
+path (the dead AddTransactionSheet edit flow) would fire `UPDATE OF date` with `cycle_id`
+unchanged and silently revert a prior move — acceptable, since editing the date is itself an
+intent change and no date-edit path is reachable in Commit 12.
+
+**Decision — standalone `MoveCycleSheet`, NOT reviving the dead edit flow:**
+Move-to-period is its own focused single-select sheet (CopyIncomeSheet chrome), opened from a
+new kebab (⋯) on `TransactionRow`. The kebab — not an inline icon — is the home for
+transaction-level *corrective* actions (move now; edit/duplicate later) without redesigning
+the row for actions that aren't part of the daily flow. The half-wired `AddTransactionSheet`
+edit path (and its latent `date`/`week`-dropped-on-update bug) stays out of scope, logged for
+a later commit.
+
+**Decision — reuse `can(role, 'log')`:** same permission as creating a transaction. If you
+can log expenses, you can correct which period one belongs to. No new permission key.
+
+**Decision — past-period guard on EITHER source OR destination:**
+`usePastPeriodGuard` (Commit 8) gates the move behind the "Edit past period?" confirm when
+the cycle the tx sits in **or** the chosen destination has ended — the common case
+(current → past) is destination-keyed, so the guard is evaluated at confirm-time once the
+destination is known (a `pendingMove` state dispatched through the guard in an effect, with
+a ref for one-dispatch-per-move). The kebab deliberately ignores the row's past-period
+`disabled` (which still blocks delete) so a tx can be moved *out* of a past period, guarded.
+
+**Extractions (cap pressure → architecture, per the Commit-11.5 rule):**
+- `useTransactionMutations.js` — `useFinance` was at 443/450; the move pushed it over.
+  Extracted add/update/delete/move (symmetric with `useIncomeMutations`); `useFinance` drops
+  to ~381 and future tx mutations have a clean home.
+- `useMoveToCycle.jsx` — the move flow (sheet state, destinations, guard, dispatch) is
+  identical in LogView and DailyView and pushed both past the 200-line views cap. Extracted
+  rather than duplicated; it composes `usePastPeriodGuard` and returns its modal element, so
+  it lives in `.jsx` (the same data-vs-UI hook convention).
+
+**Rules derived:**
+- **Database triggers that auto-resolve a derived field must narrow their UPDATE column
+  scope** so they (a) don't fire on innocent edits and (b) defer to explicit caller intent
+  when the derived field itself is set — `UPDATE OF date, cycle_id`, trusting an explicit
+  `cycle_id`.
+- **Record "when" and "which budget" as independent fields.** `date` (when it happened) and
+  `cycle_id` (which budget it counts toward) are distinct facts; conflating them — e.g.
+  moving a tx by editing its date — destroys information.
+- **Hook extraction at a size cap is architectural, not cosmetic.** When inlining a feature
+  breaches a cap, extract the right boundary (a shared flow into a hook) rather than trimming
+  comments or duplicating logic across consumers.
+
+**Files (18):** `scripts/migrate_move_cycle_trigger.sql` (NEW — branch + widened trigger,
+**must be run manually in Supabase**, like Commit 10); `services/transactions.service.js`
+(+`moveTransactionToCycle`) & its test; `hooks/useTransactionMutations.js` (NEW, extracted
++`moveTransaction`) & its test; `hooks/useFinance.js` (consumes the extraction, exposes
+`moveTransaction`) & `useFinance.test.js` (service mock adds `moveTransactionToCycle`);
+`hooks/useMoveToCycle.jsx` (NEW — shared move flow) & its test; `views/daily/MoveCycleSheet.jsx`
+(NEW — picker) & its test; `views/daily/TransactionRow.jsx` (+kebab) & its test;
+`views/LogView.jsx` & `views/DailyView.jsx` (wire kebab + move flow) & their tests; this entry.
+1225 tests.

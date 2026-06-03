@@ -12,11 +12,13 @@
 import { useState }               from 'react';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
+import { useMoveToCycle }         from '../hooks/useMoveToCycle';
 import { getCurrentMonth, groupByDate } from '../lib/finance';
 import { formatMonth, getToday }   from '../lib/dates';
 import { getCycleNav }             from '../lib/cycles';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { TransactionRow }         from './daily/TransactionRow';
+import { MoveCycleSheet }         from './daily/MoveCycleSheet';
 import { WeeklySummaryBar }       from './daily/WeeklySummaryBar';
 
 const formatDate = (dateStr) =>
@@ -42,9 +44,14 @@ export function DailyView() {
   const { txs, totalSpent, weeklyData,
           loading, error, activeMonth,
           cycles = [], activeCycle, activeCycleId, loadCycle,
-          deleteTransaction }                 = useFinanceContext();
+          deleteTransaction, moveTransaction } = useFinanceContext();
   const [deletingId,  setDeletingId]         = useState(null);
   const [deleteError, setDeleteError]        = useState(null);
+  // Move-to-period flow (Commit 12) — shared with LogView. Called before the loading
+  // return so its hooks run unconditionally (CLAUDE.md §9.5).
+  const { moveTx, moveDestinations, movingId, moveError,
+          openMove, closeMove, confirmMove, moveGuardModal } =
+    useMoveToCycle({ txs, cycles, moveTransaction });
 
   if (loading) return <DailyViewSkeleton />;
 
@@ -100,9 +107,9 @@ export function DailyView() {
       <WeeklySummaryBar weeklyData={weeklyData} fmt={fmt} activeMonth={activeMonth} />
 
       {/* Error state */}
-      {(error || deleteError) && (
+      {(error || deleteError || moveError) && (
         <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{deleteError || error}</p>
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{moveError || deleteError || error}</p>
         </div>
       )}
 
@@ -131,8 +138,10 @@ export function DailyView() {
                   tx={tx}
                   fmt={fmt}
                   onDelete={handleDelete}
+                  onMove={openMove}
                   disabled={deletingId === tx.id || !isCurrent}
                   deleting={deletingId === tx.id}
+                  moving={movingId === tx.id}
                   isLast={idx === grouped[date].length - 1}
                 />
               ))}
@@ -140,6 +149,15 @@ export function DailyView() {
           </div>
         ))
       )}
+
+      <MoveCycleSheet
+        isOpen={!!moveTx}
+        onClose={closeMove}
+        cycles={moveDestinations}
+        onMove={confirmMove}
+        moving={!!movingId}
+      />
+      {moveGuardModal}
     </div>
   );
 }

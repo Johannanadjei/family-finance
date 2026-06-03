@@ -181,6 +181,40 @@ export const updateTransaction = async (transactionId, updates) => {
 };
 
 /**
+ * Move a transaction to a different budget cycle (Commit 12).
+ *
+ * Writes cycle_id DIRECTLY, preserving the transaction's date — the move-by-cycle_id
+ * decision (Path 2): "this May-31 expense belongs to June's budget" keeps the date
+ * and only re-homes the budget assignment. The Commit-12 trigger branch
+ * (scripts/migrate_move_cycle_trigger.sql) sees the explicit cycle_id change and
+ * trusts it rather than re-resolving from date.
+ *
+ * Refuses a falsy cycleId before the write — a NULL cycle_id would orphan the row
+ * from every cycle slice (the CYC02 invariant, client side). Returns the updated row.
+ *
+ * @param {string} transactionId
+ * @param {string} cycleId — budget_cycles.id to move the transaction into
+ */
+export const moveTransactionToCycle = async (transactionId, cycleId) => {
+  if (!cycleId) {
+    const error = new Error('moveTransactionToCycle requires a target cycleId');
+    console.error('[transactions.service] moveTransactionToCycle validation error:', error.message);
+    return { data: null, error };
+  }
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .update({ cycle_id: cycleId })
+    .eq('id', transactionId)
+    .is('deleted_at', null)
+    .select()
+    .single();
+
+  if (error) console.error('[transactions.service] moveTransactionToCycle error:', error.message);
+  return { data, error };
+};
+
+/**
  * Soft delete a transaction.
  */
 export const deleteTransaction = async (transactionId) => {

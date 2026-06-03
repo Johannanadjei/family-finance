@@ -20,7 +20,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { getTransactionsByCycle, addTransaction as dbAddTransaction, updateTransaction as dbUpdateTransaction, deleteTransaction as dbDeleteTransaction } from '../services/transactions.service';
+import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
 import { getCyclesForCentre, createCalendarCycle } from '../services/cycles.service';
 import { getActiveCycle, sliceByCycle } from '../lib/cycles';
@@ -36,6 +36,7 @@ import {
 import { loadPrefs, saveThemeSkin as persistSkin, saveThemeAccent as persistAccent, saveNotifications as persistNotifs } from '../lib/storage';
 import { waitForSession } from '../lib/auth';
 import { useIncomeMutations } from './useIncomeMutations';
+import { useTransactionMutations } from './useTransactionMutations';
 
 export function useFinance({ centre, allCategories }) {
   const centreId      = centre?.id           || null;
@@ -241,72 +242,17 @@ export function useFinance({ centre, allCategories }) {
   }, [incomes]);
 
   // ── Transaction mutations ─────────────────────────────────────────────────
+  // Extracted to useTransactionMutations (symmetric with useIncomeMutations) to
+  // keep this hook within its size budget; state still lives here and is passed in
+  // with its setter. moveTransaction (Commit 12) re-homes a tx's cycle_id, preserving
+  // its date — see that file for the optimistic-remove + rollback implementation.
 
-  const addTransaction = useCallback(async (tx) => {
-    if (!centreId) return { data: null, error: new Error('No active budget centre') };
-
-    const tempId     = crypto.randomUUID();
-    const optimistic = {
-      ...tx,
-      id:               tempId,
-      budget_centre_id: centreId,
-      _optimistic:      true,
-    };
-
-    setTxs(prev => [optimistic, ...prev]);
-
-    const { data, error } = await dbAddTransaction(centreId, tx);
-
-    if (error) {
-      setTxs(prev => prev.filter(t => t.id !== tempId));
-      console.error('[useFinance] addTransaction rollback:', error.message);
-      return { data: null, error };
-    }
-
-    if (data) {
-      setTxs(prev => prev.map(t => t.id === tempId ? { ...data, _optimistic: false } : t));
-    } else {
-      // Insert succeeded but RLS blocked read-back — keep all optimistic field values,
-      // just clear the flag so the row is no longer dimmed/disabled.
-      setTxs(prev => prev.map(t => t.id === tempId ? { ...t, _optimistic: false } : t));
-    }
-    return { data, error: null };
-  }, [centreId]);
-
-  const updateTransaction = useCallback(async (transactionId, updates) => {
-    const prev = txs.find(t => t.id === transactionId);
-    if (!prev) return { data: null, error: new Error('Transaction not found') };
-
-    setTxs(prevTxs => prevTxs.map(t => t.id === transactionId ? { ...t, ...updates } : t));
-
-    const { data, error } = await dbUpdateTransaction(transactionId, updates);
-
-    if (error) {
-      setTxs(prevTxs => prevTxs.map(t => t.id === transactionId ? prev : t));
-      console.error('[useFinance] updateTransaction rollback:', error.message);
-      return { data: null, error };
-    }
-
-    setTxs(prevTxs => prevTxs.map(t => t.id === transactionId ? { ...data, _optimistic: false } : t));
-    return { data, error: null };
-  }, [txs]);
-
-  const deleteTransaction = useCallback(async (transactionId) => {
-    const prev = txs.find(t => t.id === transactionId);
-    if (!prev) return { error: new Error('Transaction not found') };
-
-    setTxs(prevTxs => prevTxs.filter(t => t.id !== transactionId));
-
-    const { error } = await dbDeleteTransaction(transactionId);
-
-    if (error) {
-      setTxs(prevTxs => [prev, ...prevTxs]);
-      console.error('[useFinance] deleteTransaction rollback:', error.message);
-      return { error };
-    }
-
-    return { error: null };
-  }, [txs]);
+  const {
+    addTransaction,
+    updateTransaction,
+    moveTransaction,
+    deleteTransaction,
+  } = useTransactionMutations({ centreId, txs, setTxs });
 
   // ── Income mutations ──────────────────────────────────────────────────────
   // Extracted to useIncomeMutations to keep this hook within its size budget;
@@ -414,6 +360,7 @@ export function useFinance({ centre, allCategories }) {
     // Transaction mutations
     addTransaction,
     updateTransaction,
+    moveTransaction,
     deleteTransaction,
 
     // Income mutations

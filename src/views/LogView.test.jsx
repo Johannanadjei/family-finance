@@ -27,6 +27,7 @@ const mockFinance = {
   loadCycle:         vi.fn(),
   deleteTransaction: vi.fn().mockResolvedValue({ error: null }),
   updateTransaction: vi.fn().mockResolvedValue({ error: null }),
+  moveTransaction:   vi.fn().mockResolvedValue({ data: {}, error: null }),
 };
 
 vi.mock('../context/FinanceContext', () => ({
@@ -153,5 +154,59 @@ describe('LogView — cycle navigation', () => {
     expect(screen.getByLabelText('Previous period').disabled).toBe(true);
     expect(screen.getByLabelText('Next period').disabled).toBe(false);
     reset();
+  });
+});
+
+// ── Move to period (Commit 12) ────────────────────────────────────────────────
+describe('LogView — move to period', () => {
+  // Clock frozen mid-May: MAY contains today (current), APR has ended (past).
+  const MAY = { id: 'cyc-may', name: 'May 2026',   start_date: '2026-05-01', end_date: '2026-05-31', deleted_at: null };
+  const APR = { id: 'cyc-apr', name: 'April 2026', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
+
+  beforeEach(() => {
+    mockCan = () => true;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-05-15T00:00:00Z'));
+    mockFinance.cycles = [MAY, APR];
+    mockFinance.activeCycle = MAY;
+    mockFinance.activeCycleId = null;
+    mockFinance.txs = mockTxs;
+    mockFinance.moveTransaction = vi.fn().mockResolvedValue({ data: {}, error: null });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    mockFinance.cycles = []; mockFinance.activeCycle = null; mockFinance.activeCycleId = null;
+  });
+
+  const openMoveSheet = () => {
+    renderView();
+    fireEvent.click(screen.getByTestId('tx-menu-tx-1'));
+    fireEvent.click(screen.getByTestId('tx-move-tx-1'));
+  };
+
+  it('kebab → "Move to period" opens the move sheet listing destination periods', () => {
+    openMoveSheet();
+    expect(screen.getByTestId('move-cycle-sheet')).toBeTruthy();
+    expect(screen.getByTestId('move-cycle-option-cyc-may')).toBeTruthy();
+    expect(screen.getByTestId('move-cycle-option-cyc-apr')).toBeTruthy();
+  });
+
+  it('moving to a current period calls moveTransaction immediately (no guard)', async () => {
+    openMoveSheet();
+    fireEvent.click(screen.getByTestId('move-cycle-option-cyc-may'));
+    fireEvent.click(screen.getByTestId('move-confirm-btn'));
+    await vi.waitFor(() => expect(mockFinance.moveTransaction).toHaveBeenCalledWith('tx-1', 'cyc-may'));
+    expect(screen.queryByText('Edit past period?')).toBeNull();
+  });
+
+  it('moving to a past period asks for confirmation before moving', async () => {
+    openMoveSheet();
+    fireEvent.click(screen.getByTestId('move-cycle-option-cyc-apr'));
+    fireEvent.click(screen.getByTestId('move-confirm-btn'));
+    const confirm = await screen.findByText('Edit past period?');
+    expect(confirm).toBeTruthy();
+    expect(mockFinance.moveTransaction).not.toHaveBeenCalled();   // held behind the guard
+    fireEvent.click(screen.getByText('Continue'));
+    await vi.waitFor(() => expect(mockFinance.moveTransaction).toHaveBeenCalledWith('tx-1', 'cyc-apr'));
   });
 });
