@@ -14,8 +14,10 @@
  *
  * Flow (Decision F2): on confirm, close the modal optimistically, then call resetPeriod.
  * On failure (CYC04 future-only / role-denied), surface a Toast — the modal API stays
- * minimal (no in-modal loading/error). On success the cycle is now empty and the
- * caller's cycles refresh (resetPeriod → reloadCycles) lets the empty-state UX take over.
+ * minimal (no in-modal loading/error). On success, resetPeriod has refreshed cycles + txs,
+ * but categories live in useBudgetCentre (a separate context), so we also call its
+ * reloadCategories — without it the wiped categories stay visible until a hard refresh.
+ * This hook bridges both contexts; that cross-context re-sync is the whole point.
  *
  * NOTE ON .jsx: returns JSX, so it lives in a .jsx file (same convention as
  * usePastPeriodGuard) — data-only hooks stay .js.
@@ -27,12 +29,14 @@
  */
 
 import { useState, useCallback } from 'react';
-import { useFinanceContext } from '../context/FinanceContext';
+import { useFinanceContext }      from '../context/FinanceContext';
+import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { ConfirmModal }       from '../components/ui/ConfirmModal';
 import { Toast }              from '../components/ui/Toast';
 
 export function useResetPeriod({ target, onClose }) {
-  const { resetPeriod } = useFinanceContext();
+  const { resetPeriod }      = useFinanceContext();
+  const { reloadCategories } = useBudgetCentreContext();
   const [errorToast, setErrorToast] = useState(null);
 
   const handleConfirm = useCallback(async () => {
@@ -40,8 +44,11 @@ export function useResetPeriod({ target, onClose }) {
     onClose();                         // optimistic close (Decision F2)
     if (!cycle) return;
     const { error } = await resetPeriod(cycle.id);
-    if (error) setErrorToast("Couldn't reset this period. Please try again.");
-  }, [target, onClose, resetPeriod]);
+    if (error) { setErrorToast("Couldn't reset this period. Please try again."); return; }
+    // resetPeriod refreshed cycles + txs; categories live in useBudgetCentre, so re-sync
+    // that stale slice here (cross-context bridge — see docs/engineering-decisions.md).
+    await reloadCategories();
+  }, [target, onClose, resetPeriod, reloadCategories]);
 
   const name = target?.name ?? 'this period';
 

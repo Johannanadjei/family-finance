@@ -10,8 +10,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useResetPeriod } from './useResetPeriod';
 
 let mockResetPeriod = vi.fn().mockResolvedValue({ data: { categories_reset: 0, transactions_reset: 0 }, error: null });
+let mockReloadCategories = vi.fn().mockResolvedValue(undefined);
 vi.mock('../context/FinanceContext', () => ({
   useFinanceContext: () => ({ resetPeriod: mockResetPeriod }),
+}));
+vi.mock('../context/BudgetCentreContext', () => ({
+  useBudgetCentreContext: () => ({ reloadCategories: mockReloadCategories }),
 }));
 
 const FUTURE = { id: 'cyc-future', name: 'August 2026', start_date: '2026-08-01', end_date: '2026-08-31' };
@@ -24,6 +28,7 @@ function Harness({ target, onClose }) {
 describe('useResetPeriod', () => {
   beforeEach(() => {
     mockResetPeriod = vi.fn().mockResolvedValue({ data: { categories_reset: 2, transactions_reset: 3 }, error: null });
+    mockReloadCategories = vi.fn().mockResolvedValue(undefined);
   });
 
   it('renders nothing when no target (modal closed)', () => {
@@ -55,7 +60,21 @@ describe('useResetPeriod', () => {
     await waitFor(() => expect(mockResetPeriod).toHaveBeenCalledWith('cyc-future'));
   });
 
-  it('surfaces an error toast when resetPeriod fails (CYC04 / 42501)', async () => {
+  it('re-syncs categories after a successful reset (the cache-coherency fix)', async () => {
+    render(<Harness target={FUTURE} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByText('Reset'));
+    await waitFor(() => expect(mockReloadCategories).toHaveBeenCalledTimes(1));
+  });
+
+  it('does NOT re-sync categories when the reset fails', async () => {
+    mockResetPeriod = vi.fn().mockResolvedValue({ data: null, error: { code: 'CYC04', message: 'cannot reset' } });
+    render(<Harness target={FUTURE} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByText('Reset'));
+    expect(await screen.findByText(/Couldn't reset this period/)).toBeTruthy();
+    expect(mockReloadCategories).not.toHaveBeenCalled();
+  });
+
+  it('surfaces an error toast when resetPeriod fails (CYC04 / role-denied)', async () => {
     mockResetPeriod = vi.fn().mockResolvedValue({ data: null, error: { code: 'CYC04', message: 'cannot reset' } });
     render(<Harness target={FUTURE} onClose={vi.fn()} />);
     fireEvent.click(screen.getByText('Reset'));

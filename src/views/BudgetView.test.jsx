@@ -17,6 +17,7 @@ const mockBudgetCentre = {
   centre:                  mockCentre,
   fmt:                     mockFmt,
   can:                     (p) => mockCan(p),
+  reloadCategories:        vi.fn().mockResolvedValue(undefined),   // post-reset re-sync
   allCategories:           mockCategories,                 // month === current month
   addCategory:             vi.fn().mockResolvedValue({ error: null }),
   getCatIcon:              (name) => name === 'Groceries' ? '🛒' : '🚗',

@@ -200,7 +200,7 @@ export default function App() {
   const [pinSkipped, setPinSkipped]                        = useState(false);
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
   const { centres, archivedCentres, plan: userPlan, reload: reloadCentres } = useCentres(user);
-  const { centre, allCategories, members, currentMemberRole,
+  const { centre, allCategories, reloadCategories, members, currentMemberRole,
           addCategory, updateCentre, updateCategory, deleteCategory,
           prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth,
           archiveCentre, permanentDeleteCentre, restoreHub,
@@ -347,6 +347,7 @@ export default function App() {
       centre={centre}
       categories={financeValues.categories}
       allCategories={allCategories}
+      reloadCategories={reloadCategories}
       members={members}
       currentMemberRole={currentMemberRole}
       currentUserId={user?.id || null}

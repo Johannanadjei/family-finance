@@ -167,6 +167,19 @@ export function useBudgetCentre(user, centreId) {
     load();
   }, [load]);
 
+  // Re-fetch ONLY the categories from the server (not the full centre/members reload).
+  // The reset-period flow (useResetPeriod) calls this after a server-authoritative wipe
+  // so the stale local allCategories cache re-syncs — a refetch, not an optimistic replay
+  // (cf. the dual-basis lesson). §12-safe: getAllCategories returns data:null on failure,
+  // so we skip the setState on error rather than blanking the list (worst case: the view
+  // stays stale until the next navigation, never wiped).
+  const reloadCategories = useCallback(async () => {
+    if (!centreId) return;
+    const { data, error } = await getAllCategories(centreId);
+    if (error) { console.error('[useBudgetCentre] reloadCategories error:', error.message); return; }
+    setAllCategories(data || []);
+  }, [centreId]);
+
   // ── Mutations ─────────────────────────────────────────────────────────────
 
   // `targetCycleId` is resolved by the caller (the view has the cycles list this
@@ -371,6 +384,7 @@ export function useBudgetCentre(user, centreId) {
     centre,
     centreId:            centre?.id || null,
     allCategories,
+    reloadCategories,
     members,
     currentMemberRole,
     loading,

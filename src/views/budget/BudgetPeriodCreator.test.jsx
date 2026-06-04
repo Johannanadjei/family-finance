@@ -15,6 +15,9 @@ import { BudgetPeriodCreator } from './BudgetPeriodCreator';
 const CYCLES = [{ id: 'jun', start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null }];
 let mockFinance;
 vi.mock('../../context/FinanceContext', () => ({ useFinanceContext: () => mockFinance }));
+// useResetPeriod (mounted here) reads reloadCategories from BudgetCentreContext.
+const mockReloadCategories = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../context/BudgetCentreContext', () => ({ useBudgetCentreContext: () => ({ reloadCategories: mockReloadCategories }) }));
 
 beforeEach(() => {
   mockFinance = {
