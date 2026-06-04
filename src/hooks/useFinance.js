@@ -130,7 +130,14 @@ export function useFinance({ centre, allCategories }) {
   // Loaded once per centre (keyed on centreId, NOT activeMonth) — cycles span the
   // whole hub, so month navigation must not refetch them.
   const loadCycles = useCallback(async () => {
-    if (!centreId) { setCycles([]); setCyclesLoading(false); return; }
+    // Null-centre pre-settle: useFinance mounts above App's auth/centre gates, so
+    // this fires once with centreId === null before the centre resolves. We must
+    // NOT flip cyclesLoading false here — leaving it at its initial true keeps the
+    // views' `if (cyclesLoading) return null` gate engaged so they never render a
+    // phantom empty/zero frame (NoCurrentPeriodPrompt + GHS 0) when the dashboard
+    // first mounts. Only a REAL loadCycles (valid centreId) settles the flag.
+    // See docs/engineering-decisions.md (cold-load flash post-mortem).
+    if (!centreId) { setCycles([]); return; }
     setCyclesLoading(true);
     const { error: sessionErr } = await waitForSession();
     if (sessionErr) {
@@ -325,6 +332,8 @@ export function useFinance({ centre, allCategories }) {
 
     // Cycles (Budget Cycles) — hub-scoped; views migrate to these in Commits 5-9
     cycles,
+    cyclesLoading,  // true until a real (valid-centre) loadCycles settles — views gate their
+                    // first paint on it so cycles resolve before any empty-state renders.
     activeCycle,
     activeCycleId,
     viewedCycleId,  // activeCycleId ?? activeCycle?.id — single source for the cycle-id fallback (Commit 14a)

@@ -44,7 +44,7 @@ function LogViewSkeleton() {
 
 export function LogView({ onEditTx }) {
   const { fmt, can, currentUserId }          = useBudgetCentreContext();
-  const { txs, loading, error,
+  const { txs, loading, cyclesLoading, error,
           activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle,
           deleteTransaction, moveTransaction } = useFinanceContext();
   const [filter,      setFilter]            = useState('all');
@@ -58,6 +58,9 @@ export function LogView({ onEditTx }) {
     useMoveToCycle({ txs, cycles, moveTransaction });
 
   if (!can('log')) return <AccessBlocked message="The transaction log is not available for your role." />;
+  // Hold first paint until cycles resolve — else the viewed-period filter/labels
+  // flash a stale or empty cycle before the current one loads (cold-load flash).
+  if (cyclesLoading) return null;
   if (loading) return <LogViewSkeleton />;
 
   // Viewed period: navigated cycle → auto-resolved current cycle → month fallback

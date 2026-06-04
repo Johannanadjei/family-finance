@@ -65,7 +65,7 @@ export function HomeView() {
     totalReceived, monthlyIncome, totalSpent, allIncome,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
     fixedTotal, spareMoney, budgetRemaining, txs,
-    loading, activeCycle, activeCycleId, loadCycle, cycles = [],
+    loading, cyclesLoading, activeCycle, activeCycleId, loadCycle, cycles = [],
   } = financeValues;
 
   // Home is the "now" dashboard — snap the shared period selection back to the
@@ -84,6 +84,9 @@ export function HomeView() {
     }
   }, [activeCycle?.id, activeCycleId]);
 
+  // Hold the first paint until cycles resolve — rendering now would flash
+  // NoCurrentPeriodPrompt + GHS 0 before the current period loads (cold-load flash).
+  if (cyclesLoading) return null;
   if (loading) return <HomeViewSkeleton />;
 
   const showIncome  = can('viewIncome');

@@ -115,6 +115,35 @@ describe('useFinance — cycles', () => {
     expect(getCyclesForCentre).toHaveBeenCalledWith('centre-1');
   });
 
+  // ── cyclesLoading flag (cold-load flash fix) ────────────────────────────────
+  // Gates every view's first paint so cycles resolve before any empty-state (e.g.
+  // NoCurrentPeriodPrompt) can render. See docs/engineering-decisions.md.
+  it('cyclesLoading starts true before the first load settles', () => {
+    const { result } = goCycles([CURRENT]);          // loadCycles is async — not yet resolved
+    expect(result.current.cyclesLoading).toBe(true);
+  });
+
+  it('cyclesLoading flips false after a real (valid-centre) loadCycles completes', async () => {
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cyclesLoading).toBe(false));
+    expect(result.current.cycles).toHaveLength(1);
+  });
+
+  // Regression lock for the Q3 amendment: useFinance mounts above App's centre gate,
+  // so loadCycles fires once with centreId === null. That branch must NOT settle the
+  // flag — leaving it true keeps the view gate engaged so no phantom empty frame paints
+  // when the dashboard finally mounts. `loading` settles false (null-centre contract),
+  // but cyclesLoading must stay true. Without the amendment this expectation fails.
+  it('cyclesLoading STAYS true while centreId is null (no pre-settle)', async () => {
+    getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
+    getIncomeSources.mockResolvedValue({ data: [], error: null });
+    getCyclesForCentre.mockResolvedValue({ data: [CURRENT], error: null });
+    const { result } = renderHook(() => useFinance({ centre: null, allCategories: [] }));
+    await waitFor(() => expect(result.current.loading).toBe(false));   // null-centre settles loading…
+    expect(result.current.cyclesLoading).toBe(true);                   // …but NOT cyclesLoading
+    expect(getCyclesForCentre).not.toHaveBeenCalled();                 // no real fetch fired
+  });
+
   it('derives activeCycle as the cycle containing today', async () => {
     const { result } = goCycles([PAST, CURRENT]);
     await waitFor(() => expect(result.current.activeCycle).toBeTruthy());

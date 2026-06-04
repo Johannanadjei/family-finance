@@ -3821,3 +3821,54 @@ landed at 195/200 as a thinner orchestrator.
   Users need *a* budget period to start; they do not need the system guessing their pay
   cycle. Create one obvious default (this calendar month), make it trivially editable,
   and stop. Defaults are a courtesy, not a model.
+
+---
+
+## [2026-06-04] Cold-load flash — `NoCurrentPeriodPrompt` + GHS 0 before cycles load
+
+**Symptom (lived-use, dev preview only):**
+Hard-refresh the dashboard → for ~200–500 ms Home rendered `NoCurrentPeriodPrompt`
+("No budget period for today") with every figure at GHS 0, then real data loaded and
+the prompt vanished. Budget showed the same; Payday/Daily/Log flashed empty/stale
+periods. Not present on production `main` (89a3249, pre-Phase-A).
+
+**Root cause:**
+`useFinance` is called at the top of `App.jsx` — *above* the auth/PIN/centre gates —
+so it runs through the gate phases while `centre` is still `null` (`centreId = null`).
+Two `!centreId` short-circuits then **pre-settled the hook to a false-empty state**:
+`load(null)` set `loading = false, loaded = true`, and `loadCycles`'s null-centre branch
+set `cyclesLoading = false` with `cycles = []`. The moment the centre gate opened and the
+views mounted, `loading` was already `false`, so each view's `if (loading) return <Skeleton>`
+was skipped and it painted the empty/zero state — including the Phase-B prompt — for the
+duration of the (now real) cycles refetch.
+
+Why it was newly *visible*: Phase A removed the auto-create effect that used to mask
+empty-cycle state, and Phase B added `NoCurrentPeriodPrompt` (a warning-bordered banner)
+that renders precisely in this window. The zero-frame was likely always there; Phase B
+turned it into an alarming banner. This is an **empty-array/stale-false vs. genuine-loading**
+confusion — the same family as the data-loss-on-refresh post-mortem.
+
+**Fix (all 5 views together — uniform regression, uniform fix):**
+1. Expose the already-existing `cyclesLoading` flag from `useFinance`'s return (it
+   flows through `FinanceContext`'s spread automatically — no context change).
+2. Gate every view's first paint: `if (cyclesLoading) return null;` ahead of the
+   existing `if (loading)` skeleton. Decision Q2: render **null**, not a skeleton —
+   a brief flash of nothing beats a flash of wrong content, at lower complexity.
+3. **Stop the null-centre pre-settle** (the actual bug): `loadCycles`'s `!centreId`
+   branch must NOT set `cyclesLoading = false`. Left at its initial `true`, the flag
+   keeps the view gate engaged until a *real* (valid-centre) `loadCycles` settles it,
+   so no phantom frame paints when the dashboard mounts. `load()`'s `loading`/`loaded`
+   semantics are untouched (the race-test contract is preserved).
+
+**The "green tests ≠ no flash" trap:**
+View tests mock `cyclesLoading` directly, so the null-centre pre-settle would never be
+caught by them — the gate would look correct while production still flashed. The lock is
+a hook-level regression test in `useFinance.test.js`: *"cyclesLoading STAYS true while
+centreId is null"*. Without the amendment it fails.
+
+**Rule derived:**
+- **A hook mounted above its gates must not report "settled-empty" during the pre-gate
+  null phase.** "No data yet because there's no context yet" is a *loading* state, not a
+  successful-empty one. Gate consumers on a flag that stays true until the first *real*
+  fetch (valid id) completes — and lock that with a hook-level test, because component
+  tests that mock the flag can't see the pre-settle.

@@ -16,6 +16,7 @@ vi.mock('../context/BudgetCentreContext', () => ({
 // Base finance context — overridden per test via mockFinance
 const mockFinance = {
   loading:        false,
+  cyclesLoading:  false,
   error:          null,
   incomes:        mockIncomes,
   allIncomes:     mockIncomes,
@@ -58,6 +59,13 @@ describe('PaydayView', () => {
     const { container } = renderView();
     expect(container.firstChild).toBeTruthy();
     mockFinance.loading = false;
+  });
+
+  it('renders nothing while cycles are loading (cold-load flash gate)', () => {
+    mockFinance.cyclesLoading = true;
+    const { container } = renderView();
+    expect(container.firstChild).toBeNull();
+    mockFinance.cyclesLoading = false;
   });
 
   it('shows period label', () => {

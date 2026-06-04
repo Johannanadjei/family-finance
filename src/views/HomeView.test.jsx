@@ -24,6 +24,7 @@ vi.mock('../context/BudgetCentreContext', () => ({
 
 const mockFinance = {
   loading:       false,
+  cyclesLoading: false,
   totalReceived: 30000,
   allIncome:      45000,
   monthlyIncome: 45000,
@@ -226,5 +227,30 @@ describe('HomeView', () => {
     fireEvent.click(screen.getByTestId('create-period-cta'));
     expect(mockNavigate).toHaveBeenCalledWith('/budget');
     mockFinance.cycles = undefined;
+  });
+
+  // ── Cold-load flash gate (cyclesLoading) ──────────────────────────────────────
+  it('renders nothing while cycles are loading', () => {
+    mockFinance.cyclesLoading = true;
+    const { container } = renderHome();
+    expect(container.firstChild).toBeNull();
+    mockFinance.cyclesLoading = false;
+  });
+
+  it('does NOT flash the no-current-period prompt while cycles are loading', () => {
+    // cycles=[] would normally show the prompt — the gate must suppress it until
+    // cycles resolve, so the cold-load flash never paints the banner.
+    mockFinance.cyclesLoading = true;
+    mockFinance.cycles = [];
+    renderHome();
+    expect(screen.queryByTestId('no-current-period-prompt')).toBeNull();
+    mockFinance.cyclesLoading = false;
+    mockFinance.cycles = undefined;
+  });
+
+  it('renders real content once cycles have loaded', () => {
+    mockFinance.cyclesLoading = false;
+    renderHome();
+    expect(screen.getByTestId('home-month-label')).toBeTruthy();
   });
 });

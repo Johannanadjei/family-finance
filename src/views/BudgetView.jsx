@@ -46,7 +46,7 @@ function BudgetViewSkeleton() {
 
 export function BudgetView() {
   const { allCategories = [], fmt, addCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth } = useBudgetCentreContext();
-  const { txs, loading, error, activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle } = useFinanceContext();
+  const { txs, loading, cyclesLoading, error, activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle } = useFinanceContext();
   const [sheetOpen,     setSheetOpen]     = useState(false);
   const [periodOpen,    setPeriodOpen]    = useState(false);   // Phase B: budget-period creator
   const [copySheetOpen, setCopySheetOpen] = useState(false);   // 2C: multi-select rollforward sheet
@@ -96,6 +96,9 @@ export function BudgetView() {
     setCopiedCount(data?.length || 0);
   };
 
+  // Hold first paint until cycles resolve — else BudgetPeriodCreator's
+  // NoCurrentPeriodPrompt + empty categories flash before the period loads.
+  if (cyclesLoading) return null;
   if (loading) return <BudgetViewSkeleton />;
 
   const rows = viewedCategories
