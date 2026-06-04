@@ -7,11 +7,12 @@ vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markRe
 vi.mock('../services/cycles.service', () => ({
   getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }),
   createBudgetPeriod: vi.fn().mockResolvedValue({ data: { id: 'cyc-new' }, error: null }),
+  resetBudgetPeriod: vi.fn().mockResolvedValue({ data: { categories_reset: 0, transactions_reset: 0, cycle_id: 'cyc-cur' }, error: null }),
 }));
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
 import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
-import { getCyclesForCentre, createBudgetPeriod } from '../services/cycles.service';
+import { getCyclesForCentre, createBudgetPeriod, resetBudgetPeriod } from '../services/cycles.service';
 import { getCurrentMonth, getToday } from '../lib/dates';
 import { calcTotalFixed } from '../lib/finance';
 const C = { id:'centre-1', currency:'GHS', surplus_target:4500 };
@@ -216,5 +217,37 @@ describe('useFinance — cycles', () => {
     expect(ret.error.code).toBe('CYC01');
     expect(getCyclesForCentre).not.toHaveBeenCalled();   // no refresh on failure
     expect(result.current.activeCycleId).toBeNull();
+  });
+
+  // ── resetPeriod (reset budget period) ────────────────────────────────────────
+  it('resetPeriod calls the service then refreshes cycles, returning the counts', async () => {
+    const counts = { categories_reset: 2, transactions_reset: 4, cycle_id: 'cyc-cur' };
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
+
+    resetBudgetPeriod.mockResolvedValue({ data: counts, error: null });
+    getCyclesForCentre.mockClear();
+    getCyclesForCentre.mockResolvedValue({ data: [CURRENT], error: null });   // refresh after reset
+
+    let ret;
+    await act(async () => { ret = await result.current.resetPeriod('cyc-cur'); });
+
+    expect(resetBudgetPeriod).toHaveBeenCalledWith('cyc-cur');
+    expect(ret.data).toEqual(counts);
+    await waitFor(() => expect(getCyclesForCentre).toHaveBeenCalled());   // reloadCycles ran
+  });
+
+  it('resetPeriod surfaces the service error and does NOT refresh', async () => {
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
+
+    resetBudgetPeriod.mockResolvedValue({ data: null, error: { code: 'CYC04', message: 'cannot reset' } });
+    getCyclesForCentre.mockClear();
+
+    let ret;
+    await act(async () => { ret = await result.current.resetPeriod('cyc-cur'); });
+
+    expect(ret.error.code).toBe('CYC04');
+    expect(getCyclesForCentre).not.toHaveBeenCalled();   // no refresh on failure
   });
 });

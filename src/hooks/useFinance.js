@@ -22,7 +22,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
-import { getCyclesForCentre, createBudgetPeriod } from '../services/cycles.service';
+import { getCyclesForCentre, createBudgetPeriod, resetBudgetPeriod } from '../services/cycles.service';
 import { getActiveCycle, sliceByCycle } from '../lib/cycles';
 import { getToday } from '../lib/dates';
 import {
@@ -294,6 +294,17 @@ export function useFinance({ centre, allCategories }) {
     return { data, error: null };
   }, [centreId, loadCycles]);
 
+  // Reset a FUTURE budget period: the RPC soft-deletes its categories + transactions
+  // (cycle row untouched), then we re-fetch so the now-empty period re-derives its
+  // slices and the empty-state UX takes over. The service gates on owner/full_access
+  // (role-denied) and future-only (CYC04) — errors pass straight through to the caller's UI.
+  const resetPeriod = useCallback(async (cycleId) => {
+    const { data, error } = await resetBudgetPeriod(cycleId);
+    if (error) return { data: null, error };
+    await loadCycles();
+    return { data, error: null };
+  }, [loadCycles]);
+
   // ── Reload ────────────────────────────────────────────────────────────────
 
   // Re-fetch the currently-viewed cycle. Resolves the cid via the same viewedCycle
@@ -340,6 +351,7 @@ export function useFinance({ centre, allCategories }) {
     loadCycle,
     reloadCycles: loadCycles,
     createPeriod,
+    resetPeriod,
 
     // Derived financial values
     monthlyIncome,

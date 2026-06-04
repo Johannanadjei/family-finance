@@ -99,3 +99,20 @@ export const createBudgetPeriod = async (centreId, { name = null, startDate, end
   if (error) { console.error('[cycles.service] createBudgetPeriod error:', error.message); return { data: null, error }; }
   return { data, error: null };
 };
+
+/**
+ * Reset a FUTURE budget period: soft-delete its categories + transactions, leaving the
+ * cycle row itself intact (it becomes empty → existing empty-state UX takes over).
+ * Wraps the reset_budget_period SECURITY DEFINER RPC (scripts/migrate_18…sql): the
+ * server gates on owner/full_access role, enforces future-only (CYC04 otherwise), and
+ * returns the wipe counts.
+ *
+ * @param {string} cycleId — the budget_cycles id to reset.
+ * @returns {Promise<{ data: { categories_reset: number, transactions_reset: number, cycle_id: string }|null, error: any }>}
+ */
+export const resetBudgetPeriod = async (cycleId) => {
+  const { data, error } = await supabase.rpc('reset_budget_period', { p_cycle_id: cycleId });
+
+  if (error) { console.error('[cycles.service] resetBudgetPeriod error:', error.message); return { data: null, error }; }
+  return { data, error: null };
+};

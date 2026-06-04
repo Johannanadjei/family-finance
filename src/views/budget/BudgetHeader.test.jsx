@@ -17,6 +17,9 @@ const base = {
   onPrev:      () => {},
   onNext:      () => {},
   onNewPeriod: () => {},
+  canManage:   true,        // owner/full_access by default; standard-member tests flip this
+  isFuture:    false,
+  onReset:     () => {},
 };
 
 describe('BudgetHeader', () => {
@@ -47,5 +50,41 @@ describe('BudgetHeader', () => {
     render(<BudgetHeader {...base} onNewPeriod={onNewPeriod} />);
     fireEvent.click(screen.getByTestId('new-period-btn'));
     expect(onNewPeriod).toHaveBeenCalledTimes(1);
+  });
+
+  // ── RBAC gate: standard members see both controls but disabled ────────────────
+  it('disables the New budget period button when canManage is false', () => {
+    const onNewPeriod = vi.fn();
+    render(<BudgetHeader {...base} canManage={false} onNewPeriod={onNewPeriod} />);
+    const btn = screen.getByTestId('new-period-btn');
+    expect(btn.disabled).toBe(true);
+    fireEvent.click(btn);
+    expect(onNewPeriod).not.toHaveBeenCalled();
+  });
+
+  // ── Reset kebab (future periods only) ─────────────────────────────────────────
+  it('hides the period-actions kebab for non-future periods', () => {
+    render(<BudgetHeader {...base} isFuture={false} />);
+    expect(screen.queryByTestId('period-actions-btn')).toBeNull();
+  });
+
+  it('shows the kebab for future periods; opening reveals Reset which fires onReset', () => {
+    const onReset = vi.fn();
+    render(<BudgetHeader {...base} isFuture onReset={onReset} />);
+    fireEvent.click(screen.getByTestId('period-actions-btn'));
+    const resetItem = screen.getByTestId('reset-period-btn');
+    expect(resetItem).toBeTruthy();
+    fireEvent.click(resetItem);
+    expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables the Reset item when canManage is false', () => {
+    const onReset = vi.fn();
+    render(<BudgetHeader {...base} isFuture canManage={false} onReset={onReset} />);
+    fireEvent.click(screen.getByTestId('period-actions-btn'));
+    const resetItem = screen.getByTestId('reset-period-btn');
+    expect(resetItem.disabled).toBe(true);
+    fireEvent.click(resetItem);
+    expect(onReset).not.toHaveBeenCalled();
   });
 });

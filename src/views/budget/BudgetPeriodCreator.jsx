@@ -20,14 +20,20 @@
  * @param {boolean}  isOpen
  * @param {function} onOpenChange    — (next: boolean) => void; lifted open state
  * @param {function} onCopyRequested — open the parent's CopyCategoriesSheet
+ * @param {object|null} resetCycle   — the cycle to reset (lifted from BudgetHeader's kebab), or null
+ * @param {function} onResetDone     — clear the lifted resetCycle (Cancel / after firing)
  */
 
 import { useFinanceContext }       from '../../context/FinanceContext';
+import { useResetPeriod }          from '../../hooks/useResetPeriod';
 import { NoCurrentPeriodPrompt }   from '../../components/NoCurrentPeriodPrompt';
 import { CreateBudgetPeriodSheet } from './CreateBudgetPeriodSheet';
 
-export function BudgetPeriodCreator({ isOpen, onOpenChange, onCopyRequested }) {
+export function BudgetPeriodCreator({ isOpen, onOpenChange, onCopyRequested, resetCycle = null, onResetDone }) {
   const { cycles = [], createPeriod } = useFinanceContext();
+  // Reset-period confirm + toast. Controlled by the lifted `resetCycle` (the kebab that
+  // opens it lives in BudgetHeader, a sibling) — same lift pattern as the create flag.
+  const { resetModal } = useResetPeriod({ target: resetCycle, onClose: onResetDone });
 
   const handleCreatePeriod = async ({ copyPrevious, ...range }) => {
     const { error } = await createPeriod(range);
@@ -45,6 +51,7 @@ export function BudgetPeriodCreator({ isOpen, onOpenChange, onCopyRequested }) {
         onClose={() => onOpenChange(false)}
         onCreate={handleCreatePeriod}
       />
+      {resetModal}
     </>
   );
 }

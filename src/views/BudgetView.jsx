@@ -17,8 +17,7 @@ import { getCurrentMonth, offsetMonth, calcTotalFixed, calcCategorySpend, calcFi
 import { formatMonth, getToday }  from '../lib/dates';
 import { getCycleNav }            from '../lib/cycles';
 import { Skeleton }               from '../components/ui/Skeleton';
-import { CategoryBudgetRow }      from './budget/CategoryBudgetRow';
-import { BudgetEmptyState }       from './budget/BudgetEmptyState';
+import { BudgetCategoryList }     from './budget/BudgetCategoryList';
 import { BudgetHeader }           from './budget/BudgetHeader';
 import { BudgetPeriodCreator }    from './budget/BudgetPeriodCreator';
 import { BudgetSheets }           from './budget/BudgetSheets';
@@ -45,7 +44,7 @@ function BudgetViewSkeleton() {
 }
 
 export function BudgetView() {
-  const { allCategories = [], fmt, addCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth } = useBudgetCentreContext();
+  const { allCategories = [], fmt, can, addCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth } = useBudgetCentreContext();
   const { txs, loading, cyclesLoading, error, activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle } = useFinanceContext();
   const [sheetOpen,     setSheetOpen]     = useState(false);
   const [periodOpen,    setPeriodOpen]    = useState(false);   // Phase B: budget-period creator
@@ -53,6 +52,7 @@ export function BudgetView() {
   const [copying,       setCopying]       = useState(false);
   const [copyError,     setCopyError]     = useState(null);
   const [copiedCount,   setCopiedCount]   = useState(0);       // >0 → success toast
+  const [resetCycle,    setResetCycle]    = useState(null);    // reset-period target (future only)
 
   // Viewed period: navigated cycle → auto-resolved current cycle → month fallback.
   const today        = getToday();
@@ -60,6 +60,7 @@ export function BudgetView() {
   const nav          = getCycleNav(cycles, viewedCycle?.id ?? null);
   const viewedMonth  = viewedCycle ? viewedCycle.start_date.slice(0, 7) : activeMonth;
   const isPast       = viewedCycle ? viewedCycle.end_date < today : viewedMonth < getCurrentMonth();
+  const isFuture     = viewedCycle ? viewedCycle.start_date > today : false;   // reset is future-only
   const periodLabel  = viewedCycle?.name ?? formatMonth(activeMonth);
 
   // Plan + spend derive from the VIEWED cycle. Local filter of allCategories by
@@ -101,15 +102,6 @@ export function BudgetView() {
   if (cyclesLoading) return null;
   if (loading) return <BudgetViewSkeleton />;
 
-  const rows = viewedCategories
-    .map(cat => {
-      const spent     = categorySpend[cat.name] || 0;
-      const remaining = cat.budget_amount - spent;
-      const pctUsed   = cat.budget_amount > 0 ? Math.min(100, Math.round((spent / cat.budget_amount) * 100)) : 0;
-      return { ...cat, spent, remaining, pctUsed, overBudget: spent > cat.budget_amount };
-    })
-    .sort((a, b) => b.pctUsed - a.pctUsed);
-
   return (
     <div style={{ padding: '16px' }}>
 
@@ -123,12 +115,17 @@ export function BudgetView() {
         onPrev={() => nav.prev && loadCycle(nav.prev.id)}
         onNext={() => nav.next && loadCycle(nav.next.id)}
         onNewPeriod={() => setPeriodOpen(true)}
+        canManage={can('manageCycles')}
+        isFuture={isFuture}
+        onReset={() => setResetCycle(viewedCycle)}
       />
 
       <BudgetPeriodCreator
         isOpen={periodOpen}
         onOpenChange={setPeriodOpen}
         onCopyRequested={() => { setCopyError(null); setCopySheetOpen(true); }}
+        resetCycle={resetCycle}
+        onResetDone={() => setResetCycle(null)}
       />
 
       {/* Error state */}
@@ -138,43 +135,22 @@ export function BudgetView() {
         </div>
       )}
 
-      {/* Category list — empty viewed cycle offers a rollforward from the previous cycle */}
-      {viewedCategories.length === 0 ? (
-        <BudgetEmptyState
-          monthLabel={periodLabel}
-          lastMonthLabel={prevPeriodLabel}
-          prevCategoryCount={prevMonthCategories.length}
-          onCopyAll={() => requestMutation(() => handleCopy(undefined))}
-          onChooseWhich={() => { setCopyError(null); requestMutation(() => setCopySheetOpen(true)); }}
-          onAddManually={() => requestMutation(() => setSheetOpen(true))}
-          copying={copying}
-          copyError={copyError}
-        />
-      ) : (
-        <div style={{ background: 'var(--c-card, #fff)', borderRadius: 16, padding: '0 16px', boxShadow: 'var(--c-shadow)' }}>
-          {rows.map(row => (
-            <CategoryBudgetRow
-              key={row.id}
-              category={row}
-              spent={row.spent}
-              remaining={row.remaining}
-              pctUsed={row.pctUsed}
-              overBudget={row.overBudget}
-              fmt={fmt}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Add category button — hidden when empty (BudgetEmptyState owns the add CTA) */}
-      {viewedCategories.length > 0 && (
-        <button
-          onClick={() => requestMutation(() => setSheetOpen(true))}
-          style={{ width: '100%', padding: '14px', borderRadius: 12, border: '2px dashed var(--c-primary, #064e3b)', background: 'transparent', color: 'var(--c-primary, #064e3b)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginTop: 24, marginBottom: 16 }}
-        >
-          + Add budget category
-        </button>
-      )}
+      {/* Category body — rows (sorted) + add button, or the empty rollforward state.
+          Extracted to BudgetCategoryList; actions are guarded via requestMutation here. */}
+      <BudgetCategoryList
+        categories={viewedCategories}
+        categorySpend={categorySpend}
+        fmt={fmt}
+        periodLabel={periodLabel}
+        prevPeriodLabel={prevPeriodLabel}
+        prevCategoryCount={prevMonthCategories.length}
+        copying={copying}
+        copyError={copyError}
+        onCopyAll={() => requestMutation(() => handleCopy(undefined))}
+        onChooseWhich={() => { setCopyError(null); requestMutation(() => setCopySheetOpen(true)); }}
+        onAddManually={() => requestMutation(() => setSheetOpen(true))}
+        onAddCategory={() => requestMutation(() => setSheetOpen(true))}
+      />
 
       <BudgetSheets
         addOpen={sheetOpen}

@@ -3872,3 +3872,98 @@ centreId is null"*. Without the amendment it fails.
   successful-empty one. Gate consumers on a flag that stays true until the first *real*
   fetch (valid id) completes — and lock that with a hook-level test, because component
   tests that mock the flag can't see the pre-settle.
+
+---
+
+## [2026-06-04] Reset budget period + standard-member RBAC gate
+
+**Feature:** an owner/full_access user can RESET a FUTURE budget period — soft-delete all
+its categories + transactions while leaving the cycle row itself intact, so the period
+goes empty and the existing rollforward/empty-state UX takes over. No follow-up
+assign-or-delete prompt (full wipe, simple UX). Standard members SEE the controls but
+they're disabled.
+
+**Server (`migrate_18_reset_budget_period.sql`):** `reset_budget_period(p_cycle_id uuid)
+RETURNS jsonb {categories_reset, transactions_reset, cycle_id}`, SECURITY DEFINER, mirrors
+create_budget_period's contract. Resolves centre + start_date from the cycle, gates on an
+active owner/full_access membership (role-denied SQLSTATE otherwise), then enforces
+FUTURE-ONLY: `start_date > (now() AT TIME ZONE 'UTC')::date` — the server twin of the
+client's `getToday()` isFuture check — raising the new **SQLSTATE `CYC04`** (parallels
+CYC01 overlap / CYC03 year) for a past/current period. Two soft-delete UPDATEs
+(`deleted_at = now() WHERE cycle_id = … AND deleted_at IS NULL`) with `GET DIAGNOSTICS`
+counts; idempotent; self-verifying DO block. **Purely additive** (no DROP) → per
+`[[single-supabase-project]]` it runs in the SQL Editor anytime after the dev commit, no
+promotion coordination.
+
+**Client:** `resetBudgetPeriod` service wrapper → `useFinance.resetPeriod` (RPC then
+`reloadCycles()` to re-derive the now-empty slices) → `useResetPeriod` hook owning the
+confirm + error Toast. The kebab lives in `BudgetHeader` (future-only, mirrors
+TransactionRow's Commit-12 three-dot pattern); the confirm modal is hosted by
+`BudgetPeriodCreator` (the period-management cluster). They're siblings, so the trigger is
+a **lifted `resetCycle`** in BudgetView — the same lift pattern as `periodOpen`.
+
+**Decisions that shaped it:**
+- **Reused `ConfirmModal`, didn't fork it.** Added one backward-compatible optional prop
+  `confirmTone='danger'` (red confirm button); the past-period-guard consumer is untouched
+  because it defaults to primary. One modal component, not a bespoke ResetConfirmModal.
+- **`can('manageCycles')` was the gate — and it already existed.** The permission key was
+  in the `PERMISSIONS` map (owner/full_access true, standard false) since the RBAC build
+  but had never been wired to a `can()` call; this is its first real consumer. No
+  roles.js change. Both the "+ New budget period" button (previously always-enabled — a
+  latent gap) and the new Reset item disable on `!can('manageCycles')`; the RPC's
+  role-denied is belt-and-suspenders.
+- **Error surfacing via Toast, not in-modal.** The modal closes optimistically on confirm;
+  a CYC04/role-denied failure raises a Toast. Keeps the ConfirmModal API minimal.
+- **Cap pressure → extraction, not compression (3rd time).** Reset wiring would have pushed
+  BudgetView from 198 to ~206. Per the standing rule (cf. PaydaySheets, BudgetSheets), the
+  category body — rows + empty-state + add-button — was extracted to `BudgetCategoryList`;
+  BudgetView landed at 174, then absorbed the reset wiring comfortably.
+
+**Audit gotcha worth remembering:** the "no hardcoded 5+ digit amounts" check (audit §I)
+greps source for 5-digit runs and **can't tell a comment from code** — a bare `42501`
+(the Postgres role-denied SQLSTATE) in three explanatory comments failed the audit. Fixed
+by wording it "role-denied" in JS and keeping the numeric code only in the SQL migration
+(scripts/ isn't scanned). Don't put 5-digit error codes in JS comments.
+
+**Rule derived:**
+- **Wire the gate at the destructure, not just the call site.** Adding `can('manageCycles')`
+  meant adding `can` to BudgetView's context destructure AND `can` to its test mock — the
+  §9.5 checklist item that tests-passing alone won't catch (an undefined `can` throws only
+  at the call). First use of a long-dormant permission key is exactly where this bites.
+
+---
+
+## [2026-06-04] Reset cache-coherency — a mutation must refresh state in EVERY context it touched
+
+**Symptom (lived-use):** tapping Reset on a future period closed the modal but left the 19
+categories on screen — only a hard browser refresh showed the empty state. Supabase
+confirmed the RPC ran correctly (19 categories soft-deleted, cycle intact).
+
+**Root cause:** `reset_budget_period` wipes rows across two slices that live in TWO different
+client hooks. `useFinance.resetPeriod` called `loadCycles()`, which refreshed `cycles` and —
+via the `cyclesLoading` toggle re-firing the gated loader — `txs`. But **categories
+(`allCategories`) live in `useBudgetCentre`**, keyed on `[user, centreId]`; nothing in the
+reset path re-fetched them, so the stale local copies (still `deleted_at: null`) kept
+rendering. Transactions refreshed, categories didn't — same wipe, two owners, one refreshed.
+
+**Fix:** added `reloadCategories()` to `useBudgetCentre` (a targeted `getAllCategories`
+refetch, **not** the full centre/members reload) and called it from `useResetPeriod` on the
+reset success branch. The hook now reads BOTH contexts — `useFinanceContext().resetPeriod`
+and `useBudgetCentreContext().reloadCategories` — and bridges them. We chose a **refetch over
+an optimistic local replay**: reset is a rare, server-authoritative full wipe of N rows in
+one transaction; replaying the soft-delete client-side would duplicate server logic and risk
+the dual-basis drift Bug 4 taught us to avoid. §12-safe: `reloadCategories` skips the
+`setState` on a fetch error (logs + returns) rather than blanking the list to `[]`.
+
+**Wiring note:** `BudgetCentreContext` is an EXPLICIT provider (named props + a `value`
+useMemo with a deps array), NOT a spread like `FinanceContext`. So exposing `reloadCategories`
+took four touches — `useBudgetCentre` return, the Provider's param list, its `value` object,
+and the `useMemo` deps — plus the `App.jsx` destructure + prop. A spread context would have
+been one line; an explicit one is five. Know which kind you're extending before estimating.
+
+**Rule derived:**
+- **A mutation must refresh state in every context it touched — not just the one it was
+  called from.** When a server op spans slices owned by different hooks (txs in useFinance,
+  categories in useBudgetCentre), refreshing one and assuming the rest follow is the bug.
+  The orchestrating hook bridges the contexts and re-syncs each. Transactions refreshing
+  "for free" (via an unrelated loader toggle) is the trap — it makes the gap look fixed.

@@ -33,7 +33,7 @@ vi.mock('../lib/supabase', () => {
 });
 
 import {
-  getCyclesForCentre, getCycleForDate, getCycleById, createBudgetPeriod,
+  getCyclesForCentre, getCycleForDate, getCycleById, createBudgetPeriod, resetBudgetPeriod,
 } from './cycles.service';
 
 const mockCycle = {
@@ -144,6 +144,32 @@ describe('createBudgetPeriod', () => {
   it('surfaces the RLS/role-denied error (42501) truthfully', async () => {
     mockRpc.mockResolvedValue({ data: null, error: { code: '42501', message: 'not an owner' } });
     const { data, error } = await createBudgetPeriod('c-1', { name: 'X', startDate: '2026-09-01', endDate: '2026-09-30' });
+    expect(data).toBeNull();
+    expect(error.code).toBe('42501');
+  });
+});
+
+// ── resetBudgetPeriod ───────────────────────────────────────────────────────
+describe('resetBudgetPeriod', () => {
+  it('calls the reset_budget_period RPC with the cycle id and returns the counts', async () => {
+    const counts = { categories_reset: 3, transactions_reset: 5, cycle_id: 'cyc-future' };
+    mockRpc.mockResolvedValue({ data: counts, error: null });
+    const { data, error } = await resetBudgetPeriod('cyc-future');
+    expect(mockRpc).toHaveBeenCalledWith('reset_budget_period', { p_cycle_id: 'cyc-future' });
+    expect(data).toEqual(counts);
+    expect(error).toBeNull();
+  });
+
+  it('returns data:null + error when the RPC errors (e.g. CYC04 past/current period)', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: 'CYC04', message: 'cannot reset' } });
+    const { data, error } = await resetBudgetPeriod('cyc-current');
+    expect(data).toBeNull();
+    expect(error).toEqual({ code: 'CYC04', message: 'cannot reset' });
+  });
+
+  it('surfaces the RLS/role-denied error (42501) truthfully', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: '42501', message: 'not an owner' } });
+    const { data, error } = await resetBudgetPeriod('cyc-future');
     expect(data).toBeNull();
     expect(error.code).toBe('42501');
   });

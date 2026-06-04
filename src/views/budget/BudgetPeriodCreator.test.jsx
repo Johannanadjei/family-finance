@@ -15,12 +15,19 @@ import { BudgetPeriodCreator } from './BudgetPeriodCreator';
 const CYCLES = [{ id: 'jun', start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null }];
 let mockFinance;
 vi.mock('../../context/FinanceContext', () => ({ useFinanceContext: () => mockFinance }));
+// useResetPeriod (mounted here) reads reloadCategories from BudgetCentreContext.
+const mockReloadCategories = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../context/BudgetCentreContext', () => ({ useBudgetCentreContext: () => ({ reloadCategories: mockReloadCategories }) }));
 
 beforeEach(() => {
-  mockFinance = { cycles: CYCLES, createPeriod: vi.fn().mockResolvedValue({ data: { id: 'new' }, error: null }) };
+  mockFinance = {
+    cycles: CYCLES,
+    createPeriod: vi.fn().mockResolvedValue({ data: { id: 'new' }, error: null }),
+    resetPeriod: vi.fn().mockResolvedValue({ data: { categories_reset: 0, transactions_reset: 0 }, error: null }),
+  };
 });
 
-const base = { isOpen: false, onOpenChange: vi.fn(), onCopyRequested: vi.fn() };
+const base = { isOpen: false, onOpenChange: vi.fn(), onCopyRequested: vi.fn(), resetCycle: null, onResetDone: vi.fn() };
 const renderIt = (props = {}) => render(<BudgetPeriodCreator {...base} {...props} />);
 
 describe('BudgetPeriodCreator', () => {
@@ -64,5 +71,25 @@ describe('BudgetPeriodCreator', () => {
     await waitFor(() => expect(mockFinance.createPeriod).toHaveBeenCalled());
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(onCopyRequested).not.toHaveBeenCalled();
+  });
+
+  // ── Reset modal (hosted here, triggered by BudgetHeader's lifted resetCycle) ──
+  it('does not show the reset confirm when resetCycle is null', () => {
+    renderIt({ resetCycle: null });
+    expect(screen.queryByText(/^Reset /)).toBeNull();
+  });
+
+  it('shows the reset confirm naming the cycle when resetCycle is set', () => {
+    renderIt({ resetCycle: { id: 'jul', name: 'July 2026', start_date: '2026-07-01', end_date: '2026-07-31' } });
+    expect(screen.getByText('Reset July 2026?')).toBeTruthy();
+    expect(screen.getByText('Reset')).toBeTruthy();
+  });
+
+  it('confirming the reset calls resetPeriod with the cycle id and clears the target', async () => {
+    const onResetDone = vi.fn();
+    renderIt({ resetCycle: { id: 'jul', name: 'July 2026', start_date: '2026-07-01', end_date: '2026-07-31' }, onResetDone });
+    fireEvent.click(screen.getByText('Reset'));
+    expect(onResetDone).toHaveBeenCalledTimes(1);   // optimistic close
+    await waitFor(() => expect(mockFinance.resetPeriod).toHaveBeenCalledWith('jul'));
   });
 });
