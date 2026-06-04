@@ -17,7 +17,7 @@ vi.mock('../../lib/supabase', () => ({
   },
 }));
 vi.mock('../../services/centres.service', () => ({
-  createCentre: vi.fn().mockResolvedValue({ data: { id: 'c-new', cycle_anchor_type: 'calendar', cycle_anchor_day: null }, error: null }),
+  createCentre: vi.fn().mockResolvedValue({ data: { id: 'c-new' }, error: null }),
 }));
 vi.mock('../../services/categories.service', () => ({
   bulkAddCategories: vi.fn().mockResolvedValue({ error: null }),
@@ -26,12 +26,11 @@ vi.mock('../../services/income.service', () => ({
   bulkAddIncomeSources: vi.fn().mockResolvedValue({ error: null }),
 }));
 vi.mock('../../services/cycles.service', () => ({
-  createCycleByAnchor: vi.fn().mockResolvedValue({ data: { id: 'cyc-new' }, error: null }),
-  getCyclesForCentre:  vi.fn().mockResolvedValue({ data: [], error: null }),
+  createBudgetPeriod: vi.fn().mockResolvedValue({ data: { id: 'cyc-new' }, error: null }),
 }));
 
 import { createCentre }        from '../../services/centres.service';
-import { createCycleByAnchor }  from '../../services/cycles.service';
+import { createBudgetPeriod }   from '../../services/cycles.service';
 import { bulkAddCategories }    from '../../services/categories.service';
 import { bulkAddIncomeSources } from '../../services/income.service';
 
@@ -46,14 +45,20 @@ const walkToConfirm = () => {
   fireEvent.click(screen.getByText('Continue →'));     // step 3 (target) → 4
 };
 
+// Phase B (anchor pivot): onboarding creates the hub's first budget period via the
+// user-driven create_budget_period RPC (a calendar-month default for today, Decision Q3)
+// BEFORE bulk-inserting categories/income, and stamps those rows with the new cycle id.
 describe('OnboardingFlow — first-cycle CYC02 closure', () => {
-  it('creates the first cycle before bulk-inserting, stamped with its id', async () => {
+  it('creates the first budget period before bulk-inserting, stamped with its id', async () => {
     render(<OnboardingFlow onComplete={vi.fn()} />);
     walkToConfirm();
     await act(async () => { fireEvent.click(screen.getByText(/Create BOS Hub/)); });
 
-    expect(createCentre).toHaveBeenCalledWith(expect.objectContaining({ cycle_anchor_type: 'calendar', cycle_anchor_day: null }));
-    expect(createCycleByAnchor).toHaveBeenCalledWith('c-new', expect.objectContaining({ anchor_type: 'calendar' }));
+    expect(createCentre).toHaveBeenCalledWith(expect.objectContaining({ name: 'My Hub' }));
+    expect(createBudgetPeriod).toHaveBeenCalledWith('c-new', expect.objectContaining({
+      startDate: expect.stringMatching(/^\d{4}-\d{2}-01$/),   // first of a calendar month
+      endDate:   expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    }));
     expect(bulkAddCategories).toHaveBeenCalledWith('c-new', expect.anything(), 'cyc-new');
     expect(bulkAddIncomeSources).toHaveBeenCalledWith('c-new', expect.anything(), 'cyc-new');
   });
@@ -66,9 +71,8 @@ describe('OnboardingFlow — first-cycle CYC02 closure', () => {
     expect(onComplete).toHaveBeenCalled();
   });
 
-  it('aborts before bulk insert when the first cycle cannot be created or resolved', async () => {
-    createCycleByAnchor.mockResolvedValueOnce({ data: null, error: { code: 'CYC01', message: 'overlap' } });
-    // getCyclesForCentre default mock returns [] → no active cycle resolvable → abort
+  it('aborts before bulk insert when the first period cannot be created', async () => {
+    createBudgetPeriod.mockResolvedValueOnce({ data: null, error: { code: 'CYC01', message: 'overlap' } });
     render(<OnboardingFlow onComplete={vi.fn()} />);
     walkToConfirm();
     await act(async () => { fireEvent.click(screen.getByText(/Create BOS Hub/)); });

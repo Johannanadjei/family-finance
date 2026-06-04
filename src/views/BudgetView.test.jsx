@@ -36,6 +36,7 @@ const THIS_CYCLE = { id: 'cyc-this', name: CM_LABEL, start_date: CM + '-01', end
 
 const mockFinance = {
   loading:       false,
+  cyclesLoading: false,
   error:         null,
   txs:           mockTxs,             // one Groceries expense (200) + one income
   activeMonth:   getCurrentMonth(),
@@ -151,6 +152,39 @@ describe('BudgetView', () => {
     fireEvent.click(screen.getByTestId('choose-which-categories-btn'));
     expect(screen.getByTestId('copy-categories-sheet')).toBeTruthy();
     resetCats();
+  });
+
+  // ── Phase B period creator ────────────────────────────────────────────────
+  it('the always-visible header button opens the budget-period creator', () => {
+    renderView();
+    expect(screen.queryByTestId('create-period-sheet')).toBeNull();
+    fireEvent.click(screen.getByTestId('new-period-btn'));
+    expect(screen.getByTestId('create-period-sheet')).toBeTruthy();
+  });
+
+  it('hides the no-current-period prompt while a live cycle covers today', () => {
+    renderView();   // default mockFinance has the current-month cycle
+    expect(screen.queryByTestId('no-current-period-prompt')).toBeNull();
+  });
+
+  // ── Cold-load flash gate (cyclesLoading) ──────────────────────────────────────
+  it('renders nothing while cycles are loading', () => {
+    mockFinance.cyclesLoading = true;
+    const { container } = renderView();
+    expect(container.firstChild).toBeNull();
+    mockFinance.cyclesLoading = false;
+  });
+
+  it('does NOT flash the period creator while cycles are loading', () => {
+    // No cycles yet — BudgetPeriodCreator would mount NoCurrentPeriodPrompt; the gate
+    // must suppress the whole view so neither the prompt nor empty categories flash.
+    mockFinance.cyclesLoading = true;
+    mockFinance.cycles = [];
+    renderView();
+    expect(screen.queryByTestId('no-current-period-prompt')).toBeNull();
+    expect(screen.queryByTestId('new-period-btn')).toBeNull();
+    mockFinance.cyclesLoading = false;
+    mockFinance.cycles = [THIS_CYCLE];
   });
 });
 

@@ -42,7 +42,7 @@ function DailyViewSkeleton() {
 export function DailyView() {
   const { fmt, can }                         = useBudgetCentreContext();
   const { txs, totalSpent, weeklyData,
-          loading, error, activeMonth,
+          loading, cyclesLoading, error, activeMonth,
           cycles = [], activeCycle, activeCycleId, loadCycle,
           deleteTransaction, moveTransaction } = useFinanceContext();
   const [deletingId,  setDeletingId]         = useState(null);
@@ -53,6 +53,9 @@ export function DailyView() {
           openMove, closeMove, confirmMove, moveGuardModal } =
     useMoveToCycle({ txs, cycles, moveTransaction });
 
+  // Hold first paint until cycles resolve — else the viewed period / weekly bar
+  // flash a stale or empty cycle before the current one loads (cold-load flash).
+  if (cyclesLoading) return null;
   if (loading) return <DailyViewSkeleton />;
 
   // Viewed period: navigated cycle → auto-resolved current cycle → month fallback

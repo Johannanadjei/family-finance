@@ -8,12 +8,14 @@
  */
 
 import { useState, useEffect }    from 'react';
+import { useNavigate }            from 'react-router-dom';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { getCurrentMonth }        from '../lib/finance';
 import { formatMonth }            from '../lib/dates';
 import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { Skeleton }               from '../components/ui/Skeleton';
+import { NoCurrentPeriodPrompt }  from '../components/NoCurrentPeriodPrompt';
 import { MonthlyIncomeCard }      from './home/MonthlyIncomeCard';
 import { BudgetHealthBar }        from './home/BudgetHealthBar';
 import { PaydaySummaryCard }      from './home/PaydaySummaryCard';
@@ -56,13 +58,14 @@ function HomeViewSkeleton() {
 export function HomeView() {
   const { fmt, can }    = useBudgetCentreContext();
   const financeValues   = useFinanceContext();
+  const navigate        = useNavigate();
   const [activeInfo, setActiveInfo] = useState(null);
 
   const {
     totalReceived, monthlyIncome, totalSpent, allIncome,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
     fixedTotal, spareMoney, budgetRemaining, txs,
-    loading, activeCycle, activeCycleId, loadCycle,
+    loading, cyclesLoading, activeCycle, activeCycleId, loadCycle, cycles = [],
   } = financeValues;
 
   // Home is the "now" dashboard — snap the shared period selection back to the
@@ -81,6 +84,9 @@ export function HomeView() {
     }
   }, [activeCycle?.id, activeCycleId]);
 
+  // Hold the first paint until cycles resolve — rendering now would flash
+  // NoCurrentPeriodPrompt + GHS 0 before the current period loads (cold-load flash).
+  if (cyclesLoading) return null;
   if (loading) return <HomeViewSkeleton />;
 
   const showIncome  = can('viewIncome');
@@ -88,6 +94,10 @@ export function HomeView() {
 
   return (
     <div style={{ padding: '16px' }}>
+
+      {/* Passive prompt — only when no live period covers today; CTA routes to Budget,
+          where the period creator lives (the sheet is mounted there, not on Home). */}
+      <NoCurrentPeriodPrompt cycles={cycles} onCreate={() => navigate('/budget')} />
 
       {/* Period label — the current cycle's name, ungated (visible without viewIncome).
           Home always shows "now", so this is the active cycle, never a navigable label. */}

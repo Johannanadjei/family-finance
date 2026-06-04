@@ -4,11 +4,14 @@ import { useFinance } from './useFinance';
 vi.mock('../lib/auth', () => ({ waitForSession: vi.fn().mockResolvedValue({ data: { session: { expires_at: 9999999999 } }, error: null }), warnOnEmptyColdLoad: vi.fn(), sessionAgeMs: vi.fn(() => 0) }));
 vi.mock('../services/transactions.service', () => ({ getTransactionsByCycle: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn(), moveTransactionToCycle: vi.fn() }));
 vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn() }));
-vi.mock('../services/cycles.service', () => ({ getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }), createCycleByAnchor: vi.fn().mockResolvedValue({ data: null, error: null }) }));
+vi.mock('../services/cycles.service', () => ({
+  getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }),
+  createBudgetPeriod: vi.fn().mockResolvedValue({ data: { id: 'cyc-new' }, error: null }),
+}));
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
 import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
-import { getCyclesForCentre, createCycleByAnchor } from '../services/cycles.service';
+import { getCyclesForCentre, createBudgetPeriod } from '../services/cycles.service';
 import { getCurrentMonth, getToday } from '../lib/dates';
 import { calcTotalFixed } from '../lib/finance';
 const C = { id:'centre-1', currency:'GHS', surplus_target:4500 };
@@ -112,51 +115,44 @@ describe('useFinance — cycles', () => {
     expect(getCyclesForCentre).toHaveBeenCalledWith('centre-1');
   });
 
+  // ── cyclesLoading flag (cold-load flash fix) ────────────────────────────────
+  // Gates every view's first paint so cycles resolve before any empty-state (e.g.
+  // NoCurrentPeriodPrompt) can render. See docs/engineering-decisions.md.
+  it('cyclesLoading starts true before the first load settles', () => {
+    const { result } = goCycles([CURRENT]);          // loadCycles is async — not yet resolved
+    expect(result.current.cyclesLoading).toBe(true);
+  });
+
+  it('cyclesLoading flips false after a real (valid-centre) loadCycles completes', async () => {
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cyclesLoading).toBe(false));
+    expect(result.current.cycles).toHaveLength(1);
+  });
+
+  // Regression lock for the Q3 amendment: useFinance mounts above App's centre gate,
+  // so loadCycles fires once with centreId === null. That branch must NOT settle the
+  // flag — leaving it true keeps the view gate engaged so no phantom empty frame paints
+  // when the dashboard finally mounts. `loading` settles false (null-centre contract),
+  // but cyclesLoading must stay true. Without the amendment this expectation fails.
+  it('cyclesLoading STAYS true while centreId is null (no pre-settle)', async () => {
+    getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
+    getIncomeSources.mockResolvedValue({ data: [], error: null });
+    getCyclesForCentre.mockResolvedValue({ data: [CURRENT], error: null });
+    const { result } = renderHook(() => useFinance({ centre: null, allCategories: [] }));
+    await waitFor(() => expect(result.current.loading).toBe(false));   // null-centre settles loading…
+    expect(result.current.cyclesLoading).toBe(true);                   // …but NOT cyclesLoading
+    expect(getCyclesForCentre).not.toHaveBeenCalled();                 // no real fetch fired
+  });
+
   it('derives activeCycle as the cycle containing today', async () => {
     const { result } = goCycles([PAST, CURRENT]);
     await waitFor(() => expect(result.current.activeCycle).toBeTruthy());
     expect(result.current.activeCycle.id).toBe('cyc-cur');
   });
 
-  it('auto-creates the next cycle (anchor-aware) when today falls in a gap', async () => {
-    createCycleByAnchor.mockResolvedValue({ data: CURRENT, error: null });
-    const { result } = goCycles([PAST]);   // no cycle covers today; PAST is the most recent
-    // calendar anchor (C has no cycle_anchor_type), reference = PAST.end + 1.
-    await waitFor(() => expect(createCycleByAnchor).toHaveBeenCalledWith(
-      'centre-1',
-      expect.objectContaining({ anchor_type: 'calendar', reference_date: '2000-02-01' }),
-    ));
-    expect(result.current.error).toBeNull();   // auto-create never surfaces to the UI
-  });
-
-  it('auto-creates the first cycle for a hub with NO cycles (relaxed guard, reference = today)', async () => {
-    createCycleByAnchor.mockResolvedValue({ data: CURRENT, error: null });
-    goCycles([]);   // brand-new hub, zero cycles — the dropped length===0 guard lets this fire
-    await waitFor(() => expect(createCycleByAnchor).toHaveBeenCalledWith(
-      'centre-1',
-      expect.objectContaining({ anchor_type: 'calendar', reference_date: TODAY }),
-    ));
-  });
-
-  it('does NOT auto-create when a current cycle already exists', async () => {
-    const { result } = goCycles([CURRENT]);
-    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
-    expect(createCycleByAnchor).not.toHaveBeenCalled();
-  });
-
-  it('handles a CYC01 race by refetching without surfacing an error', async () => {
-    getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
-    getIncomeSources.mockResolvedValue({ data: [], error: null });
-    getCyclesForCentre
-      .mockResolvedValueOnce({ data: [PAST], error: null })          // gap → triggers auto-create
-      .mockResolvedValue({ data: [PAST, CURRENT], error: null });    // another client won → refetch sees current
-    createCycleByAnchor.mockResolvedValue({ data: null, error: { code: 'CYC01', message: 'A cycle already exists' } });
-
-    const { result } = renderHook(() => useFinance({ centre: C, allCategories: CATS }));
-    await waitFor(() => expect(createCycleByAnchor).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(result.current.activeCycle?.id).toBe('cyc-cur'));
-    expect(result.current.error).toBeNull();
-  });
+  // Anchor-aware auto-create + its CYC01-race handling were removed in Phase A of the
+  // anchor pivot (budget periods become user-driven in Phase B). Their tests went with
+  // them. See engineering-decisions.md.
 
   it('exposes a working reloadCycles', async () => {
     const { result } = goCycles([CURRENT]);
@@ -186,6 +182,39 @@ describe('useFinance — cycles', () => {
     let ret;
     await act(async () => { ret = result.current.loadCycle('nope'); });
     expect(ret).toBeNull();
+    expect(result.current.activeCycleId).toBeNull();
+  });
+
+  // ── createPeriod (Phase B) ──────────────────────────────────────────────────
+  it('createPeriod calls the service, refreshes cycles, and selects the new period', async () => {
+    const NEW = { id:'cyc-new', budget_centre_id:'centre-1', name:'July 2026', start_date:'2026-07-01', end_date:'2026-07-31', anchor_type:'custom', deleted_at:null };
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
+
+    createBudgetPeriod.mockResolvedValue({ data: NEW, error: null });
+    getCyclesForCentre.mockResolvedValue({ data: [CURRENT, NEW], error: null });   // refresh sees the new period
+
+    let ret;
+    await act(async () => { ret = await result.current.createPeriod({ name: 'July 2026', startDate: '2026-07-01', endDate: '2026-07-31' }); });
+
+    expect(createBudgetPeriod).toHaveBeenCalledWith('centre-1', { name: 'July 2026', startDate: '2026-07-01', endDate: '2026-07-31' });
+    expect(ret.data.id).toBe('cyc-new');
+    await waitFor(() => expect(result.current.cycles).toHaveLength(2));            // reloadCycles ran
+    expect(result.current.activeCycleId).toBe('cyc-new');                          // new period selected
+  });
+
+  it('createPeriod surfaces the service error and does NOT refresh or select', async () => {
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
+
+    createBudgetPeriod.mockResolvedValue({ data: null, error: { code: 'CYC01', message: 'overlap' } });
+    getCyclesForCentre.mockClear();
+
+    let ret;
+    await act(async () => { ret = await result.current.createPeriod({ startDate: '2026-07-01', endDate: '2026-07-31' }); });
+
+    expect(ret.error.code).toBe('CYC01');
+    expect(getCyclesForCentre).not.toHaveBeenCalled();   // no refresh on failure
     expect(result.current.activeCycleId).toBeNull();
   });
 });

@@ -75,4 +75,26 @@ describe('CopyCategoriesSheet', () => {
     render(<CopyCategoriesSheet {...base} copying />);
     expect(screen.getByTestId('copy-categories-selected-btn').textContent).toBe('Copying…');
   });
+
+  it('shows "Deselect all" when everything is selected, and clears on click', () => {
+    render(<CopyCategoriesSheet {...base} />);
+    const toggleAll = screen.getByTestId('copy-categories-toggle-all-btn');
+    expect(toggleAll.textContent).toBe('Deselect all');
+    fireEvent.click(toggleAll);
+    expect(screen.getByTestId('copy-categories-selected-btn').textContent).toBe('Select at least one');
+    expect(toggleAll.textContent).toBe('Select all');
+  });
+
+  it('re-selects every category from the empty state via "Select all"', () => {
+    render(<CopyCategoriesSheet {...base} />);
+    fireEvent.click(screen.getByTestId('copy-categories-toggle-all-btn')); // → deselect all
+    fireEvent.click(screen.getByTestId('copy-categories-toggle-all-btn')); // → select all
+    expect(screen.getByTestId('copy-categories-selected-btn').textContent).toBe('Copy 3 selected');
+  });
+
+  it('shows "Select all" after a manual de-selection makes it partial', () => {
+    render(<CopyCategoriesSheet {...base} />);
+    fireEvent.click(screen.getByTestId('copy-category-pcat-3')); // partial selection
+    expect(screen.getByTestId('copy-categories-toggle-all-btn').textContent).toBe('Select all');
+  });
 });

@@ -41,6 +41,8 @@ export function CopyCategoriesSheet({ isOpen, onClose, lastMonthLabel, categorie
   });
 
   const count    = selected.size;
+  const allOn    = count === categories.length && count > 0;
+  const toggleAll = () => setSelected(allOn ? new Set() : new Set(categories.map(c => c.id)));
   const disabled = copying || count === 0;
 
   return createPortal(
@@ -64,9 +66,23 @@ export function CopyCategoriesSheet({ isOpen, onClose, lastMonthLabel, categorie
         <p style={{ fontSize: 18, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 4px' }}>
           Copy from {lastMonthLabel}
         </p>
-        <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: '0 0 20px' }}>
+        <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: '0 0 12px' }}>
           Pick the budget categories to carry into this month.
         </p>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <button
+            data-testid="copy-categories-toggle-all-btn"
+            onClick={toggleAll}
+            style={{
+              background: 'none', border: 'none', padding: '4px 2px', cursor: 'pointer',
+              fontSize: 13, fontWeight: 800, color: 'var(--c-primary, #064e3b)',
+              fontFamily: "'Nunito', sans-serif",
+            }}
+          >
+            {allOn ? 'Deselect all' : 'Select all'}
+          </button>
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
           {categories.map(cat => {

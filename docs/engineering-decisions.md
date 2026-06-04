@@ -3677,3 +3677,198 @@ BEFORE this commit deploys (SQL first, code second — same sequencing as 14b). 
 order is RPC re-create → data-repair UPDATE → verification; `cycle_majority_name`
 already exists from 14b, so the UPDATE can call it. `CREATE OR REPLACE` preserves the
 grant; signature, columns, CHECKs, and helpers are untouched.
+
+---
+
+## [2026-06-03] Anchor pivot, Phase A — remove the budget-cycle anchor-types scaffolding
+
+**Context:**
+Commit 14b introduced configurable budget-cycle *anchor types* — `calendar`,
+`fixed_day`, `last_working_day`, `last_day_of_month` — so a hub's cycles could be
+pinned to a payday rather than the calendar month. It shipped working (1289 tests),
+but it took three follow-up bug fixes to stabilise (dual-basis range CYC03, the
+naming corruption Bug 4, and the anchor RPC dual-basis fix). After actually living in
+the app, the conclusion was that the whole model was overengineered. AJ's framing:
+**"the app is about budgeting, not about when someone gets paid."** A household sets a
+monthly budget; the *period* it runs over is a simple thing the user should state
+directly, not a four-way anchor taxonomy with month-boundary arithmetic, forward-only
+clamps, leap-year edge cases, and a server/client twin to keep in lockstep. The
+complexity existed to model a need the user never expressed in those terms.
+
+**Decision:**
+Pivot to user-driven budget periods. Phase A (this commit) strips the anchor-types
+scaffolding back to the stable cycle core. Phase B will add a simple user-driven
+creation flow. We keep everything the cycle system is genuinely built on and cut only
+the anchor layer bolted on top.
+
+**What's KEPT (the cycle core is sound — only the anchor layer was wrong):**
+- `budget_cycles` table + all rows; `cycle_id` stamping triggers (Commit 10)
+- GiST no-overlap exclusion constraint; soft-delete columns
+- `budget_cycles.anchor_type` column (historical/audit — a *different* column on a
+  different table from the dropped `budget_centres.cycle_anchor_type`)
+- `cycle_majority_name()` SQL helper (Phase B naming will reuse it)
+- Move-transaction-to-cycle (Commit 12), budget rollforward + selective copy,
+  per-view cycle-keyed reads (`sliceByCycle` / `getCycleNav` / `cycleIdForMonth`)
+- Every bug fix shipped along the 14a/14b path (dual-basis, Bug 4, etc.) and all
+  prior engineering-decisions entries
+
+**What's CUT:**
+- DB: `budget_centres.cycle_anchor_type` + `cycle_anchor_day` columns and their CHECK
+  constraints; `create_cycle_by_anchor()` RPC; `cycle_anchored_day()` helper
+- JS: `anchorToDateRange` / `cycleDefaultName` / `computeNextCycleParams` +
+  their private helpers in `lib/cycles.js`; `createCycleByAnchor` in
+  `cycles.service.js`; the anchor whitelist in `centres.service.js`; the **auto-create
+  cycle effect** in `useFinance.js` (no more silent gap-filling); `CYCLE_ANCHOR_OPTIONS`
+- UI: `BudgetCycleSection` (Settings) deleted; the "Configure budget cycle" disclosure
+  removed from onboarding `StepCentre`
+
+**Deferred to Phase B:**
+- A user-driven `create_budget_period` RPC + UI (the named replacement for
+  `create_cycle_by_anchor`)
+- An end-of-period prompt to roll into the next period
+- A quick-create shortcut
+
+**Known, intentional breakage (Phase A only):** with `createCycleByAnchor` gone, the
+first-period step in both `OnboardingFlow` and `CreateHubSheet` now throws
+`'Phase B not yet implemented: create_budget_period RPC + UI ...'` on purpose — a
+deliberate, greppable failure. **New-hub creation and onboarding therefore cannot
+complete until Phase B.** Acceptable pre-launch (existing test hub already set up, no
+real users). The app loads cleanly otherwise; the throw fires only on attempted period
+creation. Affected tests are `.skip`ped with a `TODO(Phase B)` pointing here.
+
+**Migration:** `scripts/migrate_15_remove_anchor_columns.sql` is committed to `dev`
+alongside this code but is **NOT executed in Supabase yet**. Under the new branch model
+(dev → staging → main), running the drops now would break production, which still runs
+the 14b code off `main` that references the dropped objects. Execution is deferred to
+the promotion: run the SQL in Supabase, then dev → staging → verify → staging → main.
+The migration self-verifies (single BEGIN/COMMIT, idempotent `IF EXISTS` drops, a
+final assertion block that rolls back on any wrong post-state, and a `budget_cycles`
+row-count guard).
+
+**Rule derived:**
+- **Architectural complexity should match the user's mental model. When users describe
+  their need in simpler terms than the architecture, the architecture is wrong** — not
+  the user. The anchor taxonomy was a sophisticated answer to a question
+  ("budget monthly") that was never that complicated. Tests passing and bugs fixed do
+  not redeem a model the user doesn't think in. Strip back to the core; let the real
+  need (stated plainly) drive Phase B.
+
+## [2026-06-04] Anchor pivot, Phase B — user-driven budget periods (`create_budget_period`)
+
+Phase A stripped the anchor-types scaffolding and left new-hub/onboarding period
+creation throwing a deliberate `'Phase B not yet implemented'`. Phase B is the
+replacement: the user owns budget periods directly. No anchor maths, no payday
+taxonomy — you pick a window, the server validates and stores it.
+
+**What shipped:**
+- **`create_budget_period(p_centre_id uuid, p_name text, p_start_date date, p_end_date date)`**
+  — `SECURITY DEFINER` RPC (`scripts/migrate_16_create_budget_period.sql`). Gates on
+  `role IN ('owner','full_access')` (the DB twin of `can(role,'manageCycles')`, matching
+  the `budget_cycles` RLS write policy), validates `start <= end`, inserts
+  `anchor_type='custom'` (anchor_day NULL), and traps the GiST `no_overlapping_cycles`
+  violation as the friendly `CYC01` SQLSTATE. **Committed, not run** — executes at
+  promotion time right AFTER `migrate_15` (drops), then dev → staging → main.
+- **Name is server-authoritative-fallback:** a non-empty `p_name` is honoured; blank
+  falls back to `cycle_majority_name(start,end)` — the helper deliberately KEPT by
+  `migrate_15` precisely for this. (The old Bug-4 lesson stands: the server owns any
+  name that depends on server state. Here the client may legitimately name a custom
+  period, so we honour it but never let blank through to a NULL/garbage name.)
+- **`createBudgetPeriod` service** wraps the RPC (`{data,error}`, truthful errors).
+- **`useFinance.createPeriod`** mutation: calls the service, then `reloadCycles()` +
+  selects the new period (`setActiveCycleId`). This is what flips the passive prompt
+  off and lands the views on the fresh window. Errors pass straight through; no refresh
+  on failure. (Catch 3 from planning: `reloadCycles` was already exposed as
+  `loadCycles`; `createPeriod` is the proper home for the refresh, so views never
+  import the service.)
+- **`lib/cycles.js`** gained two pure range builders: `currentCalendarMonthRange(today)`
+  (first-cycle default — the calendar month CONTAINING today; hub created June 28 →
+  June 1–30, Decision Q3) and `nextCalendarMonthRange(cycles, today)` (quick-create —
+  day after the latest live cycle's end, guaranteeing no overlap; falls back to the
+  current month when there are no cycles). These use UTC `Date` for month-end maths —
+  the only Date use in a file whose date *pickers* are deliberately string-only.
+- **`CreateBudgetPeriodSheet`** — two-mode creator: "Next calendar month" (one tap,
+  auto-fills + saves) and "Custom period" (name + three-field DD/MM/YYYY start/end +
+  "copy from previous" toggle). The (i) copy reads: *"A budget period is your spending
+  window — usually a month, but you choose."*
+- **`NoCurrentPeriodPrompt`** — passive, persistent (not dismissable, Decision Q2)
+  banner shown ONLY when `getCycleContainingDate(cycles, today) === null`. Mounted on
+  Home (CTA → routes to Budget) and Budget (CTA → opens the creator). Centralises the
+  visibility rule so neither view duplicates it.
+- **`CopyCategoriesSheet`** gained the Select-all / Deselect-all toggle (the folded-in
+  cosmetic backlog item). Categories only — `CopyIncomeSheet` left as-is (income counts
+  are tiny; YAGNI, Decision Q5).
+- First-cycle auto-create restored in `OnboardingFlow` + `CreateHubSheet` via
+  `createBudgetPeriod(currentCalendarMonthRange(today))`. The 5 `.skip`ped Phase-A
+  tests were **rewritten** (not just un-skipped) to assert the new RPC + return shape;
+  every `createCycleByAnchor` / `cycle_anchor_type` assertion is gone.
+
+**Why auto-create on new hub is NOT a regression of the anchor model's gap-filling:**
+the old `useFinance` effect silently invented cycles whenever the clock crossed a
+boundary — opaque, and the source of the dual-basis and naming bugs. This is a
+one-shot "a hub needs at least one period to stamp into" default at creation time,
+with the user in full control afterward (edit/replace from Budget). One deterministic
+write at a known moment ≠ an ambient effect racing the clock.
+
+**BudgetView cap (Catch 2):** BudgetView was at 198/200 before Phase B and could not
+absorb the prompt + creator + handler. Per the pre-agreed rule (extract, never
+compress), the period UI moved to `BudgetPeriodCreator` (prompt + sheet + create
+handler, reads cycles/createPeriod from context) and the pre-existing modal mounts
+(add-category, copy-categories, success toast) moved to a `BudgetSheets` host. BudgetView
+landed at 195/200 as a thinner orchestrator.
+
+**Rule derived:**
+- **A "sensible default that exists" beats both an empty void and a clever auto-pilot.**
+  Users need *a* budget period to start; they do not need the system guessing their pay
+  cycle. Create one obvious default (this calendar month), make it trivially editable,
+  and stop. Defaults are a courtesy, not a model.
+
+---
+
+## [2026-06-04] Cold-load flash — `NoCurrentPeriodPrompt` + GHS 0 before cycles load
+
+**Symptom (lived-use, dev preview only):**
+Hard-refresh the dashboard → for ~200–500 ms Home rendered `NoCurrentPeriodPrompt`
+("No budget period for today") with every figure at GHS 0, then real data loaded and
+the prompt vanished. Budget showed the same; Payday/Daily/Log flashed empty/stale
+periods. Not present on production `main` (89a3249, pre-Phase-A).
+
+**Root cause:**
+`useFinance` is called at the top of `App.jsx` — *above* the auth/PIN/centre gates —
+so it runs through the gate phases while `centre` is still `null` (`centreId = null`).
+Two `!centreId` short-circuits then **pre-settled the hook to a false-empty state**:
+`load(null)` set `loading = false, loaded = true`, and `loadCycles`'s null-centre branch
+set `cyclesLoading = false` with `cycles = []`. The moment the centre gate opened and the
+views mounted, `loading` was already `false`, so each view's `if (loading) return <Skeleton>`
+was skipped and it painted the empty/zero state — including the Phase-B prompt — for the
+duration of the (now real) cycles refetch.
+
+Why it was newly *visible*: Phase A removed the auto-create effect that used to mask
+empty-cycle state, and Phase B added `NoCurrentPeriodPrompt` (a warning-bordered banner)
+that renders precisely in this window. The zero-frame was likely always there; Phase B
+turned it into an alarming banner. This is an **empty-array/stale-false vs. genuine-loading**
+confusion — the same family as the data-loss-on-refresh post-mortem.
+
+**Fix (all 5 views together — uniform regression, uniform fix):**
+1. Expose the already-existing `cyclesLoading` flag from `useFinance`'s return (it
+   flows through `FinanceContext`'s spread automatically — no context change).
+2. Gate every view's first paint: `if (cyclesLoading) return null;` ahead of the
+   existing `if (loading)` skeleton. Decision Q2: render **null**, not a skeleton —
+   a brief flash of nothing beats a flash of wrong content, at lower complexity.
+3. **Stop the null-centre pre-settle** (the actual bug): `loadCycles`'s `!centreId`
+   branch must NOT set `cyclesLoading = false`. Left at its initial `true`, the flag
+   keeps the view gate engaged until a *real* (valid-centre) `loadCycles` settles it,
+   so no phantom frame paints when the dashboard mounts. `load()`'s `loading`/`loaded`
+   semantics are untouched (the race-test contract is preserved).
+
+**The "green tests ≠ no flash" trap:**
+View tests mock `cyclesLoading` directly, so the null-centre pre-settle would never be
+caught by them — the gate would look correct while production still flashed. The lock is
+a hook-level regression test in `useFinance.test.js`: *"cyclesLoading STAYS true while
+centreId is null"*. Without the amendment it fails.
+
+**Rule derived:**
+- **A hook mounted above its gates must not report "settled-empty" during the pre-gate
+  null phase.** "No data yet because there's no context yet" is a *loading* state, not a
+  successful-empty one. Gate consumers on a flag that stays true until the first *real*
+  fetch (valid id) completes — and lock that with a hook-level test, because component
+  tests that mock the flag can't see the pre-settle.

@@ -16,6 +16,7 @@ vi.mock('../context/BudgetCentreContext', () => ({
 
 const mockFinance = {
   loading:           false,
+  cyclesLoading:     false,
   error:             null,
   txs:               mockTxs,
   totalSpent:        200,
@@ -51,6 +52,13 @@ describe('DailyView', () => {
     const { container } = renderView();
     expect(container.firstChild).toBeTruthy();
     mockFinance.loading = false;
+  });
+
+  it('renders nothing while cycles are loading (cold-load flash gate)', () => {
+    mockFinance.cyclesLoading = true;
+    const { container } = renderView();
+    expect(container.firstChild).toBeNull();
+    mockFinance.cyclesLoading = false;
   });
 
   it('shows period label', () => {
