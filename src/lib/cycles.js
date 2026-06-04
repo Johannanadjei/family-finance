@@ -127,12 +127,6 @@ function monthLabel(startStr) {
   return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
-// The day after a 'YYYY-MM-DD' date, as 'YYYY-MM-DD'.
-function nextDay(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
-}
-
 /**
  * The calendar month CONTAINING `today` — the sensible first-period default for a
  * brand-new hub (Decision Q3: hub created June 28 → 'June 1 – June 30'). No cycle
@@ -150,21 +144,37 @@ export function currentCalendarMonthRange(today) {
 
 /**
  * The NEXT budget period to offer from the quick-create button: the calendar month
- * immediately after the hub's latest live cycle (start = day after its end). With no
- * cycles yet it falls back to the current calendar month. Start = day-after-latest
- * guarantees the range never overlaps an existing cycle (GiST / CYC01).
+ * immediately AFTER the month containing `today`. History-INDEPENDENT (Phase 2 fix
+ * for Bug 1): always today + 1 calendar month — never anchored on existing cycle data,
+ * so stray future cycles can't drag the suggestion years out of range. Returns null
+ * when next month would cross into next year (the December case), signalling the
+ * caller to DISABLE quick-create rather than offer a cross-year period (the year
+ * constraint — see isWithinCurrentYear and the create_budget_period CYC03 check).
  *
- * @param {Array<{ start_date: string, end_date: string, deleted_at?: string|null }>} cycles
- * @param {string} today — 'YYYY-MM-DD'
- * @returns {{ start: string, end: string, name: string }}
+ * @param {string} today — 'YYYY-MM-DD' (default: UTC today, matching lib/dates.getToday)
+ * @returns {{ start: string, end: string, name: string }|null}
  */
-export function nextCalendarMonthRange(cycles, today) {
-  const latestEnd = cycles
-    .filter(c => !c.deleted_at)
-    .reduce((max, c) => (max === null || c.end_date.localeCompare(max) > 0 ? c.end_date : max), null);
-  if (!latestEnd) return currentCalendarMonthRange(today);
+export function nextCalendarMonthRange(today = new Date().toISOString().slice(0, 10)) {
+  const [y, m] = today.split('-').map(Number);   // m is 1-based
+  if (m === 12) return null;                       // next month is next year → blocked
+  const nm    = m + 1;                             // next month, same year, still 1-based
+  const start = `${y}-${String(nm).padStart(2, '0')}-01`;
+  return { start, end: monthEnd(y, nm - 1), name: monthLabel(start) };
+}
 
-  const start  = nextDay(latestEnd);
-  const [y, m] = start.split('-').map(Number);
-  return { start, end: monthEnd(y, m - 1), name: monthLabel(start) };
+/**
+ * True when both `startDate` and `endDate` fall within the same calendar year as
+ * `today`. String-based year extraction (slice 0–4) — no Date object, no timezone
+ * drift, matching the string-compare convention of the pickers above. The client gate
+ * for the custom-period year constraint; its server twin is the create_budget_period
+ * CYC03 check.
+ *
+ * @param {string} startDate — 'YYYY-MM-DD'
+ * @param {string} endDate   — 'YYYY-MM-DD'
+ * @param {string} today     — 'YYYY-MM-DD' (default: UTC today)
+ * @returns {boolean}
+ */
+export function isWithinCurrentYear(startDate, endDate, today = new Date().toISOString().slice(0, 10)) {
+  const yr = today.slice(0, 4);
+  return startDate.slice(0, 4) === yr && endDate.slice(0, 4) === yr;
 }

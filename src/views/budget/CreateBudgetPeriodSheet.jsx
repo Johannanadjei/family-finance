@@ -16,7 +16,6 @@
  *
  * @param {boolean}  isOpen
  * @param {function} onClose
- * @param {object[]} cycles    — live cycle list, for the "next calendar month" default
  * @param {function} onCreate  — async ({ name, startDate, endDate, copyPrevious }) => { error }
  */
 
@@ -24,13 +23,10 @@ import { useState, useEffect } from 'react';
 import { createPortal }        from 'react-dom';
 import { useModalChrome }      from '../../hooks/useModalChrome';
 import { getToday, formatMonth } from '../../lib/dates';
-import { nextCalendarMonthRange } from '../../lib/cycles';
+import { nextCalendarMonthRange, currentCalendarMonthRange, isWithinCurrentYear } from '../../lib/cycles';
 
 const pad = (n) => String(n).padStart(2, '0');
-const isValidYMD = (y, m, d) => {
-  const dt = new Date(y, m - 1, d);
-  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
-};
+const isValidYMD = (y, m, d) => { const dt = new Date(y, m - 1, d); return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d; };
 
 const inputStyle = {
   padding: '12px 10px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)',
@@ -61,7 +57,7 @@ function DateFields({ label, parts, onChange, testid }) {
 
 const blank = { d: '', m: '', y: '' };
 
-export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate }) {
+export function CreateBudgetPeriodSheet({ isOpen, onClose, onCreate }) {
   const [mode,        setMode]        = useState('choose');
   const [name,        setName]        = useState('');
   const [nameDirty,   setNameDirty]   = useState(false);
@@ -81,12 +77,17 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate
   useModalChrome({ isOpen, onClose });
   if (!isOpen) return null;
 
+  // Quick-create target: today + 1 calendar month — null in December (crosses the year).
+  const today     = getToday();
+  const nextRange = nextCalendarMonthRange(today);
+
   // Suggested (auto) name follows the start month until the user edits the field.
   const suggested = (start.y && start.m) ? formatMonth(`${start.y}-${pad(start.m)}`) : '';
   const shownName = nameDirty ? name : suggested;
 
   const openCustom = () => {
-    const range = nextCalendarMonthRange(cycles, getToday());
+    // Pre-fill from next month; in December fall back to the current month (within-year).
+    const range = nextCalendarMonthRange(today) ?? currentCalendarMonthRange(today);
     const [sy, sm, sd] = range.start.split('-').map(Number);
     const [ey, em, ed] = range.end.split('-').map(Number);
     setStart({ d: String(sd), m: String(sm), y: String(sy) });
@@ -98,8 +99,8 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate
     setSaving(true); setError(null);
     const { error: err } = await onCreate(payload);
     if (err) {
-      setError(err.code === 'CYC01'
-        ? 'That overlaps an existing budget period. Pick different dates.'
+      setError(err.code === 'CYC01' ? 'That overlaps an existing budget period. Pick different dates.'
+        : err.code === 'CYC03' ? `Periods must be within ${getToday().slice(0, 4)}.`
         : 'Could not create the budget period. Please try again.');
       setSaving(false);
     }
@@ -107,17 +108,17 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate
   };
 
   const quickCreate = () => {
-    const range = nextCalendarMonthRange(cycles, getToday());
-    save({ name: null, startDate: range.start, endDate: range.end, copyPrevious: false });
+    const range = nextCalendarMonthRange(getToday());   // null in December (button disabled)
+    if (range) save({ name: null, startDate: range.start, endDate: range.end, copyPrevious: false });
   };
 
   const saveCustom = () => {
     const sy = +start.y, sm = +start.m, sd = +start.d;
     const ey = +end.y,   em = +end.m,   ed = +end.d;
     if (!isValidYMD(sy, sm, sd) || !isValidYMD(ey, em, ed)) { setError('Please enter valid start and end dates.'); return; }
-    const startDate = `${sy}-${pad(sm)}-${pad(sd)}`;
-    const endDate   = `${ey}-${pad(em)}-${pad(ed)}`;
+    const startDate = `${sy}-${pad(sm)}-${pad(sd)}`, endDate = `${ey}-${pad(em)}-${pad(ed)}`;
     if (endDate < startDate) { setError('End date must be on or after the start date.'); return; }
+    if (!isWithinCurrentYear(startDate, endDate, getToday())) { setError(`Periods must be within ${getToday().slice(0, 4)}.`); return; }
     save({ name: shownName.trim() || null, startDate, endDate, copyPrevious: copyPrev });
   };
 
@@ -133,7 +134,7 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate
 
         <p style={{ fontSize: 18, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 4px' }}>New budget period</p>
         <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: '0 0 20px', lineHeight: 1.5 }}>
-          A budget period is your spending window — usually a month, but you choose.
+          A budget period is your spending window — typically a month. Custom periods are limited to within this year.
         </p>
 
         {error && (
@@ -144,13 +145,19 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate
 
         {mode === 'choose' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button data-testid="quick-next-month-btn" onClick={quickCreate} disabled={saving}
-              style={{ ...primaryBtn, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>
-              {saving ? 'Creating…' : `Next calendar month (${nextCalendarMonthRange(cycles, getToday()).name})`}
+            <button data-testid="quick-next-month-btn" onClick={quickCreate} disabled={saving || !nextRange}
+              style={{ ...primaryBtn, cursor: (saving || !nextRange) ? 'not-allowed' : 'pointer', opacity: (saving || !nextRange) ? 0.6 : 1 }}>
+              {saving ? 'Creating…'
+                : nextRange ? `Next calendar month (${nextRange.name})`
+                : `Wait until ${Number(today.slice(0, 4)) + 1} to plan ahead`}
             </button>
             <button data-testid="custom-period-btn" onClick={openCustom} disabled={saving}
               style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', color: 'var(--c-text, #1c1917)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
               Custom period
+            </button>
+            <button data-testid="period-close-btn" onClick={onClose} disabled={saving}
+              style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-chip-bg, #f3f4f6)', color: 'var(--c-muted, #6b7280)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+              Cancel
             </button>
           </div>
         ) : (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth, currentCalendarMonthRange, nextCalendarMonthRange } from './cycles';
+import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth, currentCalendarMonthRange, nextCalendarMonthRange, isWithinCurrentYear } from './cycles';
 
 // Three non-overlapping calendar cycles. Dates are 'YYYY-MM-DD' strings.
 const APR = { id: 'apr', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
@@ -164,35 +164,64 @@ describe('currentCalendarMonthRange', () => {
 });
 
 describe('nextCalendarMonthRange', () => {
-  it('falls back to the current calendar month when there are no cycles', () => {
-    expect(nextCalendarMonthRange([], '2026-06-10')).toEqual({
-      start: '2026-06-01', end: '2026-06-30', name: 'June 2026',
-    });
-  });
-
-  it('starts the day after the latest cycle ends (calendar-aligned → next month)', () => {
-    expect(nextCalendarMonthRange([APR, MAY, JUN], '2026-06-15')).toEqual({
+  // Phase 2 (Bug 1): history-independent — always today + 1 calendar month, never
+  // anchored on the cycle list. Single `today` arg; stray future cycles are irrelevant.
+  it('returns the calendar month after the one containing today', () => {
+    expect(nextCalendarMonthRange('2026-06-15')).toEqual({
       start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
     });
   });
 
-  it('rolls Dec → Jan across the year boundary', () => {
-    const DEC = { id: 'dec', start_date: '2026-12-01', end_date: '2026-12-31', deleted_at: null };
-    expect(nextCalendarMonthRange([DEC], '2026-12-20')).toEqual({
-      start: '2027-01-01', end: '2027-01-31', name: 'January 2027',
+  it('is independent of any date within the current month (first/last day)', () => {
+    expect(nextCalendarMonthRange('2026-06-01')).toEqual({
+      start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
+    });
+    expect(nextCalendarMonthRange('2026-06-30')).toEqual({
+      start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
     });
   });
 
-  it('uses the latest end across an unsorted list and ignores soft-deleted cycles', () => {
-    const deletedJul = { id: 'jul', start_date: '2026-07-01', end_date: '2026-07-31', deleted_at: '2026-07-02T00:00:00Z' };
-    // live latest is JUN (ends 06-30); the deleted Jul must not win
-    expect(nextCalendarMonthRange([MAY, deletedJul, JUN, APR], '2026-06-15').start).toBe('2026-07-01');
+  it('lands on a 28/29-day February correctly (next month = Feb)', () => {
+    expect(nextCalendarMonthRange('2026-01-10')).toEqual({
+      start: '2026-02-01', end: '2026-02-28', name: 'February 2026',
+    });
+    expect(nextCalendarMonthRange('2028-01-10')).toEqual({   // 2028 leap year
+      start: '2028-02-01', end: '2028-02-29', name: 'February 2028',
+    });
   });
 
-  it('starts the day after a mid-month custom period end (rest of that month)', () => {
-    const CUSTOM = { id: 'c', start_date: '2026-08-01', end_date: '2026-08-15', deleted_at: null };
-    expect(nextCalendarMonthRange([CUSTOM], '2026-08-10')).toEqual({
-      start: '2026-08-16', end: '2026-08-31', name: 'August 2026',
-    });
+  it('returns null when next month would cross into next year (December)', () => {
+    expect(nextCalendarMonthRange('2026-12-01')).toBeNull();
+    expect(nextCalendarMonthRange('2026-12-31')).toBeNull();
+  });
+
+  it('defaults `today` to UTC today when called with no argument', () => {
+    const r = nextCalendarMonthRange();
+    // Either a valid range or null (December) — never throws, always shaped right.
+    expect(r === null || (typeof r.start === 'string' && typeof r.name === 'string')).toBe(true);
+  });
+});
+
+describe('isWithinCurrentYear', () => {
+  it('is true when both ends share today’s year', () => {
+    expect(isWithinCurrentYear('2026-07-01', '2026-07-31', '2026-06-15')).toBe(true);
+    expect(isWithinCurrentYear('2026-01-01', '2026-12-31', '2026-06-15')).toBe(true);
+  });
+
+  it('is false when the start spills into another year', () => {
+    expect(isWithinCurrentYear('2025-12-15', '2026-01-15', '2026-06-15')).toBe(false);
+  });
+
+  it('is false when the end spills into next year', () => {
+    expect(isWithinCurrentYear('2026-12-15', '2027-01-15', '2026-06-15')).toBe(false);
+  });
+
+  it('is false when both ends are in a different year entirely', () => {
+    expect(isWithinCurrentYear('2027-03-01', '2027-03-31', '2026-06-15')).toBe(false);
+  });
+
+  it('defaults `today` to UTC today when omitted', () => {
+    const yr = new Date().toISOString().slice(0, 4);
+    expect(isWithinCurrentYear(`${yr}-03-01`, `${yr}-03-31`)).toBe(true);
   });
 });
