@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth } from './cycles';
+import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth, currentCalendarMonthRange, nextCalendarMonthRange } from './cycles';
 
 // Three non-overlapping calendar cycles. Dates are 'YYYY-MM-DD' strings.
 const APR = { id: 'apr', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
@@ -127,5 +127,72 @@ describe('cycleIdForMonth', () => {
   it('ignores soft-deleted cycles', () => {
     const deletedMay = { ...MAY, deleted_at: '2026-05-02T00:00:00Z' };
     expect(cycleIdForMonth([deletedMay], '2026-05')).toBeNull();
+  });
+});
+
+describe('currentCalendarMonthRange', () => {
+  it('returns the full calendar month containing today (mid-month)', () => {
+    expect(currentCalendarMonthRange('2026-06-28')).toEqual({
+      start: '2026-06-01', end: '2026-06-30', name: 'June 2026',
+    });
+  });
+
+  it('handles a 31-day month', () => {
+    expect(currentCalendarMonthRange('2026-07-15')).toEqual({
+      start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
+    });
+  });
+
+  it('handles February in a non-leap year (28 days)', () => {
+    expect(currentCalendarMonthRange('2026-02-10')).toEqual({
+      start: '2026-02-01', end: '2026-02-28', name: 'February 2026',
+    });
+  });
+
+  it('handles February in a leap year (29 days)', () => {
+    expect(currentCalendarMonthRange('2028-02-10')).toEqual({
+      start: '2028-02-01', end: '2028-02-29', name: 'February 2028',
+    });
+  });
+
+  it('works on the first and last day of a month', () => {
+    expect(currentCalendarMonthRange('2026-12-01').start).toBe('2026-12-01');
+    expect(currentCalendarMonthRange('2026-12-31')).toEqual({
+      start: '2026-12-01', end: '2026-12-31', name: 'December 2026',
+    });
+  });
+});
+
+describe('nextCalendarMonthRange', () => {
+  it('falls back to the current calendar month when there are no cycles', () => {
+    expect(nextCalendarMonthRange([], '2026-06-10')).toEqual({
+      start: '2026-06-01', end: '2026-06-30', name: 'June 2026',
+    });
+  });
+
+  it('starts the day after the latest cycle ends (calendar-aligned → next month)', () => {
+    expect(nextCalendarMonthRange([APR, MAY, JUN], '2026-06-15')).toEqual({
+      start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
+    });
+  });
+
+  it('rolls Dec → Jan across the year boundary', () => {
+    const DEC = { id: 'dec', start_date: '2026-12-01', end_date: '2026-12-31', deleted_at: null };
+    expect(nextCalendarMonthRange([DEC], '2026-12-20')).toEqual({
+      start: '2027-01-01', end: '2027-01-31', name: 'January 2027',
+    });
+  });
+
+  it('uses the latest end across an unsorted list and ignores soft-deleted cycles', () => {
+    const deletedJul = { id: 'jul', start_date: '2026-07-01', end_date: '2026-07-31', deleted_at: '2026-07-02T00:00:00Z' };
+    // live latest is JUN (ends 06-30); the deleted Jul must not win
+    expect(nextCalendarMonthRange([MAY, deletedJul, JUN, APR], '2026-06-15').start).toBe('2026-07-01');
+  });
+
+  it('starts the day after a mid-month custom period end (rest of that month)', () => {
+    const CUSTOM = { id: 'c', start_date: '2026-08-01', end_date: '2026-08-15', deleted_at: null };
+    expect(nextCalendarMonthRange([CUSTOM], '2026-08-10')).toEqual({
+      start: '2026-08-16', end: '2026-08-31', name: 'August 2026',
+    });
   });
 });

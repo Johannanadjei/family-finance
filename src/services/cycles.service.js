@@ -77,6 +77,25 @@ export const getCycleById = async (cycleId) => {
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-// NOTE: createCycleByAnchor (the anchor-types cycle-creation RPC wrapper) was
-// removed in Phase A of the anchor pivot. Its user-driven replacement
-// (create_budget_period) lands in Phase B. See engineering-decisions.md.
+/**
+ * Create a user-driven budget period (Phase B replacement for createCycleByAnchor).
+ * Wraps the create_budget_period SECURITY DEFINER RPC (scripts/migrate_16…sql):
+ * the server gates on owner/full_access role, validates the range, falls back to
+ * cycle_majority_name when name is blank, and traps overlap as the CYC01 SQLSTATE.
+ *
+ * @param {string} centreId
+ * @param {{ name?: string|null, startDate: string, endDate: string }} period
+ *        startDate / endDate are 'YYYY-MM-DD' strings (DATE type).
+ * @returns {Promise<{ data: object|null, error: any }>} the created cycle row, or error.
+ */
+export const createBudgetPeriod = async (centreId, { name = null, startDate, endDate }) => {
+  const { data, error } = await supabase.rpc('create_budget_period', {
+    p_centre_id:  centreId,
+    p_name:       name,
+    p_start_date: startDate,
+    p_end_date:   endDate,
+  });
+
+  if (error) { console.error('[cycles.service] createBudgetPeriod error:', error.message); return { data: null, error }; }
+  return { data, error: null };
+};

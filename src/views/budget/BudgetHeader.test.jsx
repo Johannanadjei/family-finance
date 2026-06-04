@@ -16,6 +16,7 @@ const base = {
   isOldest:    false,
   onPrev:      () => {},
   onNext:      () => {},
+  onNewPeriod: () => {},
 };
 
 describe('BudgetHeader', () => {
@@ -39,5 +40,12 @@ describe('BudgetHeader', () => {
     fireEvent.click(screen.getByLabelText('Next period'));
     expect(onPrev).toHaveBeenCalledTimes(1);
     expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('always shows the New budget period button and fires onNewPeriod', () => {
+    const onNewPeriod = vi.fn();
+    render(<BudgetHeader {...base} onNewPeriod={onNewPeriod} />);
+    fireEvent.click(screen.getByTestId('new-period-btn'));
+    expect(onNewPeriod).toHaveBeenCalledTimes(1);
   });
 });

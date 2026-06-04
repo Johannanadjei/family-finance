@@ -4,11 +4,14 @@ import { useFinance } from './useFinance';
 vi.mock('../lib/auth', () => ({ waitForSession: vi.fn().mockResolvedValue({ data: { session: { expires_at: 9999999999 } }, error: null }), warnOnEmptyColdLoad: vi.fn(), sessionAgeMs: vi.fn(() => 0) }));
 vi.mock('../services/transactions.service', () => ({ getTransactionsByCycle: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn(), moveTransactionToCycle: vi.fn() }));
 vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn() }));
-vi.mock('../services/cycles.service', () => ({ getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }) }));
+vi.mock('../services/cycles.service', () => ({
+  getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }),
+  createBudgetPeriod: vi.fn().mockResolvedValue({ data: { id: 'cyc-new' }, error: null }),
+}));
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
 import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
-import { getCyclesForCentre } from '../services/cycles.service';
+import { getCyclesForCentre, createBudgetPeriod } from '../services/cycles.service';
 import { getCurrentMonth, getToday } from '../lib/dates';
 import { calcTotalFixed } from '../lib/finance';
 const C = { id:'centre-1', currency:'GHS', surplus_target:4500 };
@@ -150,6 +153,39 @@ describe('useFinance — cycles', () => {
     let ret;
     await act(async () => { ret = result.current.loadCycle('nope'); });
     expect(ret).toBeNull();
+    expect(result.current.activeCycleId).toBeNull();
+  });
+
+  // ── createPeriod (Phase B) ──────────────────────────────────────────────────
+  it('createPeriod calls the service, refreshes cycles, and selects the new period', async () => {
+    const NEW = { id:'cyc-new', budget_centre_id:'centre-1', name:'July 2026', start_date:'2026-07-01', end_date:'2026-07-31', anchor_type:'custom', deleted_at:null };
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
+
+    createBudgetPeriod.mockResolvedValue({ data: NEW, error: null });
+    getCyclesForCentre.mockResolvedValue({ data: [CURRENT, NEW], error: null });   // refresh sees the new period
+
+    let ret;
+    await act(async () => { ret = await result.current.createPeriod({ name: 'July 2026', startDate: '2026-07-01', endDate: '2026-07-31' }); });
+
+    expect(createBudgetPeriod).toHaveBeenCalledWith('centre-1', { name: 'July 2026', startDate: '2026-07-01', endDate: '2026-07-31' });
+    expect(ret.data.id).toBe('cyc-new');
+    await waitFor(() => expect(result.current.cycles).toHaveLength(2));            // reloadCycles ran
+    expect(result.current.activeCycleId).toBe('cyc-new');                          // new period selected
+  });
+
+  it('createPeriod surfaces the service error and does NOT refresh or select', async () => {
+    const { result } = goCycles([CURRENT]);
+    await waitFor(() => expect(result.current.cycles).toHaveLength(1));
+
+    createBudgetPeriod.mockResolvedValue({ data: null, error: { code: 'CYC01', message: 'overlap' } });
+    getCyclesForCentre.mockClear();
+
+    let ret;
+    await act(async () => { ret = await result.current.createPeriod({ startDate: '2026-07-01', endDate: '2026-07-31' }); });
+
+    expect(ret.error.code).toBe('CYC01');
+    expect(getCyclesForCentre).not.toHaveBeenCalled();   // no refresh on failure
     expect(result.current.activeCycleId).toBeNull();
   });
 });

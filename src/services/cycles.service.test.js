@@ -33,7 +33,7 @@ vi.mock('../lib/supabase', () => {
 });
 
 import {
-  getCyclesForCentre, getCycleForDate, getCycleById,
+  getCyclesForCentre, getCycleForDate, getCycleById, createBudgetPeriod,
 } from './cycles.service';
 
 const mockCycle = {
@@ -111,5 +111,40 @@ describe('getCycleById', () => {
     const { data, error } = await getCycleById('nope');
     expect(data).toBeNull();
     expect(error).toBeNull();
+  });
+});
+
+// ── createBudgetPeriod ──────────────────────────────────────────────────────
+describe('createBudgetPeriod', () => {
+  it('calls the create_budget_period RPC with mapped params and returns the cycle', async () => {
+    mockRpc.mockResolvedValue({ data: mockCycle, error: null });
+    const { data, error } = await createBudgetPeriod('c-1', {
+      name: 'Holiday Sprint', startDate: '2026-08-01', endDate: '2026-08-14',
+    });
+    expect(mockRpc).toHaveBeenCalledWith('create_budget_period', {
+      p_centre_id: 'c-1', p_name: 'Holiday Sprint', p_start_date: '2026-08-01', p_end_date: '2026-08-14',
+    });
+    expect(data).toEqual(mockCycle);
+    expect(error).toBeNull();
+  });
+
+  it('defaults name to null when omitted (server falls back to cycle_majority_name)', async () => {
+    mockRpc.mockResolvedValue({ data: mockCycle, error: null });
+    await createBudgetPeriod('c-1', { startDate: '2026-09-01', endDate: '2026-09-30' });
+    expect(mockRpc).toHaveBeenCalledWith('create_budget_period', expect.objectContaining({ p_name: null }));
+  });
+
+  it('returns data:null + error when the RPC errors (e.g. CYC01 overlap)', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: 'CYC01', message: 'overlap' } });
+    const { data, error } = await createBudgetPeriod('c-1', { startDate: '2026-09-01', endDate: '2026-09-30' });
+    expect(data).toBeNull();
+    expect(error).toEqual({ code: 'CYC01', message: 'overlap' });
+  });
+
+  it('surfaces the RLS/role-denied error (42501) truthfully', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: '42501', message: 'not an owner' } });
+    const { data, error } = await createBudgetPeriod('c-1', { name: 'X', startDate: '2026-09-01', endDate: '2026-09-30' });
+    expect(data).toBeNull();
+    expect(error.code).toBe('42501');
   });
 });

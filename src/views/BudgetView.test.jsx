@@ -152,6 +152,19 @@ describe('BudgetView', () => {
     expect(screen.getByTestId('copy-categories-sheet')).toBeTruthy();
     resetCats();
   });
+
+  // ── Phase B period creator ────────────────────────────────────────────────
+  it('the always-visible header button opens the budget-period creator', () => {
+    renderView();
+    expect(screen.queryByTestId('create-period-sheet')).toBeNull();
+    fireEvent.click(screen.getByTestId('new-period-btn'));
+    expect(screen.getByTestId('create-period-sheet')).toBeTruthy();
+  });
+
+  it('hides the no-current-period prompt while a live cycle covers today', () => {
+    renderView();   // default mockFinance has the current-month cycle
+    expect(screen.queryByTestId('no-current-period-prompt')).toBeNull();
+  });
 });
 
 // ── Cycle navigation, viewed-cycle data, and the past-period guard (Commit 8) ──

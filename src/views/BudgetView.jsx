@@ -17,12 +17,11 @@ import { getCurrentMonth, offsetMonth, calcTotalFixed, calcCategorySpend, calcFi
 import { formatMonth, getToday }  from '../lib/dates';
 import { getCycleNav }            from '../lib/cycles';
 import { Skeleton }               from '../components/ui/Skeleton';
-import { Toast }                   from '../components/ui/Toast';
 import { CategoryBudgetRow }      from './budget/CategoryBudgetRow';
-import { AddCategorySheet }       from './budget/AddCategorySheet';
 import { BudgetEmptyState }       from './budget/BudgetEmptyState';
-import { CopyCategoriesSheet }    from './budget/CopyCategoriesSheet';
 import { BudgetHeader }           from './budget/BudgetHeader';
+import { BudgetPeriodCreator }    from './budget/BudgetPeriodCreator';
+import { BudgetSheets }           from './budget/BudgetSheets';
 
 function BudgetViewSkeleton() {
   return (
@@ -49,6 +48,7 @@ export function BudgetView() {
   const { allCategories = [], fmt, addCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth } = useBudgetCentreContext();
   const { txs, loading, error, activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle } = useFinanceContext();
   const [sheetOpen,     setSheetOpen]     = useState(false);
+  const [periodOpen,    setPeriodOpen]    = useState(false);   // Phase B: budget-period creator
   const [copySheetOpen, setCopySheetOpen] = useState(false);   // 2C: multi-select rollforward sheet
   const [copying,       setCopying]       = useState(false);
   const [copyError,     setCopyError]     = useState(null);
@@ -119,6 +119,13 @@ export function BudgetView() {
         isOldest={nav.isOldest}
         onPrev={() => nav.prev && loadCycle(nav.prev.id)}
         onNext={() => nav.next && loadCycle(nav.next.id)}
+        onNewPeriod={() => setPeriodOpen(true)}
+      />
+
+      <BudgetPeriodCreator
+        isOpen={periodOpen}
+        onOpenChange={setPeriodOpen}
+        onCopyRequested={() => { setCopyError(null); setCopySheetOpen(true); }}
       />
 
       {/* Error state */}
@@ -166,33 +173,23 @@ export function BudgetView() {
         </button>
       )}
 
-      <AddCategorySheet
-        isOpen={sheetOpen}
-        onClose={() => setSheetOpen(false)}
+      <BudgetSheets
+        addOpen={sheetOpen}
+        onCloseAdd={() => setSheetOpen(false)}
         onAdd={(cat) => addCategory(cat, viewedCycle?.id)}
         targetMonth={viewedMonth}
-      />
-
-      <CopyCategoriesSheet
-        isOpen={copySheetOpen}
-        onClose={() => setCopySheetOpen(false)}
-        lastMonthLabel={prevPeriodLabel}
-        categories={prevMonthCategories}
-        fmt={fmt}
+        copyOpen={copySheetOpen}
+        onCloseCopy={() => setCopySheetOpen(false)}
+        prevPeriodLabel={prevPeriodLabel}
+        prevCategories={prevMonthCategories}
         onCopy={handleCopy}
         copying={copying}
+        copiedCount={copiedCount}
+        periodLabel={periodLabel}
+        onDismissToast={() => setCopiedCount(0)}
       />
 
       {guardModal}
-
-      {copiedCount > 0 && (
-        <Toast
-          message={`Copied ${copiedCount} budget ${copiedCount === 1 ? 'category' : 'categories'} to ${periodLabel}`}
-          actionLabel="Done"
-          onEdit={() => setCopiedCount(0)}
-          onDismiss={() => setCopiedCount(0)}
-        />
-      )}
     </div>
   );
 }

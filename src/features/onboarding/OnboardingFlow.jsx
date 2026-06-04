@@ -15,7 +15,10 @@
 import { useState, useMemo } from 'react';
 import { supabase }           from '../../lib/supabase';
 import { makeFmt, getCurrentMonth } from '../../lib/finance';
+import { getToday }           from '../../lib/dates';
+import { currentCalendarMonthRange } from '../../lib/cycles';
 import { createCentre }       from '../../services/centres.service';
+import { createBudgetPeriod } from '../../services/cycles.service';
 import { bulkAddCategories }  from '../../services/categories.service';
 import { bulkAddIncomeSources } from '../../services/income.service';
 import { STEPS, DEFAULT_CATEGORIES } from './onboarding.constants';
@@ -89,13 +92,23 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
     }
 
     // Step 1.5 — create the hub's FIRST budget period BEFORE any period-keyed bulk
-    // insert, so categories/income stamp a real cycle_id. Phase A of the pivot
-    // removed the anchor-types scaffolding (create_cycle_by_anchor); the user-driven
-    // replacement lands in Phase B. Until then this path throws deliberately — new
-    // hub creation is expected to fail (see engineering-decisions.md, anchor pivot).
+    // insert, so categories/income stamp a real cycle_id. Phase B (anchor pivot):
+    // a sensible default — the calendar month containing today (Decision Q3) — via the
+    // user-driven create_budget_period RPC. The user can edit/replace it later from the
+    // Budget screen; onboarding doesn't make them choose. Retry skips this once created.
     let activeCycleId = firstCycleId;
     if (!activeCycleId) {
-      throw new Error('Phase B not yet implemented: create_budget_period RPC + UI is the planned replacement for create_cycle_by_anchor');
+      const range = currentCalendarMonthRange(getToday());
+      const { data: cycle, error: cycleErr } = await createBudgetPeriod(activeCentreId, {
+        name: range.name, startDate: range.start, endDate: range.end,
+      });
+      if (cycleErr) {
+        setError('We could not set up your first budget period. Please try again.');
+        setLoading(false);
+        return;
+      }
+      activeCycleId = cycle.id;
+      setFirstCycleId(activeCycleId);
     }
 
     // Step 2 — bulk insert categories, stamped with the first cycle's id

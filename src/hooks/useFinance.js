@@ -22,7 +22,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
-import { getCyclesForCentre } from '../services/cycles.service';
+import { getCyclesForCentre, createBudgetPeriod } from '../services/cycles.service';
 import { getActiveCycle, sliceByCycle } from '../lib/cycles';
 import { getToday } from '../lib/dates';
 import {
@@ -275,6 +275,18 @@ export function useFinance({ centre, allCategories }) {
     return cycle;
   }, [cycles, loadMonth]);
 
+  // Create a user-driven budget period (Phase B), then refresh: re-fetch cycles so the
+  // new period appears (NoCurrentPeriodPrompt flips off, nav updates) and select it so
+  // the views land on the freshly-created window. The service gates on owner/full_access
+  // and traps overlap as CYC01 — errors pass straight through to the caller's UI.
+  const createPeriod = useCallback(async ({ name = null, startDate, endDate }) => {
+    const { data, error } = await createBudgetPeriod(centreId, { name, startDate, endDate });
+    if (error) return { data: null, error };
+    await loadCycles();
+    setActiveCycleId(data.id);
+    return { data, error: null };
+  }, [centreId, loadCycles]);
+
   // ── Reload ────────────────────────────────────────────────────────────────
 
   // Re-fetch the currently-viewed cycle. Resolves the cid via the same viewedCycle
@@ -318,6 +330,7 @@ export function useFinance({ centre, allCategories }) {
     viewedCycleId,  // activeCycleId ?? activeCycle?.id — single source for the cycle-id fallback (Commit 14a)
     loadCycle,
     reloadCycles: loadCycles,
+    createPeriod,
 
     // Derived financial values
     monthlyIncome,

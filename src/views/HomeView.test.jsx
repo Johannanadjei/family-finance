@@ -4,11 +4,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen }           from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { HomeView }                 from './HomeView';
 import { getCurrentMonth }          from '../lib/finance';
+import { getToday }                 from '../lib/dates';
 import { mockCentre, mockFmt }      from '../test-utils/fixtures';
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async (orig) => ({ ...(await orig()), useNavigate: () => mockNavigate }));
 
 const expectedMonthLabel = () => new Date(getCurrentMonth() + '-01')
   .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -197,5 +201,30 @@ describe('HomeView', () => {
     renderHome();
     expect(loadCycle).not.toHaveBeenCalled();
     restoreCycle();
+  });
+
+  // ── Passive "no current period" prompt (Phase B) ──────────────────────────────
+  it('shows the no-current-period prompt when no live cycle covers today', () => {
+    mockFinance.cycles = [];   // brand-new / lapsed hub
+    renderHome();
+    expect(screen.getByTestId('no-current-period-prompt')).toBeTruthy();
+    mockFinance.cycles = undefined;
+  });
+
+  it('hides the prompt when a live cycle covers today', () => {
+    const today = getToday();
+    mockFinance.cycles = [{ id: 'now', start_date: today, end_date: today, deleted_at: null }];
+    renderHome();
+    expect(screen.queryByTestId('no-current-period-prompt')).toBeNull();
+    mockFinance.cycles = undefined;
+  });
+
+  it('routes to /budget when the prompt CTA is tapped', () => {
+    mockFinance.cycles = [];
+    mockNavigate.mockClear();
+    renderHome();
+    fireEvent.click(screen.getByTestId('create-period-cta'));
+    expect(mockNavigate).toHaveBeenCalledWith('/budget');
+    mockFinance.cycles = undefined;
   });
 });

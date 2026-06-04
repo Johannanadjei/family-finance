@@ -106,3 +106,65 @@ export function sliceByCycle(rows, cycleId) {
 export function cycleIdForMonth(cycles, month) {
   return cycles.find(c => !c.deleted_at && c.start_date.startsWith(month))?.id ?? null;
 }
+
+// ── Budget-period range builders (Phase B) ──────────────────────────────────────
+// Unlike the pickers above (string compares, no Date), these compute month
+// boundaries, so they parse into UTC Date. Still pure: no React, no app imports,
+// deterministic given their args. They return { start, end, name } where start/end
+// are 'YYYY-MM-DD' and name is the majority-month label for the common single-month
+// case (e.g. 'July 2026'). For ranges the user edits to span months, the server's
+// cycle_majority_name is authoritative — these names are the quick-create defaults.
+
+// Last day of the calendar month that contains [y, m0] (m0 = 0-based month).
+function monthEnd(y, m0) {
+  return new Date(Date.UTC(y, m0 + 1, 0)).toISOString().slice(0, 10);   // day 0 of next month
+}
+
+// 'Month YYYY' label for the month of a 'YYYY-MM-DD' start date (UTC, matches
+// lib/dates.formatMonth and the SQL cycle_majority_name 'FMMonth YYYY' output).
+function monthLabel(startStr) {
+  const [y, m] = startStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+// The day after a 'YYYY-MM-DD' date, as 'YYYY-MM-DD'.
+function nextDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+}
+
+/**
+ * The calendar month CONTAINING `today` — the sensible first-period default for a
+ * brand-new hub (Decision Q3: hub created June 28 → 'June 1 – June 30'). No cycle
+ * list needed; a new hub has none.
+ *
+ * @param {string} today — 'YYYY-MM-DD'
+ * @returns {{ start: string, end: string, name: string }}
+ */
+export function currentCalendarMonthRange(today) {
+  const [y, m] = today.split('-').map(Number);
+  const start  = `${today.slice(0, 7)}-01`;
+  const end    = monthEnd(y, m - 1);
+  return { start, end, name: monthLabel(start) };
+}
+
+/**
+ * The NEXT budget period to offer from the quick-create button: the calendar month
+ * immediately after the hub's latest live cycle (start = day after its end). With no
+ * cycles yet it falls back to the current calendar month. Start = day-after-latest
+ * guarantees the range never overlaps an existing cycle (GiST / CYC01).
+ *
+ * @param {Array<{ start_date: string, end_date: string, deleted_at?: string|null }>} cycles
+ * @param {string} today — 'YYYY-MM-DD'
+ * @returns {{ start: string, end: string, name: string }}
+ */
+export function nextCalendarMonthRange(cycles, today) {
+  const latestEnd = cycles
+    .filter(c => !c.deleted_at)
+    .reduce((max, c) => (max === null || c.end_date.localeCompare(max) > 0 ? c.end_date : max), null);
+  if (!latestEnd) return currentCalendarMonthRange(today);
+
+  const start  = nextDay(latestEnd);
+  const [y, m] = start.split('-').map(Number);
+  return { start, end: monthEnd(y, m - 1), name: monthLabel(start) };
+}

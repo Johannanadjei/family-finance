@@ -16,9 +16,10 @@
  * @param {boolean}  isOldest    — oldest cycle → disable Prev
  * @param {function} onPrev      — go to previous (older) period
  * @param {function} onNext      — go to next (newer) period
+ * @param {function} onNewPeriod — open the budget-period creator (always available)
  */
 
-export function BudgetHeader({ periodLabel, fmt, fixedTotal, fixedSpent, isLatest, isOldest, onPrev, onNext }) {
+export function BudgetHeader({ periodLabel, fmt, fixedTotal, fixedSpent, isLatest, isOldest, onPrev, onNext, onNewPeriod }) {
   return (
     <>
       {/* Period navigation */}
@@ -35,6 +36,13 @@ export function BudgetHeader({ periodLabel, fmt, fixedTotal, fixedSpent, isLates
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
+
+      {/* Always-visible period creator (Decision Q1 — Budget view only) */}
+      <button onClick={onNewPeriod} data-testid="new-period-btn" aria-label="New budget period"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '10px', borderRadius: 12, border: '1.5px dashed var(--c-primary, #064e3b)', background: 'transparent', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginBottom: 16 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New budget period
+      </button>
 
       {/* Summary header */}
       <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff', boxShadow: 'var(--c-shadow)' }}>
