@@ -14,12 +14,12 @@ import { selectStyle }           from '../../lib/selectStyle';
 import { createCentre }          from '../../services/centres.service';
 import { bulkAddCategories }     from '../../services/categories.service';
 import { bulkAddIncomeSources }  from '../../services/income.service';
-import { createCycleByAnchor, getCyclesForCentre } from '../../services/cycles.service';
-import { computeNextCycleParams, getActiveCycle }  from '../../lib/cycles';
-import { getToday }              from '../../lib/dates';
 import { StepIncome }            from '../onboarding/steps/StepIncome';
+import { createBudgetPeriod }    from '../../services/cycles.service';
 import { getDefaultCategories, getHubType } from '../../lib/hubTypes';
 import { makeFmt, getCurrentMonth }          from '../../lib/finance';
+import { getToday }              from '../../lib/dates';
+import { currentCalendarMonthRange } from '../../lib/cycles';
 import { CURRENCIES }        from '../onboarding/onboarding.constants';
 import { StepHubType }       from '../onboarding/steps/StepHubType';
 import { StepCategories }    from '../onboarding/steps/StepCategories';
@@ -81,17 +81,17 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
     });
     if (centreErr) { setError('Could not create hub. Please try again.'); setLoading(false); return; }
 
-    // Create the hub's FIRST cycle before any cycle-keyed bulk insert, so
-    // categories/income stamp a real cycle_id (closes CYC02 for this path too —
-    // mirrors OnboardingFlow). New hubs default to the calendar anchor.
-    const { data: cyc } = await createCycleByAnchor(data.id, computeNextCycleParams(data, null, getToday()));
-    let cycleId = cyc?.id ?? null;
-    if (!cycleId) {
-      const { data: list } = await getCyclesForCentre(data.id);   // CYC01 race / null response
-      cycleId = getActiveCycle(list || [], getToday())?.id ?? null;
-    }
-    if (!cycleId) { setError('Could not set up the budget cycle. Please try again.'); setLoading(false); return; }
+    // Create the hub's FIRST budget period before any period-keyed bulk insert, so
+    // categories/income stamp a real cycle_id. Phase B: a sensible default — the
+    // calendar month containing today (Decision Q3) — via create_budget_period. The
+    // user can replace it from the Budget screen later.
+    const range = currentCalendarMonthRange(getToday());
+    const { data: cycle, error: cycleErr } = await createBudgetPeriod(data.id, {
+      name: range.name, startDate: range.start, endDate: range.end,
+    });
+    if (cycleErr) { setError('Could not set up the first budget period. Please try again.'); setLoading(false); return; }
 
+    const cycleId = cycle.id;
     const catRows = categories.map(({ id: _id, ...c }) => ({ ...c, month: getCurrentMonth() }));
     const { error: catErr } = await bulkAddCategories(data.id, catRows, cycleId);
     if (catErr) { setError('Could not save categories. Please try again.'); setLoading(false); return; }

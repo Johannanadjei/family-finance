@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth,
-         anchorToDateRange, cycleDefaultName, computeNextCycleParams } from './cycles';
+import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth, currentCalendarMonthRange, nextCalendarMonthRange, isWithinCurrentYear } from './cycles';
 
 // Three non-overlapping calendar cycles. Dates are 'YYYY-MM-DD' strings.
 const APR = { id: 'apr', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
@@ -131,128 +130,98 @@ describe('cycleIdForMonth', () => {
   });
 });
 
-// ── Anchor-aware boundaries (Commit 14b) ───────────────────────────────────────
-describe('anchorToDateRange', () => {
-  it('calendar — the whole calendar month containing the reference date', () => {
-    expect(anchorToDateRange('calendar', null, '2026-06-15'))
-      .toEqual({ start_date: '2026-06-01', end_date: '2026-06-30' });
+describe('currentCalendarMonthRange', () => {
+  it('returns the full calendar month containing today (mid-month)', () => {
+    expect(currentCalendarMonthRange('2026-06-28')).toEqual({
+      start: '2026-06-01', end: '2026-06-30', name: 'June 2026',
+    });
   });
 
-  it('fixed_day — anchor day to the day before next month\'s anchor', () => {
-    // reference on the anchor day starts the cycle there
-    expect(anchorToDateRange('fixed_day', 29, '2026-05-29'))
-      .toEqual({ start_date: '2026-05-29', end_date: '2026-06-28' });
-    // reference before this month's anchor belongs to the previous window
-    expect(anchorToDateRange('fixed_day', 29, '2026-06-15'))
-      .toEqual({ start_date: '2026-05-29', end_date: '2026-06-28' });
+  it('handles a 31-day month', () => {
+    expect(currentCalendarMonthRange('2026-07-15')).toEqual({
+      start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
+    });
   });
 
-  it('fixed_day 31 clamps to the short month (Feb 28, non-leap)', () => {
-    expect(anchorToDateRange('fixed_day', 31, '2026-02-10'))
-      .toEqual({ start_date: '2026-01-31', end_date: '2026-02-27' });
+  it('handles February in a non-leap year (28 days)', () => {
+    expect(currentCalendarMonthRange('2026-02-10')).toEqual({
+      start: '2026-02-01', end: '2026-02-28', name: 'February 2026',
+    });
   });
 
-  it('fixed_day 31 clamps to Feb 29 in a leap year', () => {
-    expect(anchorToDateRange('fixed_day', 31, '2028-02-10'))
-      .toEqual({ start_date: '2028-01-31', end_date: '2028-02-28' });
+  it('handles February in a leap year (29 days)', () => {
+    expect(currentCalendarMonthRange('2028-02-10')).toEqual({
+      start: '2028-02-01', end: '2028-02-29', name: 'February 2028',
+    });
   });
 
-  it('last_working_day — anchors to the last weekday of the month', () => {
-    // May 2026: 31st is a Sunday → last working day is Fri May 29
-    expect(anchorToDateRange('last_working_day', null, '2026-05-15'))
-      .toEqual({ start_date: '2026-04-30', end_date: '2026-05-28' });
-  });
-
-  it('last_working_day in February — last weekday', () => {
-    // Feb 2026: 28th is a Saturday → last working day is Fri Feb 27
-    expect(anchorToDateRange('last_working_day', null, '2026-02-15'))
-      .toEqual({ start_date: '2026-01-30', end_date: '2026-02-26' });
-  });
-
-  it('last_day_of_month — anchors to the final calendar day', () => {
-    expect(anchorToDateRange('last_day_of_month', null, '2026-05-15'))
-      .toEqual({ start_date: '2026-04-30', end_date: '2026-05-30' });
-  });
-
-  it('forward-only clamp — start never reaches back over the previous cycle', () => {
-    // fixed_day 29, reference Jul 1, prev cycle ended Jun 30: raw start would be
-    // Jun 29 → clamped forward to Jul 1 (a short transition cycle, M1).
-    expect(anchorToDateRange('fixed_day', 29, '2026-07-01', '2026-06-30'))
-      .toEqual({ start_date: '2026-07-01', end_date: '2026-07-28' });
-  });
-
-  it('no clamp applied when the anchor start is already past the previous end', () => {
-    expect(anchorToDateRange('fixed_day', 29, '2026-06-29', '2026-06-28'))
-      .toEqual({ start_date: '2026-06-29', end_date: '2026-07-28' });
-  });
-
-  // Dual-basis regression (CYC03): a stale client reference can point INTO an
-  // already-covered period (referenceDate < prevEnd+1). The effective reference must
-  // roll the whole range forward to the next free period — never invert start > end.
-  it('rolls a stale calendar reference forward instead of inverting the range', () => {
-    expect(anchorToDateRange('calendar', null, '2026-06-01', '2026-06-30'))
-      .toEqual({ start_date: '2026-07-01', end_date: '2026-07-31' });
-  });
-
-  it('rolls a stale fixed_day reference forward instead of inverting the range', () => {
-    expect(anchorToDateRange('fixed_day', 29, '2026-06-01', '2026-06-30'))
-      .toEqual({ start_date: '2026-07-01', end_date: '2026-07-28' });
+  it('works on the first and last day of a month', () => {
+    expect(currentCalendarMonthRange('2026-12-01').start).toBe('2026-12-01');
+    expect(currentCalendarMonthRange('2026-12-31')).toEqual({
+      start: '2026-12-01', end: '2026-12-31', name: 'December 2026',
+    });
   });
 });
 
-describe('cycleDefaultName', () => {
-  it('majority month wins (May 29 – Jun 28 → June)', () => {
-    expect(cycleDefaultName('2026-05-29', '2026-06-28')).toBe('June 2026');
+describe('nextCalendarMonthRange', () => {
+  // Phase 2 (Bug 1): history-independent — always today + 1 calendar month, never
+  // anchored on the cycle list. Single `today` arg; stray future cycles are irrelevant.
+  it('returns the calendar month after the one containing today', () => {
+    expect(nextCalendarMonthRange('2026-06-15')).toEqual({
+      start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
+    });
   });
 
-  it('calendar month names itself', () => {
-    expect(cycleDefaultName('2026-06-01', '2026-06-30')).toBe('June 2026');
+  it('is independent of any date within the current month (first/last day)', () => {
+    expect(nextCalendarMonthRange('2026-06-01')).toEqual({
+      start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
+    });
+    expect(nextCalendarMonthRange('2026-06-30')).toEqual({
+      start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
+    });
   });
 
-  it('ties break toward the later month (15 days each → July)', () => {
-    expect(cycleDefaultName('2026-06-16', '2026-07-15')).toBe('July 2026');
+  it('lands on a 28/29-day February correctly (next month = Feb)', () => {
+    expect(nextCalendarMonthRange('2026-01-10')).toEqual({
+      start: '2026-02-01', end: '2026-02-28', name: 'February 2026',
+    });
+    expect(nextCalendarMonthRange('2028-01-10')).toEqual({   // 2028 leap year
+      start: '2028-02-01', end: '2028-02-29', name: 'February 2028',
+    });
   });
 
-  it('remains the display-preview source of truth — a forward-marched range names its own month', () => {
-    // The Bug 4 fix made the RPC server-authoritative for the PERSISTED name; the JS
-    // twin is intentionally UNCHANGED and still drives the Settings next-cycle preview
-    // (a display-only estimate). This guards against accidentally regressing it.
-    expect(cycleDefaultName('2026-07-01', '2026-07-31')).toBe('July 2026');
+  it('returns null when next month would cross into next year (December)', () => {
+    expect(nextCalendarMonthRange('2026-12-01')).toBeNull();
+    expect(nextCalendarMonthRange('2026-12-31')).toBeNull();
+  });
+
+  it('defaults `today` to UTC today when called with no argument', () => {
+    const r = nextCalendarMonthRange();
+    // Either a valid range or null (December) — never throws, always shaped right.
+    expect(r === null || (typeof r.start === 'string' && typeof r.name === 'string')).toBe(true);
   });
 });
 
-describe('computeNextCycleParams', () => {
-  it('brand-new hub (no prev cycle) uses today as the reference date', () => {
-    const p = computeNextCycleParams({ cycle_anchor_type: 'calendar' }, null, '2026-06-03');
-    expect(p.reference_date).toBe('2026-06-03');
-    expect(p.start_date).toBe('2026-06-01');
-    expect(p.end_date).toBe('2026-06-30');
-    expect(p.anchor_type).toBe('calendar');
-    expect(p.anchor_day).toBeNull();
-    expect(p.name).toBe('June 2026');
+describe('isWithinCurrentYear', () => {
+  it('is true when both ends share today’s year', () => {
+    expect(isWithinCurrentYear('2026-07-01', '2026-07-31', '2026-06-15')).toBe(true);
+    expect(isWithinCurrentYear('2026-01-01', '2026-12-31', '2026-06-15')).toBe(true);
   });
 
-  it('existing hub uses prev.end_date + 1 as the reference date', () => {
-    const p = computeNextCycleParams(
-      { cycle_anchor_type: 'fixed_day', cycle_anchor_day: 25 },
-      { end_date: '2026-06-24' },
-      '2026-06-03',
-    );
-    expect(p.reference_date).toBe('2026-06-25');
-    expect(p.anchor_type).toBe('fixed_day');
-    expect(p.anchor_day).toBe(25);
-    expect(p.start_date).toBe('2026-06-25');
-    expect(p.end_date).toBe('2026-07-24');
+  it('is false when the start spills into another year', () => {
+    expect(isWithinCurrentYear('2025-12-15', '2026-01-15', '2026-06-15')).toBe(false);
   });
 
-  it('defaults to calendar anchor when the hub has none set', () => {
-    const p = computeNextCycleParams({}, null, '2026-06-03');
-    expect(p.anchor_type).toBe('calendar');
-    expect(p.anchor_day).toBeNull();
+  it('is false when the end spills into next year', () => {
+    expect(isWithinCurrentYear('2026-12-15', '2027-01-15', '2026-06-15')).toBe(false);
   });
 
-  it('drops a stray anchor_day for non-fixed_day anchors', () => {
-    const p = computeNextCycleParams({ cycle_anchor_type: 'last_working_day', cycle_anchor_day: 25 }, null, '2026-06-03');
-    expect(p.anchor_day).toBeNull();
+  it('is false when both ends are in a different year entirely', () => {
+    expect(isWithinCurrentYear('2027-03-01', '2027-03-31', '2026-06-15')).toBe(false);
+  });
+
+  it('defaults `today` to UTC today when omitted', () => {
+    const yr = new Date().toISOString().slice(0, 4);
+    expect(isWithinCurrentYear(`${yr}-03-01`, `${yr}-03-31`)).toBe(true);
   });
 });

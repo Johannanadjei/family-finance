@@ -12,11 +12,9 @@ import { getCurrentMonth, offsetMonth } from '../lib/finance';
 import { formatMonth, getToday }   from '../lib/dates';
 import { getCycleNav }             from '../lib/cycles';
 import { Skeleton }               from '../components/ui/Skeleton';
-import { Toast }                   from '../components/ui/Toast';
-import { ConfirmSheet }           from './payday/ConfirmSheet';
-import { CopyIncomeSheet }        from './payday/CopyIncomeSheet';
 import { PaydayHeader }           from './payday/PaydayHeader';
 import { PaydayIncomeBody }       from './payday/PaydayIncomeBody';
+import { PaydaySheets }           from './payday/PaydaySheets';
 
 // Migration-created "Other Income" buckets (engineering-decisions: income-month-
 // scoping) must never roll forward, nor count toward "N sources to copy".
@@ -57,6 +55,9 @@ export function PaydayView() {
   const [copyError,      setCopyError]      = useState(null);
   const [copiedCount,    setCopiedCount]    = useState(0);       // >0 → success toast
   if (!can('viewIncome')) return <AccessBlocked message="Income tracking is only available to hub owners and full-access members." />;
+  // Hold first paint until cycles resolve — else the viewed-period nav/totals flash
+  // a stale or empty period before the current cycle loads (cold-load flash).
+  if (financeValues.cyclesLoading) return null;
   if (financeValues.loading) return <PaydayViewSkeleton />;
 
   const {
@@ -167,34 +168,23 @@ export function PaydayView() {
         onUpdateExpected={handleUpdateExpected}
       />
 
-      <ConfirmSheet
+      <PaydaySheets
         income={selectedIncome}
-        isOpen={sheetOpen}
-        onClose={() => { setSheetOpen(false); setMutateError(null); }}
+        confirmOpen={sheetOpen}
+        onCloseConfirm={() => { setSheetOpen(false); setMutateError(null); }}
         onConfirm={handleConfirm}
-        loading={mutating}
-        error={mutateError}
-        fmt={fmt}
-      />
-
-      <CopyIncomeSheet
-        isOpen={copySheetOpen}
-        onClose={() => setCopySheetOpen(false)}
-        lastMonthLabel={prevPeriodLabel}
-        sources={prevSources}
-        fmt={fmt}
+        mutating={mutating}
+        mutateError={mutateError}
+        copyOpen={copySheetOpen}
+        onCloseCopy={() => setCopySheetOpen(false)}
+        prevPeriodLabel={prevPeriodLabel}
+        prevSources={prevSources}
         onCopy={handleCopy}
         copying={copying}
+        copiedCount={copiedCount}
+        periodLabel={periodLabel}
+        onDismissToast={() => setCopiedCount(0)}
       />
-
-      {copiedCount > 0 && (
-        <Toast
-          message={`Copied ${copiedCount} income ${copiedCount === 1 ? 'source' : 'sources'} to ${periodLabel}`}
-          actionLabel="Done"
-          onEdit={() => setCopiedCount(0)}
-          onDismiss={() => setCopiedCount(0)}
-        />
-      )}
     </div>
   );
 }

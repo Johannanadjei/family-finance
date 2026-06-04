@@ -22,8 +22,6 @@ export const mockCentre = {
   currency:          'GHS',
   surplus_target:    4500,
   owner_id:          'user-1',
-  cycle_anchor_type: 'calendar',   // Commit 14b — hubs default to calendar-month cycles
-  cycle_anchor_day:  null,
 };
 
 export const mockFmt = (n) => `GHS ${Math.round(n || 0).toLocaleString()}`;

@@ -16,12 +16,11 @@ vi.mock('../../services/income.service', () => ({
   bulkAddIncomeSources: vi.fn().mockResolvedValue({ error: null }),
 }));
 vi.mock('../../services/cycles.service', () => ({
-  createCycleByAnchor: vi.fn().mockResolvedValue({ data: { id: 'new-cyc-1' }, error: null }),
-  getCyclesForCentre:  vi.fn().mockResolvedValue({ data: [], error: null }),
+  createBudgetPeriod: vi.fn().mockResolvedValue({ data: { id: 'new-cyc-1' }, error: null }),
 }));
 
 import { bulkAddCategories } from '../../services/categories.service';
-import { createCycleByAnchor } from '../../services/cycles.service';
+import { createBudgetPeriod } from '../../services/cycles.service';
 
 const renderSheet = (props = {}) =>
   render(
@@ -159,6 +158,9 @@ describe('CreateHubSheet', () => {
     expect(screen.getByText('Ready to create?')).toBeTruthy();
   });
 
+  // Phase B (anchor pivot): the confirm path creates the hub's first budget period via
+  // create_budget_period (calendar-month default for today) before bulk-inserting,
+  // then stamps categories with the new cycle id.
   it('calls onComplete with new centre id after successful creation', async () => {
     const onComplete = vi.fn();
     renderSheet({ onComplete });
@@ -167,11 +169,14 @@ describe('CreateHubSheet', () => {
     await vi.waitFor(() => expect(onComplete).toHaveBeenCalledWith('new-c-1'));
   });
 
-  it('creates the first cycle and stamps categories with its id (CYC02 closure)', async () => {
+  it('creates the first budget period and stamps categories with its id (CYC02 closure)', async () => {
     renderSheet();
     goToConfirm();
     fireEvent.click(screen.getByText('Create Hub 🎉'));
-    await vi.waitFor(() => expect(createCycleByAnchor).toHaveBeenCalledWith('new-c-1', expect.objectContaining({ anchor_type: 'calendar' })));
+    await vi.waitFor(() => expect(createBudgetPeriod).toHaveBeenCalledWith('new-c-1', expect.objectContaining({
+      startDate: expect.stringMatching(/^\d{4}-\d{2}-01$/),
+      endDate:   expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    })));
     await vi.waitFor(() => expect(bulkAddCategories).toHaveBeenCalledWith('new-c-1', expect.anything(), 'new-cyc-1'));
   });
 });

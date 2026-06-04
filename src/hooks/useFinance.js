@@ -19,11 +19,11 @@
  * - txs always reflects current month unless loadMonth() is called
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
-import { getCyclesForCentre, createCycleByAnchor } from '../services/cycles.service';
-import { getActiveCycle, sliceByCycle, computeNextCycleParams } from '../lib/cycles';
+import { getCyclesForCentre, createBudgetPeriod } from '../services/cycles.service';
+import { getActiveCycle, sliceByCycle } from '../lib/cycles';
 import { getToday } from '../lib/dates';
 import {
   calcTotalIncome, calcTotalSpent, calcBudgetUsedPct,
@@ -130,7 +130,14 @@ export function useFinance({ centre, allCategories }) {
   // Loaded once per centre (keyed on centreId, NOT activeMonth) — cycles span the
   // whole hub, so month navigation must not refetch them.
   const loadCycles = useCallback(async () => {
-    if (!centreId) { setCycles([]); setCyclesLoading(false); return; }
+    // Null-centre pre-settle: useFinance mounts above App's auth/centre gates, so
+    // this fires once with centreId === null before the centre resolves. We must
+    // NOT flip cyclesLoading false here — leaving it at its initial true keeps the
+    // views' `if (cyclesLoading) return null` gate engaged so they never render a
+    // phantom empty/zero frame (NoCurrentPeriodPrompt + GHS 0) when the dashboard
+    // first mounts. Only a REAL loadCycles (valid centreId) settles the flag.
+    // See docs/engineering-decisions.md (cold-load flash post-mortem).
+    if (!centreId) { setCycles([]); return; }
     setCyclesLoading(true);
     const { error: sessionErr } = await waitForSession();
     if (sessionErr) {
@@ -168,30 +175,9 @@ export function useFinance({ centre, allCategories }) {
     load(cid);
   }, [centreId, cyclesLoading, activeCycleId, activeCycle?.id, load]);
 
-  // Auto-create the current cycle when today falls in a gap (no cycle covers it).
-  // Anchor-aware (Commit 14b): the new cycle's range comes from the hub's anchor
-  // setting + the most recent cycle (reference = prev.end+1, else today) — lib/cycles
-  // owns the math. The cycles.length===0 guard is RELAXED so a brand-new hub with no
-  // cycles still self-heals (defence-in-depth for the CYC02 closure; onboarding +
-  // CreateHubSheet create the first cycle up front). Silent — the ref guards one
-  // attempt per hub so a benign failure or a CYC01 race can't loop.
-  const autoCreateRef = useRef(null);
-  useEffect(() => {
-    if (cyclesLoading || !centreId) return;
-    const today = getToday();
-    const hasCurrent = cycles.some(c => !c.deleted_at && c.start_date <= today && c.end_date >= today);
-    if (hasCurrent) { autoCreateRef.current = centreId; return; }
-    if (autoCreateRef.current === centreId) return;   // already attempted for this hub
-    autoCreateRef.current = centreId;
-    const prevCycle = cycles.filter(c => !c.deleted_at).sort((a, b) => b.end_date.localeCompare(a.end_date))[0] || null;
-    createCycleByAnchor(centreId, computeNextCycleParams(centre, prevCycle, today)).then(({ error }) => {
-      if (error && error.code !== 'CYC01') {
-        console.error('[useFinance] auto-create cycle error:', error.message);
-        return;
-      }
-      loadCycles();   // success or lost-the-race (CYC01) → refetch to pick up the cycle
-    });
-  }, [cycles, cyclesLoading, centreId]);
+  // Anchor-aware auto-create (Commit 14b) was removed in Phase A of the anchor
+  // pivot. Budget periods become user-driven in Phase B (no silent gap-filling).
+  // See engineering-decisions.md.
 
   // ── Derived values ────────────────────────────────────────────────────────
 
@@ -296,6 +282,18 @@ export function useFinance({ centre, allCategories }) {
     return cycle;
   }, [cycles, loadMonth]);
 
+  // Create a user-driven budget period (Phase B), then refresh: re-fetch cycles so the
+  // new period appears (NoCurrentPeriodPrompt flips off, nav updates) and select it so
+  // the views land on the freshly-created window. The service gates on owner/full_access
+  // and traps overlap as CYC01 — errors pass straight through to the caller's UI.
+  const createPeriod = useCallback(async ({ name = null, startDate, endDate }) => {
+    const { data, error } = await createBudgetPeriod(centreId, { name, startDate, endDate });
+    if (error) return { data: null, error };
+    await loadCycles();
+    setActiveCycleId(data.id);
+    return { data, error: null };
+  }, [centreId, loadCycles]);
+
   // ── Reload ────────────────────────────────────────────────────────────────
 
   // Re-fetch the currently-viewed cycle. Resolves the cid via the same viewedCycle
@@ -334,11 +332,14 @@ export function useFinance({ centre, allCategories }) {
 
     // Cycles (Budget Cycles) — hub-scoped; views migrate to these in Commits 5-9
     cycles,
+    cyclesLoading,  // true until a real (valid-centre) loadCycles settles — views gate their
+                    // first paint on it so cycles resolve before any empty-state renders.
     activeCycle,
     activeCycleId,
     viewedCycleId,  // activeCycleId ?? activeCycle?.id — single source for the cycle-id fallback (Commit 14a)
     loadCycle,
     reloadCycles: loadCycles,
+    createPeriod,
 
     // Derived financial values
     monthlyIncome,

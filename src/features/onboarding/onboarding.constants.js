@@ -29,15 +29,6 @@ export const CURRENCIES = [
 export const CENTRE_ICONS = ['🏠', '✈️', '🏢', '🏪', '🌍', '💼', '🏡', '🏗️'];
 export const INCOME_ICONS  = ['💰', '💵', '🏠', '💼', '📈', '🎯', '🏪', '✈️'];
 
-// Budget-cycle anchor options (Commit 14b). The `value`s mirror the DB CHECK on
-// budget_centres.cycle_anchor_type and lib/cycles' anchor handling — keep in sync.
-export const CYCLE_ANCHOR_OPTIONS = [
-  { value: 'calendar',          label: 'Calendar month (1st – end)' },
-  { value: 'fixed_day',         label: 'Fixed day of month' },
-  { value: 'last_working_day',  label: 'Last working day' },
-  { value: 'last_day_of_month', label: 'Last day of month' },
-];
-
 export const DEFAULT_CATEGORIES = [
   { name: 'Rent / Mortgage', icon: '🏠', budget_amount: 0, is_fixed: true,  sort_order: 0  },
   { name: 'Electricity',     icon: '⚡', budget_amount: 0, is_fixed: true,  sort_order: 1  },
