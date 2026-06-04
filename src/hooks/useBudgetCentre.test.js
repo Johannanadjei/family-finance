@@ -374,6 +374,25 @@ describe('useBudgetCentre — all-months categories (Phase 2D)', () => {
     expect(result.current.allCategories).toHaveLength(4);
   });
 
+  // reloadCategories — the post-reset re-sync (cross-context bridge from useResetPeriod).
+  it('reloadCategories re-fetches allCategories from the server', async () => {
+    const { result } = await mountLoaded();
+    expect(result.current.allCategories).toHaveLength(4);
+    // Server now returns fewer rows (a reset soft-deleted the rest).
+    getAllCategories.mockResolvedValue({ data: mockAllCategories.slice(0, 2), error: null });
+    await act(async () => { await result.current.reloadCategories(); });
+    expect(getAllCategories).toHaveBeenLastCalledWith('c-1');
+    expect(result.current.allCategories).toHaveLength(2);
+  });
+
+  it('reloadCategories keeps the existing list on fetch error (§12 — never blanks it)', async () => {
+    const { result } = await mountLoaded();
+    expect(result.current.allCategories).toHaveLength(4);
+    getAllCategories.mockResolvedValue({ data: null, error: { message: 'network' } });
+    await act(async () => { await result.current.reloadCategories(); });
+    expect(result.current.allCategories).toHaveLength(4);   // unchanged, not wiped to []
+  });
+
   // The current-cycle `categories` slice moved to useFinance (Commit 11.5) — its
   // cycle-keyed derivation is covered in useFinance.test.js. useBudgetCentre owns
   // only allCategories + the mutations below.

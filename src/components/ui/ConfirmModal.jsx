@@ -13,6 +13,9 @@
  * @param {string}   body
  * @param {string}   [confirmLabel='Continue']
  * @param {string}   [cancelLabel='Cancel']
+ * @param {'primary'|'danger'} [confirmTone='primary'] — 'danger' renders the confirm
+ *   button in red for destructive actions (e.g. Reset budget period). Default keeps
+ *   the existing primary-green styling, so prior consumers are unaffected.
  * @param {function} onConfirm
  * @param {function} onCancel
  */
@@ -20,7 +23,7 @@
 import { createPortal }   from 'react-dom';
 import { useModalChrome } from '../../hooks/useModalChrome';
 
-export function ConfirmModal({ open, title, body, confirmLabel = 'Continue', cancelLabel = 'Cancel', onConfirm, onCancel }) {
+export function ConfirmModal({ open, title, body, confirmLabel = 'Continue', cancelLabel = 'Cancel', confirmTone = 'primary', onConfirm, onCancel }) {
   useModalChrome({ isOpen: open, onClose: onCancel });   // call ABOVE the guard, per its contract
   if (!open) return null;
 
@@ -34,7 +37,7 @@ export function ConfirmModal({ open, title, body, confirmLabel = 'Continue', can
           <button onClick={onCancel} style={{ padding: '12px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-chip-bg, #f3f4f6)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-text, #1c1917)', fontFamily: "'Nunito', sans-serif" }}>
             {cancelLabel}
           </button>
-          <button onClick={onConfirm} style={{ padding: '12px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+          <button onClick={onConfirm} style={{ padding: '12px', borderRadius: 12, border: 'none', background: confirmTone === 'danger' ? 'var(--c-danger, #dc2626)' : 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
             {confirmLabel}
           </button>
         </div>

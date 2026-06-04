@@ -51,4 +51,15 @@ describe('ConfirmModal', () => {
     fireEvent.click(screen.getByText('Cancel'));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
+
+  // confirmTone — backward-compatible danger styling for destructive confirms.
+  it('renders the confirm button in danger red when confirmTone="danger"', () => {
+    render(<ConfirmModal {...base} confirmLabel="Reset" confirmTone="danger" />);
+    expect(screen.getByText('Reset').style.background).toMatch(/dc2626|c-danger/);
+  });
+
+  it('defaults the confirm button to primary (not danger) — prior consumers unaffected', () => {
+    render(<ConfirmModal {...base} />);
+    expect(screen.getByText('Continue').style.background).toMatch(/064e3b|c-primary/);
+  });
 });

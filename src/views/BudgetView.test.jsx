@@ -12,9 +12,12 @@ import { mockCentre, mockFmt, mockCategories, mockPrevMonthCategories, mockTxs }
 // Mutable so tests can flip `allCategories` empty to exercise the rollforward state.
 // BudgetView reads allCategories and filters the viewed cycle locally by cycle_id
 // (Commit 11.5), recomputing spend from txs — so the mock provides those, not totals.
+let mockCan = () => true;   // owner/full_access by default; standard-member tests flip it
 const mockBudgetCentre = {
   centre:                  mockCentre,
   fmt:                     mockFmt,
+  can:                     (p) => mockCan(p),
+  reloadCategories:        vi.fn().mockResolvedValue(undefined),   // post-reset re-sync
   allCategories:           mockCategories,                 // month === current month
   addCategory:             vi.fn().mockResolvedValue({ error: null }),
   getCatIcon:              (name) => name === 'Groceries' ? '🛒' : '🚗',
@@ -44,6 +47,7 @@ const mockFinance = {
   activeCycle:   THIS_CYCLE,
   activeCycleId: null,                // null → follows the auto-resolved current cycle
   loadCycle:     vi.fn(),
+  resetPeriod:   vi.fn().mockResolvedValue({ data: { categories_reset: 0, transactions_reset: 0 }, error: null }),
 };
 
 vi.mock('../context/FinanceContext', () => ({
@@ -276,5 +280,62 @@ describe('BudgetView — cycles', () => {
     fireEvent.click(screen.getByText('Continue'));
     expect(screen.queryByText('Edit past period?')).toBeNull();
     expect(screen.getByText('Add Budget Category')).toBeTruthy();   // sheet now open
+  });
+});
+
+// ── Reset budget period + standard-member RBAC gate ───────────────────────────
+describe('BudgetView — reset period + RBAC gate', () => {
+  const FUTURE = { id: 'cyc-fut', name: 'Future 2099', start_date: '2099-01-01', end_date: '2099-01-31', deleted_at: null };
+
+  beforeEach(() => {
+    mockCan = () => true;
+    Object.assign(mockFinance, { cycles: [FUTURE], activeCycle: FUTURE, activeCycleId: null });
+    mockBudgetCentre.allCategories = [];   // empty future period (kebab tests don't need rows)
+  });
+  afterEach(() => {
+    mockCan = () => true;
+    Object.assign(mockFinance, { cycles: [THIS_CYCLE], activeCycle: THIS_CYCLE, activeCycleId: null });
+    mockBudgetCentre.allCategories = mockCategories;
+  });
+
+  it('shows the period-actions kebab on a future period', () => {
+    renderView();
+    expect(screen.getByTestId('period-actions-btn')).toBeTruthy();
+  });
+
+  it('does NOT show the kebab on the current period', () => {
+    Object.assign(mockFinance, { cycles: [THIS_CYCLE], activeCycle: THIS_CYCLE });
+    renderView();
+    expect(screen.queryByTestId('period-actions-btn')).toBeNull();
+  });
+
+  it('opening the kebab and tapping Reset opens the reset confirm naming the period', () => {
+    renderView();
+    fireEvent.click(screen.getByTestId('period-actions-btn'));
+    fireEvent.click(screen.getByTestId('reset-period-btn'));
+    expect(screen.getByText('Reset Future 2099?')).toBeTruthy();
+  });
+
+  it('confirming the reset calls resetPeriod with the future cycle id', async () => {
+    const resetPeriod = vi.fn().mockResolvedValue({ data: { categories_reset: 1, transactions_reset: 0 }, error: null });
+    mockFinance.resetPeriod = resetPeriod;
+    renderView();
+    fireEvent.click(screen.getByTestId('period-actions-btn'));
+    fireEvent.click(screen.getByTestId('reset-period-btn'));
+    fireEvent.click(screen.getByText('Reset'));   // confirm
+    await waitFor(() => expect(resetPeriod).toHaveBeenCalledWith('cyc-fut'));
+  });
+
+  it('standard member: the New budget period button is disabled', () => {
+    mockCan = () => false;
+    renderView();
+    expect(screen.getByTestId('new-period-btn').disabled).toBe(true);
+  });
+
+  it('standard member: the Reset kebab item is disabled', () => {
+    mockCan = () => false;
+    renderView();
+    fireEvent.click(screen.getByTestId('period-actions-btn'));
+    expect(screen.getByTestId('reset-period-btn').disabled).toBe(true);
   });
 });
