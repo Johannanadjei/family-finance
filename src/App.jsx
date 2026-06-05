@@ -21,9 +21,8 @@ import { usePin }                                from './hooks/usePin';
 import { useBudgetCentre }                       from './hooks/useBudgetCentre';
 import { useCentres }                            from './hooks/useCentres';
 import { useFinance }                            from './hooks/useFinance';
-import { BudgetCentreProvider }                  from './context/BudgetCentreContext';
-import { FinanceProvider }                       from './context/FinanceContext';
-import { PinProvider }                           from './context/PinContext';
+import { useSubscription }                       from './hooks/useSubscription';
+import { DashboardProviders }                    from './components/providers/DashboardProviders';
 import { useBudgetCentreContext }                from './context/BudgetCentreContext';
 import { useFinanceContext }                     from './context/FinanceContext';
 import { applyTheme, resolveSkin }                            from './lib/themes';
@@ -199,7 +198,13 @@ export default function App() {
           verifyPin, setupPin, removePin }                 = usePin(user);
   const [pinSkipped, setPinSkipped]                        = useState(false);
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
-  const { centres, archivedCentres, plan: userPlan, reload: reloadCentres } = useCentres(user);
+  const { centres, archivedCentres, reload: reloadCentres } = useCentres(user);
+  // Plan tier sourced from the subscriptions table (replaces the old users.plan
+  // read). Spread into FinanceContext below as `userPlan` so existing consumers
+  // (ThemeSection, MembersSection, GuestSettingsSection, SidePanel) keep working
+  // unchanged this commit; their migration to useIsPro() is gate work.
+  const subscription                                       = useSubscription(user);
+  const userPlan                                           = subscription.tier;
   const { centre, allCategories, reloadCategories, members, currentMemberRole,
           addCategory, updateCentre, updateCategory, deleteCategory,
           prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth,
@@ -341,47 +346,50 @@ export default function App() {
   );
 
   // ── Dashboard ─────────────────────────────────────────────────────────────
+  const budgetCentreValue = {
+    centre,
+    categories: financeValues.categories,
+    allCategories,
+    reloadCategories,
+    members,
+    currentMemberRole,
+    currentUserId: user?.id || null,
+    addCategory,
+    updateCentre,
+    updateCategory,
+    deleteCategory,
+    prevMonthCategories,
+    loadPrevMonthCategories,
+    copyCategoriesToMonth,
+    archiveCentre: handleArchiveHub,
+    permanentDeleteCentre: handlePermanentDeleteHub,
+    restoreHub: handleRestoreHub,
+    inviteMember,
+    removeMember,
+    updateMemberRole,
+    getInvites,
+    cancelInvite,
+    centreCount: centres.length,
+  };
+
   return (
-    <PinProvider value={{ hasPinSetup, pinLoading, pinUnlocked, attempts, lockedUntil, verifyPin, setupPin, removePin }}>
-    <BudgetCentreProvider
-      centre={centre}
-      categories={financeValues.categories}
-      allCategories={allCategories}
-      reloadCategories={reloadCategories}
-      members={members}
-      currentMemberRole={currentMemberRole}
-      currentUserId={user?.id || null}
-      addCategory={addCategory}
-      updateCentre={updateCentre}
-      updateCategory={updateCategory}
-      deleteCategory={deleteCategory}
-      prevMonthCategories={prevMonthCategories}
-      loadPrevMonthCategories={loadPrevMonthCategories}
-      copyCategoriesToMonth={copyCategoriesToMonth}
-      archiveCentre={handleArchiveHub}
-      permanentDeleteCentre={handlePermanentDeleteHub}
-      restoreHub={handleRestoreHub}
-      inviteMember={inviteMember}
-      removeMember={removeMember}
-      updateMemberRole={updateMemberRole}
-      getInvites={getInvites}
-      cancelInvite={cancelInvite}
-      centreCount={centres.length}
+    <DashboardProviders
+      pin={{ hasPinSetup, pinLoading, pinUnlocked, attempts, lockedUntil, verifyPin, setupPin, removePin }}
+      subscription={subscription}
+      budgetCentre={budgetCentreValue}
+      finance={{ ...financeValues, userPlan }}
     >
-      <FinanceProvider value={{ ...financeValues, userPlan }}>
-        <BrowserRouter>
-          <DashboardShell
-            centres={centres}
-            archivedCentres={archivedCentres}
-            activeCentreId={centre?.id || null}
-            userPlan={userPlan}
-            onSwitchCentre={handleSwitchCentre}
-            onHubCreated={handleHubCreated}
-            onRestoreHub={handleRestoreHub}
-          />
-        </BrowserRouter>
-      </FinanceProvider>
-    </BudgetCentreProvider>
-    </PinProvider>
+      <BrowserRouter>
+        <DashboardShell
+          centres={centres}
+          archivedCentres={archivedCentres}
+          activeCentreId={centre?.id || null}
+          userPlan={userPlan}
+          onSwitchCentre={handleSwitchCentre}
+          onHubCreated={handleHubCreated}
+          onRestoreHub={handleRestoreHub}
+        />
+      </BrowserRouter>
+    </DashboardProviders>
   );
 }

@@ -39,6 +39,21 @@ export function makeBudgetCentreMock(overrides = {}) {
   };
 }
 
+export function makeSubscriptionContext(overrides = {}) {
+  return {
+    useSubscriptionContext: () => ({
+      subscription: null,
+      tier:         'free',
+      isActive:     false,
+      isPro:        false,
+      isLoading:    false,
+      error:        null,
+      refresh:      vi.fn(),
+      ...overrides,
+    }),
+  };
+}
+
 export function makeFinanceMock(overrides = {}) {
   return {
     useFinanceContext: () => ({

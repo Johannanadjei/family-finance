@@ -218,24 +218,7 @@ export const archiveCentre = async (centreId) => {
   return { error };
 };
 
-/**
- * Fetch the current user's plan tier.
- * Returns 'free' as a safe default on any error.
- */
-export const getUserPlan = async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { data: 'free', error: null };
-
-  const { data, error } = await supabase
-    .from('users')
-    .select('plan')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error('[centres.service] getUserPlan error:', error.message);
-    return { data: 'free', error };
-  }
-  return { data: data?.plan || 'free', error: null };
-};
+// Plan tier resolution moved to services/subscriptions.service.js + useSubscription
+// (subscriptions table is the source of truth; no row → free). The old getUserPlan
+// (users.plan) read was removed in the Pro subscription foundation commit.
 

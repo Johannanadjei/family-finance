@@ -3967,3 +3967,58 @@ been one line; an explicit one is five. Know which kind you're extending before 
   categories in useBudgetCentre), refreshing one and assuming the rest follow is the bug.
   The orchestrating hook bridges the contexts and re-syncs each. Transactions refreshing
   "for free" (via an unrelated loader toggle) is the trap — it makes the gap look fixed.
+
+---
+
+## [2026-06-05] Pro subscription foundation — table + plans/pricing + useSubscription/useIsPro (no gates)
+
+**Context:**
+Money B.O.S launches freemium (Free + Pro, ₵40/mo or ₵400/yr via Paystack, cedis only,
+no trial — the free tier IS the trial). Phase 1 diagnosis found partial, client-only,
+trivially-bypassable plan gating already in the tree (`userPlan` read from FinanceContext
+by ThemeSection, MembersSection, GuestSettingsSection, SidePanel), conflicting caps spread
+across `lib/roles.js` and `onboarding.constants.js`, and `getUserPlan` reading a `users.plan`
+column with no migration (so everyone resolved to free). No `subscriptions` table, no
+Paystack anything.
+
+**Decision (foundation only — NO feature gate is activated in this commit):**
+- `scripts/migrate_19_subscriptions.sql` — additive `subscriptions` table (one row = source
+  of truth; **no row → free**, Approach 1). RLS: own-row SELECT only; **no client write
+  policy** — the Paystack webhook writes as service-role (§9.6). Stores BOTH a normalized
+  `status` (app logic) and raw `paystack_status` (audit). Self-verifying `DO` block inside
+  `BEGIN/COMMIT` rolls the whole migration back on any failed assertion.
+- `lib/plans.js` — single source of truth for capability limits (`FREE_LIMITS`/`PRO_LIMITS`/
+  `getLimitsForTier`), incl. `maxIncomeStreams` folding in the old `MAX_FREE_INCOMES`.
+- `lib/pricing.js` — amounts in **pesewas** (Paystack subunit; ₵40 → 4000), `formatCedis`,
+  null `paystack_plan_code` placeholders.
+- `services/subscriptions.service.js` — `getCurrentSubscription` (RLS-gated read) + pure
+  `resolveSubscription(row, now)` (none/expired/canceled-status → free; active-in-period,
+  incl. cancel-at-period-end, → its tier).
+- `SubscriptionContext` (spread pattern) + `useSubscription` + `useIsPro`.
+- `components/providers/DashboardProviders.jsx` — extracted the provider nest from App.jsx
+  (Pin → Subscription → BudgetCentre → Finance) to keep App.jsx under its 400-line cap
+  ("extract, don't compress").
+- Removed `getUserPlan` from `centres.service.js`; `useCentres` no longer fetches plan.
+  `App.jsx` now sources `userPlan` from `useSubscription().tier` and still spreads it into
+  FinanceContext as a **compat shim**, so the four existing `userPlan` consumers keep working
+  untouched.
+
+**Rules derived:**
+- **Revenue/plan state is server-authoritative and never client-writable** — RLS grants read
+  of the own row only; all writes come from the service-role webhook.
+- **One source of truth for limits** (`lib/plans.js`); duplicated caps get folded in, not
+  re-declared.
+- **Pre-settle protection applies to plan state too** — `useSubscription` keeps `isLoading`
+  true while `user` is null (pre-hydration), never pre-settling to a "free" answer that would
+  flash locked UI. (Flash-fix lesson, generalized.)
+- **Foundation before gates** — ship the plumbing inert (no gate reads it yet); activate
+  gates in separate commits so a regression in either layer is isolated.
+
+**Flagged for the GATE commits (NOT changed here):**
+- `lib/roles.js` `MAX_MEMBERS.pro = 6` → 15; MembersSection "up to 6 members" copy.
+- `SidePanel.jsx` hardcoded hub limit `>= 10` → read from `plans.js`.
+- Migrate the four `userPlan`-from-FinanceContext consumers (ThemeSection, MembersSection,
+  GuestSettingsSection, SidePanel) to `useIsPro()` / `getLimitsForTier`, then drop the
+  FinanceContext `userPlan` compat shim.
+- `migrate_19` is committed but NOT auto-run; apply it in the Supabase SQL editor (additive,
+  safe anytime — single shared project).

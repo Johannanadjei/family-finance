@@ -62,6 +62,13 @@ vi.mock('./hooks/useFinance', () => ({
   useFinance: () => ({}),
 }));
 
+vi.mock('./hooks/useSubscription', () => ({
+  useSubscription: () => ({
+    subscription: null, tier: 'free', isActive: false, isPro: false,
+    isLoading: false, error: null, refresh: vi.fn(),
+  }),
+}));
+
 // OnboardingFlow stub — exposes the onComplete handoff as a clickable button.
 vi.mock('./features/onboarding/OnboardingFlow', () => ({
   OnboardingFlow: ({ onComplete }) => (
