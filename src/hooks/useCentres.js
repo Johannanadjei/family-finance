@@ -1,21 +1,21 @@
 /**
  * hooks/useCentres.js
  *
- * Loads all budget centres the current user belongs to,
- * archived centres (is_archived = true, not deleted),
- * and the user's plan tier (free | pro).
- * Used by SidePanel for hub switching, creation gating, and restore.
- * Reloads when user changes.
+ * Loads all budget centres the current user belongs to and archived centres
+ * (is_archived = true, not deleted). Used by SidePanel for hub switching and
+ * restore. Reloads when user changes.
+ *
+ * Plan tier is NOT loaded here — it moved to useSubscription (subscriptions
+ * table source of truth). The old getUserPlan(users.plan) read was removed.
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { getCentres, getArchivedCentres, getUserPlan } from '../services/centres.service';
+import { getCentres, getArchivedCentres } from '../services/centres.service';
 import { waitForSession } from '../lib/auth';
 
 export function useCentres(user) {
   const [centres,         setCentres]         = useState([]);
   const [archivedCentres, setArchivedCentres] = useState([]);
-  const [plan,            setPlan]            = useState('free');
   const [loading,         setLoading]         = useState(true);
   const [error,           setError]           = useState(null);
 
@@ -23,7 +23,6 @@ export function useCentres(user) {
     if (!user) {
       setCentres([]);
       setArchivedCentres([]);
-      setPlan('free');
       setLoading(false);
       return;
     }
@@ -39,10 +38,9 @@ export function useCentres(user) {
       return;
     }
 
-    const [centresResult, archivedResult, planResult] = await Promise.all([
+    const [centresResult, archivedResult] = await Promise.all([
       getCentres(),
       getArchivedCentres(),
-      getUserPlan(),
     ]);
 
     if (centresResult.error) {
@@ -52,11 +50,10 @@ export function useCentres(user) {
       setCentres(centresResult.data || []);
     }
     setArchivedCentres(archivedResult.data || []);
-    setPlan(planResult.data || 'free');
     setLoading(false);
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
 
-  return { centres, archivedCentres, plan, loading, error, reload: load };
+  return { centres, archivedCentres, loading, error, reload: load };
 }
