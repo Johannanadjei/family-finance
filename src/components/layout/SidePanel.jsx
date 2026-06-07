@@ -11,6 +11,7 @@ import { createPortal }                    from 'react-dom';
 import { useNavigate }                     from 'react-router-dom';
 import { useModalChrome }                  from '../../hooks/useModalChrome';
 import { ArchivedHubsList }                from './ArchivedHubsList';
+import { HubFooter }                       from './HubFooter';
 import { getInstallPrompt, triggerInstall } from '../../lib/pwa';
 import { useBudgetCentreContext }          from '../../context/BudgetCentreContext';
 import { useAuth }                         from '../../hooks/useAuth';
@@ -18,7 +19,7 @@ import { useAuth }                         from '../../hooks/useAuth';
 const _isIOS        = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const _isStandalone = window.matchMedia?.('(display-mode: standalone)')?.matches ?? false;
 
-export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], activeCentreId, onSwitch, onCreateHub, onRestore, userPlan }) {
+export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], activeCentreId, onSwitch, onCreateHub, onRestore, userPlan, hubCount = 0 }) {
   const [hoveredRow,  setHoveredRow]  = useState(null);
   const [installing,  setInstalling]  = useState(false);
   const navigate                      = useNavigate();
@@ -40,7 +41,6 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
     navigate('/');
   };
 
-  const atProLimit = userPlan === 'pro' && centres.length >= 10;
   const n          = centres.length;
   const countLabel = n === 0 ? 'BOS Hubs' : n === 1 ? '1 BOS Hub' : `${n} BOS Hubs`;
 
@@ -175,22 +175,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
 
         {/* Footer — create / upgrade (hidden for standard members) */}
         {can('settings') && (
-          <div style={{ padding: '12px 16px calc(16px + env(safe-area-inset-bottom, 20px))', borderTop: '1px solid var(--c-border, #e5e7eb)', flexShrink: 0 }}>
-            {userPlan === 'free' ? (
-              <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 12, padding: '12px 14px' }}>
-                <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', fontWeight: 700 }}>Free plan · 1 hub included</p>
-                <button disabled style={{ width: '100%', padding: '11px', borderRadius: 10, border: '1.5px dashed var(--c-border, #e5e7eb)', background: 'transparent', color: 'var(--c-muted, #9ca3af)', fontSize: 14, fontWeight: 700, cursor: 'not-allowed', fontFamily: "'Nunito', sans-serif" }}>
-                  Upgrade to add more hubs
-                </button>
-              </div>
-            ) : atProLimit ? (
-              <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0, fontWeight: 600, textAlign: 'center' }}>Maximum 10 hubs reached</p>
-            ) : (
-              <button onClick={onCreateHub} style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                + New BOS Hub
-              </button>
-            )}
-          </div>
+          <HubFooter userPlan={userPlan} hubCount={hubCount} onCreateHub={onCreateHub} />
         )}
       </aside>
     </>,

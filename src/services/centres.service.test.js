@@ -9,9 +9,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-let mockResult;   // resolved by the terminal .maybeSingle()
-let usedSingle;   // true if .single() was called (should never happen for updateCentre)
-let updateArg;    // payload passed to .update() — asserts the column whitelist
+let mockResult;     // resolved by the terminal .maybeSingle()
+let usedSingle;     // true if .single() was called (should never happen for updateCentre)
+let updateArg;      // payload passed to .update() — asserts the column whitelist
+let mockAuth;       // resolved by supabase.auth.getUser()
+let mockRpcResult;  // resolved by supabase.rpc('create_hub', …)
+let rpcCalled;      // true if .rpc() was invoked
+let rpcArgs;        // args passed to .rpc() — asserts the param mapping
 
 vi.mock('../lib/supabase', () => {
   const make = () => {
@@ -26,17 +30,27 @@ vi.mock('../lib/supabase', () => {
     };
     return q;
   };
-  return { supabase: { from: () => make() } };
+  return {
+    supabase: {
+      from: () => make(),
+      auth: { getUser: () => Promise.resolve(mockAuth) },
+      rpc:  (_name, args) => { rpcCalled = true; rpcArgs = args; return Promise.resolve(mockRpcResult); },
+    },
+  };
 });
 
 vi.mock('../lib/auth', () => ({ warnOnEmptyColdLoad: vi.fn() }));
 
-import { updateCentre } from './centres.service';
+import { updateCentre, createCentre } from './centres.service';
 
 beforeEach(() => {
-  mockResult = { data: null, error: null };
-  usedSingle = false;
-  updateArg  = undefined;
+  mockResult    = { data: null, error: null };
+  usedSingle    = false;
+  updateArg     = undefined;
+  mockAuth      = { data: { user: { id: 'u-1' } }, error: null };
+  mockRpcResult = { data: null, error: null };
+  rpcCalled     = false;
+  rpcArgs       = undefined;
 });
 
 describe('updateCentre — three-state contract', () => {
@@ -71,5 +85,49 @@ describe('updateCentre — three-state contract', () => {
     const { data, error } = await updateCentre('c-1', { name: '' });
     expect(data).toBeNull();
     expect(error).toBeTruthy();
+  });
+});
+
+describe('createCentre — atomic RPC + hub-cap gate', () => {
+  it('returns the created hub row on success', async () => {
+    mockRpcResult = { data: { id: 'c-9', name: 'New Hub' }, error: null };
+    const { data, error } = await createCentre({ name: 'New Hub', currency: 'GHS' });
+    expect(error).toBeNull();
+    expect(data).toEqual({ id: 'c-9', name: 'New Hub' });
+    expect(rpcCalled).toBe(true);
+    expect(rpcArgs.p_name).toBe('New Hub');
+    expect(rpcArgs.p_currency).toBe('GHS');
+  });
+
+  it('maps a HUB01 cap rejection to the friendly upgrade message + preserves the code', async () => {
+    mockRpcResult = { data: null, error: { code: 'HUB01', message: 'hub limit reached: 1 of 1 for tier free' } };
+    const { data, error } = await createCentre({ name: 'Second Hub', currency: 'GHS' });
+    expect(data).toBeNull();
+    expect(error.code).toBe('HUB01');
+    expect(error.message).toMatch(/reached your plan's hub limit/i);
+    expect(error.message).toMatch(/Upgrade to Pro/i);
+  });
+
+  it('surfaces a non-cap RPC error truthfully', async () => {
+    mockRpcResult = { data: null, error: { code: '23505', message: 'boom' } };
+    const { data, error } = await createCentre({ name: 'X', currency: 'GHS' });
+    expect(data).toBeNull();
+    expect(error.message).toBe('boom');
+    expect(error.code).not.toBe('HUB01');
+  });
+
+  it('returns a validation error WITHOUT calling the RPC on a blank name', async () => {
+    const { data, error } = await createCentre({ name: '', currency: 'GHS' });
+    expect(data).toBeNull();
+    expect(error).toBeTruthy();
+    expect(rpcCalled).toBe(false);
+  });
+
+  it('returns Not authenticated without calling the RPC when there is no user', async () => {
+    mockAuth = { data: { user: null }, error: null };
+    const { data, error } = await createCentre({ name: 'X', currency: 'GHS' });
+    expect(data).toBeNull();
+    expect(error).toBeTruthy();
+    expect(rpcCalled).toBe(false);
   });
 });
