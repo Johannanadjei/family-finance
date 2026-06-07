@@ -6,60 +6,78 @@ dependency order.
 
 > Extracted/authored pre-migration, 2026-06-05. Companion to the source-of-truth
 > work in commits `9a92591` (functions + triggers), `c926499` (RLS policies),
-> and `c63f7b9` (`get_centre_guests`).
+> `c63f7b9` (`get_centre_guests`), and `55a469f` (`schema_base.sql` — the 8 base tables).
 
 ---
 
-## ⚠️ Read this first — the scripts are NOT a complete from-zero build
+## ⚠️ Read this first — two ways to rebuild
 
-The repo does **not** contain `CREATE TABLE` for the 8 core tables. They were
-created by hand in the Supabase SQL Editor during early development and were
-never committed. Only **3 of 11** tables have committed DDL:
+**All 11 tables now have committed DDL.** As of `55a469f`, the 8 core tables live
+in `schema_base.sql` (extracted via `pg_dump --schema-only`); the other 3 ship in
+their feature files:
 
-| Table | DDL location |
+| Table(s) | DDL location |
 |---|---|
+| `users`, `user_preferences`, `budget_centres`, `budget_centre_members`, `guest_users`, `budget_categories`, `income_sources`, `transactions` | `schema_base.sql` |
 | `centre_invites` | `members_rbac.sql` |
 | `budget_cycles` | `migrate_cycles_schema.sql` |
 | `subscriptions` | `migrate_19_subscriptions.sql` |
 
-**Missing base DDL (8 tables):** `budget_centres`, `budget_centre_members`,
-`users`, `user_preferences`, `budget_categories`, `income_sources`,
-`transactions`, `guest_users`.
+`schema_base.sql` is the **end-state** structure (a `pg_dump` reflects the
+fully-evolved schema), so it already contains every column the incremental
+`migrate_*` files added (`cycle_id`, `is_archived`, `pin_hash`, `from_spare`,
+`month`, `income_source_id`, …). That gives two coherent rebuild strategies:
 
-Everything in `scripts/` *assumes those 8 tables already exist* (they `ALTER`,
-backfill, trigger, and gate them). Replaying the scripts onto an empty database
-will fail at the first `ALTER TABLE`/policy that references a missing table.
+### ✅ Strategy A — End-state rebuild (RECOMMENDED for a fresh project)
 
-### ✅ Recommended migration path
+Skip the incremental schema churn; go straight to the current shape:
 
-1. **`pg_dump --schema-only` from production** → load into the new project.
-   This is the real migration vehicle: it brings the 8 base tables (and, in
-   practice, all their current functions/triggers/policies too).
-2. **`pg_dump --data-only`** (or Supabase's migration tooling) for the rows.
-3. Use the files in this repo as **source-of-truth + verification** — the
-   idempotent overlay (Phase 3 below) is safe to run *after* the dump to pin the
-   canonical end-state and prove every object landed (each ends in a
-   self-verifying `DO` block that RAISEs on any mismatch).
+1. **Phase 0** — `schema_base.sql` (8 base tables, end-state).
+2. **Phase 0b** — the 3 remaining tables + their cycle wiring:
+   `migrate_cycles_schema.sql` (budget_cycles) → `migrate_cycles_fk_columns.sql`
+   (the deferred `cycle_id` FKs + indexes) → `members_rbac.sql` (centre_invites +
+   role CHECK + budget_centres RLS) → `migrate_invite_expires_at.sql` →
+   `migrate_19_subscriptions.sql` (subscriptions).
+3. **Phase 2** — helper functions, then **Phase 3** — the idempotent overlay
+   (triggers, RPCs, `rls_*.sql`), then **Phase 4** — verify.
 
-The phased order below is for the case where you **rebuild from scripts** (e.g.
-no dump available, or you reconstruct the 8 base tables by hand first). It is the
-historical build order, so it is provably correct — it is how production was
-built — but it presumes Phase 0 is done.
+Under Strategy A the **Phase 1 list below is historical record** — the
+schema-altering `migrate_*` files become no-ops against `schema_base.sql`'s
+already-correct, empty tables (their `ADD COLUMN IF NOT EXISTS` and backfills do
+nothing). You do not need to run them; they are kept for provenance and for
+Strategy B. *(Alternatively, just `pg_dump`/restore the whole prod DB and use
+this repo as the verification overlay — simplest of all.)*
+
+### Strategy B — Full historical replay
+
+Run `schema_base.sql` (Phase 0), then **every** `migrate_*` file in the Phase 1
+order below, then Phases 2–4. Provably correct (it is how prod was built) but
+does redundant add-then-drop work (see the 14b→15 net-cancel note). Use only if
+you specifically want to reproduce the migration history.
+
+> **Ordering invariant for both strategies:** `schema_base.sql` must run AFTER the
+> Supabase-managed `auth` schema exists (`public.users` has an FK to
+> `auth.users`) — always true on a fresh Supabase project.
 
 ---
 
-## Phase 0 — Base schema (NOT in repo)
+## Phase 0 — Base schema
 
-Create the 8 core tables listed above (via `pg_dump --schema-only`, or hand-
-reconstructed). Every later phase depends on this. Without it, stop here.
+Run **`schema_base.sql`** — creates the 8 core tables (end-state), their PKs, 12
+of 15 FKs, and 6 indexes; self-verifies. The 3 `cycle_id` FKs + 3 cycle indexes
+are **deferred** to `migrate_cycles_fk_columns.sql` (they reference
+`budget_cycles`). Then create the other 3 tables per **Strategy A, Phase 0b**
+above (or proceed through Phase 1 under Strategy B).
 
 ---
 
-## Phase 1 — Incremental schema & data migrations
+## Phase 1 — Incremental schema & data migrations *(historical under Strategy A)*
 
-Run in this order. Files are idempotent (`IF EXISTS` / `IF NOT EXISTS` guards)
-unless flagged **one-shot** (a data backfill — harmless to re-run, but it only
-does work once).
+The full historical build order. Under Strategy A these are a no-op against
+`schema_base.sql` and may be skipped — kept here as the canonical record and for
+Strategy B. Files are idempotent (`IF EXISTS` / `IF NOT EXISTS` guards) unless
+flagged **one-shot** (a data backfill — harmless to re-run, but it only does work
+once).
 
 ### 1a — Additive columns (independent, order-free among themselves)
 1. `pin_setup.sql` — `users.pin_hash`
@@ -175,11 +193,11 @@ WHERE n.nspname='public' AND c.relkind='r' AND NOT c.relrowsecurity ORDER BY 1;
 
 ---
 
-## File inventory by type (37 files)
+## File inventory by type (38 files)
 
-- **Base-table DDL:** `members_rbac.sql` (centre_invites), `migrate_cycles_schema.sql`
-  (budget_cycles), `migrate_19_subscriptions.sql` (subscriptions). *The other 8
-  tables are not in the repo — see Phase 0.*
+- **Base-table DDL:** `schema_base.sql` (the 8 core tables), `members_rbac.sql`
+  (centre_invites), `migrate_cycles_schema.sql` (budget_cycles),
+  `migrate_19_subscriptions.sql` (subscriptions) — all 11 tables now in repo.
 - **Schema ALTER / index:** `pin_setup`, `archive_hub`, `migrate_transactions_from_spare`,
   `migrate_invite_expires_at`, `migrate_income_source_fk`, `migrate_income_month`,
   `migrate_cycles_fk_columns`, plus the cycles chain.
