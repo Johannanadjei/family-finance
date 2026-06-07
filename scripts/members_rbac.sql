@@ -67,8 +67,15 @@ CREATE TABLE IF NOT EXISTS centre_invites (
   id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
   budget_centre_id uuid        NOT NULL REFERENCES budget_centres(id) ON DELETE CASCADE,
   invited_email    text        NOT NULL,
+  -- DRIFT FIX (2026-06-07): dropped a 3rd role, 'view_only', that was never
+  -- applied to production. Prod's centre_invites role CHECK allows only
+  -- ('full_access','standard') — confirmed via pg_constraint query. The app
+  -- agrees: INVITABLE_ROLES = ['full_access','standard'] in roles.js and no
+  -- source code assigns view_only to an invite. Paired with the
+  -- budget_centre_members 4->3 fix (f105b16); the view_only saga is now fully
+  -- resolved across the repo.
   role             text        NOT NULL
-                               CHECK (role IN ('full_access', 'standard', 'view_only')),
+                               CHECK (role IN ('full_access', 'standard')),
   token            uuid        DEFAULT gen_random_uuid() NOT NULL UNIQUE,
   invited_by       uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
   status           text        NOT NULL DEFAULT 'pending'
