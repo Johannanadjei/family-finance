@@ -95,7 +95,7 @@ function RemovedScreen({ otherCentres, onSwitchHub, onSignOut }) {
   );
 }
 
-function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, onSwitchCentre, onHubCreated, onRestoreHub }) {
+function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, hubCount, onSwitchCentre, onHubCreated, onRestoreHub }) {
   const navigate                           = useNavigate();
   const { can }                            = useBudgetCentreContext();
   const { incomes, loading, error, reload } = useFinanceContext();
@@ -181,6 +181,7 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, on
         onCreateHub={handleOpenCreateHub}
         onRestore={onRestoreHub}
         userPlan={userPlan}
+        hubCount={hubCount}
       />
       <CreateHubSheet
         isOpen={createHubOpen}
@@ -385,6 +386,7 @@ export default function App() {
           archivedCentres={archivedCentres}
           activeCentreId={centre?.id || null}
           userPlan={userPlan}
+          hubCount={centres.filter(c => c.owner_id === user?.id).length}
           onSwitchCentre={handleSwitchCentre}
           onHubCreated={handleHubCreated}
           onRestoreHub={handleRestoreHub}
