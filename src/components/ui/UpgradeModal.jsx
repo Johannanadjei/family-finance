@@ -35,10 +35,11 @@ const DEFAULT_BODY = [
 
 const DEFAULT_ITEMS_LABEL = 'Until then, you can:';
 
-const DEFAULT_ITEMS = [
-  "Archive hubs you're not actively using",
-  'Continue using your current hub',
-];
+// No default bullets for the hub-cap gate: a free user at the cap owns exactly
+// 1 hub, so "archive a hub you're not using" advice is nonsensical (it's their
+// only hub). The modal stays generic — other gates (member/category cap) can
+// still pass their own `items` prop to render a bullet list.
+const DEFAULT_ITEMS = [];
 
 export function UpgradeModal({
   open,

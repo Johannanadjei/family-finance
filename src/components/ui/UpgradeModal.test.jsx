@@ -12,8 +12,14 @@ describe('UpgradeModal', () => {
     expect(screen.getByText(/Upgrade to Pro/)).toBeTruthy();
     expect(screen.getByText(/reached your plan's hub limit/i)).toBeTruthy();
     expect(screen.getByText(/coming soon/i)).toBeTruthy();
-    expect(screen.getByText(/Archive hubs you're not actively using/i)).toBeTruthy();
     expect(screen.getByText('Got it')).toBeTruthy();
+  });
+
+  it('renders no bullet list or "Until then" section by default (hub-cap gate)', () => {
+    const { container } = render(<UpgradeModal open={true} onClose={vi.fn()} />);
+    expect(screen.queryByText(/Until then, you can:/i)).toBeNull();
+    expect(screen.queryByText(/Archive hubs/i)).toBeNull();
+    expect(container.querySelector('ul')).toBeNull();
   });
 
   it('does not render when closed', () => {
