@@ -47,6 +47,3 @@ export const ROLE_DESCRIPTIONS = {
 };
 
 export const INVITABLE_ROLES = ['full_access', 'standard'];
-
-/** Maximum member count (active + pending invites) per plan tier. */
-export const MAX_MEMBERS = { free: 2, pro: 6 };

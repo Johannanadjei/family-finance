@@ -12,6 +12,7 @@ const defaultMembers = [
   { id: 'mem-2', user_id: 'user-2', role: 'standard', joined_at: '2026-02-01T00:00:00Z', users: { name: 'Bob',      email: 'b@test.com' } },
 ];
 let mockMembersList = defaultMembers;
+let mockUserPlan    = 'pro';
 
 vi.mock('../../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({
@@ -28,12 +29,16 @@ vi.mock('../../context/BudgetCentreContext', () => ({
 }));
 
 vi.mock('../../context/FinanceContext', () => ({
-  useFinanceContext: () => ({ userPlan: 'pro' }),
+  useFinanceContext: () => ({ userPlan: mockUserPlan }),
 }));
+
+const futureISO = () => new Date(Date.now() + 86400000).toISOString();
+const pastISO   = () => new Date(Date.now() - 86400000).toISOString();
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockMembersList = defaultMembers;
+  mockUserPlan    = 'pro';
   mockGetInvites.mockResolvedValue({ data: [], error: null });
 });
 
@@ -176,5 +181,53 @@ describe('MembersSection', () => {
     await waitFor(() => screen.getByTestId('cancel-invite-inv-1'));
     fireEvent.click(screen.getByTestId('cancel-invite-inv-1'));
     await waitFor(() => expect(screen.getByText('Network error')).toBeTruthy());
+  });
+
+  // ── plan cap gate ──────────────────────────────────────────────────────────
+
+  it('shows Upgrade to Pro button at the free member cap (2), hiding the invite button', async () => {
+    mockUserPlan = 'free';   // 2 default members → at the free cap of 2
+    render(<MembersSection />);
+    await waitFor(() => expect(screen.getByTestId('upgrade-members-btn')).toBeTruthy());
+    expect(screen.queryByTestId('invite-member-btn')).toBeNull();
+  });
+
+  it('opens the member-cap UpgradeModal with up-to-15 copy when Upgrade clicked', async () => {
+    mockUserPlan = 'free';
+    render(<MembersSection />);
+    await waitFor(() => screen.getByTestId('upgrade-members-btn'));
+    fireEvent.click(screen.getByTestId('upgrade-members-btn'));
+    await waitFor(() => expect(screen.getByText(/member limit/i)).toBeTruthy());
+    expect(screen.getByText(/up to 15 members/i)).toBeTruthy();
+  });
+
+  it('pro cap is 15, not 6 — 6 members still allows inviting', async () => {
+    mockUserPlan = 'pro';
+    mockMembersList = Array.from({ length: 6 }, (_, i) => ({
+      id: `mem-${i}`, user_id: `user-${i}`, role: i === 0 ? 'owner' : 'standard',
+      joined_at: `2026-0${i + 1}-01T00:00:00Z`, users: { name: `M${i}`, email: `m${i}@test.com` },
+    }));
+    render(<MembersSection />);
+    await waitFor(() => expect(screen.getByTestId('invite-member-btn')).toBeTruthy());
+    expect(screen.queryByTestId('upgrade-members-btn')).toBeNull();
+  });
+
+  it('excludes expired pending invites from the list and the cap count', async () => {
+    mockUserPlan    = 'free';
+    mockMembersList = [defaultMembers[0]];   // owner only → 1 active member
+    mockGetInvites.mockResolvedValue({
+      data: [
+        { id: 'inv-exp',  invited_email: 'expired@test.com', role: 'standard', status: 'pending', expires_at: pastISO() },
+        { id: 'inv-live', invited_email: 'live@test.com',    role: 'standard', status: 'pending', expires_at: futureISO() },
+      ],
+      error: null,
+    });
+    render(<MembersSection />);
+    // The live invite shows; the expired one does not.
+    await waitFor(() => expect(screen.getByText('live@test.com')).toBeTruthy());
+    expect(screen.queryByText('expired@test.com')).toBeNull();
+    // Count = 1 active + 1 live pending = 2 = free cap → at limit, upgrade shown.
+    expect(screen.getByTestId('upgrade-members-btn')).toBeTruthy();
+    expect(screen.queryByTestId('invite-member-btn')).toBeNull();
   });
 });

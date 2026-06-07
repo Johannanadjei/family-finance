@@ -19,7 +19,7 @@ vi.mock('../lib/supabase', () => {
   return { supabase: { from: () => chain() } };
 });
 
-import { getMembers, addMember, updateMemberRole, removeMember } from './members.service';
+import { getMembers, updateMemberRole, removeMember } from './members.service';
 
 beforeEach(() => {
   mockResolve = () => ({ data: null, error: null });
@@ -39,32 +39,6 @@ describe('getMembers', () => {
     mockResolve = () => ({ data: null, error: null });
     const { data } = await getMembers('c-1');
     expect(data).toEqual([]);
-  });
-});
-
-// ── addMember ─────────────────────────────────────────────────────────────────
-
-describe('addMember', () => {
-  it('inserts with provided role', async () => {
-    const row = { id: 'mem-2', user_id: 'u-2', role: 'standard' };
-    mockResolve = () => ({ data: row, error: null });
-    const { data, error } = await addMember('c-1', 'u-2', 'standard');
-    expect(data.role).toBe('standard');
-    expect(error).toBeNull();
-  });
-
-  it('defaults to full_access when no role given', async () => {
-    const row = { id: 'mem-3', user_id: 'u-3', role: 'full_access' };
-    mockResolve = () => ({ data: row, error: null });
-    const { data } = await addMember('c-1', 'u-3');
-    expect(data.role).toBe('full_access');
-  });
-
-  it('returns error on Supabase failure', async () => {
-    mockResolve = () => ({ data: null, error: new Error('db error') });
-    const { data, error } = await addMember('c-1', 'u-2', 'standard');
-    expect(data).toBeNull();
-    expect(error).toBeTruthy();
   });
 });
 

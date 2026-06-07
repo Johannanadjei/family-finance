@@ -1,11 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useBudgetCentreContext }           from '../../context/BudgetCentreContext';
 import { useFinanceContext }                from '../../context/FinanceContext';
-import { ROLE_LABELS, ROLE_DESCRIPTIONS, INVITABLE_ROLES, MAX_MEMBERS } from '../../lib/roles';
+import { ROLE_LABELS, ROLE_DESCRIPTIONS, INVITABLE_ROLES } from '../../lib/roles';
+import { getLimitsForTier }                 from '../../lib/plans';
 import { selectStyle }                      from '../../lib/selectStyle';
+import { UpgradeModal }                     from '../../components/ui/UpgradeModal';
+import { MemberRow }                        from './MemberRow';
+
 const card       = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
 const label      = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: 0.8 };
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 14, fontWeight: 700, marginBottom: 8, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
+
+// Member-cap UpgradeModal body. Curly apostrophe (’) to byte-match the hub-cap
+// copy convention in UpgradeModal's DEFAULT_BODY.
+const MEMBER_CAP_BODY = [
+  "You've reached your hub's member limit. Free hubs can have 2 members (you + 1 invited).",
+  'Pro hubs will be able to have up to 15 members (₵40/month or ₵400/year) — Pro is coming soon. We’ll let you know when it launches.',
+];
+
 export function MembersSection() {
   const { members, currentMemberRole, can, inviteMember, removeMember, getInvites, cancelInvite, centre } = useBudgetCentreContext();
   const { userPlan } = useFinanceContext();
@@ -25,12 +37,15 @@ export function MembersSection() {
   const [confirmRemove, setConfirmRemove] = useState(null);
   const [cancelling,    setCancelling]    = useState(null);
   const [cancelError,   setCancelError]   = useState(null);
+  const [showUpgrade,   setShowUpgrade]   = useState(false);
 
-  const plan         = userPlan || 'free';
-  const limit        = MAX_MEMBERS[plan] ?? 2;
-  const activeCount  = members.length;
-  const pendingCount = invites.filter(i => i.status === 'pending').length;
-  const atLimit      = activeCount + pendingCount >= limit;
+  const plan = userPlan || 'free';
+  const limit = getLimitsForTier(plan).maxMembersPerHub;
+  // Non-expired pending invites only — expired invites neither hold a cap slot nor
+  // appear in the list (agreed formula; mirrors the create_invite RPC server-side).
+  const pendingInvites = invites.filter(i => i.status === 'pending' && new Date(i.expires_at) > new Date());
+  const activeCount    = members.length;
+  const atLimit        = activeCount + pendingInvites.length >= limit;
 
   const loadInvites = useCallback(async () => {
     const { data } = await getInvites();
@@ -73,52 +88,25 @@ export function MembersSection() {
       return;
     }
   };
-  const canManage      = can('manageMembers');
-  const pendingInvites = invites.filter(i => i.status === 'pending');
+  const canManage = can('manageMembers');
   // Owner first, then remaining members by join date (earliest first).
   const orderedMembers = [...members].sort((a, b) => (a.role === 'owner' ? 0 : 1) - (b.role === 'owner' ? 0 : 1) || new Date(a.joined_at || 0) - new Date(b.joined_at || 0));
   return (
     <div style={card}>
       <p style={label}>Members</p>
-      {orderedMembers.map((m, i) => {
-        const displayName = m.users?.name?.trim() || m.users?.email || 'Unknown';
-        return (
-        <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 10, marginBottom: 10, borderBottom: i < orderedMembers.length - 1 || pendingInvites.length > 0 ? '1px solid var(--c-border, #e5e7eb)' : 'none' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--c-accent-light, #f0fdf4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, color: 'var(--c-primary, #064e3b)', flexShrink: 0 }}>
-              {displayName[0].toUpperCase()}
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: 'var(--c-text, #1c1917)' }}>{displayName}</p>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--c-muted, #6b7280)' }}>{ROLE_LABELS[m.role] || m.role}</p>
-            </div>
-          </div>
-          {canManage && m.role !== 'owner' && (
-            confirmRemove === m.id ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-muted, #6b7280)', whiteSpace: 'nowrap' }}>Remove {displayName}?</span>
-                <button data-testid={`confirm-remove-member-${m.id}`}
-                  onClick={() => { setConfirmRemove(null); handleRemove(m.id, m.role); }}
-                  style={{ background: 'var(--c-danger, #dc2626)', border: 'none', borderRadius: 6, padding: '3px 8px', color: 'var(--c-btn-text, #ffffff)', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
-                  Yes
-                </button>
-                <button data-testid={`cancel-remove-member-${m.id}`}
-                  onClick={() => setConfirmRemove(null)}
-                  style={{ background: 'var(--c-border, #e5e7eb)', border: 'none', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
-                  No
-                </button>
-              </div>
-            ) : (
-              <button data-testid={`remove-member-${m.id}`} onClick={() => setConfirmRemove(m.id)}
-                disabled={removing === m.id} aria-label={`Remove ${displayName}`}
-                style={{ background: 'none', border: 'none', cursor: removing === m.id ? 'not-allowed' : 'pointer', color: 'var(--c-danger, #dc2626)', padding: '4px 8px', fontSize: 12, fontWeight: 700, fontFamily: "'Nunito', sans-serif" }}>
-                {removing === m.id ? '…' : 'Remove'}
-              </button>
-            )
-          )}
-        </div>
-        );
-      })}
+      {orderedMembers.map((m, i) => (
+        <MemberRow
+          key={m.id}
+          member={m}
+          showBorder={i < orderedMembers.length - 1 || pendingInvites.length > 0}
+          canManage={canManage}
+          removing={removing === m.id}
+          confirming={confirmRemove === m.id}
+          onAskRemove={() => setConfirmRemove(m.id)}
+          onConfirmRemove={() => { setConfirmRemove(null); handleRemove(m.id, m.role); }}
+          onCancelRemove={() => setConfirmRemove(null)}
+        />
+      ))}
       {removeError  && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px', fontWeight: 700 }}>{removeError}</p>}
       {cancelError  && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px', fontWeight: 700 }}>{cancelError}</p>}
       {invitesLoaded && pendingInvites.length > 0 && (
@@ -155,11 +143,15 @@ export function MembersSection() {
           </button>
         </div>
       )}
-      {canManage && atLimit && (
+      {canManage && atLimit && plan === 'free' && (
+        <button data-testid="upgrade-members-btn" onClick={() => setShowUpgrade(true)}
+          style={{ marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+          Upgrade to Pro
+        </button>
+      )}
+      {canManage && atLimit && plan !== 'free' && (
         <div style={{ background: 'var(--c-bg, #f3f4f6)', borderRadius: 10, padding: '10px 14px', marginTop: 4 }}>
-          <p style={{ margin: 0, fontSize: 12, color: 'var(--c-muted, #6b7280)', fontWeight: 700 }}>
-            {plan === 'free' ? `Free plan allows ${limit} members. Upgrade to Pro for up to 6 members.` : `Maximum ${limit} members reached.`}
-          </p>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--c-muted, #6b7280)', fontWeight: 700 }}>Maximum {limit} members reached.</p>
         </div>
       )}
       {canManage && !atLimit && (
@@ -195,6 +187,8 @@ export function MembersSection() {
           )}
         </>
       )}
+
+      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} body={MEMBER_CAP_BODY} />
     </div>
   );
 }
