@@ -26,10 +26,20 @@ ALTER TABLE budget_centre_members
 ALTER TABLE budget_centre_members
   DROP CONSTRAINT IF EXISTS budget_centre_members_role_fkey;
 
--- Add new constraint covering all four roles
+-- Add new constraint covering the three roles.
+-- DRIFT FIX (2026-06-07): this CHECK previously listed a 4th role, 'view_only',
+-- that was never applied to production and is not used by the app. Production's
+-- budget_centre_members_role_check allows only ('owner','full_access','standard')
+-- — confirmed by the 2026-06-05 pg_dump (see schema_base.sql). The app agrees:
+-- roles.js defines exactly these 3 roles and INVITABLE_ROLES = ['full_access',
+-- 'standard'] (roles.test.js asserts view_only is excluded), and no source file
+-- assigns view_only. Removing it here keeps a Strategy-B historical replay from
+-- re-introducing a 4th role neither prod nor the app wants. If 'view_only' ever
+-- becomes a real role, reintroduce it in roles.js, the DB CHECK, and PERMISSIONS
+-- together.
 ALTER TABLE budget_centre_members
   ADD CONSTRAINT budget_centre_members_role_check
-  CHECK (role IN ('owner', 'full_access', 'standard', 'view_only'));
+  CHECK (role IN ('owner', 'full_access', 'standard'));
 
 -- Confirm the column exists and has no NOT NULL gap
 -- (role should already be NOT NULL from the original schema — this is a no-op if so)
