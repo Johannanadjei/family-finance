@@ -70,16 +70,29 @@ export const getFirstCentre = async () => {
   return { data, error };
 };
 
+/** Friendly, user-facing copy for a plan hub-cap rejection (HUB01). */
+const HUB_CAP_MESSAGE =
+  "You've reached your plan's hub limit. Free accounts can have 1 hub. Upgrade to Pro to manage up to 10 hubs.";
+
 /**
  * Create a new budget centre and its owner member row.
+ *
+ * Delegates to the create_hub SECURITY DEFINER RPC (scripts/create_hub.sql), which
+ * (a) enforces the per-tier hub cap server-side — rejecting with SQLSTATE 'HUB01'
+ * if the caller is at their limit — and (b) inserts the centre + owner member row
+ * atomically (fixing the old client-side 2-insert orphan bug). The client-side
+ * gate is UX only; this RPC is the real enforcement.
+ *
+ * On a cap rejection the returned Error carries `error.code === 'HUB01'` so callers
+ * can open the upgrade modal and/or show HUB_CAP_MESSAGE.
  *
  * @param {{ name, currency, surplus_target, icon, type, skin_id }} opts
  */
 export const createCentre = async ({ name, currency, surplus_target = 0, icon = '🏠', type = 'family_home', skin_id = null }) => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { data: null, error: new Error('Not authenticated') };
+  const { data: { user } = {}, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) return { data: null, error: authErr || new Error('Not authenticated') };
 
-  // Validate inputs
+  // Validate inputs (fail fast, no network round-trip; RPC re-validates server-side).
   try {
     validateString(name, 'name');
     validateCurrency(currency);
@@ -88,45 +101,28 @@ export const createCentre = async ({ name, currency, surplus_target = 0, icon = 
     return { data: null, error: e };
   }
 
-  // Insert centre
-  const payload = {
-    name:           name.trim(),
-    currency,
-    surplus_target: Math.round(Math.max(0, Number(surplus_target) || 0)),
-    icon:           icon || '🏠',
-    owner_id:       user.id,
-    type:           type || 'family_home',
-  };
-  if (skin_id) payload.skin_id = skin_id;
+  const { data, error } = await supabase.rpc('create_hub', {
+    p_name:           name.trim(),
+    p_currency:       currency,
+    p_surplus_target: Math.round(Math.max(0, Number(surplus_target) || 0)),
+    p_icon:           icon || '🏠',
+    p_type:           type || 'family_home',
+    p_skin_id:        skin_id || null,
+  });
 
-  const { data: centre, error: centreErr } = await supabase
-    .from('budget_centres')
-    .insert(payload)
-    .select()
-    .single();
-
-  if (centreErr) {
-    console.error('[centres.service] createCentre insert error:', centreErr.message);
-    return { data: null, error: centreErr };
+  if (error) {
+    if (error.code === 'HUB01') {
+      // Plan cap hit — map to friendly copy + keep the code so callers can react.
+      const capErr = new Error(HUB_CAP_MESSAGE);
+      capErr.code = 'HUB01';
+      console.error('[centres.service] createCentre cap reached (HUB01)');
+      return { data: null, error: capErr };
+    }
+    console.error('[centres.service] createCentre RPC error:', error.message);
+    return { data: null, error };
   }
 
-  // Insert owner member row
-  const { error: memberErr } = await supabase
-    .from('budget_centre_members')
-    .insert({
-      budget_centre_id: centre.id,
-      user_id:          user.id,
-      role:             'owner',
-    });
-
-  if (memberErr) {
-    console.error('[centres.service] createCentre member insert error:', memberErr.message);
-    // Centre was created — return it even if member row failed
-    // The owner SELECT policy will still allow reads
-    return { data: centre, error: memberErr };
-  }
-
-  return { data: centre, error: null };
+  return { data, error: null };
 };
 
 /**

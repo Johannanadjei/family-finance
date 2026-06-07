@@ -16,6 +16,11 @@ vi.mock('../../context/BudgetCentreContext', () => ({
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ signOut: mockSignOut }),
 }));
+// Footer behaviour (cap states + upgrade modal) is covered by HubFooter.test.jsx.
+// Here we only assert the can('settings') gate renders/hides it.
+vi.mock('./HubFooter', () => ({
+  HubFooter: () => <div data-testid="hub-footer" />,
+}));
 
 const mockCentres = [
   { id: 'c-1', name: "The Adjei's", currency: 'GHS', icon: '🏠' },
@@ -99,41 +104,15 @@ describe('SidePanel', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('shows upgrade message for free plan users', () => {
-    renderPanel({ userPlan: 'free' });
-    expect(screen.getByText('Upgrade to add more hubs')).toBeTruthy();
+  it('renders the hub footer when the member can manage settings', () => {
+    renderPanel();
+    expect(screen.getByTestId('hub-footer')).toBeTruthy();
   });
 
-  it('upgrade button is disabled for free plan', () => {
-    renderPanel({ userPlan: 'free' });
-    expect(screen.getByText('Upgrade to add more hubs').disabled).toBe(true);
-  });
-
-  it('shows create button for pro users below limit', () => {
-    renderPanel({ userPlan: 'pro' });
-    expect(screen.getByText('+ New BOS Hub')).toBeTruthy();
-  });
-
-  it('calls onCreateHub when create button tapped by pro user', () => {
-    const onCreateHub = vi.fn();
-    renderPanel({ userPlan: 'pro', onCreateHub });
-    screen.getByText('+ New BOS Hub').click();
-    expect(onCreateHub).toHaveBeenCalledOnce();
-  });
-
-  it('shows limit message for pro users at 10 centres', () => {
-    const tenCentres = Array.from({ length: 10 }, (_, i) => ({
-      id: `c-${i}`, name: `Hub ${i}`, currency: 'GHS', icon: '🏠',
-    }));
-    renderPanel({ userPlan: 'pro', centres: tenCentres });
-    expect(screen.getByText('Maximum 10 hubs reached')).toBeTruthy();
-  });
-
-  it('standard member does not see upgrade or create buttons', () => {
+  it('does not render the hub footer for a standard member (no settings permission)', () => {
     mockCan = () => false;
-    renderPanel({ userPlan: 'free' });
-    expect(screen.queryByText('Upgrade to add more hubs')).toBeNull();
-    expect(screen.queryByText('+ New BOS Hub')).toBeNull();
+    renderPanel();
+    expect(screen.queryByTestId('hub-footer')).toBeNull();
   });
 
   it('shows Sign out button', () => {
