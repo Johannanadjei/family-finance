@@ -49,6 +49,23 @@ describe('MembersSection', () => {
     expect(screen.getByText('Bob')).toBeTruthy();
   });
 
+  it('shows member count over the tier cap (pro: 2 of 15)', async () => {
+    render(<MembersSection />);
+    await waitFor(() => expect(screen.getByTestId('member-count').textContent).toBe('2 of 15'));
+  });
+
+  it('shows member count at the free cap (2 of 2), excluding pending invites', async () => {
+    mockUserPlan    = 'free';
+    mockMembersList = [defaultMembers[0]];   // owner only → 1 active member
+    mockGetInvites.mockResolvedValue({
+      data: [{ id: 'inv-1', invited_email: 'alice@test.com', role: 'standard', status: 'pending', expires_at: futureISO() }],
+      error: null,
+    });
+    render(<MembersSection />);
+    // Count reflects active members only (1), not the pending invite, over the free cap (2).
+    await waitFor(() => expect(screen.getByTestId('member-count').textContent).toBe('1 of 2'));
+  });
+
   it('orders members owner first, then by joined_at ascending', async () => {
     mockMembersList = [
       { id: 'mem-2', user_id: 'user-2', role: 'standard', joined_at: '2026-03-01T00:00:00Z', users: { name: 'Bob',      email: 'b@test.com' } },

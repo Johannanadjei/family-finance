@@ -93,7 +93,10 @@ export function MembersSection() {
   const orderedMembers = [...members].sort((a, b) => (a.role === 'owner' ? 0 : 1) - (b.role === 'owner' ? 0 : 1) || new Date(a.joined_at || 0) - new Date(b.joined_at || 0));
   return (
     <div style={card}>
-      <p style={label}>Members</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <p style={{ ...label, margin: 0 }}>Members</p>
+        <span data-testid="member-count" style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-muted, #6b7280)' }}>{activeCount} of {limit}</span>
+      </div>
       {orderedMembers.map((m, i) => (
         <MemberRow
           key={m.id}
