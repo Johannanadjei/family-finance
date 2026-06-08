@@ -116,6 +116,29 @@ describe('createCentre — atomic RPC + hub-cap gate', () => {
     expect(error.code).not.toBe('HUB01');
   });
 
+  // Regression: onboarding hub creation broke when hub creation became an RPC —
+  // OnboardingFlow calls createCentre WITHOUT skin_id, so the service forwards
+  // p_skin_id: null. The RPC lists skin_id in its INSERT, which bypasses the table
+  // DEFAULT 'family_warmth' (defaults only apply to OMITTED columns) → NOT-NULL
+  // violation. Fix: create_hub.sql COALESCEs p_skin_id to 'family_warmth'. This
+  // asserts the onboarding-shaped call reaches the RPC with null (the input that
+  // broke) and succeeds; the COALESCE→'family_warmth' is verified server-side by
+  // scripts/create_hub.sql's self-verifying DO block (SQL not run in Vitest).
+  it('forwards p_skin_id: null when skin_id is omitted (onboarding path) and succeeds', async () => {
+    mockRpcResult = { data: { id: 'c-onb', name: 'Onboard Hub', skin_id: 'family_warmth' }, error: null };
+    const { data, error } = await createCentre({ name: 'Onboard Hub', currency: 'GHS' });
+    expect(error).toBeNull();
+    expect(rpcCalled).toBe(true);
+    expect(rpcArgs.p_skin_id).toBeNull();          // the input that previously broke onboarding
+    expect(data.skin_id).toBe('family_warmth');    // RPC COALESCE backstop result
+  });
+
+  it('forwards the caller-supplied skin_id unchanged (CreateHubSheet path)', async () => {
+    mockRpcResult = { data: { id: 'c-2', skin_id: 'corporate' }, error: null };
+    await createCentre({ name: 'Biz', currency: 'GHS', skin_id: 'corporate' });
+    expect(rpcArgs.p_skin_id).toBe('corporate');
+  });
+
   it('returns a validation error WITHOUT calling the RPC on a blank name', async () => {
     const { data, error } = await createCentre({ name: '', currency: 'GHS' });
     expect(data).toBeNull();

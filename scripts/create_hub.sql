@@ -102,7 +102,11 @@ BEGIN
     coalesce(p_icon, '🏠'),
     v_user,
     coalesce(p_type, 'family_home'),
-    p_skin_id
+    -- skin_id is listed in this INSERT, so the table-level DEFAULT 'family_warmth'
+    -- is BYPASSED when the caller passes NULL (defaults only apply to OMITTED
+    -- columns) — that broke onboarding, which doesn't send a skin. COALESCE here
+    -- provides the server-side default for any caller that omits it.
+    coalesce(p_skin_id, 'family_warmth')
   )
   RETURNING * INTO v_centre;
 
