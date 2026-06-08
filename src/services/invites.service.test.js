@@ -49,39 +49,37 @@ beforeEach(() => {
 // ── createInvite ──────────────────────────────────────────────────────────────
 
 describe('createInvite', () => {
-  it('returns error when duplicate pending invite exists', async () => {
-    let call = 0;
-    mockResolve = () => {
-      call++;
-      if (call === 1) return { data: { id: 'inv-existing' }, error: null }; // dup check
-      return { data: null, error: null };
-    };
-    const { data, error } = await createInvite({ centreId: 'c-1', email: 'bob@test.com', role: 'standard', invitedBy: 'u-1' });
-    expect(data).toBeNull();
-    expect(error.message).toMatch(/pending invite already exists/i);
+  it('calls the create_invite RPC with centre, email, and role', async () => {
+    mockRpc.mockResolvedValueOnce({ data: mockInvite, error: null });
+    await createInvite({ centreId: 'c-1', email: 'bob@test.com', role: 'standard' });
+    expect(mockRpc).toHaveBeenCalledWith('create_invite', {
+      p_centre_id:     'c-1',
+      p_invited_email: 'bob@test.com',
+      p_role:          'standard',
+    });
   });
 
-  it('returns inserted invite when no duplicate', async () => {
-    let call = 0;
-    mockResolve = () => {
-      call++;
-      if (call === 1) return { data: null,      error: null }; // no dup
-      if (call === 2) return { data: null,      error: null }; // no existing member
-      return { data: mockInvite, error: null };                 // insert
-    };
-    const { data, error } = await createInvite({ centreId: 'c-1', email: 'BOB@TEST.COM', role: 'standard', invitedBy: 'u-1' });
+  it('returns the invite row on success', async () => {
+    mockRpc.mockResolvedValueOnce({ data: mockInvite, error: null });
+    const { data, error } = await createInvite({ centreId: 'c-1', email: 'bob@test.com', role: 'standard' });
     expect(error).toBeNull();
     expect(data).toEqual(mockInvite);
-    expect(mockInsert).toHaveBeenCalledWith(
-      expect.objectContaining({ expires_at: expect.any(String) })
-    );
   });
 
-  it('returns error on Supabase failure', async () => {
-    mockResolve = () => ({ data: null, error: new Error('db error') });
-    const { data, error } = await createInvite({ centreId: 'c-1', email: 'bob@test.com', role: 'standard', invitedBy: 'u-1' });
+  it('maps a MEM01 cap rejection to the friendly upgrade message + keeps the code', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: { code: 'MEM01', message: 'member limit reached: 2 of 2 for tier free' } });
+    const { data, error } = await createInvite({ centreId: 'c-1', email: 'bob@test.com', role: 'standard' });
     expect(data).toBeNull();
-    expect(error).toBeTruthy();
+    expect(error.code).toBe('MEM01');
+    expect(error.message).toMatch(/member limit/i);
+    expect(error.message).toMatch(/upgrade to pro/i);
+  });
+
+  it('passes a generic RPC error through unmapped', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: new Error('db error') });
+    const { data, error } = await createInvite({ centreId: 'c-1', email: 'bob@test.com', role: 'standard' });
+    expect(data).toBeNull();
+    expect(error.message).toBe('db error');
   });
 });
 

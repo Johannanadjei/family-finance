@@ -23,9 +23,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getCentreById, getFirstCentre, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
 import { getCategories, getAllCategories, addCategory as addCategoryService, bulkAddCategories as bulkAddCategoriesService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
-import { getMembers, addMember as addMemberService, removeMember as removeMemberService, updateMemberRole as updateMemberRoleService } from '../services/members.service';
+import { getMembers, removeMember as removeMemberService, updateMemberRole as updateMemberRoleService } from '../services/members.service';
 import { createInvite as createInviteService, getHubInvites as getHubInvitesService, cancelInvite as cancelInviteService } from '../services/invites.service';
-import { getUserSession } from '../services/auth.service';
 import { waitForSession } from '../lib/auth';
 import { can } from '../lib/roles';
 
@@ -345,9 +344,8 @@ export function useBudgetCentre(user, centreId) {
   const inviteMember = useCallback(async ({ email, role }) => {
     const id = centre?.id;
     if (!id) return { error: new Error('No active centre') };
-    const { data: authData, error: authErr } = await getUserSession();
-    if (authErr) return { data: null, error: authErr };
-    return createInviteService({ centreId: id, email, role, invitedBy: authData?.user?.id });
+    // invitedBy is set server-side from auth.uid() in the create_invite RPC.
+    return createInviteService({ centreId: id, email, role });
   }, [centre?.id]);
 
   const removeMemberFromHub = useCallback(async (memberId, memberRole) => {

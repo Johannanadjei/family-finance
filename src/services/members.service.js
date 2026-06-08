@@ -23,24 +23,6 @@ export const getMembers = async (centreId) => {
 };
 
 /**
- * Add a member to a budget centre by user ID.
- *
- * @param {string} centreId
- * @param {string} userId
- * @param {string} role — 'full_access' | 'standard' (never 'owner' via this path)
- */
-export const addMember = async (centreId, userId, role = 'full_access') => {
-  const { data, error } = await supabase
-    .from('budget_centre_members')
-    .insert({ budget_centre_id: centreId, user_id: userId, role })
-    .select()
-    .single();
-
-  if (error) console.error('[members.service] addMember error:', error.message);
-  return { data, error };
-};
-
-/**
  * Update a member's role.
  *
  * @param {string} memberId — budget_centre_members.id
