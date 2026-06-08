@@ -13,6 +13,9 @@ import { AddCategorySheet }           from './budget/AddCategorySheet';
 import { GuestSettingsSection }       from './settings/GuestSettingsSection';
 import { MembersSection }             from './settings/MembersSection';
 import { SecuritySection }            from './settings/SecuritySection';
+import { UpgradeModal }               from '../components/ui/UpgradeModal';
+import { getLimitsForTier }           from '../lib/plans';
+import { CATEGORY_CAP_BODY }          from '../lib/planCopy';
 
 const card         = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
 const sectionLabel = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 0.8 };
@@ -21,9 +24,15 @@ export function SettingsView() {
   const navigate  = useNavigate();
   const { signOut }                                                            = useAuth();
   const { categories, fmt, addCategory, updateCategory, deleteCategory, can } = useBudgetCentreContext();
-  const { viewedCycleId }                                                     = useFinanceContext();
+  const { viewedCycleId, userPlan }                                           = useFinanceContext();
 
   const [addCatOpen,      setAddCatOpen]      = useState(false);
+  const [showUpgrade,     setShowUpgrade]     = useState(false);   // category-cap modal (CAT01)
+
+  // Category cap (CAT01) — current-cycle count; owner-tier enforced server-side.
+  const plan     = userPlan || 'free';
+  const catLimit = getLimitsForTier(plan).maxCategoriesPerHub;
+  const atCatCap = plan === 'free' && categories.length >= catLimit;
 
   if (!can('settings')) return <AccessBlocked message="Settings are only available to hub owners and full-access members." />;
 
@@ -51,10 +60,22 @@ export function SettingsView() {
       <div style={card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <p style={{ ...sectionLabel, margin: 0 }}>Budget Categories</p>
-          <button data-testid="add-category-btn" onClick={() => setAddCatOpen(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}>
-            + Add
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span data-testid="category-count" style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-muted, #6b7280)' }}>
+              {plan === 'free' ? `${categories.length} of ${catLimit}` : `${categories.length} categories`}
+            </span>
+            {atCatCap ? (
+              <button data-testid="upgrade-categories-btn" onClick={() => setShowUpgrade(true)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}>
+                Upgrade to Pro
+              </button>
+            ) : (
+              <button data-testid="add-category-btn" onClick={() => setAddCatOpen(true)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}>
+                + Add
+              </button>
+            )}
+          </div>
         </div>
         {categories.length === 0
           ? <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0 }}>No categories this month</p>
@@ -90,6 +111,7 @@ export function SettingsView() {
       </div>
 
       <AddCategorySheet isOpen={addCatOpen} onClose={() => setAddCatOpen(false)} onAdd={(cat) => addCategory(cat, viewedCycleId)} />
+      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} body={CATEGORY_CAP_BODY} />
     </div>
   );
 }

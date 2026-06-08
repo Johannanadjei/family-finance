@@ -351,6 +351,20 @@ describe('useBudgetCentre — budget rollforward (Phase 2C)', () => {
     // Rolled back — every optimistic row removed.
     expect(result.current.allCategories).toHaveLength(0);
   });
+
+  it('rollforward respects the category cap: a CAT01 reject rolls back and surfaces the code', async () => {
+    const { result } = await mountEmpty();
+    getCategories.mockResolvedValue({ data: mockPrevMonthCategories, error: null });
+    await act(async () => { await result.current.loadPrevMonthCategories(FROM); });
+
+    const capErr = new Error('cap'); capErr.code = 'CAT01';
+    bulkAddCategories.mockResolvedValue({ data: null, error: capErr });
+
+    let res;
+    await act(async () => { res = await result.current.copyCategoriesToMonth(FROM, TO, undefined, 'cyc-this'); });
+    expect(res.error.code).toBe('CAT01');
+    expect(result.current.allCategories).toHaveLength(0);   // optimistic rows rolled back
+  });
 });
 
 // ── Phase 2D: all-months categories (allCategories + current-month slice) ──

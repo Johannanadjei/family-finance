@@ -7,12 +7,14 @@
  *
  * @param {Category[]} data  — initial categories from OnboardingFlow
  * @param {function} fmt     — currency formatter from OnboardingFlow
+ * @param {string}   plan    — 'free' | 'pro'; free is capped at the category limit
  * @param {function} onNext  — (categories) => void
  * @param {function} onBack  — () => void
  */
 
 import { useState } from 'react';
 import { validateCategoriesStep } from '../onboarding.validation';
+import { getLimitsForTier } from '../../../lib/plans';
 import { CategoryIconGrid } from '../../../components/ui/CategoryIconGrid';
 
 const inputStyle = {
@@ -21,10 +23,15 @@ const inputStyle = {
   fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)', boxSizing: 'border-box',
 };
 
-export function StepCategories({ data, fmt, onNext, onBack }) {
+export function StepCategories({ data, fmt, plan = 'free', onNext, onBack }) {
   const [categories,   setCategories]   = useState(data);
   const [error,        setError]        = useState(null);
   const [openPickerId, setOpenPickerId] = useState(null); // row whose icon grid is open (one at a time)
+
+  // Category cap (CAT01) — gate "+ Add" at the free limit during onboarding so the
+  // seed never exceeds the cap and trips the server-side bulk reject on confirm.
+  const limit = getLimitsForTier(plan).maxCategoriesPerHub;
+  const atCap = plan === 'free' && categories.length >= limit;
 
   const update = (id, field, value) =>
     setCategories(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
@@ -111,11 +118,18 @@ export function StepCategories({ data, fmt, onNext, onBack }) {
       </div>
 
       <button
+        data-testid="onboarding-add-category-btn"
         onClick={addCategory}
-        style={{ width: '100%', padding: '11px', borderRadius: 12, border: '2px dashed var(--c-accent, #059669)', background: 'transparent', color: 'var(--c-accent, #059669)', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
+        disabled={atCap}
+        style={{ width: '100%', padding: '11px', borderRadius: 12, border: '2px dashed var(--c-accent, #059669)', background: 'transparent', color: 'var(--c-accent, #059669)', fontSize: 13, fontWeight: 800, cursor: atCap ? 'not-allowed' : 'pointer', opacity: atCap ? 0.5 : 1, fontFamily: "'Nunito', sans-serif" }}
       >
         + Add category
       </button>
+      {atCap && (
+        <p style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', margin: 0, textAlign: 'center', fontWeight: 600 }}>
+          Free hubs can have up to {limit} categories. Upgrade to Pro after setup for unlimited.
+        </p>
+      )}
 
       {error && (
         <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '12px 14px' }}>

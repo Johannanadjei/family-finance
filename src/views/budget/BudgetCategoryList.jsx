@@ -23,6 +23,11 @@
  * @param {function} onChooseWhich     — open the multi-select copy sheet (guarded)
  * @param {function} onAddManually     — open the add sheet from the empty state (guarded)
  * @param {function} onAddCategory     — open the add sheet from the list footer (guarded)
+ * @param {number}   count             — number of categories in the viewed cycle
+ * @param {number}   limit             — tier category cap (10 free / Infinity pro)
+ * @param {string}   plan              — 'free' | 'pro' (drives count display + cap)
+ * @param {boolean}  atCap             — free user at the per-cycle category limit
+ * @param {function} onUpgrade         — open the CAT01 upgrade modal (shown at cap)
  */
 
 import { CategoryBudgetRow } from './CategoryBudgetRow';
@@ -31,6 +36,7 @@ import { BudgetEmptyState }  from './BudgetEmptyState';
 export function BudgetCategoryList({
   categories, categorySpend, fmt, periodLabel, prevPeriodLabel, prevCategoryCount,
   copying, copyError, onCopyAll, onChooseWhich, onAddManually, onAddCategory,
+  count = 0, limit, plan = 'free', atCap = false, onUpgrade,
 }) {
   if (categories.length === 0) {
     return (
@@ -58,6 +64,12 @@ export function BudgetCategoryList({
 
   return (
     <>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', margin: '0 2px 8px' }}>
+        <span data-testid="category-count" style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-muted, #6b7280)' }}>
+          {plan === 'free' ? `${count} of ${limit}` : `${count} categories`}
+        </span>
+      </div>
+
       <div style={{ background: 'var(--c-card, #fff)', borderRadius: 16, padding: '0 16px', boxShadow: 'var(--c-shadow)' }}>
         {rows.map(row => (
           <CategoryBudgetRow
@@ -72,12 +84,22 @@ export function BudgetCategoryList({
         ))}
       </div>
 
-      <button
-        onClick={onAddCategory}
-        style={{ width: '100%', padding: '14px', borderRadius: 12, border: '2px dashed var(--c-primary, #064e3b)', background: 'transparent', color: 'var(--c-primary, #064e3b)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginTop: 24, marginBottom: 16 }}
-      >
-        + Add budget category
-      </button>
+      {atCap ? (
+        <button
+          data-testid="upgrade-categories-btn"
+          onClick={onUpgrade}
+          style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginTop: 24, marginBottom: 16 }}
+        >
+          Upgrade to Pro
+        </button>
+      ) : (
+        <button
+          onClick={onAddCategory}
+          style={{ width: '100%', padding: '14px', borderRadius: 12, border: '2px dashed var(--c-primary, #064e3b)', background: 'transparent', color: 'var(--c-primary, #064e3b)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginTop: 24, marginBottom: 16 }}
+        >
+          + Add budget category
+        </button>
+      )}
     </>
   );
 }

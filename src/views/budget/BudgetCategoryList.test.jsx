@@ -66,4 +66,27 @@ describe('BudgetCategoryList', () => {
     fireEvent.click(screen.getByTestId('add-category-manually-btn'));
     expect(onAddManually).toHaveBeenCalledTimes(1);
   });
+
+  // ── Category cap (CAT01) ──────────────────────────────────────────────────
+  it('free under cap: shows "N of 10" and the add button', () => {
+    renderList({ count: 2, limit: 10, plan: 'free', atCap: false });
+    expect(screen.getByTestId('category-count').textContent).toBe('2 of 10');
+    expect(screen.getByText('+ Add budget category')).toBeTruthy();
+    expect(screen.queryByTestId('upgrade-categories-btn')).toBeNull();
+  });
+
+  it('pro: shows "N categories" (no cap framing) and the add button', () => {
+    renderList({ count: 12, plan: 'pro', atCap: false });
+    expect(screen.getByTestId('category-count').textContent).toBe('12 categories');
+    expect(screen.getByText('+ Add budget category')).toBeTruthy();
+  });
+
+  it('free at cap: shows Upgrade to Pro instead of the add button', () => {
+    const onUpgrade = vi.fn();
+    renderList({ count: 10, limit: 10, plan: 'free', atCap: true, onUpgrade });
+    expect(screen.getByTestId('category-count').textContent).toBe('10 of 10');
+    expect(screen.queryByText('+ Add budget category')).toBeNull();
+    fireEvent.click(screen.getByTestId('upgrade-categories-btn'));
+    expect(onUpgrade).toHaveBeenCalledTimes(1);
+  });
 });

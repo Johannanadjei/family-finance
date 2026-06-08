@@ -48,6 +48,7 @@ const mockFinance = {
   activeCycleId: null,                // null → follows the auto-resolved current cycle
   loadCycle:     vi.fn(),
   resetPeriod:   vi.fn().mockResolvedValue({ data: { categories_reset: 0, transactions_reset: 0 }, error: null }),
+  userPlan:      'free',
 };
 
 vi.mock('../context/FinanceContext', () => ({
@@ -100,6 +101,27 @@ describe('BudgetView', () => {
     renderView();
     const rows = screen.getAllByText(/Groceries|Transport/);
     expect(rows[0].textContent).toContain('Groceries');   // 200/500 = 40% > Transport 0%
+  });
+
+  // ── Category cap (CAT01) ──────────────────────────────────────────────────
+  it('free under cap: shows "N of 10" and the add button (no upgrade)', () => {
+    renderView();   // default 2 categories, free
+    expect(screen.getByTestId('category-count').textContent).toBe('2 of 10');
+    expect(screen.getByText('+ Add budget category')).toBeTruthy();
+    expect(screen.queryByTestId('upgrade-categories-btn')).toBeNull();
+  });
+
+  it('free at cap (10 categories): shows Upgrade to Pro and opens the modal', () => {
+    mockBudgetCentre.allCategories = Array.from({ length: 10 }, (_, i) => ({
+      id: `c${i}`, name: `Cat ${i}`, icon: '🛒', budget_amount: 10, is_fixed: true,
+      sort_order: i, month: getCurrentMonth(), cycle_id: 'cyc-this',
+    }));
+    renderView();
+    expect(screen.getByTestId('category-count').textContent).toBe('10 of 10');
+    expect(screen.queryByText('+ Add budget category')).toBeNull();
+    fireEvent.click(screen.getByTestId('upgrade-categories-btn'));
+    expect(screen.getByText(/category limit for this period/)).toBeTruthy();   // UpgradeModal body
+    resetCats();
   });
 
   // ── Phase 2C budget rollforward empty-state ───────────────────────────────

@@ -63,6 +63,14 @@ describe('OnboardingFlow — first-cycle CYC02 closure', () => {
     expect(bulkAddIncomeSources).toHaveBeenCalledWith('c-new', expect.anything(), 'cyc-new');
   });
 
+  it('seeds exactly 10 default categories (trimmed 13→10 for the free cap)', async () => {
+    render(<OnboardingFlow onComplete={vi.fn()} />);
+    walkToConfirm();
+    await act(async () => { fireEvent.click(screen.getByText(/Create BOS Hub/)); });
+    const [, rows] = bulkAddCategories.mock.calls[0];
+    expect(rows).toHaveLength(10);
+  });
+
   it('completes onboarding after all writes succeed', async () => {
     const onComplete = vi.fn();
     render(<OnboardingFlow onComplete={onComplete} />);
