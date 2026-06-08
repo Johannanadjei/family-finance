@@ -44,6 +44,27 @@ describe('StepCategories', () => {
     expect(screen.getByText('+ Add category')).toBeTruthy();
   });
 
+  // ── Category cap (CAT01) during onboarding ────────────────────────────────
+  const tenCats = Array.from({ length: 10 }, (_, i) => ({
+    id: `c${i}`, name: `Cat ${i}`, icon: '🛒', budget_amount: 10, is_fixed: true, sort_order: i,
+  }));
+
+  it('free at cap (10 categories): the + Add button is disabled with a note', () => {
+    renderStep({ data: tenCats, plan: 'free' });
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(true);
+    expect(screen.getByText(/Free hubs can have up to 10 categories/)).toBeTruthy();
+  });
+
+  it('free under cap: the + Add button is enabled', () => {
+    renderStep({ data: defaultCats, plan: 'free' });   // 3 categories
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(false);
+  });
+
+  it('pro: the + Add button stays enabled even at 10 categories', () => {
+    renderStep({ data: tenCats, plan: 'pro' });
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(false);
+  });
+
   it('shows validation error when no categories', async () => {
     renderStep({ data: [] });
     await act(async () => { screen.getByText('Continue →').click(); });
