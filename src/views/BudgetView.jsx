@@ -16,7 +16,10 @@ import { usePastPeriodGuard }     from '../hooks/usePastPeriodGuard';
 import { getCurrentMonth, offsetMonth, calcTotalFixed, calcCategorySpend, calcFixedSpent } from '../lib/finance';
 import { formatMonth, getToday }  from '../lib/dates';
 import { getCycleNav }            from '../lib/cycles';
+import { getLimitsForTier }       from '../lib/plans';
+import { CATEGORY_CAP_BODY }      from '../lib/planCopy';
 import { Skeleton }               from '../components/ui/Skeleton';
+import { UpgradeModal }           from '../components/ui/UpgradeModal';
 import { BudgetCategoryList }     from './budget/BudgetCategoryList';
 import { BudgetHeader }           from './budget/BudgetHeader';
 import { BudgetPeriodCreator }    from './budget/BudgetPeriodCreator';
@@ -45,7 +48,7 @@ function BudgetViewSkeleton() {
 
 export function BudgetView() {
   const { allCategories = [], fmt, can, addCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth } = useBudgetCentreContext();
-  const { txs, loading, cyclesLoading, error, activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle } = useFinanceContext();
+  const { txs, loading, cyclesLoading, error, activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle, userPlan } = useFinanceContext();
   const [sheetOpen,     setSheetOpen]     = useState(false);
   const [periodOpen,    setPeriodOpen]    = useState(false);   // Phase B: budget-period creator
   const [copySheetOpen, setCopySheetOpen] = useState(false);   // 2C: multi-select rollforward sheet
@@ -53,6 +56,7 @@ export function BudgetView() {
   const [copyError,     setCopyError]     = useState(null);
   const [copiedCount,   setCopiedCount]   = useState(0);       // >0 → success toast
   const [resetCycle,    setResetCycle]    = useState(null);    // reset-period target (future only)
+  const [showUpgrade,   setShowUpgrade]   = useState(false);   // category-cap upgrade modal (CAT01)
 
   // Viewed period: navigated cycle → auto-resolved current cycle → month fallback.
   const today        = getToday();
@@ -74,6 +78,12 @@ export function BudgetView() {
   const fixedTotal    = useMemo(() => calcTotalFixed(viewedCategories),         [viewedCategories]);
   const categorySpend = useMemo(() => calcCategorySpend(txs, viewedCategories), [txs, viewedCategories]);
   const fixedSpent    = useMemo(() => calcFixedSpent(txs, viewedCategories),    [txs, viewedCategories]);
+
+  // Category cap (CAT01) — per-cycle scope, owner-tier resolved server-side; this is
+  // the UX gate only. Free shows "N of 10" + Upgrade at cap; Pro shows "N categories".
+  const plan      = userPlan || 'free';
+  const catLimit  = getLimitsForTier(plan).maxCategoriesPerHub;
+  const atCatCap  = plan === 'free' && viewedCategories.length >= catLimit;
 
   // Rollforward source = the previous CYCLE (nav.prev), target = the viewed month.
   const prevMonth       = nav.prev ? nav.prev.start_date.slice(0, 7) : offsetMonth(viewedMonth, -1);
@@ -150,6 +160,11 @@ export function BudgetView() {
         onChooseWhich={() => { setCopyError(null); requestMutation(() => setCopySheetOpen(true)); }}
         onAddManually={() => requestMutation(() => setSheetOpen(true))}
         onAddCategory={() => requestMutation(() => setSheetOpen(true))}
+        count={viewedCategories.length}
+        limit={catLimit}
+        plan={plan}
+        atCap={atCatCap}
+        onUpgrade={() => setShowUpgrade(true)}
       />
 
       <BudgetSheets
@@ -169,6 +184,8 @@ export function BudgetView() {
       />
 
       {guardModal}
+
+      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} body={CATEGORY_CAP_BODY} />
     </div>
   );
 }

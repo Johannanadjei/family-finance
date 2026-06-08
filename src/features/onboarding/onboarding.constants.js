@@ -29,20 +29,20 @@ export const CURRENCIES = [
 export const CENTRE_ICONS = ['🏠', '✈️', '🏢', '🏪', '🌍', '💼', '🏡', '🏗️'];
 export const INCOME_ICONS  = ['💰', '💵', '🏠', '💼', '📈', '🎯', '🏪', '✈️'];
 
+// 10 defaults — matches the Free tier cap (FREE_LIMITS.maxCategoriesPerHub).
+// Trimmed 13→10 with the category-cap gate: dropped Kids Activities, Personal Care,
+// Entertainment so a new free hub seeds exactly at the cap, not over it.
 export const DEFAULT_CATEGORIES = [
-  { name: 'Rent / Mortgage', icon: '🏠', budget_amount: 0, is_fixed: true,  sort_order: 0  },
-  { name: 'Electricity',     icon: '⚡', budget_amount: 0, is_fixed: true,  sort_order: 1  },
-  { name: 'Water',           icon: '💧', budget_amount: 0, is_fixed: true,  sort_order: 2  },
-  { name: 'Internet',        icon: '📡', budget_amount: 0, is_fixed: true,  sort_order: 3  },
-  { name: 'Groceries',       icon: '🛒', budget_amount: 0, is_fixed: true,  sort_order: 4  },
-  { name: 'Transport',       icon: '🚗', budget_amount: 0, is_fixed: true,  sort_order: 5  },
-  { name: 'School Fees',     icon: '📚', budget_amount: 0, is_fixed: true,  sort_order: 6  },
-  { name: 'Healthcare',      icon: '🏥', budget_amount: 0, is_fixed: true,  sort_order: 7  },
-  { name: 'Kids Activities', icon: '🎨', budget_amount: 0, is_fixed: true,  sort_order: 8  },
-  { name: 'Eating Out',      icon: '🍽️', budget_amount: 0, is_fixed: false, sort_order: 9  },
-  { name: 'Entertainment',   icon: '🎬', budget_amount: 0, is_fixed: false, sort_order: 10 },
-  { name: 'Clothing',        icon: '👗', budget_amount: 0, is_fixed: false, sort_order: 11 },
-  { name: 'Personal Care',   icon: '💆', budget_amount: 0, is_fixed: false, sort_order: 12 },
+  { name: 'Rent / Mortgage', icon: '🏠', budget_amount: 0, is_fixed: true,  sort_order: 0 },
+  { name: 'Electricity',     icon: '⚡', budget_amount: 0, is_fixed: true,  sort_order: 1 },
+  { name: 'Water',           icon: '💧', budget_amount: 0, is_fixed: true,  sort_order: 2 },
+  { name: 'Internet',        icon: '📡', budget_amount: 0, is_fixed: true,  sort_order: 3 },
+  { name: 'Groceries',       icon: '🛒', budget_amount: 0, is_fixed: true,  sort_order: 4 },
+  { name: 'Transport',       icon: '🚗', budget_amount: 0, is_fixed: true,  sort_order: 5 },
+  { name: 'School Fees',     icon: '📚', budget_amount: 0, is_fixed: true,  sort_order: 6 },
+  { name: 'Healthcare',      icon: '🏥', budget_amount: 0, is_fixed: true,  sort_order: 7 },
+  { name: 'Eating Out',      icon: '🍽️', budget_amount: 0, is_fixed: false, sort_order: 8 },
+  { name: 'Clothing',        icon: '👗', budget_amount: 0, is_fixed: false, sort_order: 9 },
 ];
 
 /**

@@ -24,6 +24,10 @@ const mockRemoveMember       = vi.fn().mockResolvedValue({ error: null });
 const mockCancelInvite       = vi.fn().mockResolvedValue({ error: null });
 const mockCan                = vi.fn().mockReturnValue(true);
 
+// Mutable so cap tests can swap in a 10-category slice / Pro plan.
+let mockCats = mockCategories;
+let mockPlan = 'free';
+
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => ({ user: null, loading: false, signOut: mockSignOut }),
 }));
@@ -32,7 +36,7 @@ vi.mock('../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({
     centre:            mockCentre,
     fmt:               mockFmt,
-    categories:        mockCategories,
+    categories:        mockCats,
     addCategory:       mockAddCategory,
     updateCentre:      mockUpdateCentre,
     updateCategory:    mockUpdateCategory,
@@ -58,7 +62,7 @@ vi.mock('../context/FinanceContext', () => ({
     addIncomeSource:     mockAddIncomeSource,
     deleteIncomeSource:  mockDeleteIncomeSource,
     updateIncomeSource:  mockUpdateIncomeSource,
-    userPlan:            'free',
+    get userPlan()       { return mockPlan; },
   }),
 }));
 
@@ -102,6 +106,8 @@ describe('SettingsView', () => {
     mockAddIncomeSource.mockClear();
     mockDeleteIncomeSource.mockClear();
     mockAddCategory.mockClear();
+    mockCats = mockCategories;
+    mockPlan = 'free';
   });
 
   it('renders Settings heading', () => {
@@ -220,6 +226,32 @@ describe('SettingsView', () => {
       expect.objectContaining({ name: 'School Fees' }),
       'cyc-this',
     );
+  });
+
+  // ── Category cap (CAT01) ──────────────────────────────────────────────────
+  it('free under cap: shows "N of 10" and the + Add button', () => {
+    renderSettings();
+    expect(screen.getByTestId('category-count').textContent).toBe('2 of 10');
+    expect(screen.getByTestId('add-category-btn')).toBeTruthy();
+    expect(screen.queryByTestId('upgrade-categories-btn')).toBeNull();
+  });
+
+  it('free at cap (10 categories): shows Upgrade to Pro and opens the modal', async () => {
+    mockCats = Array.from({ length: 10 }, (_, i) => ({
+      id: `c${i}`, name: `Cat ${i}`, icon: '🛒', budget_amount: 10, is_fixed: true, sort_order: i, month: getCurrentMonth(), cycle_id: 'cyc-this',
+    }));
+    renderSettings();
+    expect(screen.getByTestId('category-count').textContent).toBe('10 of 10');
+    expect(screen.queryByTestId('add-category-btn')).toBeNull();
+    await act(async () => { screen.getByTestId('upgrade-categories-btn').click(); });
+    expect(screen.getByText(/category limit for this period/)).toBeTruthy();
+  });
+
+  it('pro: shows "N categories" and the + Add button (never gated)', () => {
+    mockPlan = 'pro';
+    renderSettings();
+    expect(screen.getByTestId('category-count').textContent).toBe('2 categories');
+    expect(screen.getByTestId('add-category-btn')).toBeTruthy();
   });
 
   it('shows error when fixed_date pay day is out of range', async () => {

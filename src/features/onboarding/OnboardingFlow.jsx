@@ -157,7 +157,7 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
 
         {step === 0 && <StepCentre     data={centreData}    onNext={handleCentreNext} />}
         {step === 1 && <StepIncome     data={incomes}       centreCurrency={centreData.currency} plan={plan} onNext={handleIncomeNext} onBack={goBack} />}
-        {step === 2 && <StepCategories data={categories}    fmt={fmt} onNext={handleCatsNext}   onBack={goBack} />}
+        {step === 2 && <StepCategories data={categories}    fmt={fmt} plan={plan} onNext={handleCatsNext}   onBack={goBack} />}
         {step === 3 && <StepTarget     data={surplusTarget} totalIncome={totalIncome} totalBudgeted={totalBudgeted} fmt={fmt} onNext={handleTargetNext} onBack={goBack} />}
         {step === 4 && <StepComplete   centreData={centreData} incomes={incomes} categories={categories} surplusTarget={surplusTarget} totalIncome={totalIncome} totalBudgeted={totalBudgeted} overBudget={overBudget} fmt={fmt} loading={loading} error={error} onConfirm={handleConfirm} onBack={goBack} />}
       </div>

@@ -5,18 +5,12 @@ import { ROLE_LABELS, ROLE_DESCRIPTIONS, INVITABLE_ROLES } from '../../lib/roles
 import { getLimitsForTier }                 from '../../lib/plans';
 import { selectStyle }                      from '../../lib/selectStyle';
 import { UpgradeModal }                     from '../../components/ui/UpgradeModal';
+import { MEMBER_CAP_BODY }                   from '../../lib/planCopy';
 import { MemberRow }                        from './MemberRow';
 
 const card       = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
 const label      = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: 0.8 };
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 14, fontWeight: 700, marginBottom: 8, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
-
-// Member-cap UpgradeModal body. Curly apostrophe (’) to byte-match the hub-cap
-// copy convention in UpgradeModal's DEFAULT_BODY.
-const MEMBER_CAP_BODY = [
-  "You've reached your hub's member limit. Free hubs can have 2 members (you + 1 invited).",
-  'Pro hubs will be able to have up to 15 members (₵40/month or ₵400/year) — Pro is coming soon. We’ll let you know when it launches.',
-];
 
 export function MembersSection() {
   const { members, currentMemberRole, can, inviteMember, removeMember, getInvites, cancelInvite, centre } = useBudgetCentreContext();
