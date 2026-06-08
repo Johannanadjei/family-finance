@@ -18,6 +18,21 @@
 -- JavaScript call:
 --   supabase.rpc('accept_invite', { p_token: token, p_name: name })
 --   p_name defaults to '' — safe to omit for sign-in users (RPC falls back to metadata).
+--
+-- MODIFICATION (2026-06-07) — member-cap backstop (ships with the member-cap gate):
+--   Adds a server-side MEM01 count guard between the already-member check and the
+--   member INSERT. This is the RACE-PROOF BACKSTOP, not the primary gate — the
+--   primary issuance gate is create_invite (which counts active + pending_non_expired
+--   and blocks the link from ever being generated past the cap).
+--   • ASYMMETRIC COUNT (by design): this RPC counts ACTIVE MEMBERS ONLY — not
+--     pending invites. The pending→active conversion of the invite being accepted is
+--     net-zero, and expired invites are already rejected at the validation step
+--     below, so counting actual members is the true ceiling. (Decision D8.)
+--   • OWNER-TIER, NOT INVITEE-TIER: here auth.uid() is the INVITEE. The cap belongs
+--     to the hub OWNER (the payer). Resolve the tier from the invite's hub →
+--     budget_centres.owner_id → subscriptions, NEVER from auth.uid(). (Phase 1 §D trap.)
+--   All pre-existing logic (auth, invite validation, already_member, status update,
+--   users upsert, return shape) is preserved.
 
 DROP FUNCTION IF EXISTS accept_invite(uuid);
 
@@ -32,6 +47,10 @@ DECLARE
   v_user_id   uuid;
   v_member_id uuid;
   v_name      text;
+  v_owner     uuid;
+  v_tier      text;
+  v_limit     int;
+  v_active    int;
 BEGIN
 
   -- 1. Require an authenticated session
@@ -60,6 +79,36 @@ BEGIN
       AND  deleted_at       IS NULL
   ) THEN
     RAISE EXCEPTION 'already_member: user is already a member of this hub';
+  END IF;
+
+  -- 3b. Member-cap backstop (MEM01). Race-proof ceiling — counts ACTIVE MEMBERS
+  --     ONLY (the invite being accepted converts pending→active, net-zero; expired
+  --     invites were already rejected at step 2). Tier is the OWNER's, not the
+  --     invitee's (auth.uid() here is the invitee). HARDCODED from src/lib/plans.js
+  --     (Free maxMembersPerHub = 2, Pro = 15). Keep in sync with create_invite.sql.
+  SELECT bc.owner_id INTO v_owner
+  FROM   budget_centres bc
+  WHERE  bc.id = v_invite.budget_centre_id;
+
+  SELECT s.tier INTO v_tier
+  FROM   subscriptions s
+  WHERE  s.user_id = v_owner
+    AND  s.deleted_at IS NULL
+    AND  s.status = 'active'
+    AND  (s.current_period_end IS NULL OR s.current_period_end > now())
+  ORDER BY s.created_at DESC
+  LIMIT 1;
+  v_tier  := COALESCE(v_tier, 'free');
+  v_limit := CASE WHEN v_tier = 'pro' THEN 15 ELSE 2 END;
+
+  SELECT count(*) INTO v_active
+  FROM   budget_centre_members m
+  WHERE  m.budget_centre_id = v_invite.budget_centre_id
+    AND  m.deleted_at IS NULL;
+
+  IF v_active >= v_limit THEN
+    RAISE EXCEPTION 'member limit reached: % of % for tier %', v_active, v_limit, v_tier
+      USING ERRCODE = 'MEM01';
   END IF;
 
   -- 4. Insert the member row

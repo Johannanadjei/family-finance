@@ -7,66 +7,46 @@
 
 import { supabase } from '../lib/supabase';
 
+/** Friendly, user-facing copy for a plan member-cap rejection (MEM01). */
+const MEMBER_CAP_MESSAGE =
+  "You've reached your hub's member limit. Free hubs can have 2 members (you + 1 invited). Upgrade to Pro for up to 15 members per hub.";
+
 /**
  * Create a new pending invite for a hub.
- * Guards against duplicate pending invites and existing members.
  *
- * @param {{ centreId, email, role, invitedBy }} opts
+ * Delegates to the create_invite SECURITY DEFINER RPC (scripts/create_invite.sql),
+ * which (a) re-implements the hub-manager authorization RLS used to enforce, (b)
+ * enforces the per-tier member cap server-side using the OWNER's tier — rejecting
+ * with SQLSTATE 'MEM01' if active members + non-expired pending invites are at the
+ * limit — and (c) guards duplicate pending invites and existing members atomically.
+ * The client-side gate (MembersSection) is UX only; this RPC is the real enforcement.
+ *
+ * On a cap rejection the returned Error carries `error.code === 'MEM01'` so callers
+ * can open the upgrade modal and/or show MEMBER_CAP_MESSAGE. (Mirrors HUB01.)
+ *
+ * @param {{ centreId, email, role }} opts — invitedBy is auth.uid() server-side
  * @returns {{ data, error }}
  */
-export const createInvite = async ({ centreId, email, role, invitedBy }) => {
-  const normalised = email.trim().toLowerCase();
+export const createInvite = async ({ centreId, email, role }) => {
+  const { data, error } = await supabase.rpc('create_invite', {
+    p_centre_id:     centreId,
+    p_invited_email: email,
+    p_role:          role,
+  });
 
-  // Duplicate pending invite check
-  const { data: existing, error: dupErr } = await supabase
-    .from('centre_invites')
-    .select('id')
-    .eq('budget_centre_id', centreId)
-    .eq('invited_email', normalised)
-    .eq('status', 'pending')
-    .maybeSingle();
-
-  if (dupErr) {
-    console.error('[invites.service] createInvite dup check error:', dupErr.message);
-    return { data: null, error: dupErr };
-  }
-  if (existing) {
-    return { data: null, error: new Error('A pending invite already exists for this email.') };
-  }
-
-  // Existing active member check — filter by email via inner join
-  const { data: existingMember, error: memErr } = await supabase
-    .from('budget_centre_members')
-    .select('id, users!inner(email)')
-    .eq('budget_centre_id', centreId)
-    .eq('users.email', normalised)
-    .is('deleted_at', null)
-    .maybeSingle();
-
-  if (memErr) {
-    console.error('[invites.service] createInvite member check error:', memErr.message);
-    return { data: null, error: memErr };
-  }
-  if (existingMember) {
-    return { data: null, error: new Error('This person is already a member of this hub.') };
+  if (error) {
+    if (error.code === 'MEM01') {
+      // Plan cap hit — map to friendly copy + keep the code so callers can react.
+      const capErr = new Error(MEMBER_CAP_MESSAGE);
+      capErr.code = 'MEM01';
+      console.error('[invites.service] createInvite cap reached (MEM01)');
+      return { data: null, error: capErr };
+    }
+    console.error('[invites.service] createInvite RPC error:', error.message);
+    return { data: null, error };
   }
 
-  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-
-  const { data: invite, error } = await supabase
-    .from('centre_invites')
-    .insert({
-      budget_centre_id: centreId,
-      invited_email:    normalised,
-      role,
-      invited_by:       invitedBy,
-      expires_at:       new Date(Date.now() + sevenDaysMs).toISOString(),
-    })
-    .select()
-    .single();
-
-  if (error) console.error('[invites.service] createInvite insert error:', error.message);
-  return { data: invite, error };
+  return { data, error: null };
 };
 
 /**
