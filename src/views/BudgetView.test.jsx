@@ -52,7 +52,9 @@ const mockFinance = {
 };
 
 vi.mock('../context/FinanceContext', () => ({
-  useFinanceContext: () => mockFinance,
+  // visibleCycles defaults to the full cycles list (full visibility) unless a test
+  // sets mockFinance.visibleCycles explicitly (history at-wall cases).
+  useFinanceContext: () => ({ ...mockFinance, visibleCycles: mockFinance.visibleCycles ?? mockFinance.cycles }),
 }));
 
 const renderView = () => render(<MemoryRouter><BudgetView /></MemoryRouter>);
@@ -359,5 +361,49 @@ describe('BudgetView — reset period + RBAC gate', () => {
     renderView();
     fireEvent.click(screen.getByTestId('period-actions-btn'));
     expect(screen.getByTestId('reset-period-btn').disabled).toBe(true);
+  });
+});
+
+// ── History visibility gate — at-wall upgrade affordance (D5/D6/D8) ────────────
+describe('BudgetView — history gate at-wall affordance', () => {
+  const JUN = { id: 'cyc-jun', name: 'June 2026',  start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null };
+  const MAY = { id: 'cyc-may', name: 'May 2026',   start_date: '2026-05-01', end_date: '2026-05-31', deleted_at: null };
+  const APR = { id: 'cyc-apr', name: 'April 2026', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
+  const MAR = { id: 'cyc-mar', name: 'March 2026', start_date: '2026-03-01', end_date: '2026-03-31', deleted_at: null };
+
+  beforeEach(() => {
+    mockCan = () => true;
+    mockBudgetCentre.allCategories = [];   // empty viewed cycle — header still renders
+  });
+  afterEach(() => {
+    mockCan = () => true;
+    Object.assign(mockFinance, { cycles: [THIS_CYCLE], activeCycle: THIS_CYCLE, activeCycleId: null, userPlan: 'free' });
+    mockFinance.visibleCycles = undefined;   // back to "defaults to cycles" in the mock factory
+    mockBudgetCentre.allCategories = mockCategories;
+  });
+
+  it('free + hidden cycles + on oldest visible: prev arrow is a tappable upgrade affordance that opens the modal', () => {
+    // 4 cycles total, free window = 3 (Jun/May/Apr); viewing Apr (oldest visible) → Mar hidden.
+    Object.assign(mockFinance, { cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycle: JUN, activeCycleId: 'cyc-apr', userPlan: 'free' });
+    renderView();
+    const affordance = screen.getByTestId('upgrade-history-affordance');
+    expect(affordance.disabled).toBe(false);            // tappable, not disabled
+    fireEvent.click(affordance);
+    expect(screen.getByText(/history limit/)).toBeTruthy();   // HISTORY_CAP_BODY in the UpgradeModal
+  });
+
+  it('Pro at the hub natural oldest: normal disabled prev, no affordance', () => {
+    // Pro sees all; visibleCycles === cycles → nothing hidden.
+    Object.assign(mockFinance, { cycles: [JUN, MAY, APR], visibleCycles: [JUN, MAY, APR], activeCycle: JUN, activeCycleId: 'cyc-apr', userPlan: 'pro' });
+    renderView();
+    expect(screen.queryByTestId('upgrade-history-affordance')).toBeNull();
+    expect(screen.getByLabelText('Previous period').disabled).toBe(true);
+  });
+
+  it('free with ≤3 cycles total: no hidden history → normal disabled prev, no affordance', () => {
+    Object.assign(mockFinance, { cycles: [MAY, APR], visibleCycles: [MAY, APR], activeCycle: MAY, activeCycleId: 'cyc-apr', userPlan: 'free' });
+    renderView();
+    expect(screen.queryByTestId('upgrade-history-affordance')).toBeNull();
+    expect(screen.getByLabelText('Previous period').disabled).toBe(true);
   });
 });

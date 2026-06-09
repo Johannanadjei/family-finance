@@ -23,8 +23,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getTransactionsByCycle } from '../services/transactions.service';
 import { getIncomeSources } from '../services/income.service';
 import { getCyclesForCentre, createBudgetPeriod, resetBudgetPeriod } from '../services/cycles.service';
-import { getActiveCycle, sliceByCycle } from '../lib/cycles';
+import { getActiveCycle, sliceByCycle, visibleCycleWindow } from '../lib/cycles';
 import { getToday } from '../lib/dates';
+import { getLimitsForTier } from '../lib/plans';
 import {
   calcTotalIncome, calcTotalSpent, calcBudgetUsedPct,
   getBudgetStatusFromBudget, calcTotalFixed, calcFixedSpent,
@@ -38,7 +39,7 @@ import { waitForSession } from '../lib/auth';
 import { useIncomeMutations } from './useIncomeMutations';
 import { useTransactionMutations } from './useTransactionMutations';
 
-export function useFinance({ centre, allCategories }) {
+export function useFinance({ centre, allCategories, userPlan = 'free' }) {
   const centreId      = centre?.id           || null;
   const surplusTarget = centre?.surplus_target || 0;
   const currency      = centre?.currency      || 'GHS';
@@ -159,6 +160,16 @@ export function useFinance({ centre, allCategories }) {
   useEffect(() => { setActiveCycleId(null); }, [centreId]);
 
   const activeCycle = useMemo(() => getActiveCycle(cycles, getToday()), [cycles]);
+
+  // History visibility gate (client-side, soft UX nudge — NOT a privacy boundary).
+  // The newest-N cycles a tier may navigate to (3 free / Infinity pro). Views read
+  // visibleCycles for ALL navigation (getCycleNav, viewedCycle, move-to-period);
+  // the full `cycles` list stays for internal plumbing (active-cycle resolution,
+  // mutations). See lib/cycles.visibleCycleWindow + docs FinanceContext.
+  const visibleCycles = useMemo(
+    () => visibleCycleWindow(cycles, getLimitsForTier(userPlan).historyMonthsVisible),
+    [cycles, userPlan]
+  );
 
   // Gated loader (Commit 11) — the SOLE trigger of load(). Transactions read by
   // cycle_id, so we must wait for cycles to settle, then resolve the cycle id via
@@ -343,6 +354,8 @@ export function useFinance({ centre, allCategories }) {
 
     // Cycles (Budget Cycles) — hub-scoped; views migrate to these in Commits 5-9
     cycles,
+    visibleCycles,  // tier-windowed view of `cycles` (history gate) — views use this for ALL
+                    // navigation; `cycles` (full) is for internal plumbing only.
     cyclesLoading,  // true until a real (valid-centre) loadCycles settles — views gate their
                     // first paint on it so cycles resolve before any empty-state renders.
     activeCycle,

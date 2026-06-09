@@ -39,7 +39,7 @@ const mockFinance = {
 };
 
 vi.mock('../context/FinanceContext', () => ({
-  useFinanceContext: () => mockFinance,
+  useFinanceContext: () => ({ ...mockFinance, visibleCycles: mockFinance.visibleCycles ?? mockFinance.cycles }),
 }));
 
 const renderView = () => render(<MemoryRouter><PaydayView /></MemoryRouter>);
@@ -226,6 +226,8 @@ describe('PaydayView — cycle navigation', () => {
   const reset = () => {
     mockFinance.cycles = []; mockFinance.activeCycle = null;
     mockFinance.activeCycleId = null; mockFinance.loadCycle = vi.fn();
+    mockFinance.visibleCycles = undefined; mockFinance.userPlan = 'free';
+    mockFinance.incomes = mockIncomes; mockFinance.allIncomes = mockIncomes;
   };
 
   it('labels the header with the viewed cycle name', () => {
@@ -249,6 +251,33 @@ describe('PaydayView — cycle navigation', () => {
     renderView();
     expect(screen.getByLabelText('Previous period').disabled).toBe(true);
     expect(screen.getByLabelText('Next period').disabled).toBe(false);
+    reset();
+  });
+
+  // ── History gate (D6/D8) — Payday navigates visibleCycles; NO upgrade affordance
+  //    (Budget-only, D8) and the rollforward source is gated (Phase 1 §F leak). ──
+  const JUN = { id: 'cyc-jun', name: 'June 2026',  start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null };
+  const MAR = { id: 'cyc-mar', name: 'March 2026', start_date: '2026-03-01', end_date: '2026-03-31', deleted_at: null };
+
+  it('free with hidden cycles: at the oldest VISIBLE cycle the prev arrow is plainly disabled (no affordance)', () => {
+    // 4 cycles, free window = 3 (Jun/May/Apr); Mar hidden. Viewing Apr (oldest visible).
+    withCycles({ cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycleId: 'cyc-apr', userPlan: 'free' });
+    renderView();
+    expect(screen.getByLabelText('Previous period').disabled).toBe(true);   // can't navigate to hidden Mar
+    expect(screen.queryByTestId('upgrade-history-affordance')).toBeNull();   // Budget-only (D8)
+    reset();
+  });
+
+  it('rollforward gate: a free user at the oldest visible cycle gets no copy-from-hidden CTA', () => {
+    // historyLocked → prevMonth null, so prevSources can't reference the hidden March
+    // even though allIncomes holds March sources (Phase 1 §F leak closed at the data layer).
+    withCycles({
+      cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycleId: 'cyc-apr',
+      userPlan: 'free', incomes: [],
+      allIncomes: [{ id: 'h1', label: 'Hidden Mar Salary', icon: '💰', expected_amount: 30000, currency: 'GHS', month: '2026-03', notes: '' }],
+    });
+    renderView();
+    expect(screen.queryByTestId('copy-all-btn')).toBeNull();
     reset();
   });
 });

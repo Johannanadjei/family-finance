@@ -45,17 +45,18 @@ function LogViewSkeleton() {
 export function LogView({ onEditTx }) {
   const { fmt, can, currentUserId }          = useBudgetCentreContext();
   const { txs, loading, cyclesLoading, error,
-          activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle,
+          activeMonth, visibleCycles = [], activeCycle, activeCycleId, loadCycle,
           deleteTransaction, moveTransaction } = useFinanceContext();
   const [filter,      setFilter]            = useState('all');
   const [search,      setSearch]            = useState('');
   const [deletingId,  setDeletingId]        = useState(null);
   const [deleteError, setDeleteError]       = useState(null);
   // Move-to-period flow (Commit 12) — shared with DailyView. Called before any early
-  // return so its hooks run unconditionally (CLAUDE.md §9.5).
+  // return so its hooks run unconditionally (CLAUDE.md §9.5). visibleCycles (not the
+  // full list) so a free user can't move a transaction into a hidden period.
   const { moveTx, moveDestinations, movingId, moveError,
           openMove, closeMove, confirmMove, moveGuardModal } =
-    useMoveToCycle({ txs, cycles, moveTransaction });
+    useMoveToCycle({ txs, cycles: visibleCycles, moveTransaction });
 
   if (!can('log')) return <AccessBlocked message="The transaction log is not available for your role." />;
   // Hold first paint until cycles resolve — else the viewed-period filter/labels
@@ -67,8 +68,8 @@ export function LogView({ onEditTx }) {
   // (brand-new hub before Commit-4 auto-create). `nav` drives bounded prev/next.
   const today          = getToday();
   const currentMonth   = getCurrentMonth();
-  const viewedCycle    = cycles.find(c => c.id === activeCycleId) ?? activeCycle ?? null;
-  const nav            = getCycleNav(cycles, viewedCycle?.id ?? null);
+  const viewedCycle    = visibleCycles.find(c => c.id === activeCycleId) ?? activeCycle ?? null;
+  const nav            = getCycleNav(visibleCycles, viewedCycle?.id ?? null);
   const isCurrent      = viewedCycle ? (viewedCycle.start_date <= today && viewedCycle.end_date >= today) : activeMonth === currentMonth;
   const periodLabel    = viewedCycle?.name ?? formatMonth(activeMonth);
   const showAllTxs     = can('viewAllTxs');
