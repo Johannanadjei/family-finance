@@ -207,7 +207,7 @@ export default function App() {
   const subscription                                       = useSubscription(user);
   const userPlan                                           = subscription.tier;
   const { centre, allCategories, reloadCategories, members, currentMemberRole,
-          addCategory, updateCentre, updateCategory, deleteCategory,
+          addCategory, updateCentre, updateCentreSkin, updateCategory, deleteCategory,
           prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth,
           archiveCentre, permanentDeleteCentre, restoreHub,
           inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite,
@@ -226,9 +226,10 @@ export default function App() {
   }, [centre?.id, activeCentreId]);
 
   // Apply theme — delegates role/skin resolution to the pure resolveSkin function in lib/themes.
+  // userPlan drives the downgrade clamp (Pro→Free renders family_warmth, non-destructive).
   useEffect(() => {
-    applyTheme(resolveSkin(currentMemberRole, centre?.skin_id, financeValues?.prefs?.themeSkin));
-  }, [centre?.skin_id, financeValues?.prefs?.themeSkin, currentMemberRole]);
+    applyTheme(resolveSkin(currentMemberRole, centre?.skin_id, financeValues?.prefs?.themeSkin, userPlan));
+  }, [centre?.skin_id, financeValues?.prefs?.themeSkin, currentMemberRole, userPlan]);
 
   const handleSwitchCentre = useCallback((id) => {
     saveActiveCentreId(id);
@@ -357,6 +358,7 @@ export default function App() {
     currentUserId: user?.id || null,
     addCategory,
     updateCentre,
+    updateCentreSkin,
     updateCategory,
     deleteCategory,
     prevMonthCategories,

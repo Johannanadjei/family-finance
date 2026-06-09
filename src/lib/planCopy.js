@@ -31,3 +31,10 @@ export const HISTORY_CAP_BODY = [
   "You've reached your plan's history limit. Free hubs can see the last 3 budget periods.",
   'Pro hubs will be able to access all history (₵40/month or ₵400/year) — Pro is coming soon. We’ll let you know when it launches.',
 ];
+
+// Skin-cap UpgradeModal body (Decision D1 — agreed copy). Shown from ThemeSection's
+// tappable locked-skin chips when a free user taps a Pro skin.
+export const SKIN_CAP_BODY = [
+  "You've reached your plan's skin limit. Free hubs use the family_warmth skin.",
+  'Pro hubs will be able to use all skins (₵40/month or ₵400/year) — Pro is coming soon. We’ll let you know when it launches.',
+];

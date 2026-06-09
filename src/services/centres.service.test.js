@@ -41,7 +41,7 @@ vi.mock('../lib/supabase', () => {
 
 vi.mock('../lib/auth', () => ({ warnOnEmptyColdLoad: vi.fn() }));
 
-import { updateCentre, createCentre } from './centres.service';
+import { updateCentre, createCentre, updateCentreSkin } from './centres.service';
 
 beforeEach(() => {
   mockResult    = { data: null, error: null };
@@ -152,5 +152,40 @@ describe('createCentre — atomic RPC + hub-cap gate', () => {
     expect(data).toBeNull();
     expect(error).toBeTruthy();
     expect(rpcCalled).toBe(false);
+  });
+});
+
+describe('updateCentreSkin — server-gated skin write (SKN01)', () => {
+  it('calls the update_centre_skin RPC with the centre + skin and returns the row', async () => {
+    mockRpcResult = { data: { id: 'c-1', skin_id: 'royal_luxury' }, error: null };
+    const { data, error } = await updateCentreSkin('c-1', 'royal_luxury');
+    expect(rpcCalled).toBe(true);
+    expect(rpcArgs.p_centre_id).toBe('c-1');
+    expect(rpcArgs.p_skin_id).toBe('royal_luxury');
+    expect(data.skin_id).toBe('royal_luxury');
+    expect(error).toBeNull();
+  });
+
+  it('a free hub setting family_warmth succeeds (allowed skin)', async () => {
+    mockRpcResult = { data: { id: 'c-1', skin_id: 'family_warmth' }, error: null };
+    const { data, error } = await updateCentreSkin('c-1', 'family_warmth');
+    expect(error).toBeNull();
+    expect(data.skin_id).toBe('family_warmth');
+  });
+
+  it('maps a SKN01 cap rejection to the friendly message + preserves the code', async () => {
+    mockRpcResult = { data: null, error: { code: 'SKN01', message: 'skin requires Pro: royal_luxury' } };
+    const { data, error } = await updateCentreSkin('c-1', 'royal_luxury');
+    expect(data).toBeNull();
+    expect(error.code).toBe('SKN01');
+    expect(error.message).toMatch(/skin limit/);
+  });
+
+  it('passes through a non-SKN01 RPC error untouched', async () => {
+    mockRpcResult = { data: null, error: { code: '42501', message: 'permission denied' } };
+    const { data, error } = await updateCentreSkin('c-1', 'royal_luxury');
+    expect(data).toBeNull();
+    expect(error.code).not.toBe('SKN01');
+    expect(error.message).toBe('permission denied');
   });
 });
