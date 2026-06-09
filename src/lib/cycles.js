@@ -51,6 +51,29 @@ export function getCycleContainingDate(cycles, dateStr) {
 }
 
 /**
+ * The N most-recent cycles a tier may see — the history visibility gate (client-side,
+ * Commit: history gate). Anchored on the NEWEST cycle (Decision D2): sort newest-first
+ * and keep the first N. `limit` counts CYCLES, not calendar months (Decision D1) — it
+ * comes from getLimitsForTier(plan).historyMonthsVisible (3 free / Infinity pro; the
+ * "Months" in that key name predates the cycle model — it gates cycles).
+ *
+ * Non-mutating (sorts a copy). Empty input → []. limit === Infinity or limit >= length
+ * → all cycles (sorted copy). Does NOT filter deleted_at — the raw cycles array is
+ * already live-filtered at the query, and getCycleNav/sliceByCycle live-filter
+ * downstream; this helper is purely about the visible WINDOW.
+ *
+ * @param {Array<{ start_date: string }>} cycles
+ * @param {number} limit — cycle count cap; Infinity for unlimited (Pro)
+ * @returns {Array}
+ */
+export function visibleCycleWindow(cycles, limit) {
+  if (!Array.isArray(cycles) || cycles.length === 0) return [];
+  const sorted = [...cycles].sort((a, b) => b.start_date.localeCompare(a.start_date));  // newest-first
+  if (limit === Infinity || limit >= sorted.length) return sorted;
+  return sorted.slice(0, limit);
+}
+
+/**
  * Navigation neighbours for a cycle list, for prev/next period traversal.
  * Cycles are sorted newest-first internally, so order-independent. "next" is the
  * newer cycle, "prev" is the older — matching forward/back arrows on a timeline.

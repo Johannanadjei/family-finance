@@ -24,3 +24,10 @@ export const CATEGORY_CAP_BODY = [
   "You've reached your hub's category limit for this period. Free hubs can have 10 categories per budget period.",
   'Pro hubs will be able to have unlimited categories (₵40/month or ₵400/year) — Pro is coming soon. We’ll let you know when it launches.',
 ];
+
+// History-cap UpgradeModal body (Decision D7 — agreed copy). Shown from BudgetView's
+// at-wall prev-arrow affordance when a free user has older budget periods hidden.
+export const HISTORY_CAP_BODY = [
+  "You've reached your plan's history limit. Free hubs can see the last 3 budget periods.",
+  'Pro hubs will be able to access all history (₵40/month or ₵400/year) — Pro is coming soon. We’ll let you know when it launches.',
+];

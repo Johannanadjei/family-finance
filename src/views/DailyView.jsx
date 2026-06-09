@@ -43,15 +43,16 @@ export function DailyView() {
   const { fmt, can }                         = useBudgetCentreContext();
   const { txs, totalSpent, weeklyData,
           loading, cyclesLoading, error, activeMonth,
-          cycles = [], activeCycle, activeCycleId, loadCycle,
+          visibleCycles = [], activeCycle, activeCycleId, loadCycle,
           deleteTransaction, moveTransaction } = useFinanceContext();
   const [deletingId,  setDeletingId]         = useState(null);
   const [deleteError, setDeleteError]        = useState(null);
   // Move-to-period flow (Commit 12) — shared with LogView. Called before the loading
-  // return so its hooks run unconditionally (CLAUDE.md §9.5).
+  // return so its hooks run unconditionally (CLAUDE.md §9.5). visibleCycles (not the
+  // full list) so a free user can't move a transaction into a hidden period.
   const { moveTx, moveDestinations, movingId, moveError,
           openMove, closeMove, confirmMove, moveGuardModal } =
-    useMoveToCycle({ txs, cycles, moveTransaction });
+    useMoveToCycle({ txs, cycles: visibleCycles, moveTransaction });
 
   // Hold first paint until cycles resolve — else the viewed period / weekly bar
   // flash a stale or empty cycle before the current one loads (cold-load flash).
@@ -62,8 +63,8 @@ export function DailyView() {
   // (brand-new hub before Commit-4 auto-create). `nav` drives bounded prev/next.
   const today          = getToday();
   const currentMonth   = getCurrentMonth();
-  const viewedCycle    = cycles.find(c => c.id === activeCycleId) ?? activeCycle ?? null;
-  const nav            = getCycleNav(cycles, viewedCycle?.id ?? null);
+  const viewedCycle    = visibleCycles.find(c => c.id === activeCycleId) ?? activeCycle ?? null;
+  const nav            = getCycleNav(visibleCycles, viewedCycle?.id ?? null);
   const isCurrent      = viewedCycle ? (viewedCycle.start_date <= today && viewedCycle.end_date >= today) : activeMonth === currentMonth;
   const isPast         = viewedCycle ? viewedCycle.end_date < today : activeMonth < currentMonth;
   const periodLabel    = viewedCycle?.name ?? formatMonth(activeMonth);

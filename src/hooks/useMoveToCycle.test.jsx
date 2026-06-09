@@ -55,4 +55,17 @@ describe('useMoveToCycle', () => {
     await act(async () => { result.current.confirmMove('cyc-b'); });
     await waitFor(() => expect(result.current.moveError).toBeTruthy());
   });
+
+  // History gate: DailyView/LogView pass `visibleCycles` (not the full list) as
+  // `cycles`, so the move-to-period options only ever contain visible periods — a
+  // free user can never move a transaction into a hidden cycle.
+  it('offers only the cycles it is given (views pass visibleCycles → hidden periods absent)', () => {
+    const HIDDEN = { id: 'cyc-hidden', name: 'Old Hidden', ...FUTURE };
+    // Simulate the view passing the windowed list — HIDDEN is excluded by the caller.
+    const { result } = renderHook(() => useMoveToCycle({ txs: TXS, cycles: CYCLES, moveTransaction }));
+    act(() => result.current.openMove('tx-1'));
+    const ids = result.current.moveDestinations.map(c => c.id);
+    expect(ids).toEqual(['cyc-b', 'cyc-past']);   // exactly the given live cycles, minus the tx's own
+    expect(ids).not.toContain(HIDDEN.id);          // a cycle never passed in can't be a destination
+  });
 });

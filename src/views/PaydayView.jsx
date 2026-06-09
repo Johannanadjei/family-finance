@@ -62,26 +62,34 @@ export function PaydayView() {
 
   const {
     incomes, allIncomes = [], error, totalReceived, totalExpected, totalPending, totalIncome, txs,
-    activeMonth, cycles = [], activeCycle, activeCycleId, loadCycle,
+    activeMonth, cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, userPlan,
     markReceived, markPending, updateExpectedAmount, copyIncomeSourcesToMonth,
   } = financeValues;
 
   // Viewed period: navigated cycle → auto-resolved current cycle → month fallback
   // (brand-new hub before Commit-4 auto-create). `nav` drives bounded prev/next.
+  // Navigation reads visibleCycles (history gate); stale hidden activeCycleId falls
+  // back to the always-visible activeCycle.
   const today          = getToday();
   const currentMonth   = getCurrentMonth();
-  const viewedCycle    = cycles.find(c => c.id === activeCycleId) ?? activeCycle ?? null;
-  const nav            = getCycleNav(cycles, viewedCycle?.id ?? null);
+  const viewedCycle    = visibleCycles.find(c => c.id === activeCycleId) ?? activeCycle ?? null;
+  const nav            = getCycleNav(visibleCycles, viewedCycle?.id ?? null);
   const isCurrent      = viewedCycle ? (viewedCycle.start_date <= today && viewedCycle.end_date >= today) : activeMonth === currentMonth;
   const isPast         = viewedCycle ? viewedCycle.end_date   < today : activeMonth < currentMonth;
   const isFuture       = viewedCycle ? viewedCycle.start_date > today : activeMonth > currentMonth;
   const viewedMonth    = viewedCycle ? viewedCycle.start_date.slice(0, 7) : activeMonth;
   const periodLabel    = viewedCycle?.name ?? formatMonth(activeMonth);
   const pastIncomeTxs  = isPast ? txs.filter(t => t.type === 'income') : [];   // past = read-only, tx-derived
+  // History gate (D6): at the oldest VISIBLE cycle with older periods hidden, don't let
+  // the offsetMonth fallback pull income from a hidden period (Phase 1 §F leak). No
+  // upgrade affordance here (Budget-only, D8) — just the gate.
+  const historyLocked  = (userPlan || 'free') === 'free' && cycles.length > visibleCycles.length && nav.isOldest;
   // Rollforward source = the PREVIOUS CYCLE (not prev calendar month; cycles can gap).
-  const prevMonth      = nav.prev ? nav.prev.start_date.slice(0, 7) : offsetMonth(activeMonth, -1);
-  const prevSources    = allIncomes.filter(i => i.month === prevMonth && i.notes !== ONE_OFF_MARKER && !i.deleted_at);
-  const prevPeriodLabel = nav.prev?.name ?? formatMonth(prevMonth);
+  const prevMonth      = nav.prev ? nav.prev.start_date.slice(0, 7)
+                       : historyLocked ? null
+                       : offsetMonth(activeMonth, -1);
+  const prevSources    = prevMonth ? allIncomes.filter(i => i.month === prevMonth && i.notes !== ONE_OFF_MARKER && !i.deleted_at) : [];
+  const prevPeriodLabel = nav.prev?.name ?? (prevMonth ? formatMonth(prevMonth) : '');
 
   const handleOpenSheet = (income) => {
     setSelectedIncome(income);

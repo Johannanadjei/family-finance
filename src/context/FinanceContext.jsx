@@ -7,7 +7,15 @@
  *
  * WHAT LIVES HERE:
  *   Everything returned by useFinance — txs, incomes, derived values,
- *   mutations, navigation, state, preferences.
+ *   mutations, navigation, state, preferences. Plus `userPlan` (the tier),
+ *   spread in by App.jsx from useSubscription().
+ *
+ *   cycles vs visibleCycles (history visibility gate): `visibleCycles` is the
+ *   tier-windowed list (newest 3 for free, all for Pro) — views use it for ALL
+ *   navigation (getCycleNav, viewedCycle resolution, the move-to-period list).
+ *   `cycles` is the FULL list, kept only for internal plumbing (active-cycle
+ *   resolution, mutation hooks, the hidden-cycle count behind the upgrade
+ *   affordance). Never navigate off `cycles` directly — it leaks hidden periods.
  *
  * WHAT DOES NOT LIVE HERE:
  *   centre config, fmt, getCatIcon — those live in BudgetCentreContext.
