@@ -20,33 +20,25 @@
  * @param {function} fmt           — currency formatter
  * @param {function} onPrev        — go to previous (older) period
  * @param {function} onNext        — go to next (newer) period
+ * @param {boolean}  historyLocked — free user at the oldest visible cycle with older
+ *                                    periods hidden; prev becomes a tappable upgrade
+ *                                    affordance (the affordance + modal live in <PeriodNav>)
  */
 
-export function PaydayHeader({ periodLabel, isCurrent, isFuture, isLatest, isOldest, totalReceived, totalPending, totalIncome, fmt, onPrev, onNext }) {
+import { PeriodNav } from '../../components/layout/PeriodNav';
+
+export function PaydayHeader({ periodLabel, isCurrent, isFuture, isLatest, isOldest, totalReceived, totalPending, totalIncome, fmt, onPrev, onNext, historyLocked = false }) {
   return (
     <>
-      {/* Period navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <button
-          onClick={onPrev}
-          aria-label="Previous period"
-          disabled={isOldest}
-          style={{ background: 'none', border: 'none', padding: '8px', cursor: isOldest ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isOldest ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <p data-testid="payday-period-label" style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
-          {periodLabel}
-        </p>
-        <button
-          onClick={onNext}
-          aria-label="Next period"
-          disabled={isLatest}
-          style={{ background: 'none', border: 'none', padding: '8px', cursor: isLatest ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isLatest ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      </div>
+      <PeriodNav
+        periodLabel={periodLabel}
+        isOldest={isOldest}
+        isLatest={isLatest}
+        onPrev={onPrev}
+        onNext={onNext}
+        historyLocked={historyLocked}
+        labelTestId="payday-period-label"
+      />
 
       {/* Summary card — hidden for future periods (nothing to total yet) */}
       {!isFuture && (

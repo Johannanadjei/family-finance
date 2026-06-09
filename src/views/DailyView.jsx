@@ -17,6 +17,7 @@ import { getCurrentMonth, groupByDate } from '../lib/finance';
 import { formatMonth, getToday }   from '../lib/dates';
 import { getCycleNav }             from '../lib/cycles';
 import { Skeleton }               from '../components/ui/Skeleton';
+import { PeriodNav }              from '../components/layout/PeriodNav';
 import { TransactionRow }         from './daily/TransactionRow';
 import { MoveCycleSheet }         from './daily/MoveCycleSheet';
 import { WeeklySummaryBar }       from './daily/WeeklySummaryBar';
@@ -43,7 +44,7 @@ export function DailyView() {
   const { fmt, can }                         = useBudgetCentreContext();
   const { txs, totalSpent, weeklyData,
           loading, cyclesLoading, error, activeMonth,
-          visibleCycles = [], activeCycle, activeCycleId, loadCycle,
+          cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, userPlan,
           deleteTransaction, moveTransaction } = useFinanceContext();
   const [deletingId,  setDeletingId]         = useState(null);
   const [deleteError, setDeleteError]        = useState(null);
@@ -68,6 +69,9 @@ export function DailyView() {
   const isCurrent      = viewedCycle ? (viewedCycle.start_date <= today && viewedCycle.end_date >= today) : activeMonth === currentMonth;
   const isPast         = viewedCycle ? viewedCycle.end_date < today : activeMonth < currentMonth;
   const periodLabel    = viewedCycle?.name ?? formatMonth(activeMonth);
+  // History gate (D6/D8): at-wall upgrade affordance only for a FREE user with older
+  // cycles hidden AND on the oldest VISIBLE cycle. Pro / ≤3-cycle hubs → normal disabled.
+  const historyLocked  = (userPlan || 'free') === 'free' && cycles.length > visibleCycles.length && nav.isOldest;
   const visibleTxs     = can('viewIncome') ? txs : txs.filter(tx => tx.type === 'expense');
   const grouped        = groupByDate(visibleTxs);
   const dates          = Object.keys(grouped);
@@ -84,15 +88,15 @@ export function DailyView() {
     <div style={{ padding: '16px' }}>
 
       {/* Period navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <button onClick={() => nav.prev && loadCycle(nav.prev.id)} aria-label="Previous period" disabled={nav.isOldest} style={{ background: 'none', border: 'none', padding: '8px', cursor: nav.isOldest ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: nav.isOldest ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <p data-testid="daily-period-label" style={{ fontSize: 15, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>{periodLabel}</p>
-        <button onClick={() => nav.next && loadCycle(nav.next.id)} aria-label="Next period" disabled={nav.isLatest} style={{ background: 'none', border: 'none', padding: '8px', cursor: nav.isLatest ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: nav.isLatest ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      </div>
+      <PeriodNav
+        periodLabel={periodLabel}
+        isOldest={nav.isOldest}
+        isLatest={nav.isLatest}
+        onPrev={() => nav.prev && loadCycle(nav.prev.id)}
+        onNext={() => nav.next && loadCycle(nav.next.id)}
+        historyLocked={historyLocked}
+        labelTestId="daily-period-label"
+      />
 
       {/* Past period warning */}
       {isPast && (
