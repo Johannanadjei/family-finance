@@ -22,36 +22,26 @@
  * @param {function} onReset     — open the reset-period confirm (future periods only)
  * @param {boolean}  historyLocked    — free user on the oldest VISIBLE cycle with older
  *                                       periods hidden (history gate); the disabled prev
- *                                       arrow becomes a tappable upgrade affordance
- * @param {function} onHistoryUpgrade — open the history UpgradeModal (when historyLocked)
+ *                                       arrow becomes a tappable upgrade affordance.
+ *                                       The affordance + its modal live in <PeriodNav>.
  */
 
 import { useState } from 'react';
+import { PeriodNav } from '../../components/layout/PeriodNav';
 
-export function BudgetHeader({ periodLabel, fmt, fixedTotal, fixedSpent, isLatest, isOldest, onPrev, onNext, onNewPeriod, canManage = false, isFuture = false, onReset, historyLocked = false, onHistoryUpgrade }) {
+export function BudgetHeader({ periodLabel, fmt, fixedTotal, fixedSpent, isLatest, isOldest, onPrev, onNext, onNewPeriod, canManage = false, isFuture = false, onReset, historyLocked = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <>
-      {/* Period navigation. When historyLocked, the prev arrow keeps its disabled
-          (greyed) LOOK but becomes tappable → opens the upgrade modal instead of
-          navigating. Same visual, tier-divergent behaviour (D5/D8). */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <button
-          onClick={historyLocked ? onHistoryUpgrade : onPrev}
-          aria-label="Previous period"
-          data-testid={historyLocked ? 'upgrade-history-affordance' : undefined}
-          disabled={isOldest && !historyLocked}
-          style={{ background: 'none', border: 'none', padding: '8px', cursor: (historyLocked || !isOldest) ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isOldest ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <p data-testid="budget-period-label" style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
-          {periodLabel}
-        </p>
-        <button onClick={onNext} aria-label="Next period" disabled={isLatest}
-          style={{ background: 'none', border: 'none', padding: '8px', cursor: isLatest ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isLatest ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      </div>
+      <PeriodNav
+        periodLabel={periodLabel}
+        isOldest={isOldest}
+        isLatest={isLatest}
+        onPrev={onPrev}
+        onNext={onNext}
+        historyLocked={historyLocked}
+        labelTestId="budget-period-label"
+      />
 
       {/* Period actions: create (always shown) + reset kebab (future periods only).
           Both gate on can('manageCycles') — disabled (greyed) for standard members;

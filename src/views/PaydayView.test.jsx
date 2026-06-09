@@ -254,17 +254,20 @@ describe('PaydayView — cycle navigation', () => {
     reset();
   });
 
-  // ── History gate (D6/D8) — Payday navigates visibleCycles; NO upgrade affordance
-  //    (Budget-only, D8) and the rollforward source is gated (Phase 1 §F leak). ──
+  // ── History gate (D6/D8) — Payday navigates visibleCycles; at the oldest VISIBLE
+  //    cycle a free user gets the upgrade affordance (now consistent across all four
+  //    views via <PeriodNav>), and the rollforward source is gated (Phase 1 §F leak). ──
   const JUN = { id: 'cyc-jun', name: 'June 2026',  start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null };
   const MAR = { id: 'cyc-mar', name: 'March 2026', start_date: '2026-03-01', end_date: '2026-03-31', deleted_at: null };
 
-  it('free with hidden cycles: at the oldest VISIBLE cycle the prev arrow is plainly disabled (no affordance)', () => {
+  it('free with hidden cycles: at the oldest VISIBLE cycle the prev arrow is a tappable upgrade affordance that opens the modal', () => {
     // 4 cycles, free window = 3 (Jun/May/Apr); Mar hidden. Viewing Apr (oldest visible).
     withCycles({ cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycleId: 'cyc-apr', userPlan: 'free' });
     renderView();
-    expect(screen.getByLabelText('Previous period').disabled).toBe(true);   // can't navigate to hidden Mar
-    expect(screen.queryByTestId('upgrade-history-affordance')).toBeNull();   // Budget-only (D8)
+    const affordance = screen.getByTestId('upgrade-history-affordance');
+    expect(affordance.disabled).toBe(false);                  // tappable, not disabled
+    fireEvent.click(affordance);
+    expect(screen.getByText(/history limit/)).toBeTruthy();    // HISTORY_CAP_BODY in the UpgradeModal
     reset();
   });
 

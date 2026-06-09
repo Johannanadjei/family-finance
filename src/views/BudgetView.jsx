@@ -17,7 +17,7 @@ import { getCurrentMonth, offsetMonth, calcTotalFixed, calcCategorySpend, calcFi
 import { formatMonth, getToday }  from '../lib/dates';
 import { getCycleNav }            from '../lib/cycles';
 import { getLimitsForTier }       from '../lib/plans';
-import { CATEGORY_CAP_BODY, HISTORY_CAP_BODY } from '../lib/planCopy';
+import { CATEGORY_CAP_BODY } from '../lib/planCopy';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { UpgradeModal }           from '../components/ui/UpgradeModal';
 import { BudgetCategoryList }     from './budget/BudgetCategoryList';
@@ -57,7 +57,6 @@ export function BudgetView() {
   const [copiedCount,      setCopiedCount]      = useState(0);       // >0 → success toast
   const [resetCycle,       setResetCycle]       = useState(null);    // reset-period target (future only)
   const [showUpgrade,      setShowUpgrade]      = useState(false);   // category-cap upgrade modal (CAT01)
-  const [showHistoryUpgrade, setShowHistoryUpgrade] = useState(false); // history-gate upgrade modal
 
   // Viewed period: navigated cycle → current → month fallback. Nav reads visibleCycles
   // (history gate); a now-hidden activeCycleId (Pro→Free downgrade) falls back to activeCycle.
@@ -135,7 +134,6 @@ export function BudgetView() {
         isFuture={isFuture}
         onReset={() => setResetCycle(viewedCycle)}
         historyLocked={historyLocked}
-        onHistoryUpgrade={() => setShowHistoryUpgrade(true)}
       />
 
       <BudgetPeriodCreator
@@ -194,7 +192,6 @@ export function BudgetView() {
       {guardModal}
 
       <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} body={CATEGORY_CAP_BODY} />
-      <UpgradeModal open={showHistoryUpgrade} onClose={() => setShowHistoryUpgrade(false)} body={HISTORY_CAP_BODY} />
     </div>
   );
 }

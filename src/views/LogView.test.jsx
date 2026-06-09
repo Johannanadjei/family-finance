@@ -163,6 +163,21 @@ describe('LogView — cycle navigation', () => {
     expect(screen.getByLabelText('Next period').disabled).toBe(false);
     reset();
   });
+
+  // History gate (D6/D8) — historyLocked is computed in the view and passed to <PeriodNav>.
+  const JUN = { id: 'cyc-jun', name: 'June 2026',  start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null };
+  const MAR = { id: 'cyc-mar', name: 'March 2026', start_date: '2026-03-01', end_date: '2026-03-31', deleted_at: null };
+
+  it('free with hidden cycles at the oldest VISIBLE cycle: prev arrow is a tappable upgrade affordance', () => {
+    // 4 cycles, free window = 3 (Jun/May/Apr); Mar hidden. Viewing Apr (oldest visible).
+    withCycles({ cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycleId: 'cyc-apr', userPlan: 'free' });
+    renderView();
+    const affordance = screen.getByTestId('upgrade-history-affordance');
+    expect(affordance.disabled).toBe(false);
+    fireEvent.click(affordance);
+    expect(screen.getByText(/history limit/)).toBeTruthy();
+    reset();
+  });
 });
 
 // ── Move to period (Commit 12) ────────────────────────────────────────────────
