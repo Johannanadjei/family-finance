@@ -250,4 +250,47 @@ describe('useFinance — cycles', () => {
     expect(ret.error.code).toBe('CYC04');
     expect(getCyclesForCentre).not.toHaveBeenCalled();   // no refresh on failure
   });
+
+  // ── visibleCycles (history visibility gate) ──────────────────────────────────
+  // The newest-N window over `cycles` (3 free / Infinity pro). `cycles` stays full.
+  describe('visibleCycles', () => {
+    const C5 = [
+      CURRENT,
+      { id:'c-apr', budget_centre_id:'centre-1', name:'Apr', start_date:'2025-04-01', end_date:'2025-04-30', anchor_type:'calendar', deleted_at:null },
+      { id:'c-mar', budget_centre_id:'centre-1', name:'Mar', start_date:'2025-03-01', end_date:'2025-03-31', anchor_type:'calendar', deleted_at:null },
+      { id:'c-feb', budget_centre_id:'centre-1', name:'Feb', start_date:'2025-02-01', end_date:'2025-02-28', anchor_type:'calendar', deleted_at:null },
+      { id:'c-jan', budget_centre_id:'centre-1', name:'Jan', start_date:'2025-01-01', end_date:'2025-01-31', anchor_type:'calendar', deleted_at:null },
+    ];
+    const goPlan = (cyclesData, userPlan) => {
+      getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
+      getIncomeSources.mockResolvedValue({ data: [], error: null });
+      getCyclesForCentre.mockResolvedValue({ data: cyclesData, error: null });
+      return renderHook(() => useFinance({ centre: C, allCategories: CATS, userPlan }));
+    };
+
+    it('free: windows to the newest 3 cycles; full cycles list stays intact', async () => {
+      const { result } = goPlan(C5, 'free');
+      await waitFor(() => expect(result.current.cycles).toHaveLength(5));
+      expect(result.current.visibleCycles).toHaveLength(3);
+      expect(result.current.visibleCycles.map(c => c.id)).toEqual(['cyc-cur', 'c-apr', 'c-mar']);
+    });
+
+    it('pro: visibleCycles === all cycles', async () => {
+      const { result } = goPlan(C5, 'pro');
+      await waitFor(() => expect(result.current.cycles).toHaveLength(5));
+      expect(result.current.visibleCycles).toHaveLength(5);
+    });
+
+    it('defaults to free when userPlan omitted', async () => {
+      const { result } = goPlan(C5);   // no userPlan → 'free'
+      await waitFor(() => expect(result.current.cycles).toHaveLength(5));
+      expect(result.current.visibleCycles).toHaveLength(3);
+    });
+
+    it('hub with ≤3 cycles: no-op (visibleCycles === cycles) for free', async () => {
+      const { result } = goPlan([CURRENT, PAST], 'free');
+      await waitFor(() => expect(result.current.cycles).toHaveLength(2));
+      expect(result.current.visibleCycles).toHaveLength(2);
+    });
+  });
 });

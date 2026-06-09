@@ -33,7 +33,7 @@ const mockFinance = {
 };
 
 vi.mock('../context/FinanceContext', () => ({
-  useFinanceContext: () => mockFinance,
+  useFinanceContext: () => ({ ...mockFinance, visibleCycles: mockFinance.visibleCycles ?? mockFinance.cycles }),
 }));
 
 const renderView = () => render(<MemoryRouter><DailyView /></MemoryRouter>);

@@ -215,7 +215,7 @@ export default function App() {
           error, onOnboardingComplete }                   = useBudgetCentre(user, activeCentreId);
   // useFinance owns the current-cycle `categories` slice (Commit 11.5) — it has the
   // cycle state useBudgetCentre lacks. The Provider's categories prop sources from here.
-  const financeValues                                     = useFinance({ centre, allCategories });
+  const financeValues                                     = useFinance({ centre, allCategories, userPlan });
 
   // Persist the active centre ID once the first centre resolves
   useEffect(() => {

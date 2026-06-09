@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth, currentCalendarMonthRange, nextCalendarMonthRange, isWithinCurrentYear } from './cycles';
+import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth, currentCalendarMonthRange, nextCalendarMonthRange, isWithinCurrentYear, visibleCycleWindow } from './cycles';
 
 // Three non-overlapping calendar cycles. Dates are 'YYYY-MM-DD' strings.
 const APR = { id: 'apr', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
@@ -223,5 +223,44 @@ describe('isWithinCurrentYear', () => {
   it('defaults `today` to UTC today when omitted', () => {
     const yr = new Date().toISOString().slice(0, 4);
     expect(isWithinCurrentYear(`${yr}-03-01`, `${yr}-03-31`)).toBe(true);
+  });
+});
+
+describe('visibleCycleWindow', () => {
+  const FEB = { id: 'feb', start_date: '2026-02-01', end_date: '2026-02-28' };
+  const MAR = { id: 'mar', start_date: '2026-03-01', end_date: '2026-03-31' };
+  const five = [FEB, MAR, APR, MAY, JUN];   // chronological
+
+  it('returns [] for an empty array', () => {
+    expect(visibleCycleWindow([], 3)).toEqual([]);
+  });
+
+  it('returns all (sorted newest-first) when count < limit', () => {
+    expect(visibleCycleWindow([APR, MAY], 3).map(c => c.id)).toEqual(['may', 'apr']);
+  });
+
+  it('returns all when count === limit', () => {
+    expect(visibleCycleWindow([APR, MAY, JUN], 3).map(c => c.id)).toEqual(['jun', 'may', 'apr']);
+  });
+
+  it('returns the newest N when count > limit', () => {
+    // 5 cycles, limit 3 → the three newest (Jun, May, Apr); Feb + Mar hidden.
+    expect(visibleCycleWindow(five, 3).map(c => c.id)).toEqual(['jun', 'may', 'apr']);
+  });
+
+  it('returns all cycles when limit is Infinity (Pro)', () => {
+    expect(visibleCycleWindow(five, Infinity).map(c => c.id)).toEqual(['jun', 'may', 'apr', 'mar', 'feb']);
+  });
+
+  it('is order-independent — windows the newest N regardless of input order', () => {
+    const shuffled = [MAY, FEB, JUN, APR, MAR];
+    expect(visibleCycleWindow(shuffled, 3).map(c => c.id)).toEqual(['jun', 'may', 'apr']);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [MAY, FEB, JUN];
+    const copy  = [...input];
+    visibleCycleWindow(input, 2);
+    expect(input).toEqual(copy);
   });
 });
