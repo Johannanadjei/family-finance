@@ -21,7 +21,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { getCentreById, getFirstCentre, updateCentre as updateCentreService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
+import { getCentreById, getFirstCentre, updateCentre as updateCentreService, updateCentreSkin as updateCentreSkinService, archiveCentre as archiveCentreService, deleteCentre as deleteCentreService, unarchiveCentre as unarchiveCentreService } from '../services/centres.service';
 import { getCategories, getAllCategories, addCategory as addCategoryService, bulkAddCategories as bulkAddCategoriesService, updateCategory as updateCategoryService, deleteCategory as deleteCategoryService } from '../services/categories.service';
 import { getMembers, removeMember as removeMemberService, updateMemberRole as updateMemberRoleService } from '../services/members.service';
 import { createInvite as createInviteService, getHubInvites as getHubInvitesService, cancelInvite as cancelInviteService } from '../services/invites.service';
@@ -218,6 +218,30 @@ export function useBudgetCentre(user, centreId) {
     return { data, error: null };
   }, [centre]);
 
+  // Skin is the one centre field that writes through an RPC (update_centre_skin),
+  // not the direct updateCentre path — it is gated against the OWNER's tier server-
+  // side (SKN01). Same optimistic-then-replace shape as updateCentre, including the
+  // null-data RLS no-op guard. A SKN01 rollback surfaces error.code to the caller
+  // (ThemeSection) so it can open the upgrade modal on the DevTools-bypass path.
+  const updateCentreSkin = useCallback(async (skinId) => {
+    const id = centre?.id;
+    if (!id) return { error: new Error('No active centre') };
+    const prev = centre;
+    setCentre(c => ({ ...c, skin_id: skinId }));
+    const { data, error } = await updateCentreSkinService(id, skinId);
+    if (error) {
+      setCentre(prev);
+      console.error('[useBudgetCentre] updateCentreSkin rollback:', error.message);
+      return { error };
+    }
+    if (!data) {
+      setCentre(prev);
+      return { data: prev, error: null };
+    }
+    setCentre(data);
+    return { data, error: null };
+  }, [centre]);
+
   // Self-correct the hub timezone from its 'UTC' default to the browser's zone on
   // first cycle-aware load (Budget Cycles). Best-effort, fire-and-forget. Gated on
   // write permission: only owner/full_access may write centre settings, so standard
@@ -390,6 +414,7 @@ export function useBudgetCentre(user, centreId) {
     error,
     addCategory,
     updateCentre,
+    updateCentreSkin,
     updateCategory,
     deleteCategory,
     prevMonthCategories,

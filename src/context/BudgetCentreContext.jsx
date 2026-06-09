@@ -24,7 +24,7 @@ import { can as canRole } from '../lib/roles';
 
 const BudgetCentreContext = createContext(null);
 
-export function BudgetCentreProvider({ centre, categories, allCategories, reloadCategories, members, currentMemberRole, currentUserId, addCategory, updateCentre, updateCategory, deleteCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth, archiveCentre, permanentDeleteCentre, restoreHub, inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite, centreCount, children }) {
+export function BudgetCentreProvider({ centre, categories, allCategories, reloadCategories, members, currentMemberRole, currentUserId, addCategory, updateCentre, updateCentreSkin, updateCategory, deleteCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth, archiveCentre, permanentDeleteCentre, restoreHub, inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite, centreCount, children }) {
   const fmt = useMemo(
     () => makeFmt(centre?.currency || 'GHS'),
     [centre?.currency]
@@ -51,6 +51,7 @@ export function BudgetCentreProvider({ centre, categories, allCategories, reload
     can,
     addCategory,
     updateCentre,
+    updateCentreSkin,
     updateCategory,
     deleteCategory,
     prevMonthCategories,
@@ -67,7 +68,7 @@ export function BudgetCentreProvider({ centre, categories, allCategories, reload
     centreCount,
     fmt,
     getCatIcon,
-  }), [centre, categories, allCategories, reloadCategories, members, currentMemberRole, currentUserId, can, addCategory, updateCentre, updateCategory, deleteCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth, archiveCentre, permanentDeleteCentre, restoreHub, inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite, centreCount, fmt, getCatIcon]);
+  }), [centre, categories, allCategories, reloadCategories, members, currentMemberRole, currentUserId, can, addCategory, updateCentre, updateCentreSkin, updateCategory, deleteCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth, archiveCentre, permanentDeleteCentre, restoreHub, inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite, centreCount, fmt, getCatIcon]);
 
   return (
     <BudgetCentreContext.Provider value={value}>

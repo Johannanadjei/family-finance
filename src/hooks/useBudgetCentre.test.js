@@ -32,12 +32,13 @@ vi.mock('../lib/auth', () => ({
 }));
 
 vi.mock('../services/centres.service', () => ({
-  getCentreById:   vi.fn(),
-  getFirstCentre:  vi.fn().mockResolvedValue({ data: null, error: null }),
-  updateCentre:    vi.fn(),
-  archiveCentre:   vi.fn(),
-  deleteCentre:    vi.fn(),
-  unarchiveCentre: vi.fn(),
+  getCentreById:    vi.fn(),
+  getFirstCentre:   vi.fn().mockResolvedValue({ data: null, error: null }),
+  updateCentre:     vi.fn(),
+  updateCentreSkin: vi.fn(),
+  archiveCentre:    vi.fn(),
+  deleteCentre:     vi.fn(),
+  unarchiveCentre:  vi.fn(),
 }));
 
 vi.mock('../services/categories.service', () => ({
@@ -60,7 +61,7 @@ vi.mock('../services/auth.service', () => ({
   getUserSession: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null }),
 }));
 
-import { getCentreById, updateCentre, archiveCentre, deleteCentre, unarchiveCentre } from '../services/centres.service';
+import { getCentreById, updateCentre, updateCentreSkin, archiveCentre, deleteCentre, unarchiveCentre } from '../services/centres.service';
 import { getCategories, getAllCategories, addCategory, bulkAddCategories, updateCategory, deleteCategory } from '../services/categories.service';
 import { getMembers } from '../services/members.service';
 import { getCurrentMonth, offsetMonth } from '../lib/finance';
@@ -491,6 +492,38 @@ describe('useBudgetCentre — updateCentre wrapper null-guard', () => {
     await act(async () => { ret = await result.current.updateCentre({ name: 'Nope' }); });
     expect(result.current.centre?.name).toBe(mockCentre.name);   // rolled back
     expect(ret.error).toBeTruthy();
+  });
+});
+
+// ── updateCentreSkin wrapper — RPC-backed, server-gated (SKN01) ────────────────
+// Same optimistic-then-replace shape as updateCentre, including the null-data RLS
+// no-op guard, but routes through the update_centre_skin RPC service.
+describe('useBudgetCentre — updateCentreSkin wrapper', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('optimistically sets skin_id then replaces with the server row on success', async () => {
+    const { result } = await mountLoaded();
+    updateCentreSkin.mockResolvedValue({ data: { ...mockCentre, skin_id: 'royal_luxury' }, error: null });
+    await act(async () => { await result.current.updateCentreSkin('royal_luxury'); });
+    expect(updateCentreSkin).toHaveBeenCalledWith('c-1', 'royal_luxury');
+    expect(result.current.centre?.skin_id).toBe('royal_luxury');
+  });
+
+  it('rolls back on a SKN01 error and surfaces error.code', async () => {
+    const { result } = await mountLoaded();
+    const err = new Error('skin limit'); err.code = 'SKN01';
+    updateCentreSkin.mockResolvedValue({ data: null, error: err });
+    let ret;
+    await act(async () => { ret = await result.current.updateCentreSkin('royal_luxury'); });
+    expect(result.current.centre?.skin_id).toBe(mockCentre.skin_id);   // rolled back
+    expect(ret.error?.code).toBe('SKN01');
+  });
+
+  it('does NOT blank the centre on a null-data RLS no-op', async () => {
+    const { result } = await mountLoaded();
+    updateCentreSkin.mockResolvedValue({ data: null, error: null });
+    await act(async () => { await result.current.updateCentreSkin('panda'); });
+    expect(result.current.centre?.id).toBe('c-1');   // preserved
   });
 });
 

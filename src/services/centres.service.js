@@ -160,6 +160,36 @@ export const updateCentre = async (centreId, updates) => {
   return { data, error };
 };
 
+// Friendly copy for a plan skin-gate rejection (SKN01).
+const SKIN_CAP_MESSAGE = "You've reached your plan's skin limit. Free hubs use the family_warmth skin. Upgrade to Pro to unlock all skins.";
+
+/**
+ * Change a centre's theme skin via the update_centre_skin SECURITY DEFINER RPC —
+ * the only budget_centres field gated against the OWNER's tier (free hubs may only
+ * use 'family_warmth'), which RLS can't express. SQLSTATE 'SKN01' → friendly copy
+ * with `error.code` preserved so callers open the upgrade modal. RPC is the real
+ * enforcement; the greyed chips are UX only. See scripts/update_centre_skin.sql.
+ */
+export const updateCentreSkin = async (centreId, skinId) => {
+  const { data, error } = await supabase.rpc('update_centre_skin', {
+    p_centre_id: centreId,
+    p_skin_id:   skinId,
+  });
+
+  if (error) {
+    if (error.code === 'SKN01') {
+      const capErr = new Error(SKIN_CAP_MESSAGE);
+      capErr.code = 'SKN01';
+      console.error('[centres.service] updateCentreSkin cap reached (SKN01)');
+      return { data: null, error: capErr };
+    }
+    console.error('[centres.service] updateCentreSkin RPC error:', error.message);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+};
+
 /**
  * Soft delete a budget centre.
  */
