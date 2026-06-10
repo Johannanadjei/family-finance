@@ -7,10 +7,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act }                   from '@testing-library/react';
 import { ThemeSection }                          from './ThemeSection';
 
-const mockSaveThemeSkin = vi.fn();
-const mockUpdateCentre  = vi.fn();
-let   mockUserPlan      = 'free';
-let   mockCan           = () => true;
+const mockSaveThemeSkin    = vi.fn();
+const mockUpdateCentreSkin = vi.fn().mockResolvedValue({ data: {}, error: null });
+let   mockUserPlan         = 'free';
+let   mockCan              = () => true;
 
 vi.mock('../../context/FinanceContext', () => ({
   useFinanceContext: () => ({
@@ -21,12 +21,12 @@ vi.mock('../../context/FinanceContext', () => ({
 }));
 
 vi.mock('../../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ updateCentre: mockUpdateCentre, can: (p) => mockCan(p) }),
+  useBudgetCentreContext: () => ({ updateCentreSkin: mockUpdateCentreSkin, can: (p) => mockCan(p) }),
 }));
 
 
 describe('ThemeSection', () => {
-  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUpdateCentre.mockClear(); mockUserPlan = 'free'; mockCan = () => true; });
+  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUpdateCentreSkin.mockClear(); mockUpdateCentreSkin.mockResolvedValue({ data: {}, error: null }); mockUserPlan = 'free'; mockCan = () => true; });
 
   it('renders free theme option', () => {
     render(<ThemeSection />);
@@ -45,10 +45,12 @@ describe('ThemeSection', () => {
     expect(screen.getByTestId('theme-panda')).toBeTruthy();
   });
 
-  it('disables pro themes for free users', () => {
+  it('pro themes are tappable (not disabled) but locked for free users → open the upgrade modal', () => {
     render(<ThemeSection />);
-    expect(screen.getByTestId('theme-global_international').disabled).toBe(true);
-    expect(screen.getByTestId('theme-neon_futuristic').disabled).toBe(true);
+    const chip = screen.getByTestId('theme-global_international');
+    expect(chip.disabled).toBe(false);               // tappable, not disabled
+    act(() => { chip.click(); });
+    expect(screen.getByText(/skin limit/)).toBeTruthy();   // SKIN_CAP_BODY in the UpgradeModal
   });
 
   it('free theme is not disabled', () => {
@@ -62,16 +64,17 @@ describe('ThemeSection', () => {
     expect(mockSaveThemeSkin).toHaveBeenCalledWith('family_warmth');
   });
 
-  it('calls updateCentre with skin_id when skin selected', async () => {
+  it('calls updateCentreSkin when a skin is selected', async () => {
     render(<ThemeSection />);
     await act(async () => { screen.getByTestId('theme-family_warmth').click(); });
-    expect(mockUpdateCentre).toHaveBeenCalledWith({ skin_id: 'family_warmth' });
+    expect(mockUpdateCentreSkin).toHaveBeenCalledWith('family_warmth');
   });
 
-  it('does not call saveThemeSkin for pro themes on free plan', async () => {
+  it('does not call saveThemeSkin or updateCentreSkin for pro themes on free plan', async () => {
     render(<ThemeSection />);
     await act(async () => { screen.getByTestId('theme-corporate_professional').click(); });
     expect(mockSaveThemeSkin).not.toHaveBeenCalled();
+    expect(mockUpdateCentreSkin).not.toHaveBeenCalled();
   });
 
   it('pro users can select pro skins', async () => {

@@ -49,6 +49,7 @@ DECLARE
   v_tier   text;
   v_limit  int;
   v_count  int;
+  v_skin   text;
   v_centre public.budget_centres%ROWTYPE;
 BEGIN
   -- 1. Require an authenticated session.
@@ -92,6 +93,18 @@ BEGIN
       USING ERRCODE = 'HUB01';
   END IF;
 
+  -- 6b. Skin gate (defense-in-depth for the create path). skin_id is listed in the
+  --     INSERT below, so the table-level DEFAULT 'family_warmth' is BYPASSED when the
+  --     caller passes NULL (defaults only apply to OMITTED columns) — that broke
+  --     onboarding, which doesn't send a skin. COALESCE provides the server default.
+  --     A FREE caller is then QUIETLY clamped to family_warmth (no SKN01): the skin
+  --     here is hub-type-derived, not user-picked, so a silent override keeps the
+  --     create flow clean. The update_centre_skin RPC raises SKN01 for user picks.
+  v_skin := coalesce(p_skin_id, 'family_warmth');
+  IF v_tier = 'free' AND v_skin <> 'family_warmth' THEN
+    v_skin := 'family_warmth';
+  END IF;
+
   -- 7. Atomic create: centre row + owner member row. A failure in either rolls
   --    back the whole function (no orphaned centre).
   INSERT INTO budget_centres (name, currency, surplus_target, icon, owner_id, type, skin_id)
@@ -102,11 +115,7 @@ BEGIN
     coalesce(p_icon, '🏠'),
     v_user,
     coalesce(p_type, 'family_home'),
-    -- skin_id is listed in this INSERT, so the table-level DEFAULT 'family_warmth'
-    -- is BYPASSED when the caller passes NULL (defaults only apply to OMITTED
-    -- columns) — that broke onboarding, which doesn't send a skin. COALESCE here
-    -- provides the server-side default for any caller that omits it.
-    coalesce(p_skin_id, 'family_warmth')
+    v_skin
   )
   RETURNING * INTO v_centre;
 

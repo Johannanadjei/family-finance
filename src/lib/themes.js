@@ -7,8 +7,11 @@
  *
  * Free skin:  family_warmth
  * Pro skins:  global_international, corporate_professional, sunset_warm,
- *             neon_futuristic, dark_executive, minimal_light, royal_luxury
+ *             neon_futuristic, dark_executive, minimal_light, royal_luxury, panda
+ *             (the canonical free/Pro split lives in lib/plans.js — FREE_SKIN_IDS)
  */
+
+import { isProSkin } from './plans';
 
 const SHARED = {
   '--c-danger':             '#dc2626',
@@ -261,14 +264,24 @@ export const THEMES = {
 /**
  * Resolve which skin to apply for the current member.
  * Standard members always see family_warmth regardless of hub or pref settings.
+ *
+ * Downgrade clamp (D2): a non-Pro user never renders a Pro skin even if the hub's
+ * skin_id (or the local pref) is one — a Pro→Free downgrade falls back to
+ * family_warmth NON-DESTRUCTIVELY (centre.skin_id is untouched), so re-upgrading
+ * auto-restores the chosen skin. Pro-skin detection is owned by plans.isProSkin —
+ * the single source of truth shared with ThemeSection and the update_centre_skin gate.
+ *
  * @param {string} role — currentMemberRole
  * @param {string|null} centreSkinId — centre.skin_id
  * @param {string|null} prefThemeSkin — prefs.themeSkin
+ * @param {'free'|'pro'} [userPlan='free'] — owner tier from useSubscription
  * @returns {string} skin key
  */
-export const resolveSkin = (role, centreSkinId, prefThemeSkin) => {
+export const resolveSkin = (role, centreSkinId, prefThemeSkin, userPlan = 'free') => {
   if (role === 'standard') return 'family_warmth';
-  return centreSkinId || prefThemeSkin || 'family_warmth';
+  const resolved = centreSkinId || prefThemeSkin || 'family_warmth';
+  if (userPlan !== 'pro' && isProSkin(resolved)) return 'family_warmth';
+  return resolved;
 };
 
 /**

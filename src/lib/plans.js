@@ -43,6 +43,24 @@ export const PRO_LIMITS = {
 export const PLAN_LIMITS = { free: FREE_LIMITS, pro: PRO_LIMITS };
 
 /**
+ * Skin entitlements — single source of truth for "which skins are Pro".
+ * Free hubs may use only these skins; every other skin in lib/themes.js requires
+ * Pro. Both the client gate (ThemeSection greys/locks chips), the downgrade clamp
+ * (resolveSkin), and — conceptually — the update_centre_skin RPC's family_warmth
+ * rule key off this list, so the three can never disagree.
+ */
+export const FREE_SKIN_IDS = ['family_warmth'];
+
+/**
+ * Is this skin Pro-only? A null/empty/free skin is NOT Pro (so the clamp leaves it
+ * alone). Any non-free skin key is gated.
+ *
+ * @param {string|null|undefined} skinId
+ * @returns {boolean}
+ */
+export const isProSkin = (skinId) => !!skinId && !FREE_SKIN_IDS.includes(skinId);
+
+/**
  * Resolve the limits object for a tier. Any unknown tier falls back to FREE_LIMITS
  * — the safe default that matches "no subscription row → free".
  *
