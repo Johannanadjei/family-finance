@@ -80,6 +80,11 @@ export function CentreSettingsSection() {
               <option key={c.code} value={c.code}>{c.label}</option>
             ))}
           </select>
+          {currency !== centre?.currency && (
+            <p data-testid="currency-relabel-warning" style={{ fontSize: 12, color: 'var(--c-muted, #6b7280)', lineHeight: 1.5, margin: '0 0 8px' }}>
+              Changing currency only changes the label. Existing amounts won't be converted (e.g. 1,200 GHS will still show as 1,200 in USD). Convert your figures manually if needed.
+            </p>
+          )}
           {error && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px', fontWeight: 700 }}>{error}</p>}
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setEditing(false)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', color: 'var(--c-text, #1c1917)', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Cancel</button>
