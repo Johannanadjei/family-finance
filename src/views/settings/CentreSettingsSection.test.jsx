@@ -115,6 +115,45 @@ describe('CentreSettingsSection', () => {
     expect(mockUpdateCentre).not.toHaveBeenCalled();
   });
 
+  // ── Currency relabel disclosure ─────────────────────────────────────────────
+
+  it('does not show currency relabel warning when currency is unchanged', async () => {
+    render(<CentreSettingsSection />);
+    await act(async () => { screen.getByTestId('centre-edit-btn').click(); });
+    expect(screen.queryByTestId('currency-relabel-warning')).toBeNull();
+  });
+
+  it('shows currency relabel warning when currency is changed to a different code', async () => {
+    render(<CentreSettingsSection />);
+    await act(async () => { screen.getByTestId('centre-edit-btn').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('centre-currency-select'), { target: { value: 'USD' } });
+    });
+    expect(screen.getByTestId('currency-relabel-warning')).toBeTruthy();
+  });
+
+  it('hides currency relabel warning again when currency is reverted to original', async () => {
+    render(<CentreSettingsSection />);
+    await act(async () => { screen.getByTestId('centre-edit-btn').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('centre-currency-select'), { target: { value: 'USD' } });
+    });
+    expect(screen.getByTestId('currency-relabel-warning')).toBeTruthy();
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('centre-currency-select'), { target: { value: 'GHS' } });
+    });
+    expect(screen.queryByTestId('currency-relabel-warning')).toBeNull();
+  });
+
+  it('does not show currency relabel warning when only the name is changed', async () => {
+    render(<CentreSettingsSection />);
+    await act(async () => { screen.getByTestId('centre-edit-btn').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('centre-name-input'), { target: { value: 'New Name' } });
+    });
+    expect(screen.queryByTestId('currency-relabel-warning')).toBeNull();
+  });
+
   // ── Danger zone ────────────────────────────────────────────────────────────
 
   it('shows Archive this hub button when centreCount > 1', () => {
