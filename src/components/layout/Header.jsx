@@ -11,6 +11,7 @@
 import { useState }     from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
+import { currencySymbol } from '../../lib/currencies';
 
 export function Header({ onOpenPanel }) {
   const { centre } = useBudgetCentreContext();
@@ -54,7 +55,7 @@ export function Header({ onOpenPanel }) {
                 : (centre?.name || 'My Budget')}
             </p>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', margin: 0, fontWeight: 600 }}>
-              {centre?.currency || 'GHS'}
+              {currencySymbol(centre?.currency || 'GHS')}
             </p>
           </div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"
