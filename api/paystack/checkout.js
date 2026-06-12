@@ -69,6 +69,8 @@ export default async function handler(req, res) {
   const planCode = resolvePlanCode(interval);
   if (!planCode) return res.status(400).json({ error: 'invalid_plan_interval' });
 
+  console.log(`[checkout] plan_code prefix: ${planCode?.substring(0, 10)} interval: ${interval}`);
+
   const secret = process.env.PAYSTACK_SECRET_KEY;
   if (!secret) {
     console.error('[checkout] missing PAYSTACK_SECRET_KEY');
