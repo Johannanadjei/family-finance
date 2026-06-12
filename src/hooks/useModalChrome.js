@@ -13,9 +13,12 @@
  * Call once per modal, ABOVE the component's `if (!isOpen) return null` guard
  * (hooks-order rule). The sheet must also wrap its render in
  * `createPortal(..., document.body)` so the inerted root doesn't disable it.
+ *
+ * Returns `{ dismissForNavigation }`: call it just before a navigate() that closes
+ * the modal, so the close-time history.back() is skipped and the route push survives.
  */
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 const ROOT_ID = 'app-shell';
 const SCROLLABLE_ATTR = 'data-modal-scrollable';
@@ -55,6 +58,13 @@ export function useModalChrome({ isOpen, onClose }) {
   const entryLiveRef = useRef(false); // does THIS instance still own a history entry?
   const onCloseRef   = useRef(onClose);
   onCloseRef.current = onClose; // keep latest without re-running the effect
+
+  // Escape hatch for "the CTA navigates away" closes (e.g. UpgradeModal's /pricing CTA).
+  // The consumer calls this BEFORE navigate(): it flips entryLiveRef so the cleanup skips
+  // its history.back(). Without it, back() pops the route entry navigate() just pushed —
+  // it sits ABOVE our dummy — silently undoing the navigation. The dummy entry is left
+  // behind, but it carries the origin URL, so Back from the destination still lands home.
+  const dismissForNavigation = useCallback(() => { entryLiveRef.current = false; }, []);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -135,4 +145,6 @@ export function useModalChrome({ isOpen, onClose }) {
       }
     };
   }, [isOpen]);
+
+  return { dismissForNavigation };
 }

@@ -54,13 +54,15 @@ export function UpgradeModal({
   items      = DEFAULT_ITEMS,
   ctaLabel,
 }) {
-  useModalChrome({ isOpen: open, onClose });   // call ABOVE the guard, per its contract
+  const { dismissForNavigation } = useModalChrome({ isOpen: open, onClose });   // call ABOVE the guard, per its contract
   if (!open) return null;
 
   const paragraphs = Array.isArray(body) ? body : [body];
   // With an onUpgrade callback the button is the primary "go to /pricing" CTA; without
   // one it's a plain dismiss. ctaLabel overrides either default when a consumer passes it.
-  const onCta = onUpgrade || onClose;
+  // dismissForNavigation() runs first so the modal's close-time history.back() doesn't pop
+  // the /pricing entry onUpgrade is about to push (see useModalChrome).
+  const onCta = onUpgrade ? () => { dismissForNavigation(); onUpgrade(); } : onClose;
   const label = ctaLabel ?? (onUpgrade ? 'Upgrade to Pro' : 'Got it');
 
   return createPortal(
