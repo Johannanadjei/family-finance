@@ -4,8 +4,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act }                   from '@testing-library/react';
+import { render, screen, act, within }           from '@testing-library/react';
 import { ThemeSection }                          from './ThemeSection';
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
 
 const mockSaveThemeSkin    = vi.fn();
 const mockUpdateCentreSkin = vi.fn().mockResolvedValue({ data: {}, error: null });
@@ -26,7 +29,7 @@ vi.mock('../../context/BudgetCentreContext', () => ({
 
 
 describe('ThemeSection', () => {
-  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUpdateCentreSkin.mockClear(); mockUpdateCentreSkin.mockResolvedValue({ data: {}, error: null }); mockUserPlan = 'free'; mockCan = () => true; });
+  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUpdateCentreSkin.mockClear(); mockNavigate.mockClear(); mockUpdateCentreSkin.mockResolvedValue({ data: {}, error: null }); mockUserPlan = 'free'; mockCan = () => true; });
 
   it('renders free theme option', () => {
     render(<ThemeSection />);
@@ -51,6 +54,14 @@ describe('ThemeSection', () => {
     expect(chip.disabled).toBe(false);               // tappable, not disabled
     act(() => { chip.click(); });
     expect(screen.getByText(/skin limit/)).toBeTruthy();   // SKIN_CAP_BODY in the UpgradeModal
+  });
+
+  it('skin-cap modal CTA routes to /pricing', async () => {
+    render(<ThemeSection />);
+    await act(async () => { screen.getByTestId('theme-global_international').click(); });
+    const cta = within(screen.getByRole('dialog')).getByText('Upgrade to Pro');
+    await act(async () => { cta.click(); });
+    expect(mockNavigate).toHaveBeenCalledWith('/pricing');
   });
 
   it('free theme is not disabled', () => {

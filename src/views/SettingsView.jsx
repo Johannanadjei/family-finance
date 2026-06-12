@@ -115,7 +115,7 @@ export function SettingsView() {
       </div>
 
       <AddCategorySheet isOpen={addCatOpen} onClose={() => setAddCatOpen(false)} onAdd={(cat) => addCategory(cat, viewedCycleId)} />
-      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} body={CATEGORY_CAP_BODY} />
+      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={CATEGORY_CAP_BODY} />
     </div>
   );
 }

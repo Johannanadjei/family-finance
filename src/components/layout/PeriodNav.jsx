@@ -22,10 +22,12 @@
  */
 
 import { useState }   from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UpgradeModal } from '../ui/UpgradeModal';
 import { HISTORY_CAP_BODY } from '../../lib/planCopy';
 
 export function PeriodNav({ periodLabel, isOldest, isLatest, onPrev, onNext, historyLocked = false, labelTestId }) {
+  const navigate = useNavigate();
   const [showHistoryUpgrade, setShowHistoryUpgrade] = useState(false);
   return (
     <>
@@ -47,7 +49,7 @@ export function PeriodNav({ periodLabel, isOldest, isLatest, onPrev, onNext, his
         </button>
       </div>
 
-      <UpgradeModal open={showHistoryUpgrade} onClose={() => setShowHistoryUpgrade(false)} body={HISTORY_CAP_BODY} />
+      <UpgradeModal open={showHistoryUpgrade} onClose={() => setShowHistoryUpgrade(false)} onUpgrade={() => { setShowHistoryUpgrade(false); navigate('/pricing'); }} body={HISTORY_CAP_BODY} />
     </>
   );
 }

@@ -21,10 +21,12 @@
  */
 
 import { useState }        from 'react';
+import { useNavigate }     from 'react-router-dom';
 import { getLimitsForTier } from '../../lib/plans';
 import { UpgradeModal }    from '../ui/UpgradeModal';
 
 export function HubFooter({ userPlan, hubCount, onCreateHub }) {
+  const navigate = useNavigate();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const maxHubs = getLimitsForTier(userPlan).maxHubs;
@@ -50,7 +52,7 @@ export function HubFooter({ userPlan, hubCount, onCreateHub }) {
         </button>
       )}
 
-      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgrade={() => { setUpgradeOpen(false); navigate('/pricing'); }} />
     </div>
   );
 }

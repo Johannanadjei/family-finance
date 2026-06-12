@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate }             from 'react-router-dom';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { usePastPeriodGuard }     from '../hooks/usePastPeriodGuard';
@@ -47,6 +48,7 @@ function BudgetViewSkeleton() {
 }
 
 export function BudgetView() {
+  const navigate = useNavigate();
   const { allCategories = [], fmt, can, addCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth } = useBudgetCentreContext();
   const { txs, loading, cyclesLoading, error, activeMonth, cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, userPlan } = useFinanceContext();
   const [sheetOpen,        setSheetOpen]        = useState(false);
@@ -191,7 +193,7 @@ export function BudgetView() {
 
       {guardModal}
 
-      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} body={CATEGORY_CAP_BODY} />
+      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={CATEGORY_CAP_BODY} />
     </div>
   );
 }

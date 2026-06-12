@@ -2,9 +2,14 @@
  * components/layout/HubFooter.test.jsx
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { HubFooter }                 from './HubFooter';
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
+
+beforeEach(() => mockNavigate.mockClear());
 
 describe('HubFooter', () => {
   it('free + at cap: shows an active "Upgrade to add more hubs" button', () => {
@@ -14,16 +19,17 @@ describe('HubFooter', () => {
     expect(btn.disabled).toBeFalsy();   // no longer a dead disabled button
   });
 
-  it('free + at cap: clicking upgrade opens the UpgradeModal, "Got it" closes it', () => {
+  it('free + at cap: clicking upgrade opens the modal; its CTA routes to /pricing', () => {
     render(<HubFooter userPlan="free" hubCount={1} onCreateHub={vi.fn()} />);
-    expect(screen.queryByText(/coming soon/i)).toBeNull();        // modal closed initially
+    expect(screen.queryByText(/reached your plan's hub limit/i)).toBeNull();   // modal closed initially
 
     fireEvent.click(screen.getByText('Upgrade to add more hubs'));
     expect(screen.getByText(/reached your plan's hub limit/i)).toBeTruthy();
-    expect(screen.getByText(/coming soon/i)).toBeTruthy();
+    expect(screen.getByText(/manage up to 10 hubs/i)).toBeTruthy();            // present-tense Pro copy
 
-    fireEvent.click(screen.getByText('Got it'));
-    expect(screen.queryByText(/coming soon/i)).toBeNull();        // modal dismissed
+    fireEvent.click(screen.getByText('Upgrade to Pro'));         // the modal's primary CTA
+    expect(mockNavigate).toHaveBeenCalledWith('/pricing');
+    expect(screen.queryByText(/reached your plan's hub limit/i)).toBeNull();   // modal closed
   });
 
   it('pro + under cap: shows "+ New BOS Hub" and calls onCreateHub on click', () => {

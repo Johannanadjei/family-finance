@@ -12,6 +12,7 @@
  */
 
 import { useState }              from 'react';
+import { useNavigate }            from 'react-router-dom';
 import { useFinanceContext }      from '../../context/FinanceContext';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 import { applyTheme }             from '../../lib/themes';
@@ -32,6 +33,7 @@ const SKINS = [
 ];
 
 export function ThemeSection() {
+  const navigate = useNavigate();
   const { prefs, saveThemeSkin, userPlan } = useFinanceContext();
   const { updateCentreSkin, can }          = useBudgetCentreContext();
   const [showUpgrade, setShowUpgrade]      = useState(false);
@@ -84,7 +86,7 @@ export function ThemeSection() {
         })}
       </div>
 
-      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} body={SKIN_CAP_BODY} />
+      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={SKIN_CAP_BODY} />
     </div>
   );
 }
