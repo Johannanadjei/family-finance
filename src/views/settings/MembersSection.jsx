@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate }                       from 'react-router-dom';
 import { useBudgetCentreContext }           from '../../context/BudgetCentreContext';
 import { useFinanceContext }                from '../../context/FinanceContext';
 import { ROLE_LABELS, ROLE_DESCRIPTIONS, INVITABLE_ROLES } from '../../lib/roles';
@@ -13,6 +14,7 @@ const label      = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b72
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 14, fontWeight: 700, marginBottom: 8, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
 
 export function MembersSection() {
+  const navigate = useNavigate();
   const { members, currentMemberRole, can, inviteMember, removeMember, getInvites, cancelInvite, centre } = useBudgetCentreContext();
   const { userPlan } = useFinanceContext();
 
@@ -185,7 +187,7 @@ export function MembersSection() {
         </>
       )}
 
-      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} body={MEMBER_CAP_BODY} />
+      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={MEMBER_CAP_BODY} />
     </div>
   );
 }

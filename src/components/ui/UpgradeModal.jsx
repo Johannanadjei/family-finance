@@ -5,10 +5,10 @@
  * (HubFooter), but it is deliberately content-agnostic so future gate commits
  * (member cap, category cap, …) reuse it by passing their own title/body/items.
  *
- * No checkout flow exists yet (Paystack is webhook-only — there is no client
- * purchase path), so there is intentionally NO "Upgrade" CTA that leads nowhere.
- * The single footer button dismisses. When a purchase flow lands, add an onUpgrade
- * prop + primary CTA here and every consumer gains it for free.
+ * The footer button is the primary CTA. When an `onUpgrade` callback is passed it
+ * becomes the upgrade action (consumers route it to /pricing) and the label reads
+ * "Upgrade to Pro"; with no `onUpgrade` it falls back to a "Got it" dismiss. Dismiss
+ * is always available via the backdrop, Esc, or the back button (useModalChrome).
  *
  * Composes the shared modal infra: portal to document.body + useModalChrome
  * (scroll-lock + Esc/back close). z-index 700/710 sits ABOVE the SidePanel (400)
@@ -16,11 +16,14 @@
  *
  * @param {boolean}           open
  * @param {function}          onClose
+ * @param {function}          [onUpgrade]  primary-CTA action; when set, the button
+ *                                         calls this (and the label becomes "Upgrade to Pro")
+ *                                         instead of dismissing
  * @param {string}            [title]      defaults to the hub-cap heading
  * @param {string|string[]}   [body]       paragraph(s); defaults to the hub-cap copy
  * @param {string}            [itemsLabel] heading above the bullet list
  * @param {string[]}          [items]      bullet list; defaults to the hub-cap options
- * @param {string}            [ctaLabel='Got it']
+ * @param {string}            [ctaLabel]   overrides the button label (default: "Upgrade to Pro" when onUpgrade is set, else "Got it")
  */
 
 import { createPortal }   from 'react-dom';
@@ -30,7 +33,7 @@ const DEFAULT_TITLE = 'Upgrade to Pro';
 
 const DEFAULT_BODY = [
   "You've reached your plan's hub limit. Free accounts can have 1 hub.",
-  'Pro accounts will be able to manage up to 10 hubs (₵40/month or ₵400/year) — Pro is coming soon. We’ll let you know when it launches.',
+  'Upgrade to Pro to manage up to 10 hubs. Pro is ₵40/month or ₵400/year.',
 ];
 
 const DEFAULT_ITEMS_LABEL = 'Until then, you can:';
@@ -44,16 +47,21 @@ const DEFAULT_ITEMS = [];
 export function UpgradeModal({
   open,
   onClose,
+  onUpgrade,
   title      = DEFAULT_TITLE,
   body       = DEFAULT_BODY,
   itemsLabel = DEFAULT_ITEMS_LABEL,
   items      = DEFAULT_ITEMS,
-  ctaLabel   = 'Got it',
+  ctaLabel,
 }) {
   useModalChrome({ isOpen: open, onClose });   // call ABOVE the guard, per its contract
   if (!open) return null;
 
   const paragraphs = Array.isArray(body) ? body : [body];
+  // With an onUpgrade callback the button is the primary "go to /pricing" CTA; without
+  // one it's a plain dismiss. ctaLabel overrides either default when a consumer passes it.
+  const onCta = onUpgrade || onClose;
+  const label = ctaLabel ?? (onUpgrade ? 'Upgrade to Pro' : 'Got it');
 
   return createPortal(
     <>
@@ -76,8 +84,8 @@ export function UpgradeModal({
           </>
         )}
 
-        <button onClick={onClose} style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
-          {ctaLabel}
+        <button onClick={onCta} style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+          {label}
         </button>
       </div>
     </>,

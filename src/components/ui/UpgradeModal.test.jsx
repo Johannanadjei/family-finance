@@ -9,10 +9,10 @@ import { UpgradeModal }              from './UpgradeModal';
 describe('UpgradeModal', () => {
   it('renders the default hub-cap content when open', () => {
     render(<UpgradeModal open={true} onClose={vi.fn()} />);
-    expect(screen.getByText(/Upgrade to Pro/)).toBeTruthy();
+    expect(screen.getByText('💜 Upgrade to Pro')).toBeTruthy();   // the title (body now also contains "Upgrade to Pro")
     expect(screen.getByText(/reached your plan's hub limit/i)).toBeTruthy();
-    expect(screen.getByText(/coming soon/i)).toBeTruthy();
-    expect(screen.getByText('Got it')).toBeTruthy();
+    expect(screen.getByText(/manage up to 10 hubs/i)).toBeTruthy();   // present-tense Pro copy
+    expect(screen.getByText('Got it')).toBeTruthy();                  // dismiss label when no onUpgrade
   });
 
   it('renders no bullet list or "Until then" section by default (hub-cap gate)', () => {
@@ -32,6 +32,16 @@ describe('UpgradeModal', () => {
     render(<UpgradeModal open={true} onClose={onClose} />);
     fireEvent.click(screen.getByText('Got it'));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('when onUpgrade is provided: CTA reads "Upgrade to Pro" and calls onUpgrade, not onClose', () => {
+    const onUpgrade = vi.fn();
+    const onClose   = vi.fn();
+    render(<UpgradeModal open={true} onClose={onClose} onUpgrade={onUpgrade} />);
+    expect(screen.queryByText('Got it')).toBeNull();           // label switches to the upgrade CTA
+    fireEvent.click(screen.getByText('Upgrade to Pro'));        // the button (not the 💜 title)
+    expect(onUpgrade).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('honours custom title / body / items for reuse by other gates', () => {

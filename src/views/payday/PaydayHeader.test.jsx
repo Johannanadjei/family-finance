@@ -7,6 +7,9 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { PaydayHeader }              from './PaydayHeader';
 import { mockFmt }                   from '../../test-utils/fixtures';
 
+// PaydayHeader renders <PeriodNav>, which calls useNavigate for its /pricing upgrade CTA.
+vi.mock('react-router-dom', () => ({ useNavigate: () => () => {} }));
+
 const base = {
   periodLabel: 'May 2026',
   isCurrent: true,

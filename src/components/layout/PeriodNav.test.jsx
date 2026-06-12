@@ -7,8 +7,13 @@
  */
 
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PeriodNav } from './PeriodNav';
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
+
+beforeEach(() => mockNavigate.mockClear());
 
 const base = {
   periodLabel: 'May 2026',
@@ -61,7 +66,15 @@ describe('PeriodNav', () => {
     expect(affordance.disabled).toBe(false);                 // tappable despite isOldest
     expect(screen.queryByText(/history limit/)).toBeNull();   // modal closed initially
     fireEvent.click(affordance);
-    expect(onPrev).not.toHaveBeenCalled();                    // does NOT navigate
+    expect(onPrev).not.toHaveBeenCalled();                    // does NOT page-navigate cycles
     expect(screen.getByText(/history limit/)).toBeTruthy();   // opens the upgrade modal
+  });
+
+  it('locked: the modal CTA routes to /pricing and dismisses the modal', () => {
+    render(<PeriodNav {...base} isOldest historyLocked />);
+    fireEvent.click(screen.getByTestId('upgrade-history-affordance'));
+    fireEvent.click(screen.getByText('Upgrade to Pro'));      // modal's primary CTA
+    expect(mockNavigate).toHaveBeenCalledWith('/pricing');
+    expect(screen.queryByText(/history limit/)).toBeNull();   // modal closed
   });
 });
