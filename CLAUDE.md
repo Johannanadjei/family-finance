@@ -444,6 +444,42 @@ takes the same amount of time, is transactional, and works reliably. The time lo
 debugging RLS "permission denied for table users" errors exceeds the time to write
 a 30-line SQL function.
 
+### Locking down service_role-only RPCs (Supabase default ACL gotcha)
+
+Any `SECURITY DEFINER` function that must be callable ONLY by the service role
+(e.g. the revenue writer `apply_subscription_event`, called solely by the Paystack
+webhook) **must explicitly REVOKE EXECUTE from `authenticated` AND `anon` — not just
+from `PUBLIC`.**
+
+Supabase ships a `pg_default_acl` that grants `EXECUTE` on every new function in the
+`public` schema DIRECTLY to `anon` and `authenticated`. Those grants are **not**
+inherited through `PUBLIC`, so `REVOKE ALL ... FROM PUBLIC` alone leaves them intact —
+a signed-in client could call the function directly and (for a revenue RPC) self-upgrade.
+
+Required order:
+
+```sql
+REVOKE ALL     ON FUNCTION public.my_rpc(...) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.my_rpc(...) FROM authenticated, anon;  -- the critical line
+GRANT  EXECUTE ON FUNCTION public.my_rpc(...) TO service_role;
+```
+
+Always pair this with a self-verifying `DO` block that asserts `service_role` HAS
+execute and `authenticated`/`anon` do NOT (via `has_function_privilege`). This is
+what caught the gap during the `apply_subscription_event` rollout.
+
+Confirm the default ACL on this project with:
+
+```sql
+SELECT defaclrole::regrole, defaclnamespace::regnamespace, defaclacl
+FROM pg_default_acl WHERE defaclnamespace = 'public'::regnamespace;
+```
+
+NOTE — this applies only to RPCs meant to be service_role-only. The existing gate RPCs
+(`create_hub`/`create_invite`/`accept_invite`/`create_category`/`update_centre_skin`/
+`update_centre_currency`) are intended to be called by `authenticated` clients, so the
+default `authenticated` EXECUTE grant is correct for them — not a security hole.
+
 ---
 
 ## 10. File structure
