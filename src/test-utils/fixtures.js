@@ -118,3 +118,24 @@ export const mockGuests = [
   { id: 'guest-1', name: 'Sarah', budget_centre_id: 'c1', allowed_categories: ['Groceries', 'Transport'], is_active: true,  created_at: '2026-01-01T00:00:00Z' },
   { id: 'guest-2', name: 'Tom',   budget_centre_id: 'c1', allowed_categories: ['Groceries'],               is_active: false, created_at: '2026-01-02T00:00:00Z' },
 ];
+
+// Subscription CONTEXT values (shape of useSubscriptionContext() return) — Pro pricing.
+// Free has no row (subscription: null → resolver treats as free). Tests spread these and
+// add a fresh `refresh: vi.fn()` per case. The far-future period end keeps Pro "open".
+export const mockSubscriptionFree = {
+  subscription: null,
+  tier:         'free',
+  isActive:     false,
+  isPro:        false,
+  isLoading:    false,
+  error:        null,
+};
+
+export const mockSubscriptionPro = {
+  subscription: { id: 'sub-1', user_id: 'user-1', tier: 'pro', status: 'active', current_period_end: '2999-01-01T00:00:00Z' },
+  tier:         'pro',
+  isActive:     true,
+  isPro:        true,
+  isLoading:    false,
+  error:        null,
+};
