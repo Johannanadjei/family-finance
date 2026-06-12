@@ -3,8 +3,9 @@
  *
  * Initializes a Paystack transaction for the AUTHENTICATED caller and returns the
  * hosted-checkout URL the client redirects to. Plan-based: we pass the plan code, so
- * Paystack uses the plan's amount AND auto-creates the recurring subscription on payment
- * (no amount sent here, no card data ever touches us).
+ * Paystack auto-creates the recurring subscription on payment (no card data ever touches
+ * us). `amount` is also sent — Paystack requires it on transaction/initialize even when a
+ * plan is supplied; the plan governs the actual recurring billing.
  *
  * SECURITY — identity comes from the verified Supabase JWT, NEVER the request body. A
  * caller can only ever start a checkout for themselves; a spoofed user_id is impossible.
@@ -20,6 +21,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { PRICING } from '../../src/lib/pricing.js';
 
 const PAYSTACK_INIT_URL = 'https://api.paystack.co/transaction/initialize';
 const CALLBACK_URL      = 'https://family-finance-plum.vercel.app/pricing?checkout=return';
@@ -75,14 +77,16 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'server_misconfigured' });
   }
 
-  // 3. Initialize the transaction. `plan` drives the amount; metadata.user_id is echoed
-  //    back on charge.success so the webhook can map the payment to this user.
+  // 3. Initialize the transaction. `plan` drives recurring billing; `amount` is required
+  //    by Paystack even so. metadata.user_id is echoed back on charge.success so the
+  //    webhook can map the payment to this user.
   try {
     const psRes = await fetch(PAYSTACK_INIT_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email:        user.email,
+        amount:       PRICING[interval].amount,   // pesewas; required by Paystack even with a plan
         plan:         planCode,
         callback_url: CALLBACK_URL,
         metadata:     { user_id: user.id, plan_interval: interval },

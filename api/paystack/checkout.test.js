@@ -14,6 +14,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 import handler, { resolvePlanCode } from './checkout.js';
+import { PRICING } from '../../src/lib/pricing.js';
 
 function mockRes() {
   return {
@@ -126,9 +127,19 @@ describe('checkout handler — Paystack init', () => {
     const payload = JSON.parse(opts.body);
     expect(payload.email).toBe('aj@example.com');
     expect(payload.plan).toBe('PLN_year');           // annual → annual plan code
-    expect(payload.amount).toBeUndefined();           // amount comes from the plan, never sent
     expect(payload.metadata).toEqual({ user_id: 'user-1', plan_interval: 'annual' });
     expect(opts.headers.Authorization).toBe('Bearer sk_test_123');
+  });
+
+  it('sends amount in pesewas from PRICING, matching the requested interval', async () => {
+    const monthly = mockRes();
+    await handler(mockReq({ authorization: 'Bearer ok', body: { plan_interval: 'monthly' } }), monthly);
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body).amount).toBe(PRICING.monthly.amount);
+
+    global.fetch.mockClear();
+    const annual = mockRes();
+    await handler(mockReq({ authorization: 'Bearer ok', body: { plan_interval: 'annual' } }), annual);
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body).amount).toBe(PRICING.annual.amount);
   });
 
   it('does NOT trust a user_id supplied in the request body', async () => {
