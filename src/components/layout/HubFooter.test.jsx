@@ -2,14 +2,9 @@
  * components/layout/HubFooter.test.jsx
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { HubFooter }                 from './HubFooter';
-
-const mockNavigate = vi.fn();
-vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
-
-beforeEach(() => mockNavigate.mockClear());
 
 describe('HubFooter', () => {
   it('free + at cap: shows an active "Upgrade to add more hubs" button', () => {
@@ -19,8 +14,9 @@ describe('HubFooter', () => {
     expect(btn.disabled).toBeFalsy();   // no longer a dead disabled button
   });
 
-  it('free + at cap: clicking upgrade opens the modal; its CTA routes to /pricing', () => {
-    render(<HubFooter userPlan="free" hubCount={1} onCreateHub={vi.fn()} />);
+  it('free + at cap: clicking upgrade opens the modal; its CTA delegates to onUpgradeNavigate', () => {
+    const onUpgradeNavigate = vi.fn();
+    render(<HubFooter userPlan="free" hubCount={1} onCreateHub={vi.fn()} onUpgradeNavigate={onUpgradeNavigate} />);
     expect(screen.queryByText(/reached your plan's hub limit/i)).toBeNull();   // modal closed initially
 
     fireEvent.click(screen.getByText('Upgrade to add more hubs'));
@@ -28,7 +24,7 @@ describe('HubFooter', () => {
     expect(screen.getByText(/manage up to 10 hubs/i)).toBeTruthy();            // present-tense Pro copy
 
     fireEvent.click(screen.getByText('Upgrade to Pro'));         // the modal's primary CTA
-    expect(mockNavigate).toHaveBeenCalledWith('/pricing');
+    expect(onUpgradeNavigate).toHaveBeenCalledTimes(1);          // SidePanel owns the close-drawer + navigate
     expect(screen.queryByText(/reached your plan's hub limit/i)).toBeNull();   // modal closed
   });
 

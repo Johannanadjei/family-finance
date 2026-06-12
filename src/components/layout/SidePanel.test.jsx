@@ -16,10 +16,23 @@ vi.mock('../../context/BudgetCentreContext', () => ({
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ signOut: mockSignOut }),
 }));
-// Footer behaviour (cap states + upgrade modal) is covered by HubFooter.test.jsx.
-// Here we only assert the can('settings') gate renders/hides it.
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useNavigate: () => mockNavigate,
+}));
+
+const mockDismissForNavigation = vi.fn();
+vi.mock('../../hooks/useModalChrome', () => ({
+  useModalChrome: () => ({ dismissForNavigation: mockDismissForNavigation }),
+}));
+
+// Footer behaviour (cap states + upgrade modal) is covered by HubFooter.test.jsx. Here the
+// mock is a clickable stub so we can drive its onUpgradeNavigate and test SidePanel's handler.
 vi.mock('./HubFooter', () => ({
-  HubFooter: () => <div data-testid="hub-footer" />,
+  HubFooter: ({ onUpgradeNavigate }) => (
+    <button data-testid="hub-footer" onClick={onUpgradeNavigate}>hub-footer</button>
+  ),
 }));
 
 const mockCentres = [
@@ -113,6 +126,21 @@ describe('SidePanel', () => {
     mockCan = () => false;
     renderPanel();
     expect(screen.queryByTestId('hub-footer')).toBeNull();
+  });
+
+  it('hub-cap upgrade: dismisses its chrome, closes the drawer, THEN navigates to /pricing', () => {
+    const order = [];
+    mockDismissForNavigation.mockImplementation(() => order.push('dismiss'));
+    mockNavigate.mockImplementation(() => order.push('navigate'));
+    const onClose = vi.fn(() => order.push('close'));
+    renderPanel({ onClose });
+
+    screen.getByTestId('hub-footer').click();   // the mock invokes onUpgradeNavigate
+
+    expect(mockDismissForNavigation).toHaveBeenCalledTimes(1);  // skip SidePanel's close-time history.back()
+    expect(onClose).toHaveBeenCalledTimes(1);                   // close the drawer
+    expect(mockNavigate).toHaveBeenCalledWith('/pricing');
+    expect(order).toEqual(['dismiss', 'close', 'navigate']);    // chrome dismissed BEFORE the route push
   });
 
   it('shows Sign out button', () => {
