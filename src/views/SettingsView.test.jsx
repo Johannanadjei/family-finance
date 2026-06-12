@@ -32,6 +32,11 @@ vi.mock('../hooks/useAuth', () => ({
   useAuth: () => ({ user: null, loading: false, signOut: mockSignOut }),
 }));
 
+// PlanSection (slotted after CentreSettingsSection) reads SubscriptionContext.
+vi.mock('../context/SubscriptionContext', () => ({
+  useSubscriptionContext: () => ({ isPro: false }),
+}));
+
 vi.mock('../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({
     centre:            mockCentre,

@@ -5,6 +5,7 @@ import { useFinanceContext }           from '../context/FinanceContext';
 import { useAuth }                    from '../hooks/useAuth';
 import { AccessBlocked }              from '../components/ui/AccessBlocked';
 import { CentreSettingsSection }      from './settings/CentreSettingsSection';
+import { PlanSection }                from './settings/PlanSection';
 import { CategorySettingsRow }        from './settings/CategorySettingsRow';
 import { IncomeSourcesSection }       from './settings/IncomeSourcesSection';
 import { ThemeSection }               from './settings/ThemeSection';
@@ -52,6 +53,9 @@ export function SettingsView() {
 
       {/* Centre */}
       <CentreSettingsSection />
+
+      {/* Plan */}
+      <PlanSection />
 
       {/* Income Sources */}
       <IncomeSourcesSection />

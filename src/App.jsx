@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect, useCallback }      from 'react';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth }                               from './hooks/useAuth';
 import { usePin }                                from './hooks/usePin';
 import { useBudgetCentre }                       from './hooks/useBudgetCentre';
@@ -46,6 +46,7 @@ import { PaydayView }                            from './views/PaydayView';
 import { DailyView }                             from './views/DailyView';
 import { BudgetView }                            from './views/BudgetView';
 import { LogView }                               from './views/LogView';
+import { PricingView }                           from './views/PricingView';
 import { AddTransactionSheet }                   from './views/daily/AddTransactionSheet';
 import { SettingsView }                          from './views/SettingsView';
 import { Toast }                                 from './components/ui/Toast';
@@ -97,6 +98,7 @@ function RemovedScreen({ otherCentres, onSwitchHub, onSignOut }) {
 
 function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, hubCount, onSwitchCentre, onHubCreated, onRestoreHub }) {
   const navigate                           = useNavigate();
+  const isPricing                          = useLocation().pathname === '/pricing';  // chrome-less full-screen route
   const { can }                            = useBudgetCentreContext();
   const { incomes, loading, error, reload } = useFinanceContext();
   const [panelOpen,       setPanelOpen]    = useState(false);
@@ -142,11 +144,12 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, hu
             <Route path="/budget"   element={<BudgetView />} />
             <Route path="/log"      element={<LogView onEditTx={(tx) => { setEditTx(tx); setAddSheetOpen(true); }} />} />
             <Route path="/settings" element={<SettingsView />} />
+            <Route path="/pricing"  element={<PricingView />} />
           </Routes>
         </main>
       </ErrorBoundary>
-      {can('log') && <FAB onClick={() => setAddSheetOpen(true)} />}
-      <BottomNav />
+      {!isPricing && can('log') && <FAB onClick={() => setAddSheetOpen(true)} />}
+      {!isPricing && <BottomNav />}
       <AddTransactionSheet
         isOpen={addSheetOpen}
         onClose={() => { setAddSheetOpen(false); setEditTx(null); }}
@@ -200,10 +203,8 @@ export default function App() {
   const [pinSkipped, setPinSkipped]                        = useState(false);
   const [activeCentreId, setActiveCentreId]               = useState(() => loadActiveCentreId());
   const { centres, archivedCentres, reload: reloadCentres } = useCentres(user);
-  // Plan tier sourced from the subscriptions table (replaces the old users.plan
-  // read). Spread into FinanceContext below as `userPlan` so existing consumers
-  // (ThemeSection, MembersSection, GuestSettingsSection, SidePanel) keep working
-  // unchanged this commit; their migration to useIsPro() is gate work.
+  // Plan tier sourced from the subscriptions table (replaces the old users.plan read).
+  // Spread into FinanceContext below as `userPlan`; consumers migrate to useIsPro() in gate work.
   const subscription                                       = useSubscription(user);
   const userPlan                                           = subscription.tier;
   const { centre, allCategories, reloadCategories, members, currentMemberRole,
@@ -241,11 +242,10 @@ export default function App() {
     handleSwitchCentre(id);
   }, [reloadCentres, handleSwitchCentre]);
 
-  // Onboarding handoff: refresh the hub LIST (SidePanel source) before clearing
-  // the onboarding gate, so the freshly-created first hub is present the moment
-  // the dashboard renders. onOnboardingComplete still fires even if the list
-  // refetch fails — the hub was created; only the list fetch is a separate
-  // problem and must not trap the user in onboarding.
+  // Onboarding handoff: refresh the hub LIST (SidePanel source) before clearing the
+  // onboarding gate, so the freshly-created first hub is present when the dashboard
+  // renders. onOnboardingComplete still fires even if the list refetch fails — the hub
+  // was created; only the list fetch is a separate problem and must not trap the user.
   const handleOnboardingComplete = useCallback(async () => {
     try {
       await reloadCentres();
