@@ -18,15 +18,16 @@
  * @param {'free'|'pro'} userPlan
  * @param {number}       hubCount   the caller's OWNED, active, non-archived hubs
  * @param {function}     onCreateHub
+ * @param {function}     onUpgradeNavigate  routes to /pricing — owned by SidePanel so it
+ *                                          can close the drawer AND dismiss its own modal-
+ *                                          chrome history entry first (see SidePanel)
  */
 
 import { useState }        from 'react';
-import { useNavigate }     from 'react-router-dom';
 import { getLimitsForTier } from '../../lib/plans';
 import { UpgradeModal }    from '../ui/UpgradeModal';
 
-export function HubFooter({ userPlan, hubCount, onCreateHub }) {
-  const navigate = useNavigate();
+export function HubFooter({ userPlan, hubCount, onCreateHub, onUpgradeNavigate }) {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const maxHubs = getLimitsForTier(userPlan).maxHubs;
@@ -52,7 +53,7 @@ export function HubFooter({ userPlan, hubCount, onCreateHub }) {
         </button>
       )}
 
-      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgrade={() => { setUpgradeOpen(false); navigate('/pricing'); }} />
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgrade={() => { setUpgradeOpen(false); onUpgradeNavigate(); }} />
     </div>
   );
 }

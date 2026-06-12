@@ -26,7 +26,13 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
   const { can }                       = useBudgetCentreContext();
   const { signOut }                   = useAuth();
 
-  useModalChrome({ isOpen, onClose });
+  const { dismissForNavigation } = useModalChrome({ isOpen, onClose });
+
+  // Close the drawer for a route change (HubFooter's /pricing upgrade CTA). Like
+  // UpgradeModal, dismissForNavigation() flips this chrome's entryLiveRef so the
+  // close-time history.back() is skipped — otherwise it would pop the /pricing entry
+  // the navigation is about to push (the drawer's dummy sits below it).
+  const closeForNavigation = () => { dismissForNavigation(); onClose(); };
 
   const handleInstall = async () => {
     setInstalling(true);
@@ -175,7 +181,12 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
 
         {/* Footer — create / upgrade (hidden for standard members) */}
         {can('settings') && (
-          <HubFooter userPlan={userPlan} hubCount={hubCount} onCreateHub={onCreateHub} />
+          <HubFooter
+            userPlan={userPlan}
+            hubCount={hubCount}
+            onCreateHub={onCreateHub}
+            onUpgradeNavigate={() => { closeForNavigation(); navigate('/pricing'); }}
+          />
         )}
       </aside>
     </>,
