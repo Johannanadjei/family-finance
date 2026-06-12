@@ -104,6 +104,20 @@ describe('useModalChrome', () => {
     back.mockRestore();
   });
 
+  it('dismissForNavigation makes the programmatic close SKIP history.back() (navigate-away escape hatch)', () => {
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    const onClose = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ isOpen }) => useModalChrome({ isOpen, onClose }),
+      { initialProps: { isOpen: true } }
+    );
+    act(() => { result.current.dismissForNavigation(); });   // consumer signals "navigating away"
+    rerender({ isOpen: false });
+    expect(back).not.toHaveBeenCalled();     // the close must NOT pop — the route push survives
+    expect(onClose).not.toHaveBeenCalled();
+    back.mockRestore();
+  });
+
   it('keeps the lock until the last stacked modal closes (counter coordinator)', () => {
     const a = renderHook(
       ({ isOpen }) => useModalChrome({ isOpen, onClose: vi.fn() }),
