@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor }   from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MembersSection }                       from './MembersSection';
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
 
 const mockInviteMember  = vi.fn(async () => ({ data: { token: 'tok-abc' }, error: null }));
 const mockRemoveMember  = vi.fn(async () => ({ error: null }));
@@ -216,6 +219,16 @@ describe('MembersSection', () => {
     fireEvent.click(screen.getByTestId('upgrade-members-btn'));
     await waitFor(() => expect(screen.getByText(/member limit/i)).toBeTruthy());
     expect(screen.getByText(/up to 15 members/i)).toBeTruthy();
+  });
+
+  it('member-cap modal CTA routes to /pricing', async () => {
+    mockUserPlan = 'free';
+    render(<MembersSection />);
+    await waitFor(() => screen.getByTestId('upgrade-members-btn'));
+    fireEvent.click(screen.getByTestId('upgrade-members-btn'));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByText('Upgrade to Pro'));   // modal CTA, not the trigger
+    expect(mockNavigate).toHaveBeenCalledWith('/pricing');
   });
 
   it('pro cap is 15, not 6 — 6 members still allows inviting', async () => {

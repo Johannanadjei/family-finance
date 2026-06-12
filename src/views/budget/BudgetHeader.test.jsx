@@ -7,6 +7,9 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { BudgetHeader }              from './BudgetHeader';
 import { mockFmt }                   from '../../test-utils/fixtures';
 
+// BudgetHeader renders <PeriodNav>, which calls useNavigate for its /pricing upgrade CTA.
+vi.mock('react-router-dom', () => ({ useNavigate: () => () => {} }));
+
 const base = {
   periodLabel: 'May 2026',
   fmt:         mockFmt,
