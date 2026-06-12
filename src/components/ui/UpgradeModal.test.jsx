@@ -2,11 +2,19 @@
  * components/ui/UpgradeModal.test.jsx
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { UpgradeModal }              from './UpgradeModal';
 
+// The /pricing CTA must call the hook's escape hatch before navigating; spy on it.
+const mockDismissForNavigation = vi.fn();
+vi.mock('../../hooks/useModalChrome', () => ({
+  useModalChrome: () => ({ dismissForNavigation: mockDismissForNavigation }),
+}));
+
 describe('UpgradeModal', () => {
+  beforeEach(() => mockDismissForNavigation.mockReset());
+
   it('renders the default hub-cap content when open', () => {
     render(<UpgradeModal open={true} onClose={vi.fn()} />);
     expect(screen.getByText('💜 Upgrade to Pro')).toBeTruthy();   // the title (body now also contains "Upgrade to Pro")
@@ -42,6 +50,21 @@ describe('UpgradeModal', () => {
     fireEvent.click(screen.getByText('Upgrade to Pro'));        // the button (not the 💜 title)
     expect(onUpgrade).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('CTA tap calls dismissForNavigation BEFORE onUpgrade (so the close skips history.back())', () => {
+    const order = [];
+    mockDismissForNavigation.mockImplementation(() => order.push('dismiss'));
+    const onUpgrade = vi.fn(() => order.push('upgrade'));
+    render(<UpgradeModal open={true} onClose={vi.fn()} onUpgrade={onUpgrade} />);
+    fireEvent.click(screen.getByText('Upgrade to Pro'));
+    expect(order).toEqual(['dismiss', 'upgrade']);   // escape hatch fires first
+  });
+
+  it('does NOT call dismissForNavigation on a plain dismiss (no onUpgrade)', () => {
+    render(<UpgradeModal open={true} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByText('Got it'));
+    expect(mockDismissForNavigation).not.toHaveBeenCalled();
   });
 
   it('honours custom title / body / items for reuse by other gates', () => {
