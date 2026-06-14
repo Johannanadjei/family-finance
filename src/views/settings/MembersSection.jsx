@@ -187,7 +187,7 @@ export function MembersSection() {
         </>
       )}
 
-      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={MEMBER_CAP_BODY} />
+      <UpgradeModal testid="upgrade-modal-member" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={MEMBER_CAP_BODY} />
     </div>
   );
 }

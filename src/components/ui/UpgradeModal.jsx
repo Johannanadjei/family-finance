@@ -24,6 +24,9 @@
  * @param {string}            [itemsLabel] heading above the bullet list
  * @param {string[]}          [items]      bullet list; defaults to the hub-cap options
  * @param {string}            [ctaLabel]   overrides the button label (default: "Upgrade to Pro" when onUpgrade is set, else "Got it")
+ * @param {string}            [testid]     data-testid for the dialog container; defaults to 'upgrade-modal'.
+ *                                         Cap-gate consumers pass a per-gate value (e.g. 'upgrade-modal-hub')
+ *                                         so tests can assert WHICH gate's modal opened.
  */
 
 import { createPortal }   from 'react-dom';
@@ -53,6 +56,7 @@ export function UpgradeModal({
   itemsLabel = DEFAULT_ITEMS_LABEL,
   items      = DEFAULT_ITEMS,
   ctaLabel,
+  testid     = 'upgrade-modal',
 }) {
   const { dismissForNavigation } = useModalChrome({ isOpen: open, onClose });   // call ABOVE the guard, per its contract
   if (!open) return null;
@@ -68,7 +72,7 @@ export function UpgradeModal({
   return createPortal(
     <>
       <div onClick={onClose} aria-hidden="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 700 }} />
-      <div role="dialog" aria-modal="true" aria-label={title} style={{ position: 'fixed', top: '50%', left: 'max(0px, calc(50vw - 220px))', transform: 'translateY(-50%)', width: '100%', maxWidth: 360, margin: '0 16px', background: 'var(--c-modal-bg, var(--c-card, #fff))', borderRadius: 16, padding: '20px', zIndex: 710, boxShadow: '0 8px 32px rgba(0,0,0,.18)' }}>
+      <div role="dialog" aria-modal="true" aria-label={title} data-testid={testid} style={{ position: 'fixed', top: '50%', left: 'max(0px, calc(50vw - 220px))', transform: 'translateY(-50%)', width: '100%', maxWidth: 360, margin: '0 16px', background: 'var(--c-modal-bg, var(--c-card, #fff))', borderRadius: 16, padding: '20px', zIndex: 710, boxShadow: '0 8px 32px rgba(0,0,0,.18)' }}>
         <p style={{ fontSize: 17, fontWeight: 900, color: 'var(--c-primary, #064e3b)', margin: '0 0 10px' }}>💜 {title}</p>
 
         {paragraphs.map((p, i) => (

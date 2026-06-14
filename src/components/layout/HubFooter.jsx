@@ -38,6 +38,7 @@ export function HubFooter({ userPlan, hubCount, onCreateHub, onUpgradeNavigate }
       {atCap && userPlan === 'free' ? (
         <button
           onClick={() => setUpgradeOpen(true)}
+          data-testid="upgrade-add-hub-btn"
           style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
         >
           Upgrade to add more hubs
@@ -47,13 +48,14 @@ export function HubFooter({ userPlan, hubCount, onCreateHub, onUpgradeNavigate }
       ) : (
         <button
           onClick={onCreateHub}
+          data-testid="new-hub-btn"
           style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
           + New BOS Hub
         </button>
       )}
 
-      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgrade={() => { setUpgradeOpen(false); onUpgradeNavigate(); }} />
+      <UpgradeModal testid="upgrade-modal-hub" open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgrade={() => { setUpgradeOpen(false); onUpgradeNavigate(); }} />
     </div>
   );
 }

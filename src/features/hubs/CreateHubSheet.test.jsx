@@ -179,4 +179,35 @@ describe('CreateHubSheet', () => {
     })));
     await vi.waitFor(() => expect(bulkAddCategories).toHaveBeenCalledWith('new-c-1', expect.anything(), 'new-cyc-1'));
   });
+
+  it('exposes all 8 data-testids at the right step (stop-before-submit: submit asserted, never clicked)', () => {
+    const onComplete = vi.fn();
+    renderSheet({ onComplete });
+
+    // Step 0 — sheet container + close present from mount
+    expect(screen.getByTestId('create-hub-sheet')).toBeTruthy();
+    expect(screen.getByTestId('create-hub-close-btn')).toBeTruthy();
+
+    // Step 1 — inputs + nav buttons
+    goToStep1();
+    expect(screen.getByTestId('create-hub-name-input')).toBeTruthy();
+    expect(screen.getByTestId('create-hub-currency-select')).toBeTruthy();
+    expect(screen.getByTestId('create-hub-back-btn')).toBeTruthy();
+    expect(screen.getByTestId('create-hub-continue-btn')).toBeTruthy();
+
+    // Step 1 validation — empty name + Continue surfaces the error testid (pre-submit, Stage 1)
+    fireEvent.click(screen.getByTestId('create-hub-continue-btn'));
+    expect(screen.getByTestId('create-hub-name-error')).toBeTruthy();
+
+    // Advance to the Confirm step (step 4): name → categories → income(skip) → confirm
+    fillName();
+    fireEvent.click(screen.getByTestId('create-hub-continue-btn'));  // → step 2 (categories)
+    fireEvent.click(screen.getByText('Continue →'));                 // → step 3 (income)
+    fireEvent.click(screen.getByText('Skip for now'));               // → step 4 (confirm)
+
+    // Step 4 — submit + shared back present; submit asserted but NEVER clicked.
+    expect(screen.getByTestId('create-hub-submit-btn')).toBeTruthy();
+    expect(screen.getByTestId('create-hub-back-btn')).toBeTruthy();   // shared testid, step-4 instance
+    expect(onComplete).not.toHaveBeenCalled();                        // stop-before-submit honoured
+  });
 });

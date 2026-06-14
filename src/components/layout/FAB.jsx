@@ -13,6 +13,7 @@ export function FAB({ onClick }) {
     <button
       onClick={onClick}
       aria-label="Add transaction"
+      data-testid="fab-add-transaction"
       style={{
         position:     'fixed',
         bottom:       'calc(72px + env(safe-area-inset-bottom))',
