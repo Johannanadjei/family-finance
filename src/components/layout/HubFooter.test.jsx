@@ -46,4 +46,12 @@ describe('HubFooter', () => {
     expect(screen.getByText('+ New BOS Hub')).toBeTruthy();
     expect(screen.queryByText('Upgrade to add more hubs')).toBeNull();
   });
+
+  it('exposes upgrade-add-hub-btn (free at-cap) and new-hub-btn (under-cap) testids', () => {
+    const { rerender } = render(<HubFooter userPlan="free" hubCount={1} onCreateHub={vi.fn()} onUpgradeNavigate={vi.fn()} />);
+    expect(screen.getByTestId('upgrade-add-hub-btn')).toBeTruthy();
+
+    rerender(<HubFooter userPlan="free" hubCount={0} onCreateHub={vi.fn()} />);
+    expect(screen.getByTestId('new-hub-btn')).toBeTruthy();
+  });
 });

@@ -193,7 +193,7 @@ export function BudgetView() {
 
       {guardModal}
 
-      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={CATEGORY_CAP_BODY} />
+      <UpgradeModal testid="upgrade-modal-category-budget" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={CATEGORY_CAP_BODY} />
     </div>
   );
 }

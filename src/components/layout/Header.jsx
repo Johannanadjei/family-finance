@@ -35,6 +35,7 @@ export function Header({ onOpenPanel }) {
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         aria-label="Open BOS Hubs panel"
+        data-testid="header-hub-switcher-btn"
         style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', cursor: 'pointer', padding: 0 }}
       >
         <div style={{
@@ -71,6 +72,7 @@ export function Header({ onOpenPanel }) {
         <button
           onClick={() => navigate('/settings')}
           aria-label="Open settings"
+          data-testid="header-settings-btn"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.8)', padding: 0, display: 'flex', alignItems: 'center' }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">

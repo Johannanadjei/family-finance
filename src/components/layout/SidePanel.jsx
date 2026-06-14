@@ -94,6 +94,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
             const hovered = hoveredRow === c.id && !active;
             return (
               <button key={c.id} onClick={() => handleSwitch(c.id)} aria-label={`Switch to ${c.name}`}
+                data-testid={`hub-switch-${c.id}`}
                 onMouseEnter={() => setHoveredRow(c.id)} onMouseLeave={() => setHoveredRow(null)}
                 style={{
                   width: '100%', padding: '12px 16px 12px 14px', textAlign: 'left',
