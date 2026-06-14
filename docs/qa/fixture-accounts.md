@@ -107,7 +107,7 @@ Free-tier caps in force (from `lib/plans.js`): **1 hub · 2 members · 10 catego
 - **Covers:** the soft history gate (free sees last 3 budget periods; older → upgrade affordance on PeriodNav prev arrow).
 - **Seed:**
   1. Sign up; skip PIN; complete onboarding with 1 hub (stays **free**).
-  2. Create budget periods until the hub has **at least 4** total (period creation is not gated — only *visibility* is). Spread them across distinct months so 3 are visible and ≥1 is behind the wall.
+  2. Create budget periods until the hub has **at least 4** total (period creation is not gated — only *visibility* is): **4 non-overlapping custom periods within the current calendar year** (e.g. Jan/Feb/Mar/Apr 2026), so 3 are visible and ≥1 is behind the wall. The CYC01 overlap constraint and the within-this-year limit are both enforced by the `create_budget_period` RPC.
 - **Verify:** on the oldest **visible** period, PeriodNav's prev arrow shows the locked affordance (`data-testid="upgrade-history-affordance"`) → HISTORY_CAP_BODY modal. `budget_cycles` (not deleted) ≥ **4 rows**.
 
 ---
@@ -116,7 +116,9 @@ Free-tier caps in force (from `lib/plans.js`): **1 hub · 2 members · 10 catego
 
 Once seeded, these accounts are **immutable read-only Stage 1 fixtures.**
 
-- **Never** log in to "just check something", edit data, add/delete a hub/category/member/transaction, or change settings/skin. Any mutation shifts the state the visual baselines and cap assertions were captured against → silent test drift.
+> **DO NOT TOUCH means: do not change the DB state.** Specifically — do not create, delete, or edit hubs / categories / members / transactions / cycles / settings; do not sign up to Pro; do not change the PIN; do not change the skin. Signing in and opening modals (incl. cap gates) is fine — tests will do this routinely. Inspecting elements, reading data, or navigating between views does NOT count as touching.
+
+- **Never** edit data, add/delete a hub/category/member/transaction, or change settings/skin. Any mutation shifts the state the visual baselines and cap assertions were captured against → silent test drift.
 - **Never** point a write-capable automated test at these emails. Stage 1's network rail blocks writes; Stage 2 must use its own dedicated test project, not these.
 - **Never** delete the Pro subscription row or let it expire (the 10-year window guards against expiry).
 - Treat the `@bos-test.com` accounts as production data that happens to be fixtures: changing them is a deliberate, logged re-seed (below), not casual use.
