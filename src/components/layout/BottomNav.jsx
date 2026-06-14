@@ -11,11 +11,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useBudgetCentreContext }   from '../../context/BudgetCentreContext';
 
 const ALL_TABS = [
-  { label: 'Home',   path: '/',       permission: null           },
-  { label: 'Payday', path: '/payday', permission: 'viewIncome'  },
-  { label: 'Daily',  path: '/daily',  permission: null           },
-  { label: 'Budget', path: '/budget', permission: null           },
-  { label: 'Log',    path: '/log',    permission: null           },
+  { key: 'home',   label: 'Home',   path: '/',       permission: null           },
+  { key: 'payday', label: 'Payday', path: '/payday', permission: 'viewIncome'  },
+  { key: 'daily',  label: 'Daily',  path: '/daily',  permission: null           },
+  { key: 'budget', label: 'Budget', path: '/budget', permission: null           },
+  { key: 'log',    label: 'Log',    path: '/log',    permission: null           },
 ];
 
 export function BottomNav() {
@@ -50,6 +50,7 @@ export function BottomNav() {
             key={tab.path}
             onClick={() => navigate(tab.path)}
             aria-label={tab.label}
+            data-testid={`nav-tab-${tab.key}`}
             aria-current={active ? 'page' : undefined}
             style={{
               background:  'none',

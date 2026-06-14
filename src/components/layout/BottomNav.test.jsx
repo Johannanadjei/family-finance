@@ -53,4 +53,11 @@ describe('BottomNav', () => {
     expect(screen.getByText('Home')).toBeTruthy();
     mockCan = () => true;
   });
+
+  it('exposes a nav-tab-{key} testid on each tab', () => {
+    renderNav();
+    ['home', 'payday', 'daily', 'budget', 'log'].forEach(key =>
+      expect(screen.getByTestId(`nav-tab-${key}`)).toBeTruthy()
+    );
+  });
 });

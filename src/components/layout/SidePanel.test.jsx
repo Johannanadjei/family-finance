@@ -92,6 +92,12 @@ describe('SidePanel', () => {
     expect(screen.getByText('Active')).toBeTruthy();
   });
 
+  it('exposes a hub-switch-${id} testid on each hub row', () => {
+    renderPanel();
+    expect(screen.getByTestId('hub-switch-c-1')).toBeTruthy();
+    expect(screen.getByTestId('hub-switch-c-2')).toBeTruthy();
+  });
+
   it('calls onSwitch with correct id when non-active centre tapped', () => {
     const onSwitch = vi.fn();
     const onClose  = vi.fn();

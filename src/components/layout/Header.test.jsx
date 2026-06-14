@@ -47,4 +47,10 @@ describe('Header', () => {
     renderHeader();
     expect(screen.getByText('The Adjei Family Hou…')).toBeTruthy();
   });
+
+  it('exposes testids on the hub-switcher and settings buttons', () => {
+    renderHeader();
+    expect(screen.getByTestId('header-hub-switcher-btn')).toBeTruthy();
+    expect(screen.getByTestId('header-settings-btn')).toBeTruthy();
+  });
 });
