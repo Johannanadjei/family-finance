@@ -89,4 +89,13 @@ describe('UpgradeModal', () => {
     expect(screen.getByText('First para.')).toBeTruthy();
     expect(screen.getByText('Second para.')).toBeTruthy();
   });
+
+  it('applies the testid prop to the dialog container, defaulting to "upgrade-modal"', () => {
+    const { rerender } = render(<UpgradeModal open={true} onClose={vi.fn()} />);
+    expect(screen.getByTestId('upgrade-modal')).toBe(screen.getByRole('dialog'));   // default fallback
+
+    rerender(<UpgradeModal open={true} onClose={vi.fn()} testid="upgrade-modal-hub" />);
+    expect(screen.getByTestId('upgrade-modal-hub')).toBe(screen.getByRole('dialog'));  // per-gate value
+    expect(screen.queryByTestId('upgrade-modal')).toBeNull();                          // no longer the default
+  });
 });

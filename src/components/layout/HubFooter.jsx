@@ -53,7 +53,7 @@ export function HubFooter({ userPlan, hubCount, onCreateHub, onUpgradeNavigate }
         </button>
       )}
 
-      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgrade={() => { setUpgradeOpen(false); onUpgradeNavigate(); }} />
+      <UpgradeModal testid="upgrade-modal-hub" open={upgradeOpen} onClose={() => setUpgradeOpen(false)} onUpgrade={() => { setUpgradeOpen(false); onUpgradeNavigate(); }} />
     </div>
   );
 }

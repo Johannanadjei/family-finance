@@ -86,7 +86,7 @@ export function ThemeSection() {
         })}
       </div>
 
-      <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={SKIN_CAP_BODY} />
+      <UpgradeModal testid="upgrade-modal-skin" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={SKIN_CAP_BODY} />
     </div>
   );
 }

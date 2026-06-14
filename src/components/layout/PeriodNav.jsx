@@ -49,7 +49,7 @@ export function PeriodNav({ periodLabel, isOldest, isLatest, onPrev, onNext, his
         </button>
       </div>
 
-      <UpgradeModal open={showHistoryUpgrade} onClose={() => setShowHistoryUpgrade(false)} onUpgrade={() => { setShowHistoryUpgrade(false); navigate('/pricing'); }} body={HISTORY_CAP_BODY} />
+      <UpgradeModal testid="upgrade-modal-history" open={showHistoryUpgrade} onClose={() => setShowHistoryUpgrade(false)} onUpgrade={() => { setShowHistoryUpgrade(false); navigate('/pricing'); }} body={HISTORY_CAP_BODY} />
     </>
   );
 }
