@@ -8,7 +8,7 @@
 
 import { getCurrentMonth } from '../../lib/dates';
 
-export const STEPS = ['Centre', 'Income', 'Categories', 'Target', 'Complete'];
+export const STEPS = ['Hub', 'Income', 'Categories', 'Target', 'Complete'];
 
 export const MAX_FREE_INCOMES  = 2;
 export const MAX_FREE_MEMBERS  = 2;
