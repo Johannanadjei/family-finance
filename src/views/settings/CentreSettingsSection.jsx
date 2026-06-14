@@ -50,7 +50,7 @@ export function CentreSettingsSection() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: editing ? 12 : 0 }}>
         <p style={{ fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: 0, textTransform: 'uppercase', letterSpacing: 0.8 }}>BOS Hub</p>
         {!editing && (
-          <button data-testid="centre-edit-btn" onClick={openEdit} aria-label="Edit centre settings"
+          <button data-testid="centre-edit-btn" onClick={openEdit} aria-label="Edit hub settings"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted, #6b7280)', padding: 4, display: 'flex', alignItems: 'center' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>

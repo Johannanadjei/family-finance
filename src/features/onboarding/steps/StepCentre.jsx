@@ -72,7 +72,7 @@ export function StepCentre({ data, onNext }) {
       {/* Name */}
       <div>
         <p style={{ fontSize: 12, fontWeight: 800, color: '#6b7280', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 1 }}>
-          Centre name
+          Hub name
         </p>
         <input
           type="text"
