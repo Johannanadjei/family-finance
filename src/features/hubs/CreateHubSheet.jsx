@@ -1,9 +1,8 @@
 /**
  * features/hubs/CreateHubSheet.jsx
  *
- * Bottom sheet — 4-step flow to create an additional control centre.
- * Steps: Hub Type → Name / Currency → Categories → Confirm
- * Income sources are added later via the Payday screen.
+ * Bottom sheet — 5-step flow to create an additional control centre.
+ * Steps: Hub Type → Name / Currency → Categories → Income → Confirm
  * On completion calls onComplete(centreId) so App can switch hubs.
  */
 
@@ -115,7 +114,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
     <>
       <div onClick={handleClose} aria-hidden="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 500 }} />
 
-      <div role="dialog" aria-modal="true" data-modal-scrollable="true" style={{
+      <div role="dialog" aria-modal="true" data-modal-scrollable="true" data-testid="create-hub-sheet" style={{
         position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
         width: '100%', maxWidth: 440, maxHeight: '92vh',
         background: 'var(--c-card, #fff)', borderRadius: '20px 20px 0 0',
@@ -128,7 +127,7 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
             <p style={{ fontSize: 13, fontWeight: 900, color: 'var(--c-primary, #064e3b)', margin: '0 0 1px' }}>New BOS Hub</p>
             <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: 0 }}>Step {step + 1} of {TOTAL_STEPS}</p>
           </div>
-          <button onClick={handleClose} aria-label="Close" style={{ background: 'var(--c-bg, #f3f4f6)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 14, color: 'var(--c-muted, #6b7280)' }}>✕</button>
+          <button onClick={handleClose} aria-label="Close" data-testid="create-hub-close-btn" style={{ background: 'var(--c-bg, #f3f4f6)', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 14, color: 'var(--c-muted, #6b7280)' }}>✕</button>
         </div>
 
         {/* Step content */}
@@ -141,16 +140,20 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
               <input
                 type="text" placeholder="e.g. Our Family Home" value={hubName}
                 maxLength={50} autoFocus
+                data-testid="create-hub-name-input"
                 onChange={e => { setHubName(e.target.value); setNameErr(null); }}
                 style={inputStyle}
               />
-              <select value={currency} onChange={e => setCurrency(e.target.value)} style={{ ...inputStyle, ...selectStyle }}>
+              <select value={currency} onChange={e => setCurrency(e.target.value)} data-testid="create-hub-currency-select" style={{ ...inputStyle, ...selectStyle }}>
                 {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
               </select>
-              {nameErr && <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{nameErr}</p>}
+              {nameErr && <p data-testid="create-hub-name-error" style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{nameErr}</p>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-                <button onClick={() => setStep(0)} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-text, #1c1917)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
-                <button onClick={handleNameNext} style={{ padding: '14px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: 'var(--c-btn-text, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Continue →</button>
+                {/* create-hub-back-btn is shared with the step-4 Back button. Steps render
+                    mutually exclusively (gated by `step` state), so only one is ever in the
+                    DOM — a single testid is correct, no per-step disambiguation needed (D2). */}
+                <button onClick={() => setStep(0)} data-testid="create-hub-back-btn" style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-text, #1c1917)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
+                <button onClick={handleNameNext} data-testid="create-hub-continue-btn" style={{ padding: '14px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: 'var(--c-btn-text, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Continue →</button>
               </div>
             </div>
           )}
@@ -179,8 +182,9 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
               </p>
               {error && <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: 0 }}>{error}</p>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-                <button onClick={() => setStep(3)} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-text, #1c1917)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
-                <button onClick={handleConfirm} disabled={loading} style={{ padding: '14px', borderRadius: 12, border: 'none', background: loading ? 'var(--c-border)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: loading ? 'var(--c-muted)' : 'var(--c-btn-text, #fff)', fontSize: 14, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+                {/* Shared create-hub-back-btn — see step-1 note (D2). */}
+                <button onClick={() => setStep(3)} disabled={loading} data-testid="create-hub-back-btn" style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', color: 'var(--c-text, #1c1917)', fontFamily: "'Nunito', sans-serif" }}>← Back</button>
+                <button onClick={handleConfirm} disabled={loading} data-testid="create-hub-submit-btn" style={{ padding: '14px', borderRadius: 12, border: 'none', background: loading ? 'var(--c-border)' : 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))', color: loading ? 'var(--c-muted)' : 'var(--c-btn-text, #fff)', fontSize: 14, fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif" }}>
                   {loading ? 'Creating...' : 'Create Hub 🎉'}
                 </button>
               </div>
