@@ -43,6 +43,9 @@ export function PaydayHeader({ periodLabel, isCurrent, isFuture, isLatest, isOld
       {/* Summary card — hidden for future periods (nothing to total yet) */}
       {!isFuture && (
         <div style={{ background: 'linear-gradient(135deg, var(--c-header-from,#064e3b), var(--c-header-to,#0d7060))', borderRadius: 16, padding: '16px 18px', marginBottom: 16, color: '#fff', boxShadow: 'var(--c-shadow)', border: '1px solid rgba(255,255,255,0.2)' }}>
+          {/* isCurrent toggles between two mutually-exclusive arms; both expose the same
+              `payday-total-received` testid (current = totalReceived, past = totalIncome) —
+              only one ever renders, so getByTestId never multi-matches. */}
           {isCurrent ? (
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <div>
