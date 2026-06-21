@@ -1,6 +1,5 @@
 /**
  * views/AuthScreen.jsx
- *
  * Handles sign in, sign up, and Google OAuth.
  * Calls supabase.auth directly — auth is not a financial data operation.
  * Never redirects manually — App.jsx detects session change via useAuth.
@@ -10,6 +9,7 @@
 
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { AuthFooter } from './AuthFooter';
 
 const validateForm = (email, password, name, mode) => {
   if (!email.trim())                  return 'Email is required';
@@ -113,7 +113,6 @@ export function AuthScreen() {
         boxShadow: '0 24px 64px rgba(0,0,0,.18)',
         border: '1px solid var(--c-border, transparent)',
       }}>
-
         <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--c-muted, #6b7280)', margin: '0 0 20px', textAlign: 'center' }}>
           {mode === 'signin' ? 'Welcome back' : 'Create your account'}
         </p>
@@ -135,7 +134,6 @@ export function AuthScreen() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
           {/* Name — signup only */}
           {mode === 'signup' && (
             <input
@@ -192,9 +190,11 @@ export function AuthScreen() {
             <span style={{ marginRight: 8 }}>🔵</span>
             Continue with Google
           </button>
-
         </div>
       </div>
+
+      {/* Legal footer — public legal-page links (extracted; see AuthFooter.jsx) */}
+      <AuthFooter />
     </div>
   );
 }
