@@ -10,6 +10,7 @@ import { CategorySettingsRow }        from './settings/CategorySettingsRow';
 import { IncomeSourcesSection }       from './settings/IncomeSourcesSection';
 import { ThemeSection }               from './settings/ThemeSection';
 import { InstallAppSection }          from './settings/InstallAppSection';
+import { LegalSection }               from './settings/LegalSection';
 import { AddCategorySheet }           from './budget/AddCategorySheet';
 import { GuestSettingsSection }       from './settings/GuestSettingsSection';
 import { MembersSection }             from './settings/MembersSection';
@@ -113,6 +114,9 @@ export function SettingsView() {
           Sign Out
         </button>
       </div>
+
+      {/* Legal — static footer, links to public legal pages */}
+      <LegalSection />
 
       <AddCategorySheet isOpen={addCatOpen} onClose={() => setAddCatOpen(false)} onAdd={(cat) => addCategory(cat, viewedCycleId)} />
       <UpgradeModal testid="upgrade-modal-category-settings" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={CATEGORY_CAP_BODY} />

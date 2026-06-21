@@ -125,6 +125,12 @@ describe('SettingsView', () => {
     expect(screen.getByTestId('centre-name-display')).toBeTruthy();
   });
 
+  it('renders the Legal footer section', () => {
+    renderSettings();
+    expect(screen.getByTestId('settings-legal-section')).toBeTruthy();
+    expect(screen.getByTestId('settings-legal-link-privacy')).toBeTruthy();
+  });
+
   it('renders all categories', () => {
     renderSettings();
     expect(screen.getByTestId('cat-name-cat-1')).toBeTruthy();
