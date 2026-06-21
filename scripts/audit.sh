@@ -104,6 +104,7 @@ missing=0
 while IFS= read -r line; do
   srcfile=$(echo "$line" | cut -d: -f1)
   importpath=$(echo "$line" | grep -o "from '[./][^']*'" | sed "s/from '//;s/'//")
+  importpath=${importpath%%\?*}  # strip Vite query suffix (?raw, ?url, ?worker) before resolving
   if [ -z "$importpath" ]; then continue; fi
   dir=$(dirname "$srcfile")
   base="$dir/$importpath"
