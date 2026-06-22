@@ -111,6 +111,22 @@ describe('useFinance — income mutation reconciliation', () => {
     expect(result.current.allIncome).toBe(0);
     expect(result.current.incomes).toHaveLength(0);
   });
+
+  // ── T4: parity with migrate_20/21 — the income tx always carries the HUB
+  //        currency, never the (vestigial) per-source currency, even when they
+  //        diverge. Pre-fix this stamped income.currency ('EUR'); post-fix it is
+  //        always the hub's 'GHS'. ──────────────────────────────────────────────
+  it('T4: markReceived stamps the income tx with the hub currency, ignoring a divergent income_sources.currency', async () => {
+    const diverged = { ...SOURCE, received: false, received_amount: 0, currency: 'EUR' };
+    const { result } = mount([], [diverged]);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    markReceived.mockResolvedValue({ error: null });
+    addTransaction.mockResolvedValue({ data: { ...INCOME_TX, id: 'tx-9', currency: 'GHS' }, error: null });
+    await act(async () => { await result.current.markReceived('inc-1', 5000, '2026-05-25'); });
+
+    expect(addTransaction).toHaveBeenCalledWith('centre-1', expect.objectContaining({ currency: 'GHS' }));
+  });
 });
 
 // ── Phase 2B: income rollforward (copyIncomeSourcesToMonth) ──────────────────
