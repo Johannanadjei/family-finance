@@ -74,7 +74,7 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
           <div>
             <p style={{ fontSize: 15, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 2px' }}>{income.label}</p>
             <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: 0 }}>
-              {income.currency} · {income.pay_day_type === 'flexible' ? 'Flexible' : income.pay_day_type === 'last_working_day' ? 'Last working day' : `Day ${income.pay_day}`}
+              {income.pay_day_type === 'flexible' ? 'Flexible' : income.pay_day_type === 'last_working_day' ? 'Last working day' : `Day ${income.pay_day}`}
             </p>
           </div>
         </div>
