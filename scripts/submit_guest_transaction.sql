@@ -20,7 +20,12 @@
 --   p_description   → description
 --   p_date          → date (cast to date)
 --   p_week          → week  ('Week 1' … 'Week 5', computed client-side)
---   p_currency      → currency
+--   p_currency      → IGNORED. The hub (budget_centres.currency) is the single
+--                     source of truth for display currency; the stored tx
+--                     currency is resolved server-side from the centre so a stale
+--                     shared guest link (?cur=…) can never stamp a divergent
+--                     value. The param is kept for backward compatibility with
+--                     already-deployed clients that still send it.
 
 CREATE OR REPLACE FUNCTION submit_guest_transaction(
   p_guest_id       uuid,
@@ -42,6 +47,7 @@ DECLARE
   v_category_id  uuid;
   v_tx_id        uuid;
   v_cat_name     text;
+  v_currency     text;
 BEGIN
 
   -- 1. Validate guest: must be active, not deleted, and belong to this centre
@@ -87,6 +93,14 @@ BEGIN
   ORDER BY bc.month DESC
   LIMIT 1;
 
+  -- 5b. Resolve the display currency from the hub — authoritative source of truth.
+  --     p_currency is ignored (see header): a stale guest link must never stamp a
+  --     currency that diverges from the centre. Falls back to 'GHS' defensively.
+  SELECT COALESCE(c.currency, 'GHS')
+  INTO   v_currency
+  FROM   budget_centres c
+  WHERE  c.id = p_centre_id;
+
   -- 6. Insert the transaction
   INSERT INTO transactions (
     budget_centre_id,
@@ -112,7 +126,7 @@ BEGIN
     COALESCE(NULLIF(TRIM(p_description), ''), ''),
     p_date::date,
     p_week,
-    p_currency,
+    v_currency,                                   -- hub currency, NOT p_currency
     'expense',
     'guest_portal',
     NULL,                                         -- no Supabase Auth session for guests
