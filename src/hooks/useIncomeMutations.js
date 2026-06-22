@@ -54,7 +54,9 @@ export function useIncomeMutations({ centreId, currency, cycles, incomes, txs, s
       week:             getWeekForDate(today),
       type:             'income',
       category_name:    income.label,
-      currency:         income.currency || currency,
+      // Hub currency is authoritative for display — income_sources.currency is
+      // vestigial (migrate_20/21 aligned it to the hub; never read it back here).
+      currency:         currency,
       amount:           receivedAmount,
       description:      income.label + ' received',
       source:           'main_app',
