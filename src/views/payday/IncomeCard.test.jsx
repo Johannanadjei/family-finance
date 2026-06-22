@@ -66,6 +66,17 @@ describe('IncomeCard', () => {
     expect(screen.getAllByText(/Flexible/).length).toBeGreaterThan(0);
   });
 
+  it('does not render the income currency code in the meta line (hub-authoritative)', () => {
+    // Regression: the hub is the single source of truth for currency — amounts use
+    // the hub fmt, so a divergent income.currency (e.g. a legacy EUR row on a GHS
+    // hub) must never surface as a label. Meta line shows only the pay schedule.
+    const divergentIncome = { ...pendingIncome, currency: 'EUR' };
+    renderCard({ income: divergentIncome });
+    expect(screen.queryByText(/EUR/)).toBeNull();
+    expect(screen.queryByText(/·/)).toBeNull();
+    expect(screen.getByText('Day 25')).toBeTruthy();
+  });
+
   it('calls onConfirm with income when confirm tapped', () => {
     const onConfirm = vi.fn();
     renderCard({ onConfirm });

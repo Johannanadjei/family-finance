@@ -3,7 +3,8 @@
  *
  * Step 2 — Income streams.
  * Free plan: max 2 income streams.
- * Each stream has label, icon, expected amount, currency, pay day.
+ * Each stream has label, icon, expected amount, pay day. Currency is hub-wide
+ * (seeded from centreCurrency at insert), never picked per-stream.
  *
  * @param {IncomeStream[]} data    — initial income streams
  * @param {string} centreCurrency  — default currency for new streams
@@ -15,7 +16,7 @@
 import { useState } from 'react';
 import { selectStyle }    from '../../../lib/selectStyle';
 import { validateIncomeStep } from '../onboarding.validation';
-import { INCOME_ICONS, CURRENCIES, MAX_FREE_INCOMES, emptyIncome } from '../onboarding.constants';
+import { INCOME_ICONS, MAX_FREE_INCOMES, emptyIncome } from '../onboarding.constants';
 
 const inputStyle = {
   width: '100%', padding: '12px 14px', borderRadius: 10,
@@ -24,7 +25,7 @@ const inputStyle = {
   fontFamily: "'Nunito', sans-serif", color: '#1c1917',
 };
 
-function IncomeCard({ income, idx, total, centreCurrency, onUpdate, onRemove }) {
+function IncomeCard({ income, idx, total, onUpdate, onRemove }) {
   return (
     <div style={{ background: '#f9fafb', borderRadius: 14, padding: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -41,12 +42,7 @@ function IncomeCard({ income, idx, total, centreCurrency, onUpdate, onRemove }) 
         ))}
       </div>
       <input type="text" placeholder="e.g. Salary, Freelance" value={income.label} onChange={e => onUpdate(income.id, 'label', e.target.value)} style={{ ...inputStyle, marginBottom: 8 }} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-        <input type="number" placeholder="Expected amount" value={income.expected_amount || ''} onChange={e => onUpdate(income.id, 'expected_amount', parseFloat(e.target.value) || 0)} min="0" style={inputStyle} />
-        <select value={income.currency} onChange={e => onUpdate(income.id, 'currency', e.target.value)} style={{ ...inputStyle, ...selectStyle }}>
-          {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
-        </select>
-      </div>
+      <input type="number" placeholder="Expected amount" value={income.expected_amount || ''} onChange={e => onUpdate(income.id, 'expected_amount', parseFloat(e.target.value) || 0)} min="0" style={{ ...inputStyle, marginBottom: 8 }} />
       <select value={income.pay_day_type} onChange={e => onUpdate(income.id, 'pay_day_type', e.target.value)} style={{ ...inputStyle, ...selectStyle, marginBottom: income.pay_day_type === 'fixed_date' ? 8 : 0 }}>
         <option value="flexible">Flexible / Ad-hoc</option>
         <option value="fixed_date">Fixed date each month</option>
@@ -105,7 +101,6 @@ export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
             income={income}
             idx={idx}
             total={incomes.length}
-            centreCurrency={centreCurrency}
             onUpdate={update}
             onRemove={removeIncome}
           />
