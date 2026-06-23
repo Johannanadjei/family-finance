@@ -50,7 +50,7 @@ export function Header({ onOpenPanel }) {
         }}>
           <span style={{ fontSize: 22 }}>{centre?.icon || '🏠'}</span>
           <div style={{ textAlign: 'left' }}>
-            <p style={{ fontSize: 14, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.2 }}>
+            <p style={{ fontSize: 14, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.2, whiteSpace: 'nowrap' }}>
               {(centre?.name || 'My Budget').length > 20
                 ? (centre?.name || 'My Budget').slice(0, 20) + '…'
                 : (centre?.name || 'My Budget')}
