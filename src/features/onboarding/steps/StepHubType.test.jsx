@@ -77,4 +77,20 @@ describe('StepHubType', () => {
     renderStep({ onBack: undefined });
     expect(screen.queryByText('← Back')).toBeNull();
   });
+
+  // ── testid coverage (Stage 1 traversal) ───────────────────────────────────
+  it('exposes continue testid', () => {
+    renderStep();
+    expect(screen.getByTestId('hub-type-continue-btn')).toBeTruthy();
+  });
+
+  it('exposes back testid when onBack provided', () => {
+    renderStep();
+    expect(screen.getByTestId('hub-type-back-btn')).toBeTruthy();
+  });
+
+  it('omits back testid when onBack is not provided', () => {
+    renderStep({ onBack: undefined });
+    expect(screen.queryByTestId('hub-type-back-btn')).toBeNull();
+  });
 });

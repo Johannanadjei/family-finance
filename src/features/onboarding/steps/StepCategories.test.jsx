@@ -126,4 +126,19 @@ describe('StepCategories', () => {
     fireEvent.click(iconButtons[1]); // open a different row
     expect(screen.getAllByRole('group', { name: 'Category icons' })).toHaveLength(1);
   });
+
+  // ── testid coverage (Stage 1 traversal) ───────────────────────────────────
+  it('exposes nav testids', () => {
+    renderStep();
+    expect(screen.getByTestId('category-continue-btn')).toBeTruthy();
+    expect(screen.getByTestId('category-back-btn')).toBeTruthy();
+  });
+
+  it('exposes id-keyed per-row testids', () => {
+    renderStep(); // defaultCats → c1, c2, c3
+    expect(screen.getByTestId('category-name-c1')).toBeTruthy();
+    expect(screen.getByTestId('category-amount-c1')).toBeTruthy();
+    expect(screen.getByTestId('category-remove-c1')).toBeTruthy();
+    expect(screen.getByTestId('category-name-c3')).toBeTruthy();
+  });
 });
