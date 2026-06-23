@@ -64,6 +64,7 @@ export function StepHubType({ selected, onSelect, onNext, onBack }) {
         {onBack && (
           <button
             onClick={onBack}
+            data-testid="hub-type-back-btn"
             style={{
               padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)',
               background: 'var(--c-card, #fff)', fontSize: 14, fontWeight: 800,
@@ -76,6 +77,7 @@ export function StepHubType({ selected, onSelect, onNext, onBack }) {
         <button
           onClick={() => selected && onNext(selected)}
           disabled={!selected}
+          data-testid="hub-type-continue-btn"
           style={{
             padding: '14px', borderRadius: 12, border: 'none',
             background: selected ? 'linear-gradient(135deg, var(--c-primary, #064e3b), var(--c-primary-2, #0d7060))' : 'var(--c-border, #e5e7eb)',

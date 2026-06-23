@@ -31,7 +31,7 @@ function IncomeCard({ income, idx, total, onUpdate, onRemove }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <p style={{ fontSize: 13, fontWeight: 800, color: '#064e3b', margin: 0 }}>Income Stream {idx + 1}</p>
         {total > 1 && (
-          <button onClick={() => onRemove(income.id)} style={{ background: '#fee2e2', border: 'none', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 800, color: '#dc2626', cursor: 'pointer' }}>
+          <button onClick={() => onRemove(income.id)} data-testid={`income-stream-remove-${income.id}`} style={{ background: '#fee2e2', border: 'none', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 800, color: '#dc2626', cursor: 'pointer' }}>
             Remove
           </button>
         )}
@@ -41,9 +41,9 @@ function IncomeCard({ income, idx, total, onUpdate, onRemove }) {
           <button key={i} onClick={() => onUpdate(income.id, 'icon', i)} style={{ width: 36, height: 36, borderRadius: 8, border: 'none', fontSize: 16, cursor: 'pointer', background: income.icon === i ? '#064e3b' : '#e5e7eb', transition: 'all .2s' }}>{i}</button>
         ))}
       </div>
-      <input type="text" placeholder="e.g. Salary, Freelance" value={income.label} onChange={e => onUpdate(income.id, 'label', e.target.value)} style={{ ...inputStyle, marginBottom: 8 }} />
-      <input type="number" placeholder="Expected amount" value={income.expected_amount || ''} onChange={e => onUpdate(income.id, 'expected_amount', parseFloat(e.target.value) || 0)} min="0" style={{ ...inputStyle, marginBottom: 8 }} />
-      <select value={income.pay_day_type} onChange={e => onUpdate(income.id, 'pay_day_type', e.target.value)} style={{ ...inputStyle, ...selectStyle, marginBottom: income.pay_day_type === 'fixed_date' ? 8 : 0 }}>
+      <input type="text" placeholder="e.g. Salary, Freelance" value={income.label} onChange={e => onUpdate(income.id, 'label', e.target.value)} data-testid={`income-stream-label-${income.id}`} style={{ ...inputStyle, marginBottom: 8 }} />
+      <input type="number" placeholder="Expected amount" value={income.expected_amount || ''} onChange={e => onUpdate(income.id, 'expected_amount', parseFloat(e.target.value) || 0)} min="0" data-testid={`income-stream-amount-${income.id}`} style={{ ...inputStyle, marginBottom: 8 }} />
+      <select value={income.pay_day_type} onChange={e => onUpdate(income.id, 'pay_day_type', e.target.value)} data-testid={`income-stream-paydaytype-${income.id}`} style={{ ...inputStyle, ...selectStyle, marginBottom: income.pay_day_type === 'fixed_date' ? 8 : 0 }}>
         <option value="flexible">Flexible / Ad-hoc</option>
         <option value="fixed_date">Fixed date each month</option>
         <option value="last_working_day">Last working day</option>
@@ -111,6 +111,7 @@ export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
       {canAdd ? (
         <button
           onClick={addIncome}
+          data-testid="income-stream-add-btn"
           style={{
             width: '100%', padding: '12px', borderRadius: 12,
             border: '2px dashed #059669', background: 'transparent',
@@ -139,6 +140,7 @@ export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <button
           onClick={() => onNext([])}
+          data-testid="income-stream-skip-btn"
           style={{
             padding: '10px', borderRadius: 12, border: '1.5px solid #e5e7eb',
             background: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer',
@@ -150,6 +152,7 @@ export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
           <button
             onClick={onBack}
+            data-testid="income-stream-back-btn"
             style={{
               padding: '14px', borderRadius: 12, border: '1.5px solid #e5e7eb',
               background: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
@@ -160,6 +163,7 @@ export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
           </button>
           <button
             onClick={handleNext}
+            data-testid="income-stream-continue-btn"
             style={{
               padding: '14px', borderRadius: 12, border: 'none',
               background: 'linear-gradient(135deg, #064e3b, #0d7060)',

@@ -95,4 +95,37 @@ describe('StepIncome', () => {
     screen.getByText('Skip for now').click();
     expect(onNext).toHaveBeenCalledWith([]);
   });
+
+  // ── testid coverage (Stage 1 traversal) ───────────────────────────────────
+  const twoStreams = [
+    { id: 'inc-1', label: 'Salary', icon: '💰', expected_amount: 5000, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', notes: '' },
+    { id: 'inc-2', label: 'Side gig', icon: '💼', expected_amount: 800, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', notes: '' },
+  ];
+
+  it('exposes nav + add + skip testids', () => {
+    renderStep({ plan: 'free', data: [] });
+    expect(screen.getByTestId('income-stream-add-btn')).toBeTruthy();
+    expect(screen.getByTestId('income-stream-skip-btn')).toBeTruthy();
+    expect(screen.getByTestId('income-stream-continue-btn')).toBeTruthy();
+    expect(screen.getByTestId('income-stream-back-btn')).toBeTruthy();
+  });
+
+  it('exposes id-keyed per-card testids', () => {
+    renderStep({ data: twoStreams });
+    expect(screen.getByTestId('income-stream-label-inc-1')).toBeTruthy();
+    expect(screen.getByTestId('income-stream-amount-inc-1')).toBeTruthy();
+    expect(screen.getByTestId('income-stream-paydaytype-inc-1')).toBeTruthy();
+    expect(screen.getByTestId('income-stream-label-inc-2')).toBeTruthy();
+  });
+
+  it('exposes per-card remove testid only when more than one stream', () => {
+    renderStep({ data: twoStreams });
+    expect(screen.getByTestId('income-stream-remove-inc-1')).toBeTruthy();
+    expect(screen.getByTestId('income-stream-remove-inc-2')).toBeTruthy();
+  });
+
+  it('omits remove testid when only one stream', () => {
+    renderStep({ data: [twoStreams[0]] });
+    expect(screen.queryByTestId('income-stream-remove-inc-1')).toBeNull();
+  });
 });
