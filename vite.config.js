@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -29,6 +30,9 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals:     true,
+    // Playwright specs live in e2e/ and match vitest's default *.spec.js glob.
+    // Without this they'd be collected here and fail on the @playwright/test import.
+    exclude:     [...configDefaults.exclude, 'e2e/**'],
     coverage: {
       provider:   'v8',
       reporter:   ['text', 'json', 'html'],

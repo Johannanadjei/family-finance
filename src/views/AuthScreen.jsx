@@ -148,7 +148,7 @@ export function AuthScreen() {
 
           {/* Email */}
           <input
-            type="email"
+            data-testid="auth-email-input" type="email"
             placeholder="Email address"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -158,7 +158,7 @@ export function AuthScreen() {
 
           {/* Password */}
           <input
-            type="password"
+            data-testid="auth-password-input" type="password"
             placeholder="Password"
             value={password}
             onChange={e => setPassword(e.target.value)}
@@ -174,7 +174,7 @@ export function AuthScreen() {
           )}
 
           {/* Submit */}
-          <button onClick={handleSubmit} disabled={loading} style={btnStyle(true)}>
+          <button data-testid="auth-submit-btn" onClick={handleSubmit} disabled={loading} style={btnStyle(true)}>
             {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
           </button>
 

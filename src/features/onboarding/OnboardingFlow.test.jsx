@@ -86,4 +86,11 @@ describe('OnboardingFlow — first-cycle CYC02 closure', () => {
     await act(async () => { fireEvent.click(screen.getByText(/Create BOS Hub/)); });
     expect(bulkAddCategories).not.toHaveBeenCalled();
   });
+
+  // e2e/smoke-signin.spec.js asserts this testid to confirm the fresh fixture
+  // lands on the onboarding gate. Renaming it must fail here first.
+  it('exposes the onboarding-flow testid on the root', () => {
+    render(<OnboardingFlow onComplete={vi.fn()} />);
+    expect(screen.getByTestId('onboarding-flow')).toBeTruthy();
+  });
 });
