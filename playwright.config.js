@@ -32,7 +32,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly:    !!process.env.CI,
   retries:       process.env.CI ? 2 : 0,
-  reporter:      'list',
+  // 'list' alone writes no playwright-report/, so CI's on-failure artifact would
+  // upload an empty directory. Add the html reporter there; keep local runs to
+  // plain console output.
+  reporter:      process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
 
   use: {
     baseURL: BASE_URL,

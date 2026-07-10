@@ -160,6 +160,21 @@ the test. Sign-in is exempt by construction: it POSTs to `/auth/v1/token`, which
 not match. Every Stage 1 spec must import `test` from `test-base.js` — that import is what arms the
 rail.
 
+### CI runs
+
+`.github/workflows/ci.yml` runs the e2e suite on every push to `main`, `staging`, and `dev` (and on
+PRs into `main`/`staging`), against **these accounts on the production project**. See
+[`ci-setup.md`](./ci-setup.md).
+
+Two consequences worth stating plainly:
+
+- **Every CI run signs a fixture in.** That bumps `last_sign_in_at` and writes an entry to the
+  production auth log. It does not corrupt the fixture — the §0 rail blocks every `/rest/v1/**`
+  write — but the accounts are no longer "never touched after seeding." Expect login noise.
+- **If the shared password rotates,** the `E2E_FIXTURE_PASSWORD` repository secret must be updated
+  or every CI run fails at the sign-in step. Paste it **raw** into GitHub — the single-quoting rule
+  above is a dotenv rule, and quoting an Actions secret embeds the quote characters.
+
 ---
 
 ## DO NOT TOUCH
