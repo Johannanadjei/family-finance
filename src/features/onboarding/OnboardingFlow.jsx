@@ -137,7 +137,7 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
   };
 
   return (
-    <div style={{
+    <div data-testid="onboarding-flow" style={{
       minHeight: '100vh',
       background: 'linear-gradient(145deg, #064e3b, #0d7060)',
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center',

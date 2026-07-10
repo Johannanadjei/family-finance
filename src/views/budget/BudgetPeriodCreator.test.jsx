@@ -6,12 +6,13 @@
  * sheet and (when asked) signals the parent to open its copy sheet.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BudgetPeriodCreator } from './BudgetPeriodCreator';
 
-// Latest live cycle ends 2026-06-30 → quick "next month" = July 2026 (deterministic),
-// and it does NOT cover today, so the passive prompt shows.
+// The quick range is nextCalendarMonthRange(getToday()) — derived from the real
+// clock, NOT from cycles. Pin today to mid-June 2026 so "next month" is
+// deterministically July 2026 on any run date. (waitFor needs shouldAdvanceTime.)
 const CYCLES = [{ id: 'jun', start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null }];
 let mockFinance;
 vi.mock('../../context/FinanceContext', () => ({ useFinanceContext: () => mockFinance }));
@@ -20,11 +21,17 @@ const mockReloadCategories = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../context/BudgetCentreContext', () => ({ useBudgetCentreContext: () => ({ reloadCategories: mockReloadCategories }) }));
 
 beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(new Date('2026-06-15T00:00:00Z'));
   mockFinance = {
     cycles: CYCLES,
     createPeriod: vi.fn().mockResolvedValue({ data: { id: 'new' }, error: null }),
     resetPeriod: vi.fn().mockResolvedValue({ data: { categories_reset: 0, transactions_reset: 0 }, error: null }),
   };
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 const base = { isOpen: false, onOpenChange: vi.fn(), onCopyRequested: vi.fn(), resetCycle: null, onResetDone: vi.fn() };

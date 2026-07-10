@@ -112,6 +112,56 @@ Free-tier caps in force (from `lib/plans.js`): **1 hub · 2 members · 10 catego
 
 ---
 
+## §7 — Seeded state & automation prerequisites
+
+**Seeded on 2026-06-14 by AJ; all 7 fixtures confirmed `has_pin=true` via direct SQL query on 2026-07-10 — PIN `1611` present on all.**
+
+### PIN state supersedes the per-fixture seed steps above
+
+Each fixture's **Seed** list says "skip PIN". That reflected the original intent, **not** the
+accounts as they exist. Every one of the 7 was given PIN `1611` during seeding. Where the two
+disagree, **this section is correct** — the SQL query above is the evidence. Automation therefore
+always drives `PinScreen` (the PIN entry gate), never `PinSetupFlow` (the setup/skip gate).
+
+Do not "fix" this by clearing the PINs: `DO NOT TOUCH` below forbids changing the PIN, and the
+e2e sign-in helper depends on the PIN path existing on every fixture.
+
+### Playwright prerequisites
+
+`npm run test:e2e` reads two things from the **gitignored** `.env`, mirrored into `process.env`
+by `playwright.config.js` (via vite's `loadEnv`):
+
+| Variable | Purpose | Consequence if unset |
+|---|---|---|
+| `E2E_FIXTURE_PASSWORD` | The shared fixture password from **Shared credentials** above | `signIn()` throws immediately with a pointer to this file |
+| `VITE_SUPABASE_URL` | The origin the §0 write-rail matches against | `test-base.js` refuses to run — it will not drive the app with the rail disarmed |
+
+Add the password locally, once:
+
+```bash
+# .env  (never committed — see .gitignore)
+E2E_FIXTURE_PASSWORD='<the shared password from the team password manager>'
+```
+
+**Single-quote the value.** `loadEnv` parses `.env` with dotenv, which treats an unquoted `#`
+as the start of an inline comment and silently truncates the value there. The shared password
+contains a `#`, so an unquoted entry reaches `signIn()` as the substring before it and the fixture
+fails with "Incorrect email or password" — an auth error that looks nothing like a parsing bug.
+
+The password stays out of source, as it always has. The **PIN is not treated as a secret** and is
+a constant (`FIXTURE_PIN`) in `e2e/helpers/signIn.js` — it guards nothing on its own, since reaching
+the PIN gate already requires the password.
+
+### The §0 write-rail
+
+`e2e/helpers/test-base.js` intercepts `POST`/`PUT`/`PATCH`/`DELETE` to `/rest/v1/*` (both table
+writes and `/rest/v1/rpc/*`), **aborts** them so nothing reaches the shared production DB, and fails
+the test. Sign-in is exempt by construction: it POSTs to `/auth/v1/token`, which the REST glob does
+not match. Every Stage 1 spec must import `test` from `test-base.js` — that import is what arms the
+rail.
+
+---
+
 ## DO NOT TOUCH
 
 Once seeded, these accounts are **immutable read-only Stage 1 fixtures.**

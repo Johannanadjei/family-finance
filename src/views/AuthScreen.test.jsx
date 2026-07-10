@@ -64,4 +64,21 @@ describe('AuthScreen', () => {
     submitSignIn();
     expect(signInWithPassword).toHaveBeenCalledWith({ email: 'a@b.com', password: 'secret1' });
   });
+
+  // The e2e sign-in helper (e2e/helpers/signIn.js) drives these three testids.
+  // Asserting them here means a rename breaks a fast unit test, not a slow browser run.
+  it('exposes the auth-email-input testid', () => {
+    render(<AuthScreen />);
+    expect(screen.getByTestId('auth-email-input')).toBeTruthy();
+  });
+
+  it('exposes the auth-password-input testid', () => {
+    render(<AuthScreen />);
+    expect(screen.getByTestId('auth-password-input')).toBeTruthy();
+  });
+
+  it('exposes the auth-submit-btn testid', () => {
+    render(<AuthScreen />);
+    expect(screen.getByTestId('auth-submit-btn')).toBeTruthy();
+  });
 });
