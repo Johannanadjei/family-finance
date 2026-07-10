@@ -2,13 +2,20 @@ name: CI
 
 on:
   push:
-    branches: [main, staging]
+    branches: [main, staging, dev]
+    paths-ignore: ['docs/**', '**/*.md']
+  # No paths-ignore on PRs: a skipped job never reports a status, so a required
+  # check would leave docs-only PRs stuck "waiting for status" forever.
   pull_request:
     branches: [main, staging]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    name: Test & Audit
+    name: Test, Audit & E2E
     runs-on: ubuntu-latest
 
     steps:
@@ -18,14 +25,63 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
+      # Fail fast. Steps in a job are sequential and abort on first failure, so a
+      # red unit suite never reaches the (slow) browser install below.
       - name: Run tests
         run: npm test
 
       - name: Run audit
         run: bash scripts/audit.sh
+
+      # Keyed on the resolved Playwright version, not just the lockfile hash: a
+      # browser build is bound to the @playwright/test that downloaded it.
+      - name: Resolve Playwright version
+        id: pw-version
+        run: echo "version=$(npx playwright --version | sed 's/^Version //')" >> "$GITHUB_OUTPUT"
+
+      # Restores the browser BINARY only. On a partial restore (restore-keys match,
+      # exact key miss) cache-hit is 'false', so the install step below re-runs and
+      # repairs the version mismatch.
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ hashFiles('package-lock.json') }}-${{ steps.pw-version.outputs.version }}
+          restore-keys: |
+            playwright-browsers-${{ hashFiles('package-lock.json') }}
+
+      # UNCONDITIONAL. The apt packages Chromium links against (libatk-1.0.so.0,
+      # libnss3, libgbm1, …) are system libraries — they do NOT live in
+      # ~/.cache/ms-playwright and are never restored by the cache above. Gating
+      # this on a cache miss yields a cached binary that dies at launch with
+      # "error while loading shared libraries" and exit code 127.
+      - name: Install Chromium system dependencies
+        run: npx playwright install-deps chromium
+
+      - name: Install Chromium binary
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Run e2e
+        run: npm run test:e2e
+        env:
+          VITE_SUPABASE_URL:      ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          E2E_FIXTURE_PASSWORD:   ${{ secrets.E2E_FIXTURE_PASSWORD }}
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
