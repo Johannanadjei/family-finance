@@ -108,11 +108,62 @@ Common causes, in the order they've actually occurred:
 
 ---
 
+## Deploy gating
+
+Production deploys are gated on CI via Vercel's **Ignored Build Step**, not branch protection.
+Branch protection with a required check was rejected deliberately: promotions here are direct
+pushes to `main` (no PRs), and a required check rejects the push of a fresh merge commit that has
+no check run yet — it would force a PR flow. The Ignored Build Step keeps direct-push promotion
+intact and instead makes Vercel *wait and verify* before building.
+
+**How it works.** `scripts/vercel-ignore-build.mjs`, wired via `ignoreCommand` in `vercel.json`,
+runs before every Vercel build:
+
+- Non-`main` refs → exit 1 (build). Previews deploy freely, ungated.
+- `main` → poll the GitHub check-runs API for the deploying commit's SHA, every 15s up to 5 min.
+  Deploy only if **every** `github-actions` check run for that SHA concluded `success`.
+
+Exit codes are Vercel's convention and are counter-intuitive: **exit 1 = build, exit 0 = cancel**
+(mirrors `git diff --quiet`). The script header states this; do not flip it.
+
+**Fail-closed.** Timeout, no checks registered, or a missing token/SHA all → skip the deploy
+(exit 0) with a loud `[deploy-gate]` log line. An unverified commit must never reach production;
+the recovery cost is a manual redeploy once CI is green, which is not symmetric with shipping red
+code. CI runs in ~2 min, so the 5-min timeout only trips when something is genuinely wrong.
+
+**What a red CI looks like.** The Vercel deployment shows as **Canceled**, with the
+`[deploy-gate] CI did not pass: … — skipping deploy` line in its build log. Production stays on
+the last good deployment.
+
+### Vercel setup (one-time)
+
+1. **Token.** Create a GitHub **fine-grained PAT**, scoped to **only** `Johannanadjei/family-finance`,
+   with repository permission **Checks: Read-only** (Metadata:Read is added automatically). No other
+   scope. This token can read CI status and nothing else.
+2. **Store it** in Vercel → Project → Settings → Environment Variables as `GH_CHECKS_TOKEN`,
+   available to the **Production** environment (and Preview if you ever gate previews). It is a
+   secret — it lives only in Vercel, never in the repo.
+3. **Ignored Build Step.** Leave Vercel → Settings → Git → *Ignored Build Step* **empty** — the
+   command lives in `vercel.json` (`ignoreCommand`) so it is version-controlled and reviewable.
+   Do not set it in both places.
+
+### Emergency deploy despite red CI
+
+The reliable lever is **Vercel → Deployments → the last good deployment → "Promote to Production"
+(instant rollback / re-promote)** — promoting an existing build does not re-run the ignore step, so
+it is unaffected by CI state.
+
+To force-deploy *new* code past a red gate, temporarily clear `ignoreCommand` from `vercel.json`
+(or set the dashboard field to `exit 1`), deploy, then revert. A plain **Redeploy** of the blocked
+commit re-runs the gate, so it only succeeds once CI is actually green — which is the normal,
+non-emergency recovery path. *(The exact Redeploy-vs-ignore-step interaction is worth confirming
+in the dashboard the first time; treat the promote-previous-deployment lever as the guaranteed one.)*
+
 ## Known gaps
 
-**CI does not gate deployment.** Vercel deploys from its own Git integration, in parallel with this
-workflow. A red CI run does not stop a deploy. Closing that requires either branch protection with
-this check marked required, or wiring Vercel's Ignored Build Step to CI status. Neither is done.
+**CI does not gate deployment via branch protection** — by design; see Deploy gating above. The
+Ignored Build Step is the gate. One consequence: it protects `main` (production) only. `staging`
+and `dev` deploys, if any Vercel environments exist for them, are ungated.
 
 **E2E runs against the production Supabase project.** There is no separate test database
 (`oxpwgpugvucsqnzixafi` is shared across dev, staging, and main). The §0 write-rail keeps the run
