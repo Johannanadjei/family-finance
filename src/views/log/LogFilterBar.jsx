@@ -33,7 +33,6 @@ export function LogFilterBar({ filter, onFilter, search, onSearch, showIncome = 
                 flex:         1,
                 padding:      '8px 0',
                 borderRadius: 10,
-                border:       'none',
                 background:   isActive ? 'var(--c-primary, #064e3b)' : 'var(--c-card, #fff)',
                 color:        isActive ? 'var(--c-btn-text, #ffffff)' : 'var(--c-muted, #6b7280)',
                 fontSize:     13,
