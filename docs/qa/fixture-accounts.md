@@ -66,6 +66,7 @@ Free-tier caps in force (from `lib/plans.js`): **1 hub · 2 members · 10 catego
   3. Accept that invite from fixture #5's session (the invitee must be a real second auth user — `accept_invite` runs as the invitee).
   4. After acceptance: **2 members total** (owner + 1 standard) = free cap.
 - **Verify:** Members section shows **2 of 2** and the invite control is disabled / shows MEM01 affordance. `budget_centre_members` (this hub, not deleted) = **2 rows**, one `role='standard'`.
+- **⚠️ This hub is NOT transaction-empty.** It carries 2 seeded transactions (1 income, 1 expense) added 2026-07-12 for the F1 RLS audit — see [Deliberate fixture changes](#deliberate-fixture-changes) below. Anyone capturing §5 standard-role visual baselines against this hub is capturing a hub **with** transaction content (RecentActivity populated, non-zero totals), not an empty one.
 
 ### 5. `stage1-fixture-mem-cap-member@bos-test.com` — standard-role member (supporting fixture)
 - **Its own fixture, also read-only.** This is the standard-role invitee that completes fixture #4, and it is **separately a Stage 1 fixture** used to capture the **standard-role** UI: `STAGE_1_FIXTURES.memCapMember` in `src/lib/fixtures.js`. This doc is the source of truth for its seeded state too.
@@ -187,6 +188,46 @@ Once seeded, these accounts are **immutable read-only Stage 1 fixtures.**
 - **Never** point a write-capable automated test at these emails. Stage 1's network rail blocks writes; Stage 2 must use its own dedicated test project, not these.
 - **Never** delete the Pro subscription row or let it expire (the 10-year window guards against expiry).
 - Treat the `@bos-test.com` accounts as production data that happens to be fixtures: changing them is a deliberate, logged re-seed (below), not casual use.
+
+---
+
+## Deliberate fixture changes
+
+Every sanctioned mutation to a seeded fixture is logged here, with date, reason, and the exact rows
+touched — so a later reader never finds an unexplained row and has to guess whether it is corruption.
+
+### 2026-07-12 — 2 transactions added to fixture #4's hub (F1 RLS audit)
+
+**Hub:** `0d3ccc2e-d691-47f9-9cad-9c6a35966793` ("sal income"), owned by `stage1-fixture-mem-cap`.
+
+**Why:** the F1 RLS audit found that `transactions_select_member` and `income_sources_select_member`
+gate SELECT on `is_budget_centre_member()`, which checks membership only — **no role check**. A
+standard member can therefore read income data over direct REST that the UI hides from them. Proving
+that empirically (and proving the fix closes it) requires a live standard-member session reading a
+hub that actually **contains** transactions. Fixture #4's hub was the only hub with a standard member
+and it held **zero** transactions — every probe returned 0, which is indistinguishable from a working
+policy. A zero-row baseline cannot fail, so it cannot prove a fix.
+
+**Rows added** (both inserted via the **owner's own session** over the normal client write path — not
+a service-role backdoor):
+
+| id | type | amount | date | purpose |
+|---|---|---|---|---|
+| `4d0a0e08-6f20-4212-b4f5-0c2579c09270` | `income` | GHS 5000 | 2026-06-25 | the leak probe — standard must read **0** of these after the fix |
+| `d6b3b86c-7da1-4f22-b722-422a2fbc8250` | `expense` | GHS 250 | 2026-06-26 | the **regression baseline** — standard must still read **1** after the fix |
+
+Both carry `description` starting `"F1 RLS audit fixture"` and `cycle_id 9cc01f8e-…` (stamped by the
+Commit-10 trigger from `date`).
+
+**Why this did not cause baseline drift:** at the time of the change, no visual baselines existed —
+`e2e/` contained zero `.png` snapshots, no spec referenced the mem-cap fixtures, and nothing asserted
+on transactions or RecentActivity. The DO-NOT-TOUCH rule's stated cost (silent drift against captured
+baselines) was therefore not yet payable. **This is no longer true once §5 baselines are captured** —
+after that, this hub is frozen again and these two rows are part of its expected state.
+
+**To restore a transaction-empty hub** (if a future baseline needs one): soft-delete both rows
+(`deleted_at = now()`), never hard-delete — soft delete is the codebase-wide invariant and every read
+filters `deleted_at IS NULL`.
 
 ---
 

@@ -115,14 +115,28 @@ describe('HomeView', () => {
     expect(screen.queryByText('Surplus Left')).toBeNull();
   });
 
-  it('standard member sees only Spare Money stat card', () => {
+  // F1 RLS audit (2026-07-12): this test previously asserted that a standard member
+  // "sees only Spare Money" — encoding the leak as expected behaviour. Spare Money is
+  // INCOME-DERIVED (allIncome − max(fixedTotal, budgetSpend) − spareSpend), so showing it
+  // to a role with viewIncome:false disclosed a currency figure computed from the hub's
+  // income. A standard member must now see NO money stat cards at all.
+  it('standard member sees no stat cards — Spare Money is income-derived and gated', () => {
     mockCan = () => false;
     renderHome();
     expect(screen.queryByText('Money In')).toBeNull();
     expect(screen.queryByText('Budget Left')).toBeNull();
-    expect(screen.getByText('Spare Money')).toBeTruthy();
+    expect(screen.queryByText('Spare Money')).toBeNull();
     // Month label is ungated — visible even without viewIncome permission
     expect(screen.getByTestId('home-month-label').textContent).toContain(expectedMonthLabel());
+  });
+
+  it('standard member sees no spare-money figure anywhere on Home', () => {
+    mockCan = () => false;
+    mockFinance.spareMoney = 19600;
+    renderHome();
+    // Belt and braces: the value itself must not reach the DOM by any route
+    // (StatCard, hero mini-stat, or otherwise) for a role without viewBalance.
+    expect(screen.queryByText('GHS 19,600')).toBeNull();
   });
 
   it('stat cards show formatted values', () => {
