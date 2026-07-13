@@ -123,35 +123,47 @@ export function HomeView() {
           totalExpected={totalExpected}
         />
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-        {showIncome && (
-          <StatCard
-            label="Money In"
-            value={fmt(allIncome)}
-            infoKey="income"
-            activeInfo={activeInfo}
-            onInfo={setActiveInfo}
-            color="var(--c-success,#059669)"
-          />
-        )}
-        {showBalance && (
-          <StatCard
-            label="Budget Left"
-            value={fmt(budgetRemaining)}
-            infoKey="fixed"
-            activeInfo={activeInfo}
-            onInfo={setActiveInfo}
-          />
-        )}
-        <StatCard
-          label="Spare Money"
-          value={fmt(spareMoney)}
-          infoKey="spare"
-          activeInfo={activeInfo}
-          onInfo={setActiveInfo}
-          color={spareMoney < 0 ? 'var(--c-danger,#dc2626)' : 'var(--c-success,#059669)'}
-        />
-      </div>
+      {/* Spare Money is INCOME-DERIVED (allIncome − max(fixedTotal, budgetSpend) − spareSpend),
+          so it is gated on viewBalance like the other money figures. It was previously
+          ungated, which showed a `standard` member a currency figure computed from the
+          hub's income — the disclosure the F1 RLS audit closed at the DB layer. Once RLS
+          stops returning income rows, allIncome is 0 for a standard session and spareMoney
+          goes negative, so leaving this ungated would also render a large red negative.
+          With no income and no balance permission there is nothing left to put in the grid,
+          hence the wrapper gate — an empty 3-column grid would otherwise reserve space. */}
+      {(showIncome || showBalance) && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+          {showIncome && (
+            <StatCard
+              label="Money In"
+              value={fmt(allIncome)}
+              infoKey="income"
+              activeInfo={activeInfo}
+              onInfo={setActiveInfo}
+              color="var(--c-success,#059669)"
+            />
+          )}
+          {showBalance && (
+            <StatCard
+              label="Budget Left"
+              value={fmt(budgetRemaining)}
+              infoKey="fixed"
+              activeInfo={activeInfo}
+              onInfo={setActiveInfo}
+            />
+          )}
+          {showBalance && (
+            <StatCard
+              label="Spare Money"
+              value={fmt(spareMoney)}
+              infoKey="spare"
+              activeInfo={activeInfo}
+              onInfo={setActiveInfo}
+              color={spareMoney < 0 ? 'var(--c-danger,#dc2626)' : 'var(--c-success,#059669)'}
+            />
+          )}
+        </div>
+      )}
       <BudgetHealthBar healthPct={healthPct} budgetStatus={budgetStatus} totalSpent={totalSpent} fixedTotal={fixedTotal} />
       <RecentActivity txs={txs} showIncome={showIncome} />
     </div>

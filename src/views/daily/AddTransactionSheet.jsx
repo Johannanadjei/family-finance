@@ -57,7 +57,12 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
   }, [isOpen, editTx?.id]);
 
   // Hide when no spare; edit-mode keeps it visible if the original tx had the flag.
-  const showFromSpareToggle = type === 'expense' && (spareMoney > 0 || editTx?.from_spare === true);
+  // Gated on viewBalance: spareMoney is income-derived, so its visibility leaks the
+  // sign of income to a role that must not see income at all. Gating on the role also
+  // keeps the toggle deliberate once RLS stops returning income rows (spareMoney would
+  // otherwise go negative and hide the toggle for an unrelated reason).
+  const showFromSpareToggle =
+    can('viewBalance') && type === 'expense' && (spareMoney > 0 || editTx?.from_spare === true);
 
   useModalChrome({ isOpen, onClose });
 
