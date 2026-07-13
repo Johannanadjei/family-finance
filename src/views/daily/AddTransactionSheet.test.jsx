@@ -14,13 +14,14 @@ vi.mock('../../context/BudgetCentreContext', () => ({
     fmt:        mockFmt,
     categories: mockCategories,
     getCatIcon: (name) => name === 'Groceries' ? '🛒' : '💸',
-    can:        () => true,
+    can:        (p) => mockCan(p),
   }),
 }));
 
 const mockAddTransaction    = vi.fn().mockResolvedValue({ error: null });
 const mockUpdateTransaction = vi.fn().mockResolvedValue({ error: null });
 let mockSpareMoney          = 5000;
+let mockCan                 = () => true;
 
 vi.mock('../../context/FinanceContext', () => ({
   useFinanceContext: () => ({
@@ -44,6 +45,7 @@ describe('AddTransactionSheet', () => {
     mockAddTransaction.mockClear();
     mockUpdateTransaction.mockClear();
     mockSpareMoney = 5000;
+    mockCan        = () => true;
   });
 
   it('does not render when closed', () => {
@@ -232,6 +234,24 @@ describe('AddTransactionSheet', () => {
     mockSpareMoney = 5000;
     renderSheet();
     expect(screen.getByTestId('from-spare-toggle')).toBeTruthy();
+  });
+
+  // F1 RLS audit (2026-07-12): the toggle's visibility condition is spareMoney > 0,
+  // which leaks the SIGN of an income-derived figure to a role that must not see income.
+  // It is now gated on viewBalance, so a standard member never sees it — regardless of
+  // spareMoney's value, and regardless of whether RLS still returns income rows.
+  it('hides from-spare toggle for a standard member even when spareMoney > 0', () => {
+    mockCan        = () => false;
+    mockSpareMoney = 5000;
+    renderSheet();
+    expect(screen.queryByTestId('from-spare-toggle')).toBeNull();
+  });
+
+  it('hides from-spare toggle for a standard member even on an editTx with from_spare:true', () => {
+    mockCan = () => false;
+    const editTx = { id:'tx-1', type:'expense', amount:200, category_name:'Groceries', category_id:'cat-1', description:'', date:'2026-05-20', from_spare:true };
+    renderSheet({ editTx });
+    expect(screen.queryByTestId('from-spare-toggle')).toBeNull();
   });
 
   it('hides from-spare toggle when spareMoney <= 0', () => {
