@@ -138,7 +138,7 @@
   DO $$
   DECLARE
     -- ── PARAMS ─────────────────────────────────────────────────────────────────
-    p_phase            text := 'BEFORE';   -- 'BEFORE' (pre-migration) | 'AFTER' (post)
+    p_phase            text := 'AFTER';    -- 'BEFORE' (pre-migration) | 'AFTER' (post)
 
     -- Prefixes from the discovery grid (2026-07-16). Resolved to full UUIDs below.
     p_hub_pfx          text := '0d3ccc2e';   -- (0) fixture hub "sal income", GHS
