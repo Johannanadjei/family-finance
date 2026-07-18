@@ -144,3 +144,107 @@ only defines three — `view_only` falls through to `can()`'s default-false. Tha
 so its access is intentional rather than incidental.
 
 **Schedule:** post-MVP / when `view_only` is surfaced in the UI.
+
+---
+
+## Freemium billing CTA escapes the settings gate — a standard member can pay for nothing — UX bug now, P0 on Paystack live-key swap
+
+**Finding (CAT01 lineage).** The hub tier that governs Free-plan caps is the **owner's**,
+resolved server-side. The client decides whether to offer the "Upgrade to Pro" path from
+the **viewer's** own subscription via `useIsPro()` (`src/hooks/useIsPro.js`, a thin read of
+`SubscriptionContext.isPro`). For a non-owner those are two different people. Result: a
+**standard** member in a hub that has hit a Free cap is shown an upgrade CTA, can complete a
+**real Paystack checkout**, upgrades *their own* user to Pro — and the hub cap does not move,
+because it still resolves on the owner's (still-Free) tier. Money leaves, nothing unlocks.
+
+**Two routes past the gate SidePanel applies:**
+- `SidePanel.jsx:184` gates the Settings entry with `can('settings')` (false for standard),
+  so the *panel* path to billing is correctly closed for non-owners — but
+- `App.jsx:106` mounts `<Route path="/pricing" element={<PricingView />} />` with **no
+  role/tier guard**; any authenticated member can reach it directly, and
+- `BudgetView.jsx:196` — the category-cap `UpgradeModal` CTA calls `navigate('/pricing')`
+  (the Log/Daily cap CTAs share the pattern), shown on the *cap* condition, not on
+  `can('settings')`. The cap flow hands a standard member a live route to checkout.
+
+**Fix shape.** Introduce a `useHubTier()` distinct from `useIsPro()`: `useIsPro()` answers
+"is the signed-in user Pro" (correct for their own account / badges); `useHubTier()` answers
+"is THIS hub Pro" (owner's tier — what caps key on). Gate the cap CTAs and the `/pricing`
+entry on `useHubTier()` + ownership so only someone who can actually lift the hub's cap is
+offered the purchase. Touches `BudgetView`, `LogView`, `DailyView`, and the `/pricing`
+route guard.
+
+**Open question 1 — severity switch — ANSWERED 2026-07-18: TEST mode.** Paystack is in
+**test mode** (confirmed in the Paystack dashboard), so `PAYSTACK_SECRET_KEY` is `sk_test_…`
+and **no real money can move**. Current severity: **UX/logic bug, not P0** — a standard
+member can walk the checkout flow, but the charge is a test-mode no-op. (`checkout.js:14`
+documents both key forms; the test hardcodes `sk_test_123`.)
+
+**BLOCKER ON THE LIVE-KEY SWAP.** Severity flips to **P0 the instant `PAYSTACK_SECRET_KEY`
+becomes `sk_live_…`** — at that point a standard member in a Free hub at a cap is charged
+real cedis for a benefit that never lands. Therefore the `useHubTier()` fix below is **not a
+floating post-MVP item: it is a hard prerequisite of the live-key swap and must land BEFORE
+Paystack goes live.** Whoever flips the key must confirm this fix (or an interim
+non-owner-CTA hide) is deployed first. Treat "go live on Paystack" as blocked on this row.
+
+**Open question 2 — stale doc comment.** `api/paystack/checkout.js:20` still reads
+"Ships DARK: no UI calls this yet (Commit 2 wires the pricing page)." No longer true —
+`PricingView` is mounted and `BudgetView` navigates to `/pricing`. Correct the comment when
+this is picked up so it stops implying the endpoint is unreachable.
+
+**Schedule:** UX bug while Paystack stays in test mode — but a **release blocker on the
+Paystack live-key swap** (see OQ1). Ship `useHubTier()` before that swap, not after.
+
+---
+
+## Inactivity expense-reminder prompt — POST-MVP feature
+
+**Idea.** Nudge a member who hasn't logged any expense for a stretch (e.g. N days) with a
+gentle reminder to capture spending, so the budget doesn't silently drift out of date and
+the "spent vs budget" health stays meaningful for people who log in bursts.
+
+**Needs scoping:** the inactivity window and what counts as activity (any expense in the
+active cycle? per-member vs per-hub?); delivery surface (in-app banner vs PWA push — push
+needs the notification-permission plumbing); snooze/dismiss plus a per-user opt-out
+(localStorage `ffc_` pref, UI-only per §11). A client-side last-activity check needs no
+server work; push delivery would need a scheduled job.
+
+**Schedule:** post-MVP. Engagement feature, not correctness.
+
+---
+
+## Receipt/invoice photo capture → OCR/vision auto-logged expense — POST-MVP feature
+
+**Idea.** The end state of the phase-1 "attach photo to expense" feature: a member
+photographs a receipt/invoice and the amount (ideally merchant/date/category too) is
+extracted by OCR/vision and pre-filled into the Add-Transaction sheet, turning expense
+logging into a snap instead of manual entry. Always confirm-before-save, never auto-commit.
+
+**Needs scoping:** phase-1 is plain photo capture + attach; this item is the extraction
+layer on top. OCR/vision provider (on-device vs a hosted API — the latter adds a dependency
+and sends receipt images off-device, a privacy call for financial data); where extraction
+runs (a serverless function like the Paystack ones, keeping keys server-only); mapping
+extracted text → amount/category with a manual-correction step; image storage vs
+discard-after-parse. Multi-currency parsing must respect the hub currency.
+
+**Schedule:** post-MVP. Larger feature — new dependency + serverless surface + a review UI.
+Scope as its own project once phase-1 photo capture lands.
+
+---
+
+## CI does not run on feature branches — they merge unverified — POST-MVP (tooling)
+
+**Gap (verified against `.github/workflows/ci.yml`).** `push` triggers only on
+`branches: [main, staging, dev]` and `pull_request` only on base `[main, staging]`. So a
+`feature/**` branch gets **no CI run on push**, and a **PR into `dev` also skips CI** (dev
+is not a `pull_request` base) — feature work can reach dev unverified unless the author runs
+tests locally. The three-branch model (dev/staging/main) predates any feature-branch
+convention.
+
+**What:** decide the feature-branch naming convention (`feature/**`) and extend the triggers
+to cover it — add `feature/**` to the `push` branch list (or a broader wildcard), and/or add
+`dev` as a `pull_request` base so feature→dev PRs run the suite. Mind the existing
+`paths-ignore: ['docs/**','**/*.md']` and the note at ci.yml:7 (no paths-ignore on PRs, so
+required checks don't hang on docs-only PRs) when editing.
+
+**Schedule:** post-MVP tooling. Pick up when a feature-branch workflow is actually adopted;
+today all work lands directly on dev, which is covered.
