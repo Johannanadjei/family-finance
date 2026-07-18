@@ -3,7 +3,18 @@ name: CI
 on:
   push:
     branches: [main, staging, dev]
-    paths-ignore: ['docs/**', '**/*.md']
+    # Do NOT use a blanket '**/*.md' ignore. Markdown under src/content/ is
+    # BUNDLED into the production app (imported ?raw — the legal policies in
+    # src/content/legal/*.md render at /privacy, /terms, /cookies, /disclaimer).
+    # A change there is a shipping change: it must run CI and reach the Vercel
+    # deploy gate. A blanket ignore once made removing a non-existent subprocessor
+    # from the privacy policy look like a docs edit — CI skipped, the fail-closed
+    # gate (scripts/vercel-ignore-build.mjs) skipped the build, and production
+    # kept serving the stale bundle. So ignore only genuinely non-shipping markdown.
+    paths-ignore:
+      - 'docs/**'          # engineering docs, backlog — never bundled
+      - 'scripts/**/*.md'  # SQL/audit records — never bundled
+      - '*.md'             # repo-root README/CLAUDE/ENGINEERING — never bundled
   # No paths-ignore on PRs: a skipped job never reports a status, so a required
   # check would leave docs-only PRs stuck "waiting for status" forever.
   pull_request:
