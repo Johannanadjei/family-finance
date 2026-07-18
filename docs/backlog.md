@@ -185,3 +185,58 @@ P0. Not resolvable from the repo; check the Vercel dashboard.
 this is picked up so it stops implying the endpoint is unreachable.
 
 **Schedule:** triage as soon as OQ1 is answered; if live-key, expedite.
+
+---
+
+## Inactivity expense-reminder prompt — POST-MVP feature
+
+**Idea.** Nudge a member who hasn't logged any expense for a stretch (e.g. N days) with a
+gentle reminder to capture spending, so the budget doesn't silently drift out of date and
+the "spent vs budget" health stays meaningful for people who log in bursts.
+
+**Needs scoping:** the inactivity window and what counts as activity (any expense in the
+active cycle? per-member vs per-hub?); delivery surface (in-app banner vs PWA push — push
+needs the notification-permission plumbing); snooze/dismiss plus a per-user opt-out
+(localStorage `ffc_` pref, UI-only per §11). A client-side last-activity check needs no
+server work; push delivery would need a scheduled job.
+
+**Schedule:** post-MVP. Engagement feature, not correctness.
+
+---
+
+## Receipt/invoice photo capture → OCR/vision auto-logged expense — POST-MVP feature
+
+**Idea.** The end state of the phase-1 "attach photo to expense" feature: a member
+photographs a receipt/invoice and the amount (ideally merchant/date/category too) is
+extracted by OCR/vision and pre-filled into the Add-Transaction sheet, turning expense
+logging into a snap instead of manual entry. Always confirm-before-save, never auto-commit.
+
+**Needs scoping:** phase-1 is plain photo capture + attach; this item is the extraction
+layer on top. OCR/vision provider (on-device vs a hosted API — the latter adds a dependency
+and sends receipt images off-device, a privacy call for financial data); where extraction
+runs (a serverless function like the Paystack ones, keeping keys server-only); mapping
+extracted text → amount/category with a manual-correction step; image storage vs
+discard-after-parse. Multi-currency parsing must respect the hub currency.
+
+**Schedule:** post-MVP. Larger feature — new dependency + serverless surface + a review UI.
+Scope as its own project once phase-1 photo capture lands.
+
+---
+
+## CI does not run on feature branches — they merge unverified — POST-MVP (tooling)
+
+**Gap (verified against `.github/workflows/ci.yml`).** `push` triggers only on
+`branches: [main, staging, dev]` and `pull_request` only on base `[main, staging]`. So a
+`feature/**` branch gets **no CI run on push**, and a **PR into `dev` also skips CI** (dev
+is not a `pull_request` base) — feature work can reach dev unverified unless the author runs
+tests locally. The three-branch model (dev/staging/main) predates any feature-branch
+convention.
+
+**What:** decide the feature-branch naming convention (`feature/**`) and extend the triggers
+to cover it — add `feature/**` to the `push` branch list (or a broader wildcard), and/or add
+`dev` as a `pull_request` base so feature→dev PRs run the suite. Mind the existing
+`paths-ignore: ['docs/**','**/*.md']` and the note at ci.yml:7 (no paths-ignore on PRs, so
+required checks don't hang on docs-only PRs) when editing.
+
+**Schedule:** post-MVP tooling. Pick up when a feature-branch workflow is actually adopted;
+today all work lands directly on dev, which is covered.
