@@ -89,7 +89,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 **7.2 **Before transferring Personal Data internationally, we take steps to ensure an adequate level of protection, including: (a) transferring only to recipients in jurisdictions that provide an adequate level of protection, or (b) putting in place contractual safeguards (such as data-processing terms and appropriate security commitments) requiring the recipient to protect the data to a standard consistent with Act 843, or (c) relying on another lawful transfer mechanism, including your consent where appropriate.
 
-**7.3 **Our principal Subprocessors are: Supabase Inc. (database hosting and authentication — United States), Vercel Inc. (application hosting and edge delivery — United States), Paystack Payments Limited (subscription payment processing — Nigeria / South Africa), and Resend Inc. (transactional email delivery — United States). We require each Subprocessor to maintain technical and organisational measures appropriate to the data they Process. We will update this list when material changes occur.
+**7.3 **Our principal Subprocessors are: Supabase Inc. (database hosting and authentication — United States), Vercel Inc. (application hosting and edge delivery — United States), and Paystack Payments Limited (subscription payment processing — Nigeria / South Africa). We require each Subprocessor to maintain technical and organisational measures appropriate to the data they Process. We will update this list when material changes occur.
 
 ## 8. Security Measures
 
