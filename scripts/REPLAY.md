@@ -130,12 +130,19 @@ once).
 
 ## Phase 2 — Helper functions (must precede Phase 3)
 
-The two RLS predicate helpers are referenced by the Phase 3 `rls_*.sql` files, so
+The three RLS predicate helpers are referenced by the Phase 3 `rls_*.sql` files, so
 they must exist first. (No `migrate_` file uses them — the cycle/period RPCs and
 the `budget_cycles`/`budget_centres` policies inline their own `EXISTS` checks.)
 
 24. `is_budget_centre_member.sql`
 25. `is_budget_centre_owner.sql`
+26. `can_view_income.sql` — the role-aware income gate (F1 RLS audit, 2026-07-12).
+    **Load-bearing since the F1 fix:** `rls_income_sources.sql` (step 37) and
+    `rls_transactions.sql` (step 38) both reference `can_view_income()` in their
+    read AND write policies, so a rebuild that skips this file fails at Phase 3c
+    with "function can_view_income(uuid) does not exist". It was omitted from this
+    list when the F1 read-side fix landed (2026-07-13); added 2026-07-16 alongside
+    the write-side fix.
 
 ---
 
@@ -147,28 +154,38 @@ definition, and each self-verifies. Order within the phase is free **except**
 that the `rls_*.sql` files require Phase 2.
 
 ### 3a — Trigger functions + triggers
-26. `handle_new_user.sql` — fn + `on_auth_user_created` trigger on `auth.users`
-27. `handle_updated_at.sql` — fn + 7 `BEFORE UPDATE` triggers
+27. `handle_new_user.sql` — fn + `on_auth_user_created` trigger on `auth.users`
+28. `handle_updated_at.sql` — fn + 7 `BEFORE UPDATE` triggers
 
 ### 3b — RPCs (client-callable)
-28. `accept_invite.sql`
-29. `authenticate_guest.sql`
-30. `submit_guest_transaction.sql`
-31. `get_centre_guests.sql`
+29. `accept_invite.sql`
+30. `authenticate_guest.sql`
+31. `submit_guest_transaction.sql`
+32. `get_centre_guests.sql`
 
 ### 3c — RLS policies for the 7 tables that had no committed policies
-32. `rls_users.sql`
-33. `rls_user_preferences.sql`
-34. `rls_budget_centre_members.sql`
-35. `rls_budget_categories.sql`
-36. `rls_income_sources.sql`
-37. `rls_transactions.sql`
-38. `rls_guest_users.sql`
+33. `rls_users.sql`
+34. `rls_user_preferences.sql`
+35. `rls_budget_centre_members.sql`
+36. `rls_budget_categories.sql`
+37. `rls_income_sources.sql` — **needs `can_view_income` (step 26)**
+38. `rls_transactions.sql` — **needs `can_view_income` (step 26)**
+39. `rls_guest_users.sql`
+
+> **F1 note (2026-07-16):** the `migrate_22`–`migrate_25` policy migrations are NOT
+> in this replay order and do not need to be. They are incremental fixes to policies
+> that steps 37–38 already define in their end state (role-aware SELECT *and* write
+> gates, including the explicit `WITH CHECK` on both UPDATE policies). Under Strategy
+> A the `rls_*.sql` overlay is the source of truth; the `migrate_2x` files are the
+> historical record of how production got there, and each carries the reasoning for
+> why a clause exists. Do not "simplify" a clause out of steps 37–38 without reading
+> them — their verify blocks RAISE on exactly that.
 
 > RLS for the other 4 tables ships earlier: `budget_centres` + `centre_invites`
 > in `members_rbac.sql` (step 4), `budget_cycles` in `migrate_cycles_schema.sql`
 > (step 8), `subscriptions` in `migrate_19_subscriptions.sql` (step 22). Full RLS
 > surface = those 10 policies + the 26 here = **36 policies across 11 tables**.
+> (Unchanged by F1: migrate_22–25 replaced policy *definitions*, adding none.)
 
 ---
 
@@ -203,7 +220,7 @@ WHERE n.nspname='public' AND c.relkind='r' AND NOT c.relrowsecurity ORDER BY 1;
   `migrate_cycles_fk_columns`, plus the cycles chain.
 - **One-shot data backfills:** `migrate_cycles_backfill`, `migrate_backfill_cycle_ids`,
   `backfill_user_names`.
-- **Functions / RPCs:** `is_budget_centre_member`, `is_budget_centre_owner`,
+- **Functions / RPCs:** `is_budget_centre_member`, `is_budget_centre_owner`, `can_view_income`,
   `handle_new_user`, `handle_updated_at`, `accept_invite`, `authenticate_guest`,
   `submit_guest_transaction`, `get_centre_guests`, plus cycle/period RPCs inside
   the `migrate_*` files (`create_calendar_cycle`, `create_budget_period`,
