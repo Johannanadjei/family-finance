@@ -248,3 +248,43 @@ required checks don't hang on docs-only PRs) when editing.
 
 **Schedule:** post-MVP tooling. Pick up when a feature-branch workflow is actually adopted;
 today all work lands directly on dev, which is covered.
+
+---
+
+## Privacy/Cookie policy claims processing we don't do — analytics + email-open pixels aspirational — RESOLVE BEFORE DPC REGISTRATION
+
+**Finding (same class as the Resend subprocessor misstatement, commit `be790dd`).** The
+published privacy and cookie policies describe analytics and email-open tracking the app
+does not perform. Verified: **no analytics/telemetry SDK is integrated anywhere** — no
+gtag / Google Analytics / Plausible / PostHog / Mixpanel / Sentry / Amplitude /
+`@vercel/analytics` / Segment / Hotjar in `package.json` or `src/`. The claims:
+
+- **`privacy.md` §3.1(e)** — processing purpose "to improve and develop the Service,
+  including through aggregated and de-identified **analytics**".
+- **`privacy.md` §10.1** — "we use cookies and similar technologies … with your consent
+  where required, **for analytics**".
+- **`cookies.md` §F.5 / §F.5.1** — "Analytics Technologies and Tracking Pixels"; "we **may
+  use** analytics technologies and, in communications, **tracking pixels** to measure
+  engagement (for example, whether an email was opened)". Transactional email is Supabase
+  Auth's built-in sender (no open-tracking pixels), and there is no marketing-email system.
+- **`cookies.md` §F.5 (line 26)** — an "Analytics / performance cookies" category described
+  as in use; with no analytics SDK, no such cookies are actually set.
+
+Same defect as Resend, on the read side: a live legal document heading into DPC
+registration that describes processing we don't do is a factual misstatement.
+
+**Resolve before DPC registration — per claim, one of:**
+- **Remove** the analytics/pixel language (accurate to today's zero-telemetry state), or
+- **Reframe as explicit future-state** ("we may, in future, …") and wire the actual SDK +
+  consent gating before the wording becomes present-tense.
+
+The "may use" hedging already in cookies §F.5.1 softens but does not cure this if a reader
+reasonably concludes analytics are active — DPC/counsel should set the bar.
+
+**Depends on:** the analytics decision itself. If analytics IS planned pre-launch, integrate
+and consent-gate it and keep the language; if not, strip it. Flag for the same Ghanaian
+counsel pass as the DPO rename and §5.1 rights edits (parked on branch
+`feature/legal-counsel-review`, DO NOT MERGE until counsel opines) and the Act 843
+privacy-policy-contents review.
+
+**Schedule:** before DPC registration / before launch. Blocks a clean, truthful policy.
