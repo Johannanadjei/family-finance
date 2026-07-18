@@ -147,7 +147,7 @@ so its access is intentional rather than incidental.
 
 ---
 
-## Freemium billing CTA escapes the settings gate — a standard member can pay for nothing — TRIAGE (severity gated on OQ1)
+## Freemium billing CTA escapes the settings gate — a standard member can pay for nothing — UX bug now, P0 on Paystack live-key swap
 
 **Finding (CAT01 lineage).** The hub tier that governs Free-plan caps is the **owner's**,
 resolved server-side. The client decides whether to offer the "Upgrade to Pro" path from
@@ -173,18 +173,26 @@ entry on `useHubTier()` + ownership so only someone who can actually lift the hu
 offered the purchase. Touches `BudgetView`, `LogView`, `DailyView`, and the `/pricing`
 route guard.
 
-**Open question 1 — severity switch (answer before triage).** Is Vercel's
-`PAYSTACK_SECRET_KEY` an `sk_test_…` or `sk_live_…` key? (`api/paystack/checkout.js:14`
-documents both forms; the test hardcodes `sk_test_123`.) If **test**, no real money moves —
-this is a UX/logic bug. If **live**, a standard member is charged real cedis for nothing —
-P0. Not resolvable from the repo; check the Vercel dashboard.
+**Open question 1 — severity switch — ANSWERED 2026-07-18: TEST mode.** Paystack is in
+**test mode** (confirmed in the Paystack dashboard), so `PAYSTACK_SECRET_KEY` is `sk_test_…`
+and **no real money can move**. Current severity: **UX/logic bug, not P0** — a standard
+member can walk the checkout flow, but the charge is a test-mode no-op. (`checkout.js:14`
+documents both key forms; the test hardcodes `sk_test_123`.)
+
+**BLOCKER ON THE LIVE-KEY SWAP.** Severity flips to **P0 the instant `PAYSTACK_SECRET_KEY`
+becomes `sk_live_…`** — at that point a standard member in a Free hub at a cap is charged
+real cedis for a benefit that never lands. Therefore the `useHubTier()` fix below is **not a
+floating post-MVP item: it is a hard prerequisite of the live-key swap and must land BEFORE
+Paystack goes live.** Whoever flips the key must confirm this fix (or an interim
+non-owner-CTA hide) is deployed first. Treat "go live on Paystack" as blocked on this row.
 
 **Open question 2 — stale doc comment.** `api/paystack/checkout.js:20` still reads
 "Ships DARK: no UI calls this yet (Commit 2 wires the pricing page)." No longer true —
 `PricingView` is mounted and `BudgetView` navigates to `/pricing`. Correct the comment when
 this is picked up so it stops implying the endpoint is unreachable.
 
-**Schedule:** triage as soon as OQ1 is answered; if live-key, expedite.
+**Schedule:** UX bug while Paystack stays in test mode — but a **release blocker on the
+Paystack live-key swap** (see OQ1). Ship `useHubTier()` before that swap, not after.
 
 ---
 
