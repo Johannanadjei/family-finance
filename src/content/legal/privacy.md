@@ -67,7 +67,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 ## 5. Data Subject Rights
 
-**5.1 **Subject to the conditions and exceptions in the Data Protection Act, 2012 (Act 843), you have the right to: (a) request access to the Personal Data we hold about you; (b) request correction of inaccurate or incomplete data; (c) request deletion of your data where there is no lawful ground to retain it; (d) object to or request restriction of certain Processing, including direct marketing; (e) request a copy of data you provided in a portable, machine-readable format where technically feasible; and (f) withdraw consent where Processing is based on consent.
+**5.1 **Subject to the conditions and exceptions in the Data Protection Act, 2012 (Act 843), you have the right to: (a) request access to the Personal Data we hold about you; (b) request correction of inaccurate or incomplete data; (c) request deletion of your data where there is no lawful ground to retain it; (d) object to certain Processing, including direct marketing; and (e) withdraw consent where Processing is based on consent.
 
 **5.2 **You may exercise these rights through your Account settings or by contacting the Data Protection Supervisor. We will respond without undue delay and in any event within the period required by Applicable Law. We may need to verify your identity before acting on a request, and we may charge a reasonable fee or decline a request that is manifestly unfounded or excessive, to the extent permitted by law.
 
