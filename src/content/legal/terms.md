@@ -67,7 +67,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 **6.5 ****Failed payments. **If a payment fails, we may retry the charge and may suspend or downgrade your access to Paid Plan features until payment is received. Continued non-payment may result in termination under clause 18.
 
-**6.6 ****Cancellation. **You may cancel your subscription at any time through your Account settings or by contacting us. Cancellation stops future renewals; it takes effect at the end of the current billing cycle, and you retain access to Paid Plan features until then.
+**6.6 ****Cancellation. **You may cancel your subscription at any time by contacting our support team at info@moneybos.com. In-account cancellation through your Account settings is not yet available and will be offered once that flow ships. Cancellation stops future renewals; it takes effect at the end of the current billing cycle, and you retain access to Paid Plan features until then.
 
 **6.7 ****Refunds. **Except where required by Applicable Law or expressly stated in these Terms, Fees are non-refundable and we do not provide refunds or credits for partial billing cycles, downgrades, or periods during which your Account remained open but unused. Statutory cancellation or cooling-off rights that apply to consumers are unaffected by this clause.
 

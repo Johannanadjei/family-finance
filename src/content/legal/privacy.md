@@ -15,7 +15,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 ## 1. Who We Are and How to Contact Us
 
-**1.1 **Money BOS Limited is a company incorporated in the Republic of Ghana and is the data controller responsible for Personal Data processed about individual users of the Service. Our registered particulars are: Money BOS Limited, incorporated in the Republic of Ghana, registered office c/o info@moneybos.com. Our Data Protection Commission registration number is [PENDING — application in progress].
+**1.1 **Money BOS Limited is a company incorporated in the Republic of Ghana and is the data controller responsible for Personal Data processed about individual users of the Service. Our registered particulars are: Money BOS Limited, incorporated in the Republic of Ghana, registered office 26–28 Obenesu Crescent, Cantonments, Accra, Ghana. Our Data Protection Commission registration number is [PENDING — application in progress].
 
 **1.2 **We have designated a Data Protection Officer (“DPO”) who can be contacted at info@moneybos.com in respect of any question or request relating to this Policy or your Personal Data.
 
