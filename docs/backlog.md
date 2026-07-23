@@ -305,30 +305,51 @@ rights — DO NOT MERGE until counsel opines) and the Act 843 privacy-policy-con
 
 ---
 
-## Undeclared data recipients / international transfers — Google Fonts + Google OAuth — RESOLVE BEFORE DPC REGISTRATION
+## Undeclared data recipient / international transfer — Google OAuth — RESOLVE BEFORE DPC REGISTRATION
 
-**Finding (same audit, 2026-07-23).** Two third-party recipients receive user data —
-including IP address, an international transfer to the **United States** — but are named in
-**no** policy: not `privacy.md` §7 (International Transfers / Subprocessors), not
-`cookies.md`. The DPC registration form requires declaring recipients and their transfer
-destinations, so this blocks a truthful application.
+**Finding (same audit, 2026-07-23; Google Fonts ruled out on re-check — see below).** One
+shipped third-party recipient receives user data — an international transfer to the **United
+States** — but is named in **no** policy: not `privacy.md` §7 (International Transfers /
+Subprocessors), not `cookies.md`. The DPC registration form requires declaring recipients and
+their transfer destinations, so this blocks a truthful application.
 
-- **Google Fonts (`fonts.googleapis.com` / `fonts.gstatic.com`)** — the app renders in the
-  `'Nunito'` webfont (`src/index.css`) and the service worker runtime-caches Google Fonts
-  (`vite.config.js:18-21`, `cacheName: 'google-fonts-cache'`). Each font fetch sends the
-  user's IP to Google in the US. Declared nowhere.
-  **Recommended: self-host the font** — bundle Nunito as a local asset and drop the SW rule
-  (and any Google Fonts link). This removes the recipient and the transfer obligation
-  *entirely*, which is cleaner than declaring it. (No `<link>` to `fonts.googleapis` is
-  currently in `index.html`; confirm the live request path while fixing — the SW cache rule
-  plus the audit's live-cache finding indicate it fires.)
 - **Google OAuth** — "Continue with Google" sign-in (`AuthScreen.jsx:68-69`,
   `supabase.auth.signInWithOAuth({ provider: 'google' })`). Authenticating users hand data to
-  Google (US). This is a genuine, shipped feature, so it **must be declared** — add Google as
-  a recipient / international transfer in `privacy.md` §7 (alongside Supabase / Vercel /
-  Paystack) and reference it in the `cookies.md` rewrite.
+  Google (US). Genuine, shipped feature → it **must be declared** — add Google as a recipient
+  / international transfer in `privacy.md` §7 (alongside Supabase / Vercel / Paystack) and
+  reference it in the `cookies.md` rewrite.
 
-**Resolve before DPC registration:** self-host fonts (removes one recipient), declare Google
-OAuth (keeps the feature, cures the omission). Same counsel pass as the `cookies.md` rewrite.
+**Google Fonts — NOT a recipient (ruled out 2026-07-23).** The initial audit flagged
+`fonts.googleapis.com` from a `google-fonts-cache` service-worker rule in `vite.config.js`,
+but verification against source and the **live deployed bundle** (HTML + CSS + JS) found **no
+request ever fires**: `'Nunito'` is only a `font-family` name — no `@font-face`, `@import`,
+`<link>`, or font file anywhere — so the browser falls back to `sans-serif` and never contacts
+Google. A `runtimeCaching` rule only caches requests that are *made*; with none made it was
+**dead config, now removed** (`vite.config.js` runtimeCaching deleted). No transfer happens,
+so there is nothing to declare. Do **not** self-host to "fix" this — that would *newly*
+introduce a Nunito load; the purely-visual font gap is tracked separately below.
+
+**Resolve before DPC registration:** declare Google OAuth in `privacy.md` §7. Same counsel
+pass as the `cookies.md` rewrite.
 
 **Schedule:** before DPC registration / before launch.
+
+---
+
+## 'Nunito' font declared but never loaded — app renders in default sans-serif — UI decision (POST-MVP)
+
+**Not a compliance issue — purely visual.** `src/index.css` and inline styles across the app
+set `font-family: 'Nunito', sans-serif`, but Nunito is **never actually loaded**: there is no
+`@font-face`, no `@import`, no `<link>`, and no bundled font file. So every user currently
+sees the browser's default `sans-serif`, not the intended Nunito. (Surfaced by the Google
+Fonts recipient check, 2026-07-23 — see the Google OAuth recipients entry above.)
+
+**Decide later, one of:**
+- **Self-host Nunito properly** — add the `woff2` files to the repo + a local `@font-face`.
+  This DOES create a font asset to bundle, but stays first-party — still **no third-party
+  transfer** (contrast the abandoned Google-Fonts-CDN idea). Restores the intended look.
+- **Drop the `'Nunito'` declaration** and pick a deliberate system font stack (e.g.
+  `-apple-system, "Segoe UI", Roboto, sans-serif`). Zero bytes, no font asset, and honest
+  about what actually renders.
+
+**Schedule:** POST-MVP. No functional or legal impact; visual polish only.
