@@ -159,7 +159,7 @@ export function PricingView() {
       </button>
 
       <p style={{ fontSize: 24, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 4px' }}>Choose your plan</p>
-      <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-muted, #6b7280)', margin: '0 0 18px' }}>Upgrade any time. Cancel any time.</p>
+      <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--c-muted, #6b7280)', margin: '0 0 18px' }}>Upgrade any time.</p>
 
       {banner && (
         <div data-testid={banner.testid} style={{ borderRadius: 12, padding: '14px 16px', background: banner.bg, marginBottom: 14 }}>

@@ -4022,3 +4022,46 @@ Paystack anything.
   FinanceContext `userPlan` compat shim.
 - `migrate_19` is committed but NOT auto-run; apply it in the Supabase SQL editor (additive,
   safe anytime — single shared project).
+
+## [2026-07-23] Branch promotion is a `--no-ff` merge, never `--ff-only`
+
+Promoting `dev → staging` (and `staging → main`) uses `git merge --no-ff`. Do **not**
+use `--ff-only` — it fails with `fatal: Not possible to fast-forward, aborting.`
+
+**Why `--ff-only` fails.** `staging` is not a fast-forward ancestor of `dev`. It carries
+its own history of **merge bubbles** — one merge commit per past promotion
+(`Merge dev → staging: …`) — and it also takes `main → staging` merges to pull hotfixes
+back down. So `dev` and `staging` share a merge base (the last-promoted `dev` commit) but
+each has commits the other lacks: `dev` has the new un-promoted work; `staging` has all
+the prior merge commits. That is *divergence*, which fast-forward cannot cross. A
+`git rev-parse --short dev origin/dev staging origin/staging` before promoting will look
+fine (all heads resolve); the divergence only shows up as the FF refusal, or via
+`git log --oneline dev..staging` (non-empty = staging has commits dev doesn't).
+
+**The pattern (visible throughout `staging`'s history):** one merge commit per promotion,
+message `Merge <src> → <dst>: <summary>, N tests`. Example that shipped this rule:
+
+```
+git checkout staging
+git merge --no-ff dev -m "Merge dev → staging: <summary>, 1557 tests"
+```
+
+The merge is normally clean (conflicts only if `staging` touched the same files since the
+base — e.g. a `main → staging` hotfix); resolve those the usual way.
+
+**Gate order — merge, then verify, THEN push. Never push-then-check.**
+
+1. `git checkout staging` (working tree now shows staging's tree — expected).
+2. `git merge --no-ff dev -m "Merge dev → staging: …"`.
+3. **Verify content on the merged tree** — grep the actual files for the change you meant
+   to promote (e.g. the removed strings are gone, the renamed heading is present). The
+   merged tree is what will deploy; a clean merge exit code is not proof the right content
+   landed.
+4. **Run `npm test -- --run`** on the merged tree and confirm the count.
+5. **Only now `git push origin staging`.** Then `git checkout dev` to restore the working
+   branch.
+
+A bad merge caught at step 3/4 is a local `git reset --hard`; caught after step 5 it is a
+force-push to a shared branch. The whole point of the gate is that nothing reaches the
+remote until the merged tree is verified green. Cross-refs: [[branch-model]],
+[[commit-push-verify-one-flow]].
