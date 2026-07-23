@@ -251,40 +251,84 @@ today all work lands directly on dev, which is covered.
 
 ---
 
-## Privacy/Cookie policy claims processing we don't do — analytics + email-open pixels aspirational — RESOLVE BEFORE DPC REGISTRATION
+## Privacy/Cookie policy claims processing we don't do — analytics + email-open pixels aspirational — PARTIALLY RESOLVED (privacy/terms closed; cookies.md STILL OPEN)
+
+**STATUS (2026-07-23): PARTIALLY RESOLVED.** The `privacy.md` + `terms.md` analytics claims
+are removed and live-verified in production. The `cookies.md` pixel/cookie claims remain
+open and now need a **full rewrite, not a strike-list** (see below).
 
 **Finding (same class as the Resend subprocessor misstatement, commit `be790dd`).** The
 published privacy and cookie policies describe analytics and email-open tracking the app
 does not perform. Verified: **no analytics/telemetry SDK is integrated anywhere** — no
 gtag / Google Analytics / Plausible / PostHog / Mixpanel / Sentry / Amplitude /
-`@vercel/analytics` / Segment / Hotjar in `package.json` or `src/`. The claims:
+`@vercel/analytics` / Segment / Hotjar in `package.json` or `src/`.
 
-- **`privacy.md` §3.1(e)** — processing purpose "to improve and develop the Service,
-  including through aggregated and de-identified **analytics**".
+**✅ CLOSED — removed by commit `ffcf679`, verified live in the production bundle
+`App-CFNvf8HZ.js` (fetched from family-finance-plum.vercel.app, 0 occurrences of each):**
+- **`privacy.md` §3.1(e)** — "to improve and develop the Service, including through
+  aggregated and de-identified **analytics**". Removed.
 - **`privacy.md` §10.1** — "we use cookies and similar technologies … with your consent
-  where required, **for analytics**".
+  where required, **for analytics**". Removed.
+- **`terms.md` §12.1** — "**analytics providers** and integrations you choose to enable".
+  Removed.
+
+(Part of the 15-edit legal-accuracy pass, `ffcf679` → promoted dev→staging→main, CI green
+on main run `30026893957`, then live-verified against the deployed bundle.)
+
+**❌ STILL OPEN — `cookies.md` was out of scope for that pass and still misstates processing:**
 - **`cookies.md` §F.5 / §F.5.1** — "Analytics Technologies and Tracking Pixels"; "we **may
   use** analytics technologies and, in communications, **tracking pixels** to measure
-  engagement (for example, whether an email was opened)". Transactional email is Supabase
-  Auth's built-in sender (no open-tracking pixels), and there is no marketing-email system.
+  engagement (for example, whether an email was opened)". We run no email-open tracking:
+  transactional mail is Supabase Auth's built-in sender (no open-tracking pixels), and there
+  is no marketing-email system.
 - **`cookies.md` §F.5 (line 26)** — an "Analytics / performance cookies" category described
   as in use; with no analytics SDK, no such cookies are actually set.
 
-Same defect as Resend, on the read side: a live legal document heading into DPC
-registration that describes processing we don't do is a factual misstatement.
+**`cookies.md` needs a FULL REWRITE, not a strike-list.** The same audit found the document
+is wrong at a more basic level than the pixel claims:
+- **We set no first-party cookies at all.** Client state is **localStorage / sessionStorage
+  only** (`ffc_`-prefixed UI prefs; the Supabase auth token). A "Cookie Policy" built around
+  first-party cookie *categories we set* is structurally inaccurate — the honest document
+  describes localStorage/sessionStorage plus any third-party recipients (see the separate
+  "undeclared recipients" entry below), not a first-party cookie taxonomy.
+- **§F.3 promises a consent banner and a preference centre that don't exist.** No cookie-
+  consent UI ships anywhere in `src/`. A live policy promising controls we don't provide is
+  the same class of misstatement as the pixels.
 
-**Resolve before DPC registration — per claim, one of:**
-- **Remove** the analytics/pixel language (accurate to today's zero-telemetry state), or
-- **Reframe as explicit future-state** ("we may, in future, …") and wire the actual SDK +
-  consent gating before the wording becomes present-tense.
+**Resolve before DPC registration:** rewrite `cookies.md` to match reality (no first-party
+cookies; localStorage/sessionStorage; declare the real third-party recipients), and either
+build the promised §F.3 consent/preference UI or strike those promises. Flag for the same
+Ghanaian counsel pass as the parked `feature/legal-counsel-review` items (DPO rename, §5.1
+rights — DO NOT MERGE until counsel opines) and the Act 843 privacy-policy-contents review.
 
-The "may use" hedging already in cookies §F.5.1 softens but does not cure this if a reader
-reasonably concludes analytics are active — DPC/counsel should set the bar.
+**Schedule:** before DPC registration / before launch. Blocks a clean, truthful cookie policy.
 
-**Depends on:** the analytics decision itself. If analytics IS planned pre-launch, integrate
-and consent-gate it and keep the language; if not, strip it. Flag for the same Ghanaian
-counsel pass as the DPO rename and §5.1 rights edits (parked on branch
-`feature/legal-counsel-review`, DO NOT MERGE until counsel opines) and the Act 843
-privacy-policy-contents review.
+---
 
-**Schedule:** before DPC registration / before launch. Blocks a clean, truthful policy.
+## Undeclared data recipients / international transfers — Google Fonts + Google OAuth — RESOLVE BEFORE DPC REGISTRATION
+
+**Finding (same audit, 2026-07-23).** Two third-party recipients receive user data —
+including IP address, an international transfer to the **United States** — but are named in
+**no** policy: not `privacy.md` §7 (International Transfers / Subprocessors), not
+`cookies.md`. The DPC registration form requires declaring recipients and their transfer
+destinations, so this blocks a truthful application.
+
+- **Google Fonts (`fonts.googleapis.com` / `fonts.gstatic.com`)** — the app renders in the
+  `'Nunito'` webfont (`src/index.css`) and the service worker runtime-caches Google Fonts
+  (`vite.config.js:18-21`, `cacheName: 'google-fonts-cache'`). Each font fetch sends the
+  user's IP to Google in the US. Declared nowhere.
+  **Recommended: self-host the font** — bundle Nunito as a local asset and drop the SW rule
+  (and any Google Fonts link). This removes the recipient and the transfer obligation
+  *entirely*, which is cleaner than declaring it. (No `<link>` to `fonts.googleapis` is
+  currently in `index.html`; confirm the live request path while fixing — the SW cache rule
+  plus the audit's live-cache finding indicate it fires.)
+- **Google OAuth** — "Continue with Google" sign-in (`AuthScreen.jsx:68-69`,
+  `supabase.auth.signInWithOAuth({ provider: 'google' })`). Authenticating users hand data to
+  Google (US). This is a genuine, shipped feature, so it **must be declared** — add Google as
+  a recipient / international transfer in `privacy.md` §7 (alongside Supabase / Vercel /
+  Paystack) and reference it in the `cookies.md` rewrite.
+
+**Resolve before DPC registration:** self-host fonts (removes one recipient), declare Google
+OAuth (keeps the feature, cures the omission). Same counsel pass as the `cookies.md` rewrite.
+
+**Schedule:** before DPC registration / before launch.
