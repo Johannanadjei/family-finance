@@ -13,17 +13,10 @@ export default defineConfig({
       manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-cache',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
+        // No runtimeCaching: the app requests no cross-origin assets. A prior
+        // google-fonts-cache rule was dead config — 'Nunito' is only a
+        // font-family name, never loaded from Google, so no request ever fired
+        // (verified against the live deployed HTML/CSS/JS, 2026-07-23).
       },
     }),
   ],
