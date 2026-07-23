@@ -95,7 +95,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 **8.2 **While we take security seriously, no method of transmission or storage is completely secure. You are responsible for keeping your credentials confidential and for using the security features we make available.
 
-## 9. Marketing Communications
+## 9. Communications and Sale of Personal Data
 
 **9.1 **We may send you service and transactional messages necessary to operate your Account; these are operational messages and you cannot opt out of them while you hold an Account.
 
