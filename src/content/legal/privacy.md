@@ -37,19 +37,17 @@ Effective date: 1 June 2026  |  Version 1.0
 
 - Usage and device data — IP address, device and browser type, operating system, pages and features accessed, and dates and times of access, collected through cookies and similar technologies as described in Part F (Cookie Policy).
 
-- Diagnostic data — logs, crash reports and performance information used to maintain and secure the Service.
+- Diagnostic data — logs and performance information used to maintain and secure the Service.
 
 ### (c) Information from third parties
 
 - Payment-status data — confirmation of payment and limited transaction references from our payment service providers. We do not receive or store full payment-card numbers.
 
-- Integration data — where you choose to connect a third-party service, the data that service shares with the Service under the permissions you grant.
-
 **2.2 **We do not intentionally collect special categories of Personal Data (such as data about health, religion or political opinions). You should not input such data into the Service.
 
 ## 3. Purposes of Processing
 
-**3.1 **We Process Personal Data for the following purposes: (a) to create and administer your Account and provide the Service; (b) to process subscriptions, payments and renewals; (c) to provide customer support and respond to your communications; (d) to maintain the security, integrity and performance of the Service and to detect, prevent and investigate fraud and misuse; (e) to improve and develop the Service, including through aggregated and de-identified analytics; (f) to send service and transactional communications; (g) with your consent or as otherwise permitted, to send marketing communications; and (h) to comply with Applicable Law and to establish, exercise or defend legal claims.
+**3.1 **We Process Personal Data for the following purposes: (a) to create and administer your Account and provide the Service; (b) to process subscriptions, payments and renewals; (c) to provide customer support and respond to your communications; (d) to maintain the security, integrity and performance of the Service and to detect, prevent and investigate fraud and misuse; (e) to improve and develop the Service; (f) to send service and transactional communications; and (g) to comply with Applicable Law and to establish, exercise or defend legal claims.
 
 ## 4. Legal Basis for Processing
 
@@ -57,7 +55,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 (a) **Performance of a contract **— where Processing is necessary to provide the Service to you under the Terms of Service (for example, administering your Account and processing payments).
 
-(b) **Consent **— where you have given consent, for example for non-essential cookies or marketing communications. You may withdraw consent at any time without affecting Processing carried out before withdrawal.
+(b) **Consent **— where you have given consent, for example for non-essential cookies. You may withdraw consent at any time without affecting Processing carried out before withdrawal.
 
 (c) **Compliance with a legal obligation **— where Processing is necessary to comply with Applicable Law, for example record-keeping and responding to lawful requests.
 
@@ -79,7 +77,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 **6.1 **We retain Personal Data only for as long as necessary for the purposes for which it was collected, including to provide the Service, to comply with Applicable Law (including tax and accounting requirements), to resolve disputes and to enforce our agreements.
 
-**6.2 **Account and Customer Data are retained for the duration of your Account. Following closure of your Account, we make Customer Data available for export for thirty (30) days and then delete or anonymise it within our routine deletion cycle, which removes data from active systems promptly and from encrypted backups within ninety (90) days, save where a longer period is required by Applicable Law.
+**6.2 **Account and Customer Data are retained for the duration of your Account. Following closure of your Account, we delete or anonymise Customer Data within our routine deletion cycle, which removes data from active systems promptly and from encrypted backups within ninety (90) days, save where a longer period is required by Applicable Law.
 
 **6.3 **Certain records are retained for longer periods to meet statutory and regulatory obligations: transaction and billing records are retained for seven (7) years from the end of the relevant tax year in line with Ghanaian tax and accounting requirements; subscription, payment-confirmation and consent records are retained for twenty-four (24) months after Account closure; and records necessary to demonstrate compliance with the Data Protection Act, 2012 (Act 843) are retained for as long as the relevant compliance obligation requires.
 
@@ -93,19 +91,19 @@ Effective date: 1 June 2026  |  Version 1.0
 
 ## 8. Security Measures
 
-**8.1 **We implement appropriate technical and organisational measures designed to protect Personal Data against accidental or unlawful destruction, loss, alteration, unauthorised disclosure or access. These measures are described in detail in Part E (Cybersecurity & Information Security Policy) and include encryption of data in transit and at rest, access controls and multi-factor authentication, monitoring and logging, and a documented incident-response process.
+**8.1 **We implement appropriate technical and organisational measures designed to protect Personal Data against accidental or unlawful destruction, loss, alteration, unauthorised disclosure or access. These measures are described in detail in Part E (Cybersecurity & Information Security Policy) and include encryption of data in transit and at rest, access controls, monitoring and logging, and a documented incident-response process.
 
 **8.2 **While we take security seriously, no method of transmission or storage is completely secure. You are responsible for keeping your credentials confidential and for using the security features we make available.
 
 ## 9. Marketing Communications
 
-**9.1 **We may send you service and transactional messages necessary to operate your Account; these are not marketing and you cannot opt out of them while you hold an Account.
+**9.1 **We may send you service and transactional messages necessary to operate your Account; these are operational messages and you cannot opt out of them while you hold an Account.
 
-**9.2 **We will send marketing communications only where permitted by Applicable Law, and where consent is required, only with your consent. You may opt out of marketing at any time using the unsubscribe link in the message or through your Account settings. We do not sell your Personal Data.
+**9.2 **We do not sell your Personal Data.
 
 ## 10. Cookies and Similar Technologies
 
-**10.1 **We use cookies and similar technologies to operate, secure and improve the Service and, with your consent where required, for analytics. Full details, including the categories of cookies we use and how to manage them, are set out in Part F (Cookie Policy).
+**10.1 **We use cookies and similar technologies to operate, secure and improve the Service. Full details, including the categories of cookies we use and how to manage them, are set out in Part F (Cookie Policy).
 
 ## 11. Children’s Privacy
 
@@ -129,7 +127,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 ## 15. How to Make a Privacy Request
 
-**15.1 **To make any privacy request — including access, correction, deletion, objection or withdrawal of consent — contact our DPO at info@moneybos.com, or use the in-product privacy controls. Please include enough detail for us to identify you and understand your request.
+**15.1 **To make any privacy request — including access, correction, deletion, objection or withdrawal of consent — contact our DPO at info@moneybos.com. Please include enough detail for us to identify you and understand your request.
 
 **15.2 **We will acknowledge your request, may ask you to verify your identity, and will respond within the timeframe required by Applicable Law. There is no charge for most requests, although we may charge a reasonable fee or refuse to act where a request is manifestly unfounded, repetitive or excessive, to the extent permitted by law.
 

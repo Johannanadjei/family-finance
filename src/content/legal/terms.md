@@ -113,7 +113,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 **9.4 ****Aggregated and de-identified data. **We may generate aggregated, anonymised or de-identified statistical data from use of the Service and may use such data for any lawful business purpose, including improving the Service, provided that such data does not identify you or any individual and is not capable of being re-identified.
 
-**9.5 ****Export and deletion. **During an active subscription you may export Customer Data using the export functions provided. Following termination, we will handle Customer Data in accordance with clause 18.4 and Part B.
+**9.5 ****Retention and deletion. **Following termination, we will handle Customer Data in accordance with clause 18.4 and Part B.
 
 ## 10. Intellectual Property
 
@@ -133,9 +133,9 @@ Effective date: 1 June 2026  |  Version 1.0
 
 ## 12. Third-Party Services
 
-**12.1 **The Service may interoperate with or link to third-party products, services or websites (including payment providers, analytics providers and integrations you choose to enable). Those third-party services are governed by their own terms and privacy notices, and we are not responsible for them.
+**12.1 **The Service may interoperate with or link to third-party products, services or websites (including payment providers). Those third-party services are governed by their own terms and privacy notices, and we are not responsible for them.
 
-**12.2 **Where you enable an integration, you authorise the exchange of data between the Service and that third-party service to the extent necessary for the integration to function. You are responsible for your use of third-party services and for any data you share with them.
+**12.2 **You are responsible for your use of any third-party services and for any data you share with them.
 
 **12.3 **We do not endorse and are not liable for any third-party service, and your dealings with third parties are solely between you and them.
 
@@ -191,7 +191,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 **18.3 ****Termination by us. **We may terminate these Terms or your Account: (a) on notice if you materially breach these Terms and, where the breach is capable of remedy, fail to remedy it within fourteen (14) days of notice; (b) immediately for a non-remediable material breach or repeated breaches; (c) if you become insolvent or cease trading; or (d) on not less than thirty (30) days’ notice for convenience, in which case we will refund pre-paid, unused Fees on a pro-rata basis.
 
-**18.4 ****Effect of termination. **On termination: (a) your right to access the Service ceases; (b) accrued payment obligations remain due; and (c) we will make Customer Data available for export for a period of thirty (30) days, after which we will delete or anonymise Customer Data within our standard backup and deletion cycle described in Part B, save where retention is required by Applicable Law.
+**18.4 ****Effect of termination. **On termination: (a) your right to access the Service ceases; (b) accrued payment obligations remain due; and (c) we will delete or anonymise Customer Data within our standard backup and deletion cycle described in Part B, save where retention is required by Applicable Law.
 
 **18.5 ****Survival. **Clauses that by their nature should survive termination — including clauses 9, 10, 13, 15, 16, 19, 20, 21 and 23 — survive.
 
