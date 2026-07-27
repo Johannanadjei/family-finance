@@ -13,7 +13,7 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({ auth: { getUser } }),
 }));
 
-import handler, { resolvePlanCode } from './checkout.js';
+import handler, { resolvePlanCode, resolveCallbackUrl } from './checkout.js';
 import { PRICING } from '../../src/lib/pricing.js';
 
 function mockRes() {
@@ -25,10 +25,10 @@ function mockRes() {
   };
 }
 
-function mockReq({ method = 'POST', authorization, body } = {}) {
+function mockReq({ method = 'POST', authorization, body, headers } = {}) {
   return {
     method,
-    headers: authorization ? { authorization } : {},
+    headers: { ...(authorization ? { authorization } : {}), ...headers },
     body,
   };
 }
@@ -65,6 +65,43 @@ describe('resolvePlanCode', () => {
   it('returns null when the env var for a valid interval is unset', () => {
     delete process.env.PAYSTACK_PLAN_CODE_ANNUAL;
     expect(resolvePlanCode('annual')).toBeNull();
+  });
+});
+
+// ── resolveCallbackUrl (pure) ───────────────────────────────────────────────
+describe('resolveCallbackUrl', () => {
+  const req = (host) => ({
+    headers: host !== undefined ? { 'x-forwarded-host': host } : {},
+  });
+
+  it('echoes the allow-listed moneybos.com host over https', () => {
+    expect(resolveCallbackUrl(req('moneybos.com')))
+      .toBe('https://moneybos.com/pricing?checkout=return');
+  });
+
+  it('echoes the allow-listed vercel.app host over https', () => {
+    expect(resolveCallbackUrl(req('family-finance-plum.vercel.app')))
+      .toBe('https://family-finance-plum.vercel.app/pricing?checkout=return');
+  });
+
+  it('falls back to moneybos.com when x-forwarded-host is absent', () => {
+    expect(resolveCallbackUrl(req(undefined)))
+      .toBe('https://moneybos.com/pricing?checkout=return');
+  });
+
+  it('falls back to moneybos.com for an unknown/spoofed host — never reflects it', () => {
+    const url = resolveCallbackUrl(req('evil.com'));
+    expect(url).toBe('https://moneybos.com/pricing?checkout=return');
+    expect(url).not.toContain('evil.com');
+  });
+
+  it('accepts www.moneybos.com, is case-insensitive, and takes the first host in a proxy chain', () => {
+    expect(resolveCallbackUrl(req('www.moneybos.com')))
+      .toBe('https://www.moneybos.com/pricing?checkout=return');
+    expect(resolveCallbackUrl(req('MONEYBOS.COM')))
+      .toBe('https://moneybos.com/pricing?checkout=return');
+    expect(resolveCallbackUrl(req('moneybos.com, proxy.internal')))
+      .toBe('https://moneybos.com/pricing?checkout=return');
   });
 });
 
@@ -147,6 +184,28 @@ describe('checkout handler — Paystack init', () => {
     await handler(mockReq({ authorization: 'Bearer ok', body: { plan_interval: 'monthly', user_id: 'attacker' } }), res);
     const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
     expect(payload.metadata.user_id).toBe('user-1');  // from the token, not the body
+  });
+
+  it('sets callback_url from the forwarded host when allow-listed, not a hardcode', async () => {
+    const res = mockRes();
+    await handler(mockReq({
+      authorization: 'Bearer ok',
+      body: { plan_interval: 'monthly' },
+      headers: { 'x-forwarded-host': 'moneybos.com' },
+    }), res);
+    const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(payload.callback_url).toBe('https://moneybos.com/pricing?checkout=return');
+  });
+
+  it('falls back callback_url to moneybos.com for a spoofed forwarded host', async () => {
+    const res = mockRes();
+    await handler(mockReq({
+      authorization: 'Bearer ok',
+      body: { plan_interval: 'monthly' },
+      headers: { 'x-forwarded-host': 'evil.com' },
+    }), res);
+    const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(payload.callback_url).toBe('https://moneybos.com/pricing?checkout=return');
   });
 
   it('502s when Paystack reports a failure', async () => {
