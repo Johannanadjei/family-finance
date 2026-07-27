@@ -54,6 +54,7 @@ import { Toast }                                 from './components/ui/Toast';
 import { InstallPrompt }                         from './components/ui/InstallPrompt';
 import { JoinView }                              from './views/JoinView';
 import { LegalView, resolveLegalSlug }           from './views/LegalView';
+import { ResetPasswordScreen, isResetPasswordPath } from './views/ResetPasswordScreen';
 
 function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, hubCount, onSwitchCentre, onHubCreated, onRestoreHub }) {
   const navigate                           = useNavigate();
@@ -155,7 +156,10 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, hu
 }
 
 export default function App() {
-  const { user, loading: authLoading, signOut }           = useAuth();
+  const { user, loading: authLoading, signOut, isRecovery } = useAuth();
+  // Latches once the reset screen hands back, so App stops re-rendering it and falls
+  // through to the normal gates (the pathname check below is not reactive on its own).
+  const [recoveryHandled, setRecoveryHandled]              = useState(false);
   const { hasPinSetup, pinLoading, pinUnlocked,
           attempts, lockedUntil,
           verifyPin, setupPin, removePin }                 = usePin(user);
@@ -249,12 +253,30 @@ export default function App() {
     return { error: null };
   }, [restoreHub, reloadCentres, handleSwitchCentre]);
 
+  // Reset done — drop the recovery URL (and its consumed hash) and fall through to
+  // the normal gates with the session still live. The PIN gate deliberately still
+  // applies: a PIN is a device-level lock, and a password reset is not proof of
+  // device possession.
+  const handleRecoveryComplete = useCallback(() => {
+    window.history.replaceState({}, '', '/');
+    setRecoveryHandled(true);
+  }, []);
+
   const handleForgotPin = useCallback(async () => {
     const { error } = await resetPasswordForEmail(user?.email || '');
     if (error) console.error('[App] resetPasswordForEmail error:', error.message);
     await removePin();
     signOut();
   }, [user?.email, removePin, signOut]);
+
+  // ── Password recovery — bypass all gates ─────────────────────────────────
+  // MUST come before the auth AND pin gates: a recovery link establishes a real
+  // session, so `user` is non-null and the PIN gate would otherwise demand a PIN
+  // from someone who arrived here unable to get in. Path is the primary trigger
+  // (survives a reload); isRecovery is the backstop for links that land elsewhere.
+  if (!recoveryHandled && (isResetPasswordPath(window.location.pathname) || isRecovery)) {
+    return <ResetPasswordScreen onComplete={handleRecoveryComplete} />;
+  }
 
   // ── Invite join — bypass all gates so unauthenticated invitees can reach it
   if (window.location.pathname.replace(/\/$/, '') === '/join') return <BrowserRouter><JoinView /></BrowserRouter>;

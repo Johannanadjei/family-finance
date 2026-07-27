@@ -3,12 +3,17 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent }            from '@testing-library/react';
+import { render, screen, fireEvent, act }       from '@testing-library/react';
 import { AuthScreen }                           from './AuthScreen';
 
 const signInWithPassword = vi.fn().mockResolvedValue({ error: null });
 const signUp             = vi.fn().mockResolvedValue({ error: null });
 const signInWithOAuth    = vi.fn().mockResolvedValue({ error: null });
+const resetPassword      = vi.fn().mockResolvedValue({ error: null });
+
+vi.mock('../services/auth.service', () => ({
+  resetPasswordForEmail: (...a) => resetPassword(...a),
+}));
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
@@ -25,6 +30,8 @@ describe('AuthScreen', () => {
     signInWithPassword.mockClear();
     signUp.mockClear();
     signInWithOAuth.mockClear();
+    resetPassword.mockClear();
+    resetPassword.mockResolvedValue({ error: null });
   });
 
   it('renders the brand logo image and wordmark', () => {
@@ -80,5 +87,85 @@ describe('AuthScreen', () => {
   it('exposes the auth-submit-btn testid', () => {
     render(<AuthScreen />);
     expect(screen.getByTestId('auth-submit-btn')).toBeTruthy();
+  });
+});
+
+describe('AuthScreen — forgot password', () => {
+  beforeEach(() => {
+    resetPassword.mockClear();
+    resetPassword.mockResolvedValue({ error: null });
+  });
+
+  const reveal = () => fireEvent.click(screen.getByTestId('forgot-password-btn'));
+
+  it('shows the forgot-password link on the sign in tab', () => {
+    render(<AuthScreen />);
+    expect(screen.getByTestId('forgot-password-btn')).toBeTruthy();
+  });
+
+  it('hides the forgot-password link on the sign up tab', () => {
+    render(<AuthScreen />);
+    fireEvent.click(screen.getByText('Sign Up'));
+    expect(screen.queryByTestId('forgot-password-btn')).toBeNull();
+  });
+
+  it('reveals an email input and send button when clicked', () => {
+    render(<AuthScreen />);
+    reveal();
+    expect(screen.getByTestId('forgot-email-input')).toBeTruthy();
+    expect(screen.getByTestId('forgot-password-send-btn')).toBeTruthy();
+  });
+
+  it('sends the reset link for the entered email', async () => {
+    render(<AuthScreen />);
+    reveal();
+    fireEvent.change(screen.getByTestId('forgot-email-input'), { target: { value: 'a@b.com' } });
+    await act(async () => { fireEvent.click(screen.getByTestId('forgot-password-send-btn')); });
+    expect(resetPassword).toHaveBeenCalledWith('a@b.com');
+  });
+
+  it('rejects an invalid email without calling the service', () => {
+    render(<AuthScreen />);
+    reveal();
+    fireEvent.change(screen.getByTestId('forgot-email-input'), { target: { value: 'nope' } });
+    fireEvent.click(screen.getByTestId('forgot-password-send-btn'));
+    expect(resetPassword).not.toHaveBeenCalled();
+    expect(screen.getByTestId('forgot-password-error')).toBeTruthy();
+  });
+
+  it('shows the check-your-email confirmation after sending', async () => {
+    render(<AuthScreen />);
+    reveal();
+    fireEvent.change(screen.getByTestId('forgot-email-input'), { target: { value: 'a@b.com' } });
+    await act(async () => { fireEvent.click(screen.getByTestId('forgot-password-send-btn')); });
+    expect(screen.getByTestId('forgot-password-sent')).toBeTruthy();
+  });
+
+  // Account-enumeration safety: an unknown address, a rate-limit, and a real send must
+  // be indistinguishable to the caller. Same testid, same copy, no error surface.
+  it('shows the SAME confirmation when the service returns an error', async () => {
+    resetPassword.mockResolvedValue({ error: { message: 'User not found' } });
+    render(<AuthScreen />);
+    reveal();
+    fireEvent.change(screen.getByTestId('forgot-email-input'), { target: { value: 'ghost@b.com' } });
+    await act(async () => { fireEvent.click(screen.getByTestId('forgot-password-send-btn')); });
+    expect(screen.getByTestId('forgot-password-sent')).toBeTruthy();
+    expect(screen.queryByTestId('forgot-password-error')).toBeNull();
+  });
+
+  it('renders identical confirmation copy for an existing and a non-existent address', async () => {
+    const { unmount } = render(<AuthScreen />);
+    reveal();
+    fireEvent.change(screen.getByTestId('forgot-email-input'), { target: { value: 'real@b.com' } });
+    await act(async () => { fireEvent.click(screen.getByTestId('forgot-password-send-btn')); });
+    const existing = screen.getByTestId('forgot-password-sent').textContent;
+    unmount();
+
+    resetPassword.mockResolvedValue({ error: { message: 'User not found' } });
+    render(<AuthScreen />);
+    reveal();
+    fireEvent.change(screen.getByTestId('forgot-email-input'), { target: { value: 'ghost@b.com' } });
+    await act(async () => { fireEvent.click(screen.getByTestId('forgot-password-send-btn')); });
+    expect(screen.getByTestId('forgot-password-sent').textContent).toBe(existing);
   });
 });

@@ -14,8 +14,11 @@ import { supabase }            from '../lib/supabase';
 import { clearPrefs }          from '../lib/storage';
 
 export function useAuth() {
-  const [user,    setUser]    = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user,       setUser]       = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  // True between a PASSWORD_RECOVERY event and App handing off out of the reset screen.
+  // The hook only reports the fact — App owns routing (a hook must not navigate).
+  const [isRecovery, setIsRecovery] = useState(false);
 
   useEffect(() => {
     // Stabilise the user reference: Supabase fires a fresh `session.user` object on
@@ -34,7 +37,15 @@ export function useAuth() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        // A recovery link authenticates the user, so without this branch they would
+        // land straight on the dashboard with no way to actually set a password.
+        // NOTE this event is a BACKSTOP, not the primary route: supabase-js emits it
+        // from _initialize() behind a setTimeout(0), and NOT at all once the URL hash
+        // has been consumed (a reload restores from storage and emits INITIAL_SESSION).
+        // The /reset-password path check in App.jsx is what reliably lands the user.
+        if (event === 'PASSWORD_RECOVERY')                     setIsRecovery(true);
+        else if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') setIsRecovery(false);
         applySession(session);
         setLoading(false);
       }
@@ -48,5 +59,5 @@ export function useAuth() {
     await supabase.auth.signOut();
   };
 
-  return { user, loading, signOut };
+  return { user, loading, signOut, isRecovery };
 }

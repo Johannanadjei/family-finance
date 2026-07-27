@@ -77,4 +77,52 @@ describe('useAuth', () => {
     await act(async () => { authCallback('SIGNED_OUT', null); });
     expect(result.current.user).toBeNull();
   });
+
+  // A recovery link authenticates the user, so without this flag App drops them on the
+  // dashboard with no way to set a password. The hook only REPORTS it — App routes.
+  describe('password recovery', () => {
+    it('is not in recovery by default', async () => {
+      const { result } = renderHook(() => useAuth());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.isRecovery).toBe(false);
+    });
+
+    it('flags isRecovery on PASSWORD_RECOVERY', async () => {
+      const { result } = renderHook(() => useAuth());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => { authCallback('PASSWORD_RECOVERY', session('user-1')); });
+      expect(result.current.isRecovery).toBe(true);
+      expect(result.current.user?.id).toBe('user-1');   // recovery still establishes a session
+    });
+
+    it('leaves isRecovery false on a normal SIGNED_IN — no behaviour change', async () => {
+      const { result } = renderHook(() => useAuth());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => { authCallback('SIGNED_IN', session('user-1')); });
+      expect(result.current.isRecovery).toBe(false);
+      expect(result.current.user?.id).toBe('user-1');
+    });
+
+    it('clears isRecovery on SIGNED_OUT', async () => {
+      const { result } = renderHook(() => useAuth());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => { authCallback('PASSWORD_RECOVERY', session('user-1')); });
+      expect(result.current.isRecovery).toBe(true);
+
+      await act(async () => { authCallback('SIGNED_OUT', null); });
+      expect(result.current.isRecovery).toBe(false);
+    });
+
+    it('does not flag recovery on TOKEN_REFRESHED', async () => {
+      getSession.mockResolvedValue({ data: { session: session('user-1') } });
+      const { result } = renderHook(() => useAuth());
+      await waitFor(() => expect(result.current.user?.id).toBe('user-1'));
+
+      await act(async () => { authCallback('TOKEN_REFRESHED', session('user-1')); });
+      expect(result.current.isRecovery).toBe(false);
+    });
+  });
 });

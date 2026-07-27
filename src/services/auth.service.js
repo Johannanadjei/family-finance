@@ -47,8 +47,29 @@ export const signOutUser = async () => {
   return { error };
 };
 
-export const resetPasswordForEmail = async (email) => {
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
+// Origins allowed to receive a password-recovery link. This list MIRRORS the
+// Redirect URLs configured in Supabase Auth — an origin absent there is rejected
+// by GoTrue and silently swapped for the project Site URL, so keeping the two in
+// sync is what makes the link land where we intend.
+// Exact-origin matching (not hostname): an unexpected port or host cannot smuggle
+// a redirect through. `www.moneybos.com` is deliberately ABSENT — Supabase wildcards
+// cover paths, not subdomains, so `moneybos.com/**` does not match it; a reset begun
+// on www therefore falls back to the apex URL, which is always allow-listed.
+const ALLOWED_RESET_ORIGINS  = ['https://moneybos.com', 'http://localhost:5173'];
+const DEFAULT_RESET_REDIRECT = 'https://moneybos.com/reset-password';
+
+/**
+ * Resolve the password-recovery redirect for the current origin.
+ * Pure — no window access — so it is directly unit-testable.
+ * @param {string} origin — window.location.origin of the sending page
+ * @returns {string} an allow-listed absolute /reset-password URL
+ */
+export const resolveResetRedirect = (origin) =>
+  ALLOWED_RESET_ORIGINS.includes(origin) ? `${origin}/reset-password` : DEFAULT_RESET_REDIRECT;
+
+export const resetPasswordForEmail = async (email, redirectTo) => {
+  const target = redirectTo || resolveResetRedirect(typeof window === 'undefined' ? '' : window.location.origin);
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: target });
   if (error) console.error('[auth.service] resetPasswordForEmail error:', error.message);
   return { error };
 };
