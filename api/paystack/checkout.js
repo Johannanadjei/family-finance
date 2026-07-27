@@ -24,7 +24,18 @@ import { createClient } from '@supabase/supabase-js';
 import { PRICING } from '../../src/lib/pricing.js';
 
 const PAYSTACK_INIT_URL = 'https://api.paystack.co/transaction/initialize';
-const CALLBACK_URL      = 'https://family-finance-plum.vercel.app/pricing?checkout=return';
+
+// Post-payment return path + the hosts we are willing to echo into a Paystack
+// callback_url. Anything not on this allow-list (absent, malformed, or spoofed) falls
+// back to https://moneybos.com — we never reflect an unvalidated host on a payment
+// redirect (open-redirect risk), and never revert to the old vercel.app hardcode.
+const CALLBACK_PATH          = '/pricing?checkout=return';
+const CALLBACK_FALLBACK_HOST = 'moneybos.com';
+const CALLBACK_HOST_ALLOWLIST = new Set([
+  'moneybos.com',
+  'www.moneybos.com',
+  'family-finance-plum.vercel.app',
+]);
 
 // Canonical interval ('monthly' | 'annual') → the env var holding its Paystack plan code.
 // Plan codes live in env (never committed): a clean test↔live swap with no code change.
@@ -42,6 +53,25 @@ export function resolvePlanCode(interval) {
   const envKey = PLAN_CODE_ENV[interval];
   if (!envKey) return null;
   return process.env[envKey] || null;
+}
+
+/**
+ * Derive the post-payment callback URL from the forwarded host, validated against
+ * CALLBACK_HOST_ALLOWLIST. On Vercel the public host the user actually hit arrives in
+ * `x-forwarded-host` (Origin is often absent on same-site redirects, and
+ * `req.headers.host` is the internal deploy host). The scheme is ALWAYS https — both
+ * allow-listed hosts are https-only and a payment callback must never be http; we
+ * deliberately ignore x-forwarded-proto so a spoofed proto can't downgrade it. An
+ * absent, malformed, or non-allow-listed host falls back to https://moneybos.com.
+ * @param {import('http').IncomingMessage} req
+ * @returns {string} absolute https URL ending in /pricing?checkout=return
+ */
+export function resolveCallbackUrl(req) {
+  const rawHost = req?.headers?.['x-forwarded-host'];
+  // May be a comma-separated proxy chain; the first entry is the client-facing host.
+  const host = typeof rawHost === 'string' ? rawHost.split(',')[0].trim().toLowerCase() : '';
+  const validHost = CALLBACK_HOST_ALLOWLIST.has(host) ? host : CALLBACK_FALLBACK_HOST;
+  return `https://${validHost}${CALLBACK_PATH}`;
 }
 
 export default async function handler(req, res) {
@@ -88,7 +118,7 @@ export default async function handler(req, res) {
         email:        user.email,
         amount:       PRICING[interval].amount,   // pesewas; required by Paystack even with a plan
         plan:         planCode,
-        callback_url: CALLBACK_URL,
+        callback_url: resolveCallbackUrl(req),
         metadata:     { user_id: user.id, plan_interval: interval },
       }),
     });
