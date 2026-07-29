@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getUserSession, signUpUser, signInUser, signOutUser, resetPasswordForEmail, waitForSession, updateUserName } from './auth.service';
+import { getUserSession, signUpUser, signInUser, signOutUser, resetPasswordForEmail, resolveResetRedirect, waitForSession, updateUserName } from './auth.service';
 
 const mockUpsert = vi.fn().mockResolvedValue({ error: null });
 
@@ -114,11 +114,55 @@ describe('signOutUser', () => {
   });
 });
 
+// The recovery link is useless without a redirectTo — GoTrue falls back to the project
+// Site URL, which is not /reset-password. These lock the allow-list in place; it must
+// stay in sync with the Redirect URLs configured in Supabase Auth.
+describe('resolveResetRedirect', () => {
+  it('returns an origin-relative reset URL for the production origin', () => {
+    expect(resolveResetRedirect('https://moneybos.com')).toBe('https://moneybos.com/reset-password');
+  });
+
+  it('returns an origin-relative reset URL for the allow-listed dev origin', () => {
+    expect(resolveResetRedirect('http://localhost:5173')).toBe('http://localhost:5173/reset-password');
+  });
+
+  it('falls back to production for an origin that is not allow-listed', () => {
+    expect(resolveResetRedirect('https://evil.example.com')).toBe('https://moneybos.com/reset-password');
+  });
+
+  it('falls back to production for a www subdomain (Supabase wildcards cover paths, not subdomains)', () => {
+    expect(resolveResetRedirect('https://www.moneybos.com')).toBe('https://moneybos.com/reset-password');
+  });
+
+  it('falls back to production for an empty origin', () => {
+    expect(resolveResetRedirect('')).toBe('https://moneybos.com/reset-password');
+  });
+});
+
 describe('resetPasswordForEmail', () => {
-  it('calls resetPasswordForEmail with the given email', async () => {
+  it('calls resetPasswordForEmail with the given email AND a redirectTo', async () => {
     supabase.auth.resetPasswordForEmail.mockResolvedValue({ error: null });
     await resetPasswordForEmail('a@b.com');
-    expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith('a@b.com');
+    expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+      'a@b.com',
+      { redirectTo: resolveResetRedirect(window.location.origin) },
+    );
+  });
+
+  it('always sends a redirectTo pointing at the reset screen', async () => {
+    supabase.auth.resetPasswordForEmail.mockResolvedValue({ error: null });
+    await resetPasswordForEmail('a@b.com');
+    const [, options] = supabase.auth.resetPasswordForEmail.mock.calls[0];
+    expect(options.redirectTo).toMatch(/\/reset-password$/);
+  });
+
+  it('honours an explicit redirectTo override', async () => {
+    supabase.auth.resetPasswordForEmail.mockResolvedValue({ error: null });
+    await resetPasswordForEmail('a@b.com', 'https://moneybos.com/reset-password');
+    expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+      'a@b.com',
+      { redirectTo: 'https://moneybos.com/reset-password' },
+    );
   });
 
   it('returns no error on success', async () => {

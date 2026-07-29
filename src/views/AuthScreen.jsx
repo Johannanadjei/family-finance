@@ -10,25 +10,8 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { AuthFooter } from './AuthFooter';
-
-const validateForm = (email, password, name, mode) => {
-  if (!email.trim())                  return 'Email is required';
-  if (!/\S+@\S+\.\S+/.test(email))   return 'Please enter a valid email address';
-  if (!password)                      return 'Password is required';
-  if (password.length < 6)           return 'Password must be at least 6 characters';
-  if (mode === 'signup' && !name.trim()) return 'Please enter your name';
-  return null;
-};
-
-const mapAuthError = (message) => {
-  if (!message) return 'Something went wrong. Please try again.';
-  const m = message.toLowerCase();
-  if (m.includes('invalid login') || m.includes('invalid credentials')) return 'Incorrect email or password';
-  if (m.includes('already registered') || m.includes('already exists'))  return 'An account with this email already exists';
-  if (m.includes('network') || m.includes('fetch'))                      return 'Connection failed. Please try again.';
-  if (m.includes('popup'))                                                return 'Please allow popups for Google sign in';
-  return message;
-};
+import { ForgotPasswordPanel } from './auth/ForgotPasswordPanel';
+import { validateForm, mapAuthError } from './auth/authValidation';
 
 export function AuthScreen() {
   const [mode,     setMode]     = useState('signin');
@@ -190,6 +173,9 @@ export function AuthScreen() {
             <span style={{ marginRight: 8 }}>🔵</span>
             Continue with Google
           </button>
+
+          {/* Forgot password — sign-in only; unmounting on tab switch resets it */}
+          {mode === 'signin' && <ForgotPasswordPanel />}
         </div>
       </div>
 
