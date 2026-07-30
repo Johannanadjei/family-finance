@@ -29,8 +29,12 @@ const clearSession = ()  => sessionStorage.removeItem(SESSION_KEY);
 export function useGuestAuth(centreId) {
   const [session, setSession] = useState(() => {
     const s = loadSession();
-    // Reject sessions from a different centre
-    if (s && s.centreId === centreId) return s;
+    // Reject sessions from a different centre, and any session with no server
+    // session token. A tokenless session is either pre-hardening (stored before
+    // submit_guest_transaction required a token) or hand-crafted — either way every
+    // submit would fail with GST01, so send the guest back to the PIN screen now
+    // rather than after they have typed an expense.
+    if (s && s.centreId === centreId && s.sessionToken) return s;
     return null;
   });
   const [guests,  setGuests]  = useState([]);
@@ -61,12 +65,21 @@ export function useGuestAuth(centreId) {
       setError('Incorrect PIN. Please try again.');
       return { ok: false };
     }
-    // status === 'ok'
+    // status === 'ok' — the server minted a session token; without it no submit
+    // can succeed, so treat its absence as a failed login rather than storing a
+    // session that is guaranteed to be rejected on first use.
+    if (!data.session_token) {
+      console.error('[useGuestAuth] authenticate returned ok with no session_token');
+      setError('Something went wrong. Please try again.');
+      return { ok: false };
+    }
+
     const newSession = {
       guestId:           data.id,
       guestName:         data.name,
       allowedCategories: data.allowed_categories || [],
       centreId:          data.budget_centre_id,
+      sessionToken:      data.session_token,
     };
     saveSession(newSession);
     setSession(newSession);

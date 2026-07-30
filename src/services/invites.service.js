@@ -11,6 +11,10 @@ import { supabase } from '../lib/supabase';
 const MEMBER_CAP_MESSAGE =
   "You've reached your hub's member limit. Free hubs can have 2 members (you + 1 invited). Upgrade to Pro for up to 15 members per hub.";
 
+/** Friendly copy for a server-side invite identity-binding rejection (INV01). */
+const INVITE_EMAIL_MISMATCH_MESSAGE =
+  'This invite was sent to a different email address. Sign in with the invited account to accept it.';
+
 /**
  * Create a new pending invite for a hub.
  *
@@ -50,22 +54,35 @@ export const createInvite = async ({ centreId, email, role }) => {
 };
 
 /**
- * Fetch a pending, non-expired invite by its token.
- * Joins the hub name for display in JoinView.
+ * Fetch a pending, non-expired invite by its token — for JoinView.
+ *
+ * Delegates to the get_invite_by_token SECURITY DEFINER RPC
+ * (scripts/migrate_26_invite_token_scope.sql) instead of selecting the table.
+ * This is a SECURITY boundary, not a refactor: the old table read relied on a
+ * policy that granted every pending invite to PUBLIC (anon included) and left the
+ * token-scoping to this client filter. RLS cannot see a WHERE clause, so the token
+ * must arrive as an RPC ARGUMENT to be a real constraint. The RPC also projects
+ * only what JoinView renders and never returns the token itself.
+ *
+ * Callable without a session (anon holds EXECUTE) — /join is pre-auth by design.
+ *
+ * Returns the same shape the previous select produced —
+ * { role, invited_email, expires_at, budget_centres: { id, name, icon, currency } }
+ * — so JoinView needs no change. `data` is null for an unknown, malformed,
+ * non-pending or expired token; those cases are indistinguishable by design.
  *
  * @param {string} token
  * @returns {{ data, error }}
  */
 export const getInviteByToken = async (token) => {
-  const { data, error } = await supabase
-    .from('centre_invites')
-    .select('*, budget_centres(id, name, icon, currency)')
-    .eq('token', token)
-    .eq('status', 'pending')
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('get_invite_by_token', { p_token: token });
 
-  if (error) console.error('[invites.service] getInviteByToken error:', error.message);
-  return { data, error };
+  if (error) {
+    console.error('[invites.service] getInviteByToken error:', error.message);
+    return { data: null, error };
+  }
+
+  return { data: data ?? null, error: null };
 };
 
 /**
@@ -107,12 +124,24 @@ export const cancelInvite = async (inviteId) => {
  * All validation and writes happen server-side in a single transaction.
  * The caller must be signed in — auth.uid() is used server-side for the user ID.
  *
+ * The RPC binds acceptance to the invitee's identity: it compares the caller's
+ * auth email against the invite's invited_email and rejects a mismatch with
+ * SQLSTATE 'INV01' (scripts/accept_invite.sql). JoinView already blocks that case
+ * client-side via its wrongEmail phase, so INV01 only surfaces when the UI is
+ * bypassed — we map it to friendly copy anyway rather than leaking a raw DB message.
+ *
  * @param {{ token }} opts
  * @returns {{ data: { centreId }, error }}
  */
 export const acceptInvite = async ({ token, name = '' }) => {
   const { data, error } = await supabase.rpc('accept_invite', { p_token: token, p_name: name });
   if (error) {
+    if (error.code === 'INV01') {
+      const mismatchErr = new Error(INVITE_EMAIL_MISMATCH_MESSAGE);
+      mismatchErr.code = 'INV01';
+      console.error('[invites.service] acceptInvite email mismatch (INV01)');
+      return { data: null, error: mismatchErr };
+    }
     console.error('[invites.service] acceptInvite error:', error.message);
     return { data: null, error };
   }
