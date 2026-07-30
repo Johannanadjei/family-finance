@@ -18,6 +18,7 @@ const mockSession = {
   guestName:         'Sarah',
   allowedCategories: ['Groceries', 'Transport'],
   centreId:          'c1',
+  sessionToken:      'd'.repeat(64),   // proof of PIN entry (P0-B, 2026-07-30)
 };
 
 const renderForm = (props = {}) =>
@@ -99,8 +100,49 @@ describe('GuestTransactionForm', () => {
         amount:       150,
         categoryName: 'Groceries',
         currency:     'GHS',
+        sessionToken: mockSession.sessionToken,
       })
     );
+  });
+
+  it('shows a re-authenticate prompt when the guest session is rejected', async () => {
+    // GST01 is not a save failure — retrying cannot help, only re-entering the PIN
+    // can, so the guest must be told that rather than shown "could not save".
+    const sessionErr = new Error('Your guest session has expired. Please enter your PIN again to keep logging expenses.');
+    sessionErr.code = 'GST01';
+    mockSubmitGuestTransaction.mockResolvedValueOnce({ data: null, error: sessionErr });
+
+    renderForm();
+    await act(async () => { fireEvent.change(screen.getByTestId('guest-amount-input'), { target: { value: '150' } }); });
+    await act(async () => { screen.getByTestId('guest-save-btn').click(); });
+
+    expect(screen.getByTestId('guest-session-expired').textContent).toMatch(/PIN again/i);
+    expect(screen.queryByTestId('guest-form-error')).toBeNull();
+  });
+
+  it('re-authenticate button signs the guest out back to the PIN screen', async () => {
+    const sessionErr = new Error('Your guest session has expired. Please enter your PIN again to keep logging expenses.');
+    sessionErr.code = 'GST01';
+    mockSubmitGuestTransaction.mockResolvedValueOnce({ data: null, error: sessionErr });
+    const onSignOut = vi.fn();
+
+    renderForm({ onSignOut });
+    await act(async () => { fireEvent.change(screen.getByTestId('guest-amount-input'), { target: { value: '150' } }); });
+    await act(async () => { screen.getByTestId('guest-save-btn').click(); });
+    await act(async () => { screen.getByTestId('guest-reauth-btn').click(); });
+
+    expect(onSignOut).toHaveBeenCalled();
+  });
+
+  it('still shows the generic error for a non-session failure', async () => {
+    mockSubmitGuestTransaction.mockResolvedValueOnce({ data: null, error: new Error('category_not_allowed: Rent') });
+
+    renderForm();
+    await act(async () => { fireEvent.change(screen.getByTestId('guest-amount-input'), { target: { value: '150' } }); });
+    await act(async () => { screen.getByTestId('guest-save-btn').click(); });
+
+    expect(screen.getByTestId('guest-form-error').textContent).toMatch(/Could not save/i);
+    expect(screen.queryByTestId('guest-session-expired')).toBeNull();
   });
 
   it('uses Other when no category selected', async () => {

@@ -129,17 +129,27 @@ WITH CHECK (
   )
 );
 
--- Anyone (including unauthenticated) can read a pending, non-expired invite
--- by its token. This is the /join?token=... lookup.
+-- ⚠️ REMOVED 2026-07-30 (P0-A(a), migrate_26_invite_token_scope.sql) — DO NOT
+-- RECREATE. A policy named "Anyone can read pending invite by token" used to live
+-- here with USING (status = 'pending' AND expires_at > now()) and no TO clause.
+-- The name described the CLIENT's .eq('token', …) filter, not the policy: RLS never
+-- sees a WHERE clause, so it granted PUBLIC (including `anon`, whose key ships in
+-- the frontend bundle) a read of EVERY pending invite in the project — token,
+-- invited_email, budget_centre_id and role. Since the token is the entire
+-- authorization for /join and centre_invites.role admits 'full_access', that was a
+-- cross-tenant hub JOIN, not just an information leak.
+--
+-- The /join?token=... lookup now goes through get_invite_by_token(text) — a
+-- SECURITY DEFINER function (migrate_26) that takes the token as an ARGUMENT, which
+-- is the only way to express "only the row whose token you supplied"; a policy is
+-- evaluated per candidate row and cannot reference the caller's filter. It projects
+-- only the columns JoinView renders and never echoes the token back.
+--
+-- A Strategy-B replay of this file must therefore leave centre_invites with exactly
+-- TWO policies (the manager ALL policy above + the invitee UPDATE policy below) and
+-- ZERO SELECT policies. The DROP is kept so a replay over an older database lands
+-- in the correct end state.
 DROP POLICY IF EXISTS "Anyone can read pending invite by token" ON centre_invites;
-
-CREATE POLICY "Anyone can read pending invite by token"
-ON centre_invites
-FOR SELECT
-USING (
-  status     = 'pending'
-  AND expires_at > now()
-);
 
 -- Authenticated users can update the status of an invite addressed to their
 -- own email (to mark it 'accepted'). This fires during invite acceptance.
