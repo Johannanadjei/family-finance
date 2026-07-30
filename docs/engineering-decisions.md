@@ -4065,3 +4065,194 @@ A bad merge caught at step 3/4 is a local `git reset --hard`; caught after step 
 force-push to a shared branch. The whole point of the gate is that nothing reaches the
 remote until the merged tree is verified green. Cross-refs: [[branch-model]],
 [[commit-push-verify-one-flow]].
+
+---
+
+## [2026-07-30] Pre-launch enforcement audit — the client-only gate class, and the P0-A invite fix
+
+**Why this audit happened.** Diagnosing the freemium billing CTA (a `standard` member could
+reach Paystack checkout and upgrade their OWN user while hub caps resolve on the OWNER's
+tier — pay for nothing) surfaced a pattern rather than a bug: a rule enforced only in the
+client, with no server backstop, bypassable by anyone whose client state differs from what
+the server assumes. Rather than fix leaks one at a time we enumerated every entitlement,
+cap and role gate and classified each SERVER-ENFORCED vs CLIENT-ONLY. Pre-launch, no real
+users, so the batch is hardening at normal pace — not an incident.
+
+**What the audit found, ranked by harm at launch:**
+
+1. **Invite takeover (P0).** `centre_invites` carried a policy *named* "Anyone can read
+   pending invite by token" whose predicate never mentioned the token
+   (`status='pending' AND expires_at > now()`, no `TO` clause → PUBLIC → `anon`). The name
+   described the CLIENT's `.eq('token', …)` filter. RLS never sees a WHERE clause, so
+   `GET /rest/v1/centre_invites?select=*` with the bundled anon key returned every live
+   invite — token included. And `accept_invite` validated the token but never that the
+   caller WAS the invitee. Together: read any token → sign up as anybody → join a
+   stranger's hub at the invite's role, and `centre_invites.role` admits `full_access`,
+   which can read household income. Cross-tenant, pre-auth, no credentials needed.
+2. **Guest write bypass (P0).** `submit_guest_transaction` takes `(guest_id, centre_id)` and
+   **no PIN**, while `get_centre_guests` is granted to `anon` and hands out guest ids so the
+   portal can render its picker. The PIN gates login only; possession of a guest link is
+   enough to write unlimited transactions into a hub. Integrity/DoS, not confidentiality.
+3. **Caps enforced on the app path only (P1).** Categories/hubs/skins are enforced correctly
+   inside SECURITY DEFINER RPCs, but the underlying tables still accept the equivalent
+   direct write (`budget_categories_insert` is bare membership; `budget_centres` INSERT has
+   no cap; an owner can PATCH `skin_id`). The RPC is a gate in front of an unlocked door.
+4. **History window (P1).** Enforced only by a client-side array slice
+   (`useFinance.js` `visibleCycleWindow`), and windowed on the VIEWER's tier — so a member
+   who buys Pro unlocks history in a hub they don't own, and a Pro hub's standard members
+   are wrongly clamped to 3 periods.
+5. **`viewAllTxs` (P1).** Client `.filter()` only; the server serves every member's expense
+   rows to any member.
+6. **Roster/PII (P1).** `users_select_hub_members` gives any member co-members' name AND
+   email; the UI shows the roster only behind `can('settings')`.
+7. **Four declared caps enforced nowhere** (`maxIncomeStreams`, `allowMultiCurrency`,
+   `allowFullExport`, `allowCustomEmojiPicker`) plus a dead `allowAllSkins`.
+
+**What was already correct** — worth recording so it is not "re-fixed": the F1 income work
+(`can_view_income` + `migrate_22`–`migrate_25`) genuinely closed income read AND write for
+`standard`; cycle-management RPCs are double-gated (in-function role check + role-aware
+`budget_cycles` policy); `subscriptions` has no client write policy at all; guest PIN
+comparison, lockout, `allowed_categories` and the currency override are all server-side.
+
+### Decisions taken (2026-07-30)
+
+- **`viewAllTxs` = HOUSEHOLD visibility.** A shared budget means members see household
+  expenses. This is a UI bug, not a policy gap: `LogView` filters to own rows,
+  `DailyView` does not. Resolve toward household — drop the Log filter. **Income is
+  untouched by this**, twice over: `LogView`'s income predicate is a separate `.filter()`
+  keyed on `viewIncome`, and `transactions_select_member` never sends income rows to a
+  `standard` session at all. Side effect worth having: guest-submitted expenses
+  (`logged_by_user_id IS NULL`) are currently invisible to standard members and become
+  visible, which is correct. **The `viewAllTxs` key is DELETED, not renamed** (confirmed
+  2026-07-30): with household visibility every role is `true`, so the key no longer
+  discriminates, and `PERMISSIONS` should describe only real divergence. `viewIncome`
+  becomes the single transaction-scope permission. A future genuinely-restricted role
+  re-adds a key then, with a name that means something.
+- **`full_access` = co-owner. WIDEN the policy, don't narrow the UI.** `"Owners can update
+  centres"` (`owner_id = auth.uid()`) contradicts `can('settings')` and
+  `ROLE_DESCRIPTIONS.full_access`; `update_centre_skin` already admits full_access. Same
+  for the owner-only guest roster. Independently: `useBudgetCentre`'s null-data guard
+  turns an RLS-blocked update into a silent success — it must report an error.
+- **Caps: enforce 1, delete 4.** Verified against the code before deciding, so nothing is
+  deleted that has a feature behind it and nothing is enforced on a phantom:
+  `maxIncomeStreams` **ENFORCE**, **PER-CYCLE** (confirmed 2026-07-30) — real table, real
+  CRUD, real lever. Per-cycle rather than per-hub because rollforward copies income sources
+  into every new period, so a per-hub cap would self-breach on the second period; per-cycle
+  also matches the category cap (Decision D1), so both caps share one mental model.
+  `allowMultiCurrency` **DELETE** — per-row currency was deliberately engineered OUT
+  (hub-authoritative everywhere, `submit_guest_transaction` ignores `p_currency`,
+  `IncomeCard.test.jsx` regression-tests a divergent row, `migrate_20`/`21` backfilled);
+  per-HUB currency does exist but is core, not premium. `allowFullExport` **DELETE** — no
+  export feature exists. `allowCustomEmojiPicker` **DELETE** — no picker or curated set
+  exists. `allowAllSkins` **DELETE** — dead; skins gate on `FREE_SKIN_IDS`.
+- **History server enforcement folds into the P1 sweep** — same `hub_tier()` machinery,
+  don't build the pattern twice.
+- **App PIN: accept and document, plus a `verify_pin` RPC.** It cannot be made
+  un-bypassable — the session token lives in `localStorage`, so anyone holding the device
+  can query REST directly regardless of any PIN. But today `usePin` fetches the hash to the
+  client and compares locally, so an unsalted SHA-256 of a 4-digit PIN (10k candidates,
+  instantly reversible) is handed to whoever holds the session. That leaks the PIN VALUE,
+  which matters because people reuse PINs. `verify_pin` keeps the hash and the attempt
+  counter server-side. Framed honestly: **the PIN is a privacy screen over an already
+  authenticated session, NOT an access boundary.** Nobody should build on it as if it were.
+
+### The design rule this batch establishes
+
+**A cap does not belong in an RLS predicate; a visibility rule does.** A cap is a COUNT over
+sibling rows — in a `WITH CHECK` that is a correlated subquery with no advisory lock: racy,
+slow, and unable to reason cleanly about the row being inserted. The RPCs already count
+correctly under `pg_advisory_xact_lock`. So the fix for a bypassable cap is to **close the
+direct-write path so the RPC is the only way in** — RLS is the locked door, the RPC stays the
+gate. That keeps the sweep almost predicate-free, which is why it carries almost no
+lockout risk. Corollary for `skin_id`: use **column privileges** (revoke table-level UPDATE,
+re-grant column-wise) rather than a tier predicate — a predicate on the post-image would
+block an owner from renaming a hub that still stores a Pro skin from before a downgrade.
+
+### P0-A as shipped (this commit)
+
+`migrate_26_invite_token_scope.sql` + the `accept_invite.sql` identity binding. Two ends of
+one finding — closing the token read alone would still leave a forwarded link redeemable.
+
+- **Why an RPC, not a tighter policy:** "you may read only the row whose token you supplied"
+  is not expressible in RLS. A policy is evaluated per candidate row and cannot reference
+  the caller's WHERE clause, so the token must arrive as an ARGUMENT.
+  `get_invite_by_token(text)` is SECURITY DEFINER + STABLE, granted to `anon` (the /join
+  screen is pre-auth by design), projects only what `JoinView` renders, and never echoes
+  the token back. It returns `json` shaped exactly like the select it replaced, so
+  `JoinView` needed **zero** changes — its 9 tests passed untouched, which is the evidence
+  the consumer contract held.
+- **`p_token` is TEXT, cast inside an exception block** that returns NULL, so a mangled
+  link reads as "invite not found" instead of surfacing a cast error to an unauthenticated
+  visitor. The cast precedes the lookup, so the unique index is still used.
+- **INV01** on an email mismatch, compared `lower(btrim(...))` on both sides so casing or
+  whitespace in an invited address can never lock out the right person; a NULL caller email
+  fails closed. This is not a new product rule — `JoinView`'s `wrongEmail` phase already
+  performed exactly this check client-side. Strict by design: an invitee who signs up with
+  a different address must be re-invited at that address. Softening it to a warning would
+  restore token-only redemption.
+- **Both verify blocks assert BOTH directions** — not just that the attack is closed
+  (zero SELECT policies remain on `centre_invites`) but that legitimate access survives:
+  `anon` holds EXECUTE (or every invitee breaks), the manager ALL policy still backs
+  MembersSection's list, the invitee UPDATE policy is intact, `authenticated` holds EXECUTE
+  on `accept_invite`, and the MEM01 cap backstop survived the edit. A must-pass assertion
+  that can fail loudly is worth more than a must-fail one.
+- **Source-of-truth updated in the same commit:** `members_rbac.sql` no longer creates the
+  dropped policy and carries a DO-NOT-RECREATE note; `REPLAY.md` gains `migrate_26` as a
+  **required** step (unlike `migrate_22`–`migrate_25`, it creates a function no other file
+  contains — skip it and every invite link fails at the read), and the RLS surface count
+  goes 36 → 35.
+
+**Nothing in this batch is destructive** — no table dropped, no column removed, no row
+deleted. One additive table is planned (`guest_sessions`, P0-B). Everything else is policy
+swaps, function replacements, grant changes and client edits, all reversible by re-running
+the prior definition. Cross-refs: [[single-supabase-project]], [[lived-use-is-verification]].
+
+### P0-B as shipped (guest write path)
+
+`migrate_27_guest_sessions.sql` + `authenticate_guest.sql` + `submit_guest_transaction.sql`.
+The PIN gated login only; the write path never consulted it.
+
+- **Why guest ids could never be authorization:** `get_centre_guests` is granted to `anon`
+  and returns guest ids so the login picker can render "who are you?", and the portal URL
+  (`?guest=1&c=<centreId>`) is a link people deliberately share. Both halves of the old
+  `(guest_id, centre_id)` authorization were therefore public. The attempt counter and
+  15-minute lockout guarded `authenticate_guest` — a function an attacker never had to call.
+- **A correct PIN now mints a token** (two core `gen_random_uuid()`s, hyphens stripped: 64
+  hex chars / 244 bits), stored as `sha256` hex, returned in the clear exactly once.
+  `submit_guest_transaction` requires it, bound to the same `guest_id`, unexpired (12h).
+- **Core `sha256()` + `convert_to()`, deliberately not pgcrypto:** Supabase installs
+  pgcrypto into the `extensions` schema and these functions run `SET search_path = public`,
+  so `gen_random_bytes()`/`digest()` would fail to resolve. Also note Postgres has no
+  text→bytea cast for a text-typed *value* (only for a literal), hence `convert_to(v,'UTF8')`.
+- **A plain hash is right here and would be wrong for the app PIN:** the token is 244 bits
+  of uniform randomness, so there is no candidate space to enumerate. The 4-digit PIN is the
+  opposite case (10k) — see the P3 note above. Same primitive, opposite verdict, because the
+  entropy of the input is what decides it.
+- **⚠️ The `DROP FUNCTION` of the 8-arg overload is load-bearing, not tidiness.** Adding a
+  9th parameter creates a NEW signature, and PostgREST resolves an RPC by the argument names
+  it is handed — so leaving the old function installed would leave the token-less path fully
+  callable and the entire fix cosmetic. The verify block asserts exactly ONE overload
+  survives, and that no parameter has a DEFAULT (an omitted token must be a resolution error,
+  never a silent NULL).
+- **The guest-row check stays after the session check** — it is the REVOCATION path.
+  Deactivating or soft-deleting a guest must stop writes immediately even while an unexpired
+  token still sits in that guest's sessionStorage.
+- **`guest_sessions` has RLS on and ZERO policies** — a credential store must never be
+  client-reachable; both writers are SECURITY DEFINER. Same posture as `subscriptions`
+  (§9.6). The verify block fails if a future migration adds a policy.
+- **Client:** the token lives in `sessionStorage` alongside the existing guest session (tab
+  scoped, cleared on close). `useGuestAuth` rejects any stored session lacking a token —
+  pre-hardening sessions would otherwise fail every submit with GST01 — and refuses to start
+  a session if the server ever returns `ok` without one. `GuestTransactionForm` treats GST01
+  as its own state with an "Enter PIN again" button rather than "Could not save": retrying
+  cannot help, only re-authenticating can.
+- **All five SQL files in this batch are wrapped in BEGIN/COMMIT** so each verify block is a
+  real gate — a failed assertion rolls the change back instead of reporting a problem after
+  the fact. This matters most for `submit_guest_transaction`, where a half-applied state is
+  the vulnerability.
+
+**Test coverage added:** `guests.service.test.js` (new — token passthrough on login, no token
+for wrong-PIN/locked, explicit null rather than an omitted arg, GST01 mapping),
+`useGuestAuth.test.jsx` (new — restore rules, tokenless-session rejection, ok-without-token
+refusal, lockout/wrong-PIN paths), plus GST01 UI states in `GuestTransactionForm.test.jsx`.
+1670 tests, audit 297/0.

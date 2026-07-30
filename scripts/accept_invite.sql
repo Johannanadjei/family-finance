@@ -34,6 +34,32 @@
 --   All pre-existing logic (auth, invite validation, already_member, status update,
 --   users upsert, return shape) is preserved.
 
+-- MODIFICATION (2026-07-30) — IDENTITY BINDING, P0-A(b) of the pre-launch
+-- hardening batch. Pairs with migrate_26_invite_token_scope.sql; apply both.
+--   THE GAP: this function validated the TOKEN (pending, unexpired) but never that
+--   the caller IS the invitee. Token possession alone was sufficient to join a hub
+--   at the invite's role — and centre_invites.role admits 'full_access', which can
+--   read household income. Combined with the world-readable invite SELECT policy
+--   that migrate_26 drops, that made hub-join reachable by anyone holding the
+--   public anon key: read any token, sign up as anybody, join a stranger's hub.
+--   THE FIX: step 2b below compares auth.users.email for auth.uid() against
+--   centre_invites.invited_email (both lower()+btrim()) and raises SQLSTATE
+--   'INV01' on a mismatch. Defense in depth with migrate_26 — closing the token
+--   read alone would still leave a shared/forwarded link fully redeemable.
+--   NOT A NEW PRODUCT RULE: JoinView.jsx already performs exactly this comparison
+--   client-side (the 'wrongEmail' phase, "This invite was sent to <x>. You are
+--   signed in as <y>."). Strict binding was always the intent; only the server
+--   never enforced it. So no legitimate flow changes — the client blocks this case
+--   before the RPC is ever called, and INV01 is the backstop for a bypassed UI.
+--   Deliberately strict: an invitee who signs up with a DIFFERENT address than the
+--   one invited must be re-invited at that address. That is the security property,
+--   not a bug — softening it to a warning would restore token-only redemption.
+
+-- Wrapped in a transaction (2026-07-30) so the verify block at the foot is a real
+-- gate: if any assertion RAISEs, the function change rolls back rather than landing
+-- with a failed check reported after the fact.
+BEGIN;
+
 DROP FUNCTION IF EXISTS accept_invite(uuid);
 
 CREATE OR REPLACE FUNCTION accept_invite(p_token uuid, p_name text DEFAULT '')
@@ -43,14 +69,15 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_invite    centre_invites%ROWTYPE;
-  v_user_id   uuid;
-  v_member_id uuid;
-  v_name      text;
-  v_owner     uuid;
-  v_tier      text;
-  v_limit     int;
-  v_active    int;
+  v_invite       centre_invites%ROWTYPE;
+  v_user_id      uuid;
+  v_member_id    uuid;
+  v_name         text;
+  v_owner        uuid;
+  v_tier         text;
+  v_limit        int;
+  v_active       int;
+  v_caller_email text;   -- identity binding (2026-07-30)
 BEGIN
 
   -- 1. Require an authenticated session
@@ -69,6 +96,22 @@ BEGIN
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'invite_not_found: invite not found, already used, or expired';
+  END IF;
+
+  -- 2b. IDENTITY BINDING (2026-07-30) — the caller MUST be the invitee.
+  --     Without this, token possession alone joined a hub: the token is the entire
+  --     authorization for /join, and it used to be world-readable (migrate_26).
+  --     Both sides are lower()+btrim()'d so casing/whitespace in an invited address
+  --     can never lock out the right person. A NULL caller email fails closed.
+  --     JoinView already blocks this client-side; INV01 is the server backstop.
+  SELECT lower(btrim(au.email)) INTO v_caller_email
+  FROM   auth.users au
+  WHERE  au.id = v_user_id;
+
+  IF v_caller_email IS NULL
+     OR v_caller_email IS DISTINCT FROM lower(btrim(v_invite.invited_email)) THEN
+    RAISE EXCEPTION 'invite_email_mismatch: this invite was sent to a different email address'
+      USING ERRCODE = 'INV01';
   END IF;
 
   -- 3. Guard against duplicate membership
@@ -155,3 +198,54 @@ $$;
 
 -- Only authenticated users may accept invites.
 GRANT EXECUTE ON FUNCTION accept_invite(uuid, text) TO authenticated;
+
+-- ── Verification — self-asserting; any failure RAISES (added 2026-07-30) ──────
+DO $$
+DECLARE
+  v_n   int;
+  v_src text;
+BEGIN
+  -- (a) Installed with the 2-arg signature, and the old 1-arg overload is gone
+  --     (an ambiguous overload would let a caller reach a pre-binding version).
+  SELECT count(*) INTO v_n FROM pg_proc
+   WHERE proname = 'accept_invite'
+     AND pg_get_function_identity_arguments(oid) = 'p_token uuid, p_name text';
+  IF v_n <> 1 THEN RAISE EXCEPTION 'FAIL: accept_invite(uuid, text) not found (got %)', v_n; END IF;
+
+  SELECT count(*) INTO v_n FROM pg_proc WHERE proname = 'accept_invite';
+  IF v_n <> 1 THEN RAISE EXCEPTION 'FAIL: % accept_invite overloads exist — the 1-arg version must be dropped', v_n; END IF;
+
+  -- (b) SECURITY DEFINER — the invitee is not yet a member, so the writes need it.
+  SELECT count(*) INTO v_n FROM pg_proc WHERE proname = 'accept_invite' AND prosecdef IS TRUE;
+  IF v_n <> 1 THEN RAISE EXCEPTION 'FAIL: accept_invite is not SECURITY DEFINER'; END IF;
+
+  -- (c) THE IDENTITY BINDING IS PRESENT. Without this the function is redeemable
+  --     by anyone holding a token, which is the whole finding.
+  SELECT prosrc INTO v_src FROM pg_proc WHERE proname = 'accept_invite';
+  IF v_src NOT LIKE '%INV01%'         THEN RAISE EXCEPTION 'FAIL: accept_invite has no INV01 raise — identity binding missing'; END IF;
+  IF v_src NOT LIKE '%invited_email%' THEN RAISE EXCEPTION 'FAIL: accept_invite never reads invited_email — identity binding missing'; END IF;
+
+  -- (d) The member-cap backstop (MEM01) survived this edit.
+  IF v_src NOT LIKE '%MEM01%' THEN RAISE EXCEPTION 'FAIL: accept_invite lost its MEM01 cap backstop'; END IF;
+
+  -- (e) MUST-PASS: authenticated holds EXECUTE — every legitimate invitee needs it.
+  SELECT count(*) INTO v_n FROM information_schema.routine_privileges
+   WHERE routine_name = 'accept_invite' AND grantee = 'authenticated' AND privilege_type = 'EXECUTE';
+  IF v_n < 1 THEN RAISE EXCEPTION 'FAIL: authenticated lacks EXECUTE on accept_invite — nobody could join'; END IF;
+
+  RAISE NOTICE 'accept_invite OK: single 2-arg overload, SECURITY DEFINER, INV01 identity binding + MEM01 cap backstop present.';
+END $$;
+
+COMMIT;
+
+-- =============================================================================
+-- Post-run checks with test accounts — BOTH directions:
+--
+-- MUST FAIL: signed in as someone OTHER than invited_email →
+--   SELECT accept_invite('<token>'::uuid, '');   -- expect INV01
+--
+-- MUST PASS: signed in AS invited_email →
+--   SELECT accept_invite('<token>'::uuid, 'Test Name');
+--   -- expect { centreId, memberId }, a new budget_centre_members row, and the
+--   -- invite flipped to 'accepted'
+-- =============================================================================

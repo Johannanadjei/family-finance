@@ -12,8 +12,8 @@ dependency order.
 
 ## ⚠️ Read this first — two ways to rebuild
 
-**All 11 tables now have committed DDL.** As of `55a469f`, the 8 core tables live
-in `schema_base.sql` (extracted via `pg_dump --schema-only`); the other 3 ship in
+**All 12 tables now have committed DDL.** As of `55a469f`, the 8 core tables live
+in `schema_base.sql` (extracted via `pg_dump --schema-only`); the other 4 ship in
 their feature files:
 
 | Table(s) | DDL location |
@@ -22,6 +22,7 @@ their feature files:
 | `centre_invites` | `members_rbac.sql` |
 | `budget_cycles` | `migrate_cycles_schema.sql` |
 | `subscriptions` | `migrate_19_subscriptions.sql` |
+| `guest_sessions` | `migrate_27_guest_sessions.sql` (2026-07-30) |
 
 `schema_base.sql` is the **end-state** structure (a `pg_dump` reflects the
 fully-evolved schema), so it already contains every column the incremental
@@ -33,11 +34,13 @@ fully-evolved schema), so it already contains every column the incremental
 Skip the incremental schema churn; go straight to the current shape:
 
 1. **Phase 0** — `schema_base.sql` (8 base tables, end-state).
-2. **Phase 0b** — the 3 remaining tables + their cycle wiring:
+2. **Phase 0b** — the 4 remaining tables + their cycle wiring:
    `migrate_cycles_schema.sql` (budget_cycles) → `migrate_cycles_fk_columns.sql`
    (the deferred `cycle_id` FKs + indexes) → `members_rbac.sql` (centre_invites +
    role CHECK + budget_centres RLS) → `migrate_invite_expires_at.sql` →
-   `migrate_19_subscriptions.sql` (subscriptions).
+   `migrate_19_subscriptions.sql` (subscriptions) →
+   `migrate_27_guest_sessions.sql` (guest_sessions — **must precede Phase 3b**:
+   both `authenticate_guest` and `submit_guest_transaction` reference it).
 3. **Phase 2** — helper functions, then **Phase 3** — the idempotent overlay
    (triggers, RPCs, `rls_*.sql`), then **Phase 4** — verify.
 
@@ -158,34 +161,48 @@ that the `rls_*.sql` files require Phase 2.
 28. `handle_updated_at.sql` — fn + 7 `BEFORE UPDATE` triggers
 
 ### 3b — RPCs (client-callable)
-29. `accept_invite.sql`
+29. `accept_invite.sql` — carries the **INV01 identity binding** (2026-07-30): the
+    caller's auth email must equal the invite's `invited_email`. Without this,
+    token possession alone joins a hub.
 30. `authenticate_guest.sql`
 31. `submit_guest_transaction.sql`
 32. `get_centre_guests.sql`
+33. `migrate_26_invite_token_scope.sql` — **REQUIRED, not optional** (see note below):
+    creates `get_invite_by_token(text)`, the only read path for `/join?token=…`.
 
 ### 3c — RLS policies for the 7 tables that had no committed policies
-33. `rls_users.sql`
-34. `rls_user_preferences.sql`
-35. `rls_budget_centre_members.sql`
-36. `rls_budget_categories.sql`
-37. `rls_income_sources.sql` — **needs `can_view_income` (step 26)**
-38. `rls_transactions.sql` — **needs `can_view_income` (step 26)**
-39. `rls_guest_users.sql`
+34. `rls_users.sql`
+35. `rls_user_preferences.sql`
+36. `rls_budget_centre_members.sql`
+37. `rls_budget_categories.sql`
+38. `rls_income_sources.sql` — **needs `can_view_income` (step 26)**
+39. `rls_transactions.sql` — **needs `can_view_income` (step 26)**
+40. `rls_guest_users.sql`
 
 > **F1 note (2026-07-16):** the `migrate_22`–`migrate_25` policy migrations are NOT
 > in this replay order and do not need to be. They are incremental fixes to policies
-> that steps 37–38 already define in their end state (role-aware SELECT *and* write
+> that steps 38–39 already define in their end state (role-aware SELECT *and* write
 > gates, including the explicit `WITH CHECK` on both UPDATE policies). Under Strategy
 > A the `rls_*.sql` overlay is the source of truth; the `migrate_2x` files are the
 > historical record of how production got there, and each carries the reasoning for
-> why a clause exists. Do not "simplify" a clause out of steps 37–38 without reading
+> why a clause exists. Do not "simplify" a clause out of steps 38–39 without reading
 > them — their verify blocks RAISE on exactly that.
+
+> **Why `migrate_26` IS in the order (2026-07-30), unlike `migrate_22`–`migrate_25`:**
+> those four only *replaced* policy definitions that the `rls_*.sql` overlay already
+> ships in end state, so skipping them is harmless. `migrate_26` also **creates a
+> function** — `get_invite_by_token(text)` — that no source-of-truth file contains,
+> and that function is the ONLY way `/join?token=…` can read an invite. Skip it and
+> every invite link 404s at the read step. Its policy half is already reflected in
+> `members_rbac.sql` (step 4), which no longer creates the world-readable
+> `centre_invites` SELECT policy and carries a DO-NOT-RECREATE note in its place.
 
 > RLS for the other 4 tables ships earlier: `budget_centres` + `centre_invites`
 > in `members_rbac.sql` (step 4), `budget_cycles` in `migrate_cycles_schema.sql`
 > (step 8), `subscriptions` in `migrate_19_subscriptions.sql` (step 22). Full RLS
-> surface = those 10 policies + the 26 here = **36 policies across 11 tables**.
-> (Unchanged by F1: migrate_22–25 replaced policy *definitions*, adding none.)
+> surface = those 9 policies + the 26 here = **35 policies across 11 tables**.
+> (migrate_22–25 replaced policy *definitions*, adding none. `migrate_26` REMOVED
+> one — the world-readable `centre_invites` SELECT policy — taking 36 → 35.)
 
 ---
 

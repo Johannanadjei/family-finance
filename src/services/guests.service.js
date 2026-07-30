@@ -16,6 +16,14 @@ import { supabase } from '../lib/supabase';
 import { validateString } from '../lib/validation';
 import { hashPin } from '../lib/crypto';
 
+/**
+ * Friendly copy for a rejected guest session (GST01) — a missing, expired, or
+ * wrong-guest session token. Not a save failure: the guest simply needs to
+ * re-authenticate, so the copy points at the PIN rather than at retrying.
+ */
+const GUEST_SESSION_EXPIRED_MESSAGE =
+  'Your guest session has expired. Please enter your PIN again to keep logging expenses.';
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 /**
@@ -198,13 +206,20 @@ export const authenticateGuest = async (guestId, pin) => {
 
 /**
  * Submit a guest expense transaction via the server-side RPC.
- * Guest session (guestId + centreId) is validated server-side.
  *
- * @param {{ guestId, centreId, amount, categoryName, description, date, week, currency }}
+ * The guest's SESSION TOKEN is mandatory — it is the proof the PIN was entered.
+ * Before this existed the RPC authorized on (guestId, centreId) alone, and both are
+ * effectively public: get_centre_guests hands guest ids to the anon key so the login
+ * picker can render, and the portal URL carries the centre id. The server rejects a
+ * missing, expired, or wrong-guest token with SQLSTATE 'GST01'
+ * (scripts/submit_guest_transaction.sql), which callers surface as
+ * "re-enter your PIN" rather than as a failure to save.
+ *
+ * @param {{ guestId, centreId, amount, categoryName, description, date, week, currency, sessionToken }}
  * @returns {{ data: uuid|null, error }}
  */
 export const submitGuestTransaction = async ({
-  guestId, centreId, amount, categoryName, description, date, week, currency,
+  guestId, centreId, amount, categoryName, description, date, week, currency, sessionToken,
 }) => {
   const { data, error } = await supabase.rpc('submit_guest_transaction', {
     p_guest_id:      guestId,
@@ -215,7 +230,19 @@ export const submitGuestTransaction = async ({
     p_date:          date,
     p_week:          week,
     p_currency:      currency,
+    p_session_token: sessionToken ?? null,
   });
-  if (error) console.error('[guests.service] submitGuestTransaction error:', error.message);
-  return { data, error };
+
+  if (error) {
+    if (error.code === 'GST01') {
+      const sessionErr = new Error(GUEST_SESSION_EXPIRED_MESSAGE);
+      sessionErr.code = 'GST01';
+      console.error('[guests.service] submitGuestTransaction rejected: invalid guest session (GST01)');
+      return { data: null, error: sessionErr };
+    }
+    console.error('[guests.service] submitGuestTransaction error:', error.message);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
 };

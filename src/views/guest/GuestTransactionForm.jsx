@@ -24,6 +24,7 @@ export function GuestTransactionForm({ session, currency, onSignOut }) {
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState(null);
   const [success,     setSuccess]     = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(null);   // GST01 message
 
   const handleSubmit = async () => {
     const n = parseFloat(amount);
@@ -40,8 +41,13 @@ export function GuestTransactionForm({ session, currency, onSignOut }) {
       amount: Math.round(n), categoryName: category || 'Other',
       description: description.trim(), date: dateStr,
       week: getWeekForDate(dateStr), currency: currency || 'GHS',
+      sessionToken: session.sessionToken,
     });
     setSaving(false);
+    // An expired/invalid guest session is not a save failure — retrying cannot
+    // help, only re-entering the PIN can. Surface it as its own state so the guest
+    // is told what to do instead of being dropped back to the PIN screen unexplained.
+    if (e?.code === 'GST01') { setSessionExpired(e.message); return; }
     if (e) { setError('Could not save. Please try again.'); return; }
     const fresh = new Date();
     setCategory(''); setAmount(''); setDescription('');
@@ -103,6 +109,16 @@ export function GuestTransactionForm({ session, currency, onSignOut }) {
             <input data-testid="guest-date-year"  type="number" min="2020" max="2030" placeholder="YYYY" value={year}  onChange={e => { setYear(e.target.value.replace(/\D/g, ''));  setError(null); }} style={{ ...dateInp, width: 80 }} />
           </div>
         </div>
+
+        {sessionExpired && (
+          <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+            <p data-testid="guest-session-expired" style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: '0 0 10px' }}>{sessionExpired}</p>
+            <button data-testid="guest-reauth-btn" onClick={onSignOut}
+              style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+              Enter PIN again
+            </button>
+          </div>
+        )}
 
         {error && (
           <div style={{ background: 'var(--c-danger-bg, #fef2f2)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>

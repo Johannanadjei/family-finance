@@ -86,23 +86,56 @@ describe('createInvite', () => {
 // ── getInviteByToken ──────────────────────────────────────────────────────────
 
 describe('getInviteByToken', () => {
+  // What the get_invite_by_token RPC projects — the same shape the old table
+  // select returned, minus the token (never echoed back to the caller).
+  const inviteProjection = {
+    role:           mockInvite.role,
+    invited_email:  mockInvite.invited_email,
+    expires_at:     mockInvite.expires_at,
+    budget_centres: mockInvite.budget_centres,
+  };
+
+  it('reads through the get_invite_by_token RPC, not the table', async () => {
+    // Security-relevant: a table select relies on a policy that cannot see the
+    // token filter. The token must travel as an RPC argument.
+    mockRpc.mockResolvedValueOnce({ data: inviteProjection, error: null });
+    await getInviteByToken('tok-abc');
+    expect(mockRpc).toHaveBeenCalledWith('get_invite_by_token', { p_token: 'tok-abc' });
+  });
+
   it('returns invite on success', async () => {
-    mockResolve = () => ({ data: mockInvite, error: null });
+    mockRpc.mockResolvedValueOnce({ data: inviteProjection, error: null });
     const { data, error } = await getInviteByToken('tok-abc');
-    expect(data).toEqual(mockInvite);
+    expect(data).toEqual(inviteProjection);
     expect(error).toBeNull();
   });
 
+  it('does not expose the invite token to the client', async () => {
+    mockRpc.mockResolvedValueOnce({ data: inviteProjection, error: null });
+    const { data } = await getInviteByToken('tok-abc');
+    expect(data.token).toBeUndefined();
+  });
+
   it('returns null when token not found', async () => {
-    mockResolve = () => ({ data: null, error: null });
+    mockRpc.mockResolvedValueOnce({ data: null, error: null });
     const { data, error } = await getInviteByToken('bad-token');
     expect(data).toBeNull();
     expect(error).toBeNull();
   });
 
+  it('returns null (not an error) for a malformed token', async () => {
+    // The RPC guards the uuid cast and returns NULL, so a mangled link reads as
+    // "invite not found" rather than surfacing a database error pre-auth.
+    mockRpc.mockResolvedValueOnce({ data: null, error: null });
+    const { data, error } = await getInviteByToken('not-a-uuid');
+    expect(data).toBeNull();
+    expect(error).toBeNull();
+  });
+
   it('returns error on Supabase failure', async () => {
-    mockResolve = () => ({ data: null, error: new Error('db error') });
+    mockRpc.mockResolvedValueOnce({ data: null, error: new Error('db error') });
     const { data, error } = await getInviteByToken('tok-abc');
+    expect(data).toBeNull();
     expect(error).toBeTruthy();
   });
 });
@@ -167,5 +200,20 @@ describe('acceptInvite', () => {
     const { data, error } = await acceptInvite({ token: 'bad' });
     expect(data).toBeNull();
     expect(error).toBeTruthy();
+  });
+
+  it('maps an identity-binding rejection to friendly copy and keeps the code', async () => {
+    // The server rejects a caller whose email is not the invite's invited_email.
+    // JoinView blocks this first, so this path means the UI was bypassed — the
+    // user must still not see a raw database message.
+    const rpcErr = new Error('invite_email_mismatch: this invite was sent to a different email address');
+    rpcErr.code = 'INV01';
+    mockRpc.mockResolvedValueOnce({ data: null, error: rpcErr });
+
+    const { data, error } = await acceptInvite({ token: 'tok-abc' });
+    expect(data).toBeNull();
+    expect(error.code).toBe('INV01');
+    expect(error.message).toMatch(/different email address/i);
+    expect(error.message).not.toMatch(/invite_email_mismatch/);
   });
 });
