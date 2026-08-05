@@ -13,10 +13,12 @@ import { mockCentre, mockFmt, mockCategories, mockPrevMonthCategories, mockTxs }
 // BudgetView reads allCategories and filters the viewed cycle locally by cycle_id
 // (Commit 11.5), recomputing spend from txs — so the mock provides those, not totals.
 let mockCan = () => true;   // owner/full_access by default; standard-member tests flip it
+let mockIsOwner = true;     // owner by default; cap-CTA tests flip it
 const mockBudgetCentre = {
   centre:                  mockCentre,
   fmt:                     mockFmt,
   can:                     (p) => mockCan(p),
+  get isOwner()            { return mockIsOwner; },
   reloadCategories:        vi.fn().mockResolvedValue(undefined),   // post-reset re-sync
   allCategories:           mockCategories,                 // month === current month
   addCategory:             vi.fn().mockResolvedValue({ error: null }),
@@ -48,7 +50,7 @@ const mockFinance = {
   activeCycleId: null,                // null → follows the auto-resolved current cycle
   loadCycle:     vi.fn(),
   resetPeriod:   vi.fn().mockResolvedValue({ data: { categories_reset: 0, transactions_reset: 0 }, error: null }),
-  userPlan:      'free',
+  hubPlan:      'free',
 };
 
 vi.mock('../context/FinanceContext', () => ({
@@ -123,6 +125,69 @@ describe('BudgetView', () => {
     expect(screen.queryByText('+ Add budget category')).toBeNull();
     fireEvent.click(screen.getByTestId('upgrade-categories-btn'));
     expect(screen.getByText(/category limit for this period/)).toBeTruthy();   // UpgradeModal body
+    expect(screen.queryByTestId('ask-owner-note')).toBeNull();                 // owner keeps the pay CTA
+    resetCats();
+  });
+
+  // The cap is the HUB's (its owner's), not the viewer's. A member of a PAID hub was
+  // being shown "10 of 10" and offered an upgrade that could never lift it, while the
+  // server would have accepted the write — the false-cap half of the freemium bug.
+  it('PAID hub, NON-OWNER at 10 categories: no cap, no CTA, no ask-owner line', () => {
+    // THE inverse bug, stated directly. The viewer is a member on Free themselves, but
+    // the hub's owner pays, so create_category would accept category #11. Before this
+    // fix the client showed "10 of 10", blocked the add, and offered an upgrade that
+    // could never have lifted the cap. Nothing may render here.
+    mockFinance.hubPlan = 'pro';
+    mockIsOwner = false;
+    mockBudgetCentre.allCategories = Array.from({ length: 10 }, (_, i) => ({
+      id: `c${i}`, name: `Cat ${i}`, icon: '🛒', budget_amount: 10, is_fixed: true,
+      sort_order: i, month: getCurrentMonth(), cycle_id: 'cyc-this',
+    }));
+    renderView();
+    expect(screen.getByTestId('category-count').textContent).toBe('10 categories');
+    expect(screen.getByText('+ Add budget category')).toBeTruthy();
+    expect(screen.queryByTestId('upgrade-categories-btn')).toBeNull();
+    expect(screen.queryByTestId('ask-owner-note')).toBeNull();   // no cap → nothing to ask for
+    mockFinance.hubPlan = 'free';
+    mockIsOwner = true;
+    resetCats();
+  });
+
+  // Unresolved tier must not render a cap it may not have.
+  it('hubPlan not yet resolved: no cap and no upgrade CTA at 10 categories', () => {
+    mockFinance.hubPlan = null;
+    mockBudgetCentre.allCategories = Array.from({ length: 10 }, (_, i) => ({
+      id: `c${i}`, name: `Cat ${i}`, icon: '🛒', budget_amount: 10, is_fixed: true,
+      sort_order: i, month: getCurrentMonth(), cycle_id: 'cyc-this',
+    }));
+    renderView();
+    expect(screen.queryByTestId('upgrade-categories-btn')).toBeNull();
+    expect(screen.getByText('+ Add budget category')).toBeTruthy();
+    mockFinance.hubPlan = 'free';
+    resetCats();
+  });
+
+  // Free hub, non-owner: the LIMIT still shows (they hit the same shared cap and must
+  // know why), but the purchase path is replaced — their payment would land on their
+  // own account and leave this hub's cap exactly where it is.
+  it('free hub, non-owner at cap: states the limit and offers ask-owner, not a pay CTA', () => {
+    mockIsOwner = false;
+    mockBudgetCentre.allCategories = Array.from({ length: 10 }, (_, i) => ({
+      id: `c${i}`, name: `Cat ${i}`, icon: '🛒', budget_amount: 10, is_fixed: true,
+      sort_order: i, month: getCurrentMonth(), cycle_id: 'cyc-this',
+    }));
+    renderView();
+
+    expect(screen.getByTestId('category-count').textContent).toBe('10 of 10');   // cap still visible
+    const btn = screen.getByTestId('upgrade-categories-btn');
+    expect(btn.textContent).toBe('Limit reached');
+    expect(screen.queryByText('Upgrade to Pro')).toBeNull();
+
+    fireEvent.click(btn);
+    expect(screen.getByText(/category limit for this period/)).toBeTruthy();     // explanation intact
+    expect(screen.getByTestId('ask-owner-note')).toBeTruthy();
+
+    mockIsOwner = true;
     resetCats();
   });
 
@@ -377,14 +442,14 @@ describe('BudgetView — history gate at-wall affordance', () => {
   });
   afterEach(() => {
     mockCan = () => true;
-    Object.assign(mockFinance, { cycles: [THIS_CYCLE], activeCycle: THIS_CYCLE, activeCycleId: null, userPlan: 'free' });
+    Object.assign(mockFinance, { cycles: [THIS_CYCLE], activeCycle: THIS_CYCLE, activeCycleId: null, hubPlan: 'free' });
     mockFinance.visibleCycles = undefined;   // back to "defaults to cycles" in the mock factory
     mockBudgetCentre.allCategories = mockCategories;
   });
 
   it('free + hidden cycles + on oldest visible: prev arrow is a tappable upgrade affordance that opens the modal', () => {
     // 4 cycles total, free window = 3 (Jun/May/Apr); viewing Apr (oldest visible) → Mar hidden.
-    Object.assign(mockFinance, { cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycle: JUN, activeCycleId: 'cyc-apr', userPlan: 'free' });
+    Object.assign(mockFinance, { cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycle: JUN, activeCycleId: 'cyc-apr', hubPlan: 'free' });
     renderView();
     const affordance = screen.getByTestId('upgrade-history-affordance');
     expect(affordance.disabled).toBe(false);            // tappable, not disabled
@@ -394,14 +459,25 @@ describe('BudgetView — history gate at-wall affordance', () => {
 
   it('Pro at the hub natural oldest: normal disabled prev, no affordance', () => {
     // Pro sees all; visibleCycles === cycles → nothing hidden.
-    Object.assign(mockFinance, { cycles: [JUN, MAY, APR], visibleCycles: [JUN, MAY, APR], activeCycle: JUN, activeCycleId: 'cyc-apr', userPlan: 'pro' });
+    Object.assign(mockFinance, { cycles: [JUN, MAY, APR], visibleCycles: [JUN, MAY, APR], activeCycle: JUN, activeCycleId: 'cyc-apr', hubPlan: 'pro' });
     renderView();
     expect(screen.queryByTestId('upgrade-history-affordance')).toBeNull();
     expect(screen.getByLabelText('Previous period').disabled).toBe(true);
   });
 
+  it('PAID hub, NON-OWNER: full history, no at-wall affordance', () => {
+    // The inverse bug on the history axis: a member of a paid hub was having periods
+    // 4+ hidden and being nudged to buy Pro, on a hub that already had it.
+    mockIsOwner = false;
+    Object.assign(mockFinance, { cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR, MAR], activeCycle: JUN, activeCycleId: 'cyc-mar', hubPlan: 'pro' });
+    renderView();
+    expect(screen.queryByTestId('upgrade-history-affordance')).toBeNull();
+    expect(screen.queryByTestId('ask-owner-note')).toBeNull();
+    mockIsOwner = true;
+  });
+
   it('free with ≤3 cycles total: no hidden history → normal disabled prev, no affordance', () => {
-    Object.assign(mockFinance, { cycles: [MAY, APR], visibleCycles: [MAY, APR], activeCycle: MAY, activeCycleId: 'cyc-apr', userPlan: 'free' });
+    Object.assign(mockFinance, { cycles: [MAY, APR], visibleCycles: [MAY, APR], activeCycle: MAY, activeCycleId: 'cyc-apr', hubPlan: 'free' });
     renderView();
     expect(screen.queryByTestId('upgrade-history-affordance')).toBeNull();
     expect(screen.getByLabelText('Previous period').disabled).toBe(true);

@@ -28,7 +28,7 @@ vi.mock('../../context/BudgetCentreContext', () => ({
 }));
 
 vi.mock('../../context/FinanceContext', () => ({
-  useFinanceContext: () => ({ userPlan: 'free' }),
+  useFinanceContext: () => ({ hubPlan: 'free' }),
 }));
 
 const renderSection = () => render(<GuestSettingsSection />);
@@ -88,7 +88,7 @@ describe('GuestSettingsSection', () => {
 
   it('shows add button for pro plan regardless of guest count', async () => {
     vi.doMock('../../context/FinanceContext', () => ({
-      useFinanceContext: () => ({ userPlan: 'pro' }),
+      useFinanceContext: () => ({ hubPlan: 'pro' }),
     }));
     // Re-render via separate test — this just checks the gate logic
     mockGetGuestUsers.mockResolvedValueOnce({ data: mockGuests, error: null });

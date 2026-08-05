@@ -46,7 +46,7 @@ function LogViewSkeleton() {
 export function LogView({ onEditTx }) {
   const { fmt, can, currentUserId }          = useBudgetCentreContext();
   const { txs, loading, cyclesLoading, error,
-          activeMonth, cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, userPlan,
+          activeMonth, cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, hubPlan,
           deleteTransaction, moveTransaction } = useFinanceContext();
   const [filter,      setFilter]            = useState('all');
   const [search,      setSearch]            = useState('');
@@ -75,7 +75,7 @@ export function LogView({ onEditTx }) {
   const periodLabel    = viewedCycle?.name ?? formatMonth(activeMonth);
   // History gate (D6/D8): at-wall upgrade affordance only for a FREE user with older
   // cycles hidden AND on the oldest VISIBLE cycle. Pro / ≤3-cycle hubs → normal disabled.
-  const historyLocked  = (userPlan || 'free') === 'free' && cycles.length > visibleCycles.length && nav.isOldest;
+  const historyLocked  = hubPlan === 'free' && cycles.length > visibleCycles.length && nav.isOldest;
   const showAllTxs     = can('viewAllTxs');
   const showIncome     = can('viewIncome');
 

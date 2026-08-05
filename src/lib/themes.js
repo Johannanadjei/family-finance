@@ -274,13 +274,16 @@ export const THEMES = {
  * @param {string} role — currentMemberRole
  * @param {string|null} centreSkinId — centre.skin_id
  * @param {string|null} prefThemeSkin — prefs.themeSkin
- * @param {'free'|'pro'} [userPlan='free'] — owner tier from useSubscription
+ * @param {'free'|'pro'} [hubPlan='free'] — the HUB's tier (its OWNER's), from
+ *   useHubTier. NOT the viewer's own tier: the skin belongs to the hub, so every
+ *   member of a Pro hub renders its Pro skin. App.jsx holds the effect until this
+ *   resolves rather than passing null, which would clamp a Pro skin for a beat.
  * @returns {string} skin key
  */
-export const resolveSkin = (role, centreSkinId, prefThemeSkin, userPlan = 'free') => {
+export const resolveSkin = (role, centreSkinId, prefThemeSkin, hubPlan = 'free') => {
   if (role === 'standard') return 'family_warmth';
   const resolved = centreSkinId || prefThemeSkin || 'family_warmth';
-  if (userPlan !== 'pro' && isProSkin(resolved)) return 'family_warmth';
+  if (hubPlan !== 'pro' && isProSkin(resolved)) return 'family_warmth';
   return resolved;
 };
 

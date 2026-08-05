@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, fireEvent }        from '@testing-library/react';
+import { render, screen, act, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter }                          from 'react-router-dom';
 import { SettingsView }                          from './SettingsView';
 import { mockCentre, mockFmt, mockCategories, mockIncomes } from '../test-utils/fixtures';
@@ -27,6 +27,7 @@ const mockCan                = vi.fn().mockReturnValue(true);
 // Mutable so cap tests can swap in a 10-category slice / Pro plan.
 let mockCats = mockCategories;
 let mockPlan = 'free';
+let mockIsOwner = true;
 
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => ({ user: null, loading: false, signOut: mockSignOut }),
@@ -49,6 +50,7 @@ vi.mock('../context/BudgetCentreContext', () => ({
     members:           [],
     currentMemberRole: 'owner',
     can:               mockCan,
+    get isOwner()      { return mockIsOwner; },
     inviteMember:      mockInviteMember,
     removeMember:      mockRemoveMember,
     getInvites:        mockGetInvites,
@@ -67,7 +69,7 @@ vi.mock('../context/FinanceContext', () => ({
     addIncomeSource:     mockAddIncomeSource,
     deleteIncomeSource:  mockDeleteIncomeSource,
     updateIncomeSource:  mockUpdateIncomeSource,
-    get userPlan()       { return mockPlan; },
+    get hubPlan()       { return mockPlan; },
   }),
 }));
 
@@ -113,6 +115,7 @@ describe('SettingsView', () => {
     mockAddCategory.mockClear();
     mockCats = mockCategories;
     mockPlan = 'free';
+    mockIsOwner = true;
   });
 
   it('renders Settings heading', () => {
@@ -263,6 +266,43 @@ describe('SettingsView', () => {
     renderSettings();
     expect(screen.getByTestId('category-count').textContent).toBe('2 categories');
     expect(screen.getByTestId('add-category-btn')).toBeTruthy();
+  });
+
+  // Settings is reachable by full_access as well as the owner, so this is the gate's
+  // real audience: a co-owner who can manage everything except the hub's billing.
+  it('free hub, non-owner at cap: keeps the limit visible, swaps the pay CTA', async () => {
+    mockIsOwner = false;
+    mockCats = Array.from({ length: 10 }, (_, i) => ({
+      id: `c${i}`, name: `Cat ${i}`, icon: '🛒', budget_amount: 10, is_fixed: true, sort_order: i, month: getCurrentMonth(), cycle_id: 'cyc-this',
+    }));
+    renderSettings();
+
+    expect(screen.getByTestId('category-count').textContent).toBe('10 of 10');
+    expect(screen.getByTestId('upgrade-categories-btn').textContent).toBe('Limit reached');
+
+    await act(async () => { screen.getByTestId('upgrade-categories-btn').click(); });
+
+    // Scoped to the modal on purpose: PlanSection's own "Upgrade to Pro" link is
+    // still on this page and is deliberately NOT gated — it sells the viewer their
+    // own account tier, which is a legitimate purchase for any role. Only the
+    // hub-cap-driven CTA is withheld.
+    const dialog = within(screen.getByTestId('upgrade-modal-category-settings'));
+    expect(dialog.getByText(/category limit for this period/)).toBeTruthy();
+    expect(dialog.getByTestId('ask-owner-note')).toBeTruthy();
+    expect(dialog.queryByText('Upgrade to Pro')).toBeNull();
+    expect(screen.getByTestId('plan-cta')).toBeTruthy();   // account-scoped path intact
+  });
+
+  it('PRO hub at 10 categories: no cap for anyone, owner or not', () => {
+    mockPlan = 'pro';
+    mockIsOwner = false;
+    mockCats = Array.from({ length: 10 }, (_, i) => ({
+      id: `c${i}`, name: `Cat ${i}`, icon: '🛒', budget_amount: 10, is_fixed: true, sort_order: i, month: getCurrentMonth(), cycle_id: 'cyc-this',
+    }));
+    renderSettings();
+    expect(screen.getByTestId('category-count').textContent).toBe('10 categories');
+    expect(screen.getByTestId('add-category-btn')).toBeTruthy();
+    expect(screen.queryByTestId('upgrade-categories-btn')).toBeNull();
   });
 
   it('shows error when fixed_date pay day is out of range', async () => {

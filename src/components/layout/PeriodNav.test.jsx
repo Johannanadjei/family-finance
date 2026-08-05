@@ -13,7 +13,14 @@ import { PeriodNav } from './PeriodNav';
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
 
-beforeEach(() => mockNavigate.mockClear());
+// PeriodNav reads isOwner from BudgetCentreContext to decide whether the history-cap
+// modal offers a pay CTA or the "ask your hub owner" line.
+let mockIsOwner = true;
+vi.mock('../../context/BudgetCentreContext', () => ({
+  useBudgetCentreContext: () => ({ isOwner: mockIsOwner }),
+}));
+
+beforeEach(() => { mockNavigate.mockClear(); mockIsOwner = true; });
 
 const base = {
   periodLabel: 'May 2026',
@@ -76,5 +83,24 @@ describe('PeriodNav', () => {
     fireEvent.click(screen.getByText('Upgrade to Pro'));      // modal's primary CTA
     expect(mockNavigate).toHaveBeenCalledWith('/pricing');
     expect(screen.queryByText(/history limit/)).toBeNull();   // modal closed
+  });
+
+  // The history cap belongs to the hub, so a non-owner is genuinely blocked by it and
+  // must see why — but buying Pro on their own account would not widen this hub's
+  // window by a single period.
+  it('locked, non-owner: the affordance and the explanation stay; the pay CTA does not', () => {
+    mockIsOwner = false;
+    render(<PeriodNav {...base} isOldest historyLocked />);
+
+    const affordance = screen.getByTestId('upgrade-history-affordance');
+    expect(affordance.disabled).toBe(false);
+    fireEvent.click(affordance);
+
+    expect(screen.getByText(/history limit/)).toBeTruthy();    // cap message intact
+    expect(screen.getByTestId('ask-owner-note')).toBeTruthy();
+    expect(screen.queryByText('Upgrade to Pro')).toBeNull();
+
+    fireEvent.click(screen.getByText('Got it'));
+    expect(mockNavigate).not.toHaveBeenCalled();               // no route to checkout
   });
 });

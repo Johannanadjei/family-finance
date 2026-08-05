@@ -49,8 +49,8 @@ function BudgetViewSkeleton() {
 
 export function BudgetView() {
   const navigate = useNavigate();
-  const { allCategories = [], fmt, can, addCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth } = useBudgetCentreContext();
-  const { txs, loading, cyclesLoading, error, activeMonth, cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, userPlan } = useFinanceContext();
+  const { allCategories = [], fmt, can, isOwner, addCategory, prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth } = useBudgetCentreContext();
+  const { txs, loading, cyclesLoading, error, activeMonth, cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, hubPlan } = useFinanceContext();
   const [sheetOpen,        setSheetOpen]        = useState(false);
   const [periodOpen,       setPeriodOpen]       = useState(false);   // Phase B: budget-period creator
   const [copySheetOpen,    setCopySheetOpen]    = useState(false);   // 2C: multi-select rollforward sheet
@@ -80,12 +80,13 @@ export function BudgetView() {
   const categorySpend = useMemo(() => calcCategorySpend(txs, viewedCategories), [txs, viewedCategories]);
   const fixedSpent    = useMemo(() => calcFixedSpent(txs, viewedCategories),    [txs, viewedCategories]);
 
-  // Category cap (CAT01) — UX gate only (owner-tier enforced server-side). Free → "N of 10".
-  const plan      = userPlan || 'free';
+  // Category cap (CAT01) — keyed on the HUB's tier (its owner's), which is what
+  // create_category enforces. null = unresolved → no cap shown. Free → "N of 10".
+  const plan      = hubPlan;
   const catLimit  = getLimitsForTier(plan).maxCategoriesPerHub;
   const atCatCap  = plan === 'free' && viewedCategories.length >= catLimit;
 
-  // History gate (D6) — at-wall upgrade affordance shows only for a FREE user with older
+  // History gate (D6) — at-wall upgrade affordance shows only on a FREE HUB with older
   // cycles hidden AND on the oldest VISIBLE cycle. Pro / ≤3-cycle hubs → normal disabled.
   const historyLocked = plan === 'free' && cycles.length > visibleCycles.length && nav.isOldest;
 
@@ -171,7 +172,7 @@ export function BudgetView() {
         count={viewedCategories.length}
         limit={catLimit}
         plan={plan}
-        atCap={atCatCap}
+        atCap={atCatCap} isOwner={isOwner}
         onUpgrade={() => setShowUpgrade(true)}
       />
 
@@ -193,7 +194,7 @@ export function BudgetView() {
 
       {guardModal}
 
-      <UpgradeModal testid="upgrade-modal-category-budget" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={CATEGORY_CAP_BODY} />
+      <UpgradeModal testid="upgrade-modal-category-budget" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={CATEGORY_CAP_BODY} canUpgrade={isOwner} />
     </div>
   );
 }

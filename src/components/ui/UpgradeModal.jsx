@@ -24,6 +24,14 @@
  * @param {string}            [itemsLabel] heading above the bullet list
  * @param {string[]}          [items]      bullet list; defaults to the hub-cap options
  * @param {string}            [ctaLabel]   overrides the button label (default: "Upgrade to Pro" when onUpgrade is set, else "Got it")
+ * @param {boolean}           [canUpgrade] when false, the pay CTA is withheld: the body
+ *                                         (the cap explanation) still renders in full, but
+ *                                         the button reverts to a "Got it" dismiss and
+ *                                         ASK_OWNER_LINE takes the CTA's place. For
+ *                                         hub-scoped caps this is the viewer's isOwner —
+ *                                         a non-owner's payment lands on their own account
+ *                                         and cannot lift THIS hub's cap. Defaults true so
+ *                                         account-scoped gates (the hub cap) are unaffected.
  * @param {string}            [testid]     data-testid for the dialog container; defaults to 'upgrade-modal'.
  *                                         Cap-gate consumers pass a per-gate value (e.g. 'upgrade-modal-hub')
  *                                         so tests can assert WHICH gate's modal opened.
@@ -31,6 +39,7 @@
 
 import { createPortal }   from 'react-dom';
 import { useModalChrome } from '../../hooks/useModalChrome';
+import { ASK_OWNER_LINE } from '../../lib/planCopy';
 
 const DEFAULT_TITLE = 'Upgrade to Pro';
 
@@ -56,6 +65,7 @@ export function UpgradeModal({
   itemsLabel = DEFAULT_ITEMS_LABEL,
   items      = DEFAULT_ITEMS,
   ctaLabel,
+  canUpgrade = true,
   testid     = 'upgrade-modal',
 }) {
   const { dismissForNavigation } = useModalChrome({ isOpen: open, onClose });   // call ABOVE the guard, per its contract
@@ -66,8 +76,13 @@ export function UpgradeModal({
   // one it's a plain dismiss. ctaLabel overrides either default when a consumer passes it.
   // dismissForNavigation() runs first so the modal's close-time history.back() doesn't pop
   // the /pricing entry onUpgrade is about to push (see useModalChrome).
-  const onCta = onUpgrade ? () => { dismissForNavigation(); onUpgrade(); } : onClose;
-  const label = ctaLabel ?? (onUpgrade ? 'Upgrade to Pro' : 'Got it');
+  // canUpgrade === false withholds the purchase path entirely: no navigation, no
+  // Paystack, no "Upgrade to Pro" label. The cap copy above is untouched — hiding
+  // that would leave a non-owner stuck at a limit with no explanation, which is a
+  // worse failure than the misleading button we are removing.
+  const upgradeAllowed = canUpgrade && !!onUpgrade;
+  const onCta = upgradeAllowed ? () => { dismissForNavigation(); onUpgrade(); } : onClose;
+  const label = ctaLabel ?? (upgradeAllowed ? 'Upgrade to Pro' : 'Got it');
 
   return createPortal(
     <>
@@ -88,6 +103,10 @@ export function UpgradeModal({
               ))}
             </ul>
           </>
+        )}
+
+        {!canUpgrade && onUpgrade && (
+          <p data-testid="ask-owner-note" style={{ fontSize: 13, fontWeight: 800, color: 'var(--c-text, #1c1917)', margin: '4px 0 14px', lineHeight: 1.5 }}>{ASK_OWNER_LINE}</p>
         )}
 
         <button onClick={onCta} style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>

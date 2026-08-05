@@ -62,7 +62,7 @@ export function PaydayView() {
 
   const {
     incomes, allIncomes = [], error, totalReceived, totalExpected, totalPending, totalIncome, txs,
-    activeMonth, cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, userPlan,
+    activeMonth, cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, hubPlan,
     markReceived, markPending, updateExpectedAmount, copyIncomeSourcesToMonth,
   } = financeValues;
 
@@ -83,7 +83,7 @@ export function PaydayView() {
   // History gate (D6/D8): at the oldest VISIBLE cycle with older periods hidden, this
   // both (a) stops the offsetMonth fallback pulling income from a hidden period (Phase 1
   // §F leak) and (b) drives the prev-arrow upgrade affordance in <PeriodNav> via PaydayHeader.
-  const historyLocked  = (userPlan || 'free') === 'free' && cycles.length > visibleCycles.length && nav.isOldest;
+  const historyLocked  = hubPlan === 'free' && cycles.length > visibleCycles.length && nav.isOldest;
   // Rollforward source = the PREVIOUS CYCLE (not prev calendar month; cycles can gap).
   const prevMonth      = nav.prev ? nav.prev.start_date.slice(0, 7)
                        : historyLocked ? null

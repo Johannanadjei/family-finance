@@ -13,6 +13,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 let mockResolve;   // resolves .maybeSingle()
 let eqCalls;       // [col, val] pairs passed to .eq()
 let isCalls;       // [col, val] pairs passed to .is()
+let mockRpcResolve;// resolves supabase.rpc()
+let rpcCalls;      // [fnName, args] pairs passed to .rpc()
 
 vi.mock('../lib/supabase', () => {
   const chain = () => {
@@ -27,10 +29,15 @@ vi.mock('../lib/supabase', () => {
     };
     return q;
   };
-  return { supabase: { from: () => chain() } };
+  return {
+    supabase: {
+      from: () => chain(),
+      rpc:  (fn, args) => { rpcCalls.push([fn, args]); return Promise.resolve(mockRpcResolve); },
+    },
+  };
 });
 
-import { getCurrentSubscription, resolveSubscription } from './subscriptions.service';
+import { getCurrentSubscription, getHubTier, resolveSubscription } from './subscriptions.service';
 
 const proRow = {
   id:                   'sub-1',
@@ -42,9 +49,39 @@ const proRow = {
 };
 
 beforeEach(() => {
-  mockResolve = { data: null, error: null };
-  eqCalls     = [];
-  isCalls     = [];
+  mockResolve    = { data: null, error: null };
+  eqCalls        = [];
+  isCalls        = [];
+  mockRpcResolve = { data: null, error: null };
+  rpcCalls       = [];
+});
+
+// ── getHubTier ──────────────────────────────────────────────────────────────
+// The hub's tier is its OWNER's, resolved by the hub_tier RPC. Must go through the
+// RPC, not a direct select: subscriptions RLS is own-row-only, so a member reading
+// it directly gets nothing and every hub collapses to 'free' (the false-cap bug).
+describe('getHubTier', () => {
+  it('calls the hub_tier RPC with the centre id and returns the tier', async () => {
+    mockRpcResolve = { data: 'pro', error: null };
+    const { data, error } = await getHubTier('centre-1');
+    expect(error).toBeNull();
+    expect(data).toBe('pro');
+    expect(rpcCalls).toContainEqual(['hub_tier', { p_centre_id: 'centre-1' }]);
+  });
+
+  it('returns the error and a null tier on RPC failure — never masks it as free', async () => {
+    mockRpcResolve = { data: null, error: { message: 'permission denied' } };
+    const { data, error } = await getHubTier('centre-1');
+    expect(data).toBeNull();
+    expect(error).toEqual({ message: 'permission denied' });
+  });
+
+  it('short-circuits on a missing centre id without calling the RPC', async () => {
+    const { data, error } = await getHubTier(null);
+    expect(data).toBeNull();
+    expect(error).toBeNull();
+    expect(rpcCalls).toHaveLength(0);
+  });
 });
 
 // ── getCurrentSubscription ──────────────────────────────────────────────────

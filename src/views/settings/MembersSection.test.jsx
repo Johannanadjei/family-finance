@@ -15,7 +15,8 @@ const defaultMembers = [
   { id: 'mem-2', user_id: 'user-2', role: 'standard', joined_at: '2026-02-01T00:00:00Z', users: { name: 'Bob',      email: 'b@test.com' } },
 ];
 let mockMembersList = defaultMembers;
-let mockUserPlan    = 'pro';
+let mockHubPlan    = 'pro';
+let mockIsOwner    = true;
 
 vi.mock('../../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({
@@ -23,6 +24,7 @@ vi.mock('../../context/BudgetCentreContext', () => ({
     currentMemberRole: 'owner',
     currentUserId:     'user-1',
     can:               () => true,
+    isOwner:           mockIsOwner,
     inviteMember:      mockInviteMember,
     removeMember:      mockRemoveMember,
     getInvites:        mockGetInvites,
@@ -32,7 +34,7 @@ vi.mock('../../context/BudgetCentreContext', () => ({
 }));
 
 vi.mock('../../context/FinanceContext', () => ({
-  useFinanceContext: () => ({ userPlan: mockUserPlan }),
+  useFinanceContext: () => ({ hubPlan: mockHubPlan }),
 }));
 
 const futureISO = () => new Date(Date.now() + 86400000).toISOString();
@@ -41,7 +43,8 @@ const pastISO   = () => new Date(Date.now() - 86400000).toISOString();
 beforeEach(() => {
   vi.clearAllMocks();
   mockMembersList = defaultMembers;
-  mockUserPlan    = 'pro';
+  mockHubPlan    = 'pro';
+  mockIsOwner    = true;
   mockGetInvites.mockResolvedValue({ data: [], error: null });
 });
 
@@ -58,7 +61,7 @@ describe('MembersSection', () => {
   });
 
   it('shows member count at the free cap (2 of 2), excluding pending invites', async () => {
-    mockUserPlan    = 'free';
+    mockHubPlan    = 'free';
     mockMembersList = [defaultMembers[0]];   // owner only → 1 active member
     mockGetInvites.mockResolvedValue({
       data: [{ id: 'inv-1', invited_email: 'alice@test.com', role: 'standard', status: 'pending', expires_at: futureISO() }],
@@ -206,14 +209,14 @@ describe('MembersSection', () => {
   // ── plan cap gate ──────────────────────────────────────────────────────────
 
   it('shows Upgrade to Pro button at the free member cap (2), hiding the invite button', async () => {
-    mockUserPlan = 'free';   // 2 default members → at the free cap of 2
+    mockHubPlan = 'free';   // 2 default members → at the free cap of 2
     render(<MembersSection />);
     await waitFor(() => expect(screen.getByTestId('upgrade-members-btn')).toBeTruthy());
     expect(screen.queryByTestId('invite-member-btn')).toBeNull();
   });
 
   it('opens the member-cap UpgradeModal with up-to-15 copy when Upgrade clicked', async () => {
-    mockUserPlan = 'free';
+    mockHubPlan = 'free';
     render(<MembersSection />);
     await waitFor(() => screen.getByTestId('upgrade-members-btn'));
     fireEvent.click(screen.getByTestId('upgrade-members-btn'));
@@ -222,7 +225,7 @@ describe('MembersSection', () => {
   });
 
   it('member-cap modal CTA routes to /pricing', async () => {
-    mockUserPlan = 'free';
+    mockHubPlan = 'free';
     render(<MembersSection />);
     await waitFor(() => screen.getByTestId('upgrade-members-btn'));
     fireEvent.click(screen.getByTestId('upgrade-members-btn'));
@@ -231,8 +234,51 @@ describe('MembersSection', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/pricing');
   });
 
+  // manageMembers is owner-only today, so isOwner is currently implied by canManage —
+  // this pins the billing gate independently, so it cannot start selling to a
+  // co-owner if the role map ever lets full_access invite.
+  it('non-owner at the member cap: no pay CTA, ask-owner instead', async () => {
+    mockHubPlan = 'free';
+    mockIsOwner = false;
+    render(<MembersSection />);
+
+    await waitFor(() => expect(screen.getByTestId('upgrade-members-btn')).toBeTruthy());
+    expect(screen.getByTestId('upgrade-members-btn').textContent).toBe('Limit reached');
+
+    fireEvent.click(screen.getByTestId('upgrade-members-btn'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/member limit/i)).toBeTruthy();     // cap message stays
+    expect(within(dialog).getByTestId('ask-owner-note')).toBeTruthy();
+    expect(within(dialog).queryByText('Upgrade to Pro')).toBeNull();
+
+    fireEvent.click(within(dialog).getByText('Got it'));
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  // The member cap is create_invite's "OWNER-TIER, NOT INVITER-TIER" rule. A hub whose
+  // owner pays has 15 seats regardless of what the person looking at it is on.
+  it('unresolved hubPlan: no cap computed against the free fallback of 2', async () => {
+    mockHubPlan = null;
+    render(<MembersSection />);
+    await waitFor(() => expect(screen.getByTestId('invite-member-btn')).toBeTruthy());
+    expect(screen.queryByTestId('upgrade-members-btn')).toBeNull();
+    expect(screen.getByTestId('member-count').textContent).toBe('2');   // no "of N" yet
+  });
+
+  // The inverse bug on the member axis: create_invite resolves the OWNER's tier, so a
+  // paid hub has 15 seats no matter who is looking at the invite form.
+  it('PAID hub, NON-OWNER at 2 members: no cap, no CTA, no ask-owner line', async () => {
+    mockHubPlan = 'pro';
+    mockIsOwner = false;   // 2 default members — the FREE cap, but this hub is paid
+    render(<MembersSection />);
+
+    await waitFor(() => expect(screen.getByTestId('member-count').textContent).toBe('2 of 15'));
+    expect(screen.queryByTestId('upgrade-members-btn')).toBeNull();
+    expect(screen.queryByTestId('ask-owner-note')).toBeNull();
+  });
+
   it('pro cap is 15, not 6 — 6 members still allows inviting', async () => {
-    mockUserPlan = 'pro';
+    mockHubPlan = 'pro';
     mockMembersList = Array.from({ length: 6 }, (_, i) => ({
       id: `mem-${i}`, user_id: `user-${i}`, role: i === 0 ? 'owner' : 'standard',
       joined_at: `2026-0${i + 1}-01T00:00:00Z`, users: { name: `M${i}`, email: `m${i}@test.com` },
@@ -243,7 +289,7 @@ describe('MembersSection', () => {
   });
 
   it('excludes expired pending invites from the list and the cap count', async () => {
-    mockUserPlan    = 'free';
+    mockHubPlan    = 'free';
     mockMembersList = [defaultMembers[0]];   // owner only → 1 active member
     mockGetInvites.mockResolvedValue({
       data: [

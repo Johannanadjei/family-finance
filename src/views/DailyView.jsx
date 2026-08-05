@@ -44,7 +44,7 @@ export function DailyView() {
   const { fmt, can }                         = useBudgetCentreContext();
   const { txs, totalSpent, weeklyData,
           loading, cyclesLoading, error, activeMonth,
-          cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, userPlan,
+          cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, hubPlan,
           deleteTransaction, moveTransaction } = useFinanceContext();
   const [deletingId,  setDeletingId]         = useState(null);
   const [deleteError, setDeleteError]        = useState(null);
@@ -71,7 +71,7 @@ export function DailyView() {
   const periodLabel    = viewedCycle?.name ?? formatMonth(activeMonth);
   // History gate (D6/D8): at-wall upgrade affordance only for a FREE user with older
   // cycles hidden AND on the oldest VISIBLE cycle. Pro / ≤3-cycle hubs → normal disabled.
-  const historyLocked  = (userPlan || 'free') === 'free' && cycles.length > visibleCycles.length && nav.isOldest;
+  const historyLocked  = hubPlan === 'free' && cycles.length > visibleCycles.length && nav.isOldest;
   const visibleTxs     = can('viewIncome') ? txs : txs.filter(tx => tx.type === 'expense');
   const grouped        = groupByDate(visibleTxs);
   const dates          = Object.keys(grouped);

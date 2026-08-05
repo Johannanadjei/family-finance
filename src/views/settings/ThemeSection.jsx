@@ -34,8 +34,11 @@ const SKINS = [
 
 export function ThemeSection() {
   const navigate = useNavigate();
-  const { prefs, saveThemeSkin, userPlan } = useFinanceContext();
-  const { updateCentreSkin, can }          = useBudgetCentreContext();
+  // hubPlan, not userPlan: the skin belongs to the hub, and update_centre_skin's
+  // SKN01 gate resolves the OWNER's tier. A full_access member of a Pro hub must see
+  // the Pro skins unlocked — they can legitimately set them.
+  const { prefs, saveThemeSkin, hubPlan }  = useFinanceContext();
+  const { updateCentreSkin, can, isOwner } = useBudgetCentreContext();
   const [showUpgrade, setShowUpgrade]      = useState(false);
   const current = prefs?.themeSkin || 'family_warmth';
 
@@ -56,7 +59,9 @@ export function ThemeSection() {
       <p style={{ fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: 0.8 }}>Theme</p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {SKINS.map(s => {
-          const locked = isProSkin(s.key) && userPlan !== 'pro';
+          // hubPlan null (unresolved) → treat as unlocked: a momentary PRO badge on a
+          // hub that is already Pro is the false-cap bug in miniature.
+          const locked = isProSkin(s.key) && hubPlan != null && hubPlan !== 'pro';
           return (
             <button
               key={s.key}
@@ -86,7 +91,7 @@ export function ThemeSection() {
         })}
       </div>
 
-      <UpgradeModal testid="upgrade-modal-skin" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={SKIN_CAP_BODY} />
+      <UpgradeModal testid="upgrade-modal-skin" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={SKIN_CAP_BODY} canUpgrade={isOwner} />
     </div>
   );
 }

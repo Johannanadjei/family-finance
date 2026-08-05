@@ -24,6 +24,7 @@ export function makeBudgetCentreMock(overrides = {}) {
       members:           mockMembers,
       currentMemberRole: 'owner',
       can:               vi.fn().mockReturnValue(true),
+      isOwner:           true,
       getCatIcon:        vi.fn((name) => name === 'Groceries' ? '🛒' : '💸'),
       addCategory:       vi.fn().mockResolvedValue({ error: null }),
       updateCentre:      vi.fn().mockResolvedValue({ error: null }),
@@ -79,7 +80,8 @@ export function makeFinanceMock(overrides = {}) {
       weeklyData:           mockWeeklyData,
       categorySpend:        mockCategorySpend,
       prefs:                { themeSkin: 'family_warmth' },
-      userPlan:             'free',
+      userPlan:             'free',   // viewer's own account tier (hub cap, /pricing)
+      hubPlan:              'free',   // the HUB's tier = its owner's (every hub-scoped cap)
       loadMonth:            vi.fn(),
       addTransaction:       vi.fn().mockResolvedValue({ error: null }),
       updateTransaction:    vi.fn().mockResolvedValue({ error: null }),
