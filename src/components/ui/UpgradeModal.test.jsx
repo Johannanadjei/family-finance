@@ -90,6 +90,68 @@ describe('UpgradeModal', () => {
     expect(screen.getByText('Second para.')).toBeTruthy();
   });
 
+  // ── canUpgrade — the owner-only purchase path ───────────────────────────────
+  // A subscription attaches to the payer's account, but hub caps resolve from the
+  // OWNER's tier. So a non-owner still sees the cap explanation in full; only the
+  // pay CTA is withheld.
+  describe('canUpgrade', () => {
+    it('withholds the pay CTA for a non-owner but keeps the cap message', () => {
+      const onUpgrade = vi.fn();
+      render(
+        <UpgradeModal
+          open={true}
+          onClose={vi.fn()}
+          onUpgrade={onUpgrade}
+          canUpgrade={false}
+          body={['You have reached this hub\'s category limit.']}
+        />
+      );
+
+      // The cap explanation survives — hiding it would leave a non-owner stuck at a
+      // limit with no explanation, which is worse than the misleading button.
+      expect(screen.getByText("You have reached this hub's category limit.")).toBeTruthy();
+      expect(screen.getByTestId('ask-owner-note').textContent).toBe('Ask your hub owner to upgrade to Pro.');
+      expect(screen.queryByText('Upgrade to Pro')).toBeNull();
+      expect(screen.getByText('Got it')).toBeTruthy();
+    });
+
+    it('never invokes onUpgrade when canUpgrade is false — the CTA dismisses instead', () => {
+      const onUpgrade = vi.fn();
+      const onClose   = vi.fn();
+      render(<UpgradeModal open={true} onClose={onClose} onUpgrade={onUpgrade} canUpgrade={false} />);
+
+      fireEvent.click(screen.getByText('Got it'));
+      expect(onUpgrade).not.toHaveBeenCalled();   // no /pricing, no Paystack
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('gives an owner the pay CTA and no ask-owner note', () => {
+      const onUpgrade = vi.fn();
+      render(<UpgradeModal open={true} onClose={vi.fn()} onUpgrade={onUpgrade} canUpgrade={true} />);
+
+      expect(screen.queryByTestId('ask-owner-note')).toBeNull();
+      fireEvent.click(screen.getByText('Upgrade to Pro'));
+      expect(onUpgrade).toHaveBeenCalled();
+    });
+
+    it('defaults to allowing the upgrade, so account-scoped gates are unaffected', () => {
+      // The hub cap (HubFooter) passes no canUpgrade: create_hub gates on the CALLER's
+      // tier, so that purchase genuinely does lift that cap for whoever is looking.
+      const onUpgrade = vi.fn();
+      render(<UpgradeModal open={true} onClose={vi.fn()} onUpgrade={onUpgrade} />);
+
+      expect(screen.queryByTestId('ask-owner-note')).toBeNull();
+      expect(screen.getByText('Upgrade to Pro')).toBeTruthy();
+    });
+
+    it('shows no ask-owner note when there was no upgrade path to begin with', () => {
+      // canUpgrade is irrelevant to an informational modal with no onUpgrade.
+      render(<UpgradeModal open={true} onClose={vi.fn()} canUpgrade={false} />);
+      expect(screen.queryByTestId('ask-owner-note')).toBeNull();
+      expect(screen.getByText('Got it')).toBeTruthy();
+    });
+  });
+
   it('applies the testid prop to the dialog container, defaulting to "upgrade-modal"', () => {
     const { rerender } = render(<UpgradeModal open={true} onClose={vi.fn()} />);
     expect(screen.getByTestId('upgrade-modal')).toBe(screen.getByRole('dialog'));   // default fallback

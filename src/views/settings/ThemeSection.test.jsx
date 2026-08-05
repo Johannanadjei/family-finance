@@ -12,24 +12,25 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
 
 const mockSaveThemeSkin    = vi.fn();
 const mockUpdateCentreSkin = vi.fn().mockResolvedValue({ data: {}, error: null });
-let   mockUserPlan         = 'free';
+let   mockHubPlan         = 'free';
 let   mockCan              = () => true;
+let   mockIsOwner          = true;
 
 vi.mock('../../context/FinanceContext', () => ({
   useFinanceContext: () => ({
     prefs:         { themeSkin: 'family_warmth' },
     saveThemeSkin: mockSaveThemeSkin,
-    userPlan:      mockUserPlan,
+    hubPlan:       mockHubPlan,
   }),
 }));
 
 vi.mock('../../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ updateCentreSkin: mockUpdateCentreSkin, can: (p) => mockCan(p) }),
+  useBudgetCentreContext: () => ({ updateCentreSkin: mockUpdateCentreSkin, can: (p) => mockCan(p), isOwner: mockIsOwner }),
 }));
 
 
 describe('ThemeSection', () => {
-  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUpdateCentreSkin.mockClear(); mockNavigate.mockClear(); mockUpdateCentreSkin.mockResolvedValue({ data: {}, error: null }); mockUserPlan = 'free'; mockCan = () => true; });
+  beforeEach(() => { mockSaveThemeSkin.mockClear(); mockUpdateCentreSkin.mockClear(); mockNavigate.mockClear(); mockUpdateCentreSkin.mockResolvedValue({ data: {}, error: null }); mockHubPlan = 'free'; mockCan = () => true; mockIsOwner = true; });
 
   it('renders free theme option', () => {
     render(<ThemeSection />);
@@ -89,7 +90,7 @@ describe('ThemeSection', () => {
   });
 
   it('pro users can select pro skins', async () => {
-    mockUserPlan = 'pro';
+    mockHubPlan = 'pro';
     render(<ThemeSection />);
     expect(screen.getByTestId('theme-corporate_professional').disabled).toBe(false);
     await act(async () => { screen.getByTestId('theme-corporate_professional').click(); });
@@ -97,9 +98,38 @@ describe('ThemeSection', () => {
   });
 
   it('pro users see no PRO badge on pro skins', () => {
-    mockUserPlan = 'pro';
+    mockHubPlan = 'pro';
     render(<ThemeSection />);
     expect(screen.queryByText('PRO')).toBeNull();
+  });
+
+  // A full_access member of a PAID hub may legitimately set a Pro skin —
+  // update_centre_skin authorises owner OR full_access and gates on the OWNER's tier.
+  // Locking their chips off the viewer's own tier was the false-cap bug.
+  it('PRO hub: skins unlock for a non-owner member too', async () => {
+    mockHubPlan = 'pro';
+    mockIsOwner = false;
+    render(<ThemeSection />);
+    expect(screen.queryByText('PRO')).toBeNull();
+    await act(async () => { screen.getByTestId('theme-corporate_professional').click(); });
+    expect(mockSaveThemeSkin).toHaveBeenCalledWith('corporate_professional');
+  });
+
+  it('hubPlan unresolved: no PRO badge flashes before the tier lands', () => {
+    mockHubPlan = null;
+    render(<ThemeSection />);
+    expect(screen.queryByText('PRO')).toBeNull();
+  });
+
+  it('free hub, non-owner: the skin modal explains the cap but offers no pay CTA', async () => {
+    mockIsOwner = false;
+    render(<ThemeSection />);
+    await act(async () => { screen.getByTestId('theme-corporate_professional').click(); });
+
+    expect(screen.getByText(/skin limit/)).toBeTruthy();       // cap message intact
+    expect(screen.getByTestId('ask-owner-note')).toBeTruthy();
+    expect(screen.queryByText('Upgrade to Pro')).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('renders nothing for standard members (no settings permission)', () => {

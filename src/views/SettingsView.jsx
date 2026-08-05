@@ -17,7 +17,7 @@ import { MembersSection }             from './settings/MembersSection';
 import { SecuritySection }            from './settings/SecuritySection';
 import { UpgradeModal }               from '../components/ui/UpgradeModal';
 import { getLimitsForTier }           from '../lib/plans';
-import { CATEGORY_CAP_BODY }          from '../lib/planCopy';
+import { CATEGORY_CAP_BODY, CAP_REACHED_LABEL } from '../lib/planCopy';
 
 const card         = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
 const sectionLabel = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 0.8 };
@@ -25,14 +25,15 @@ const sectionLabel = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b
 export function SettingsView() {
   const navigate  = useNavigate();
   const { signOut }                                                            = useAuth();
-  const { categories, fmt, addCategory, updateCategory, deleteCategory, can } = useBudgetCentreContext();
-  const { viewedCycleId, userPlan }                                           = useFinanceContext();
+  const { categories, fmt, addCategory, updateCategory, deleteCategory, can, isOwner } = useBudgetCentreContext();
+  const { viewedCycleId, hubPlan }                                                     = useFinanceContext();
 
   const [addCatOpen,      setAddCatOpen]      = useState(false);
   const [showUpgrade,     setShowUpgrade]     = useState(false);   // category-cap modal (CAT01)
 
-  // Category cap (CAT01) — current-cycle count; owner-tier enforced server-side.
-  const plan     = userPlan || 'free';
+  // Category cap (CAT01) — current-cycle count, keyed on the HUB's tier (its owner's),
+  // which is what create_category enforces. null = unresolved → no cap shown.
+  const plan     = hubPlan;
   const catLimit = getLimitsForTier(plan).maxCategoriesPerHub;
   const atCatCap = plan === 'free' && categories.length >= catLimit;
 
@@ -70,9 +71,11 @@ export function SettingsView() {
               {plan === 'free' ? `${categories.length} of ${catLimit}` : `${categories.length} categories`}
             </span>
             {atCatCap ? (
+              /* Shown to owner and full_access alike (both reach Settings); only the
+                 owner's opens a purchase path — see BudgetCategoryList for the rationale. */
               <button data-testid="upgrade-categories-btn" onClick={() => setShowUpgrade(true)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-primary, #064e3b)', fontSize: 13, fontWeight: 800, padding: 0, fontFamily: "'Nunito', sans-serif" }}>
-                Upgrade to Pro
+                {isOwner ? 'Upgrade to Pro' : CAP_REACHED_LABEL}
               </button>
             ) : (
               <button data-testid="add-category-btn" onClick={() => setAddCatOpen(true)}
@@ -119,7 +122,7 @@ export function SettingsView() {
       <LegalSection />
 
       <AddCategorySheet isOpen={addCatOpen} onClose={() => setAddCatOpen(false)} onAdd={(cat) => addCategory(cat, viewedCycleId)} />
-      <UpgradeModal testid="upgrade-modal-category-settings" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={CATEGORY_CAP_BODY} />
+      <UpgradeModal testid="upgrade-modal-category-settings" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={CATEGORY_CAP_BODY} canUpgrade={isOwner} />
     </div>
   );
 }

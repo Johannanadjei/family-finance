@@ -11,7 +11,7 @@ const slbl  = { fontSize: 13, fontWeight: 900, color: 'var(--c-muted, #6b7280)',
 
 export function GuestSettingsSection() {
   const { centre, categories } = useBudgetCentreContext();
-  const { userPlan }           = useFinanceContext();
+  const { hubPlan }            = useFinanceContext();
   const [guests,    setGuests]    = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -58,7 +58,11 @@ export function GuestSettingsSection() {
     setGuests(prev => prev.filter(g => g.id !== deleteId)); setDeleteId(null);
   };
 
-  const canAddMore = userPlan === 'pro' || guests.length === 0;
+  // Guests belong to the hub, so the cap follows the HUB's tier (its owner's), not
+  // the viewer's — a full_access member of a Pro hub was seeing "PRO to add more" on
+  // a hub that had already paid. null (unresolved) permits, so no false cap flashes.
+  // Display-only: this badge is static, with no purchase path to gate.
+  const canAddMore = hubPlan == null || hubPlan === 'pro' || guests.length === 0;
   const catNames   = categories.map(c => c.name);
 
   return (
