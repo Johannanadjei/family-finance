@@ -25,18 +25,20 @@
  * @param {function} onAddCategory     — open the add sheet from the list footer (guarded)
  * @param {number}   count             — number of categories in the viewed cycle
  * @param {number}   limit             — tier category cap (10 free / Infinity pro)
- * @param {string}   plan              — 'free' | 'pro' (drives count display + cap)
- * @param {boolean}  atCap             — free user at the per-cycle category limit
+ * @param {string|null} plan           — the HUB's tier: 'free' | 'pro' | null (unresolved)
+ * @param {boolean}  atCap             — free HUB at the per-cycle category limit
+ * @param {boolean}  isOwner           — viewer owns this hub; only they get the pay CTA
  * @param {function} onUpgrade         — open the CAT01 upgrade modal (shown at cap)
  */
 
 import { CategoryBudgetRow } from './CategoryBudgetRow';
 import { BudgetEmptyState }  from './BudgetEmptyState';
+import { CAP_REACHED_LABEL } from '../../lib/planCopy';
 
 export function BudgetCategoryList({
   categories, categorySpend, fmt, periodLabel, prevPeriodLabel, prevCategoryCount,
   copying, copyError, onCopyAll, onChooseWhich, onAddManually, onAddCategory,
-  count = 0, limit, plan = 'free', atCap = false, onUpgrade,
+  count = 0, limit, plan = null, atCap = false, isOwner = true, onUpgrade,
 }) {
   if (categories.length === 0) {
     return (
@@ -84,13 +86,17 @@ export function BudgetCategoryList({
         ))}
       </div>
 
+      {/* At cap the button renders for EVERY role — a non-owner hits the same shared
+          limit and must see it — but only the owner's opens a purchase path. Theirs
+          reads "Upgrade to Pro"; a non-owner's states the limit and the modal offers
+          ASK_OWNER_LINE instead of the pay CTA. */}
       {atCap ? (
         <button
           data-testid="upgrade-categories-btn"
           onClick={onUpgrade}
           style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginTop: 24, marginBottom: 16 }}
         >
-          Upgrade to Pro
+          {isOwner ? 'Upgrade to Pro' : CAP_REACHED_LABEL}
         </button>
       ) : (
         <button

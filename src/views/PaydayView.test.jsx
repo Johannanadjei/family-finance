@@ -10,7 +10,7 @@ import { PaydayView }               from './PaydayView';
 import { mockCentre, mockFmt, mockIncomes } from '../test-utils/fixtures';
 
 vi.mock('../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: () => true }),
+  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: () => true, isOwner: true }),
 }));
 
 // Base finance context — overridden per test via mockFinance
@@ -226,7 +226,7 @@ describe('PaydayView — cycle navigation', () => {
   const reset = () => {
     mockFinance.cycles = []; mockFinance.activeCycle = null;
     mockFinance.activeCycleId = null; mockFinance.loadCycle = vi.fn();
-    mockFinance.visibleCycles = undefined; mockFinance.userPlan = 'free';
+    mockFinance.visibleCycles = undefined; mockFinance.hubPlan = 'free';
     mockFinance.incomes = mockIncomes; mockFinance.allIncomes = mockIncomes;
   };
 
@@ -262,7 +262,7 @@ describe('PaydayView — cycle navigation', () => {
 
   it('free with hidden cycles: at the oldest VISIBLE cycle the prev arrow is a tappable upgrade affordance that opens the modal', () => {
     // 4 cycles, free window = 3 (Jun/May/Apr); Mar hidden. Viewing Apr (oldest visible).
-    withCycles({ cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycleId: 'cyc-apr', userPlan: 'free' });
+    withCycles({ cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycleId: 'cyc-apr', hubPlan: 'free' });
     renderView();
     const affordance = screen.getByTestId('upgrade-history-affordance');
     expect(affordance.disabled).toBe(false);                  // tappable, not disabled
@@ -276,7 +276,7 @@ describe('PaydayView — cycle navigation', () => {
     // even though allIncomes holds March sources (Phase 1 §F leak closed at the data layer).
     withCycles({
       cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycleId: 'cyc-apr',
-      userPlan: 'free', incomes: [],
+      hubPlan: 'free', incomes: [],
       allIncomes: [{ id: 'h1', label: 'Hidden Mar Salary', icon: '💰', expected_amount: 30000, currency: 'GHS', month: '2026-03', notes: '' }],
     });
     renderView();

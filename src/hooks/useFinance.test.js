@@ -261,11 +261,11 @@ describe('useFinance — cycles', () => {
       { id:'c-feb', budget_centre_id:'centre-1', name:'Feb', start_date:'2025-02-01', end_date:'2025-02-28', anchor_type:'calendar', deleted_at:null },
       { id:'c-jan', budget_centre_id:'centre-1', name:'Jan', start_date:'2025-01-01', end_date:'2025-01-31', anchor_type:'calendar', deleted_at:null },
     ];
-    const goPlan = (cyclesData, userPlan) => {
+    const goPlan = (cyclesData, hubPlan) => {
       getTransactionsByCycle.mockResolvedValue({ data: [], error: null });
       getIncomeSources.mockResolvedValue({ data: [], error: null });
       getCyclesForCentre.mockResolvedValue({ data: cyclesData, error: null });
-      return renderHook(() => useFinance({ centre: C, allCategories: CATS, userPlan }));
+      return renderHook(() => useFinance({ centre: C, allCategories: CATS, hubPlan }));
     };
 
     it('free: windows to the newest 3 cycles; full cycles list stays intact', async () => {
@@ -281,10 +281,13 @@ describe('useFinance — cycles', () => {
       expect(result.current.visibleCycles).toHaveLength(5);
     });
 
-    it('defaults to free when userPlan omitted', async () => {
-      const { result } = goPlan(C5);   // no userPlan → 'free'
+    // Unresolved tier shows EVERYTHING rather than defaulting to the free window.
+    // Hiding periods off a tier we have not fetched yet would flash a history cap on
+    // a Pro hub — the false-cap bug. The tier lands a moment later and windows it.
+    it('hubPlan omitted (unresolved): no window applied', async () => {
+      const { result } = goPlan(C5);   // no hubPlan → null → all cycles visible
       await waitFor(() => expect(result.current.cycles).toHaveLength(5));
-      expect(result.current.visibleCycles).toHaveLength(3);
+      expect(result.current.visibleCycles).toHaveLength(5);
     });
 
     it('hub with ≤3 cycles: no-op (visibleCycles === cycles) for free', async () => {

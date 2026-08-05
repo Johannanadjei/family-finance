@@ -6,7 +6,7 @@ import { ROLE_LABELS, ROLE_DESCRIPTIONS, INVITABLE_ROLES } from '../../lib/roles
 import { getLimitsForTier }                 from '../../lib/plans';
 import { selectStyle }                      from '../../lib/selectStyle';
 import { UpgradeModal }                     from '../../components/ui/UpgradeModal';
-import { MEMBER_CAP_BODY }                   from '../../lib/planCopy';
+import { MEMBER_CAP_BODY, CAP_REACHED_LABEL } from '../../lib/planCopy';
 import { MemberRow }                        from './MemberRow';
 
 const card       = { background: 'var(--c-card, #fff)', borderRadius: 16, padding: '16px 18px', boxShadow: 'var(--c-shadow)', marginBottom: 16 };
@@ -15,8 +15,8 @@ const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 10, bord
 
 export function MembersSection() {
   const navigate = useNavigate();
-  const { members, currentMemberRole, can, inviteMember, removeMember, getInvites, cancelInvite, centre } = useBudgetCentreContext();
-  const { userPlan } = useFinanceContext();
+  const { members, currentMemberRole, can, isOwner, inviteMember, removeMember, getInvites, cancelInvite, centre } = useBudgetCentreContext();
+  const { hubPlan } = useFinanceContext();
 
   const [invites,       setInvites]       = useState([]);
   const [invitesLoaded, setInvitesLoaded] = useState(false);
@@ -35,13 +35,17 @@ export function MembersSection() {
   const [cancelError,   setCancelError]   = useState(null);
   const [showUpgrade,   setShowUpgrade]   = useState(false);
 
-  const plan = userPlan || 'free';
+  // Member cap (MEM01) — the HUB's tier (its owner's), matching create_invite's own
+  // "OWNER-TIER, NOT INVITER-TIER" rule. null = unresolved → no cap shown.
+  const plan = hubPlan;
   const limit = getLimitsForTier(plan).maxMembersPerHub;
   // Non-expired pending invites only — expired invites neither hold a cap slot nor
   // appear in the list (agreed formula; mirrors the create_invite RPC server-side).
   const pendingInvites = invites.filter(i => i.status === 'pending' && new Date(i.expires_at) > new Date());
   const activeCount    = members.length;
-  const atLimit        = activeCount + pendingInvites.length >= limit;
+  // plan != null: getLimitsForTier(null) falls back to FREE_LIMITS, which would flash
+  // "Maximum 2 members reached" on a Pro hub before hubPlan lands.
+  const atLimit        = plan != null && activeCount + pendingInvites.length >= limit;
 
   const loadInvites = useCallback(async () => {
     const { data } = await getInvites();
@@ -91,7 +95,7 @@ export function MembersSection() {
     <div style={card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <p style={{ ...label, margin: 0 }}>Members</p>
-        <span data-testid="member-count" style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-muted, #6b7280)' }}>{activeCount} of {limit}</span>
+        <span data-testid="member-count" style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-muted, #6b7280)' }}>{plan == null ? activeCount : `${activeCount} of ${limit}`}</span>
       </div>
       {orderedMembers.map((m, i) => (
         <MemberRow
@@ -142,10 +146,13 @@ export function MembersSection() {
           </button>
         </div>
       )}
+      {/* canManage (manageMembers) is owner-only today, so isOwner is implied here.
+          Kept explicit: a billing decision must not start selling to co-owners if
+          that role map ever lets full_access invite. */}
       {canManage && atLimit && plan === 'free' && (
         <button data-testid="upgrade-members-btn" onClick={() => setShowUpgrade(true)}
           style={{ marginTop: 8, width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
-          Upgrade to Pro
+          {isOwner ? 'Upgrade to Pro' : CAP_REACHED_LABEL}
         </button>
       )}
       {canManage && atLimit && plan !== 'free' && (
@@ -187,7 +194,7 @@ export function MembersSection() {
         </>
       )}
 
-      <UpgradeModal testid="upgrade-modal-member" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={MEMBER_CAP_BODY} />
+      <UpgradeModal testid="upgrade-modal-member" open={showUpgrade} onClose={() => setShowUpgrade(false)} onUpgrade={() => { setShowUpgrade(false); navigate('/pricing'); }} body={MEMBER_CAP_BODY} canUpgrade={isOwner} />
     </div>
   );
 }

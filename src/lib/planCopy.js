@@ -15,6 +15,22 @@
  * of the defaults, so there is nothing to share. Future gates add their copy here.
  */
 
+// Non-owner substitute for the pay CTA at every hub-scoped cap gate. The cap
+// MESSAGE stays visible to all roles — a standard/full_access member hits the same
+// shared limit and must be told why — but the purchase path is owner-only: a
+// subscription attaches to the PAYER's user_id, while create_category /
+// create_invite / update_centre_skin all resolve the cap from
+// budget_centres.owner_id → subscriptions. A non-owner paying would upgrade their
+// own account and change nothing about this hub.
+//
+// This can only ever render on a hub whose owner is genuinely on Free: the gates
+// key on hubPlan (the owner's tier), so a paid hub shows no cap at all.
+export const ASK_OWNER_LINE = 'Ask your hub owner to upgrade to Pro.';
+
+// Label for a cap CTA shown to a non-owner. States the limit without implying they
+// can buy past it; still opens the same modal, which carries the full explanation.
+export const CAP_REACHED_LABEL = 'Limit reached';
+
 // Member-cap UpgradeModal body (moved from MembersSection.jsx — single source now).
 export const MEMBER_CAP_BODY = [
   "You've reached your hub's member limit. Free hubs can have 2 members (you + 1 invited).",

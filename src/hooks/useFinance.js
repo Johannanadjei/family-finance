@@ -39,7 +39,7 @@ import { waitForSession } from '../lib/auth';
 import { useIncomeMutations } from './useIncomeMutations';
 import { useTransactionMutations } from './useTransactionMutations';
 
-export function useFinance({ centre, allCategories, userPlan = 'free' }) {
+export function useFinance({ centre, allCategories, hubPlan = null }) {
   const centreId      = centre?.id           || null;
   const surplusTarget = centre?.surplus_target || 0;
   const currency      = centre?.currency      || 'GHS';
@@ -166,9 +166,14 @@ export function useFinance({ centre, allCategories, userPlan = 'free' }) {
   // visibleCycles for ALL navigation (getCycleNav, viewedCycle, move-to-period);
   // the full `cycles` list stays for internal plumbing (active-cycle resolution,
   // mutations). See lib/cycles.visibleCycleWindow + docs FinanceContext.
+  //
+  // Keyed on hubPlan (the OWNER's tier), not the viewer's: history belongs to the
+  // hub, so every member of a Pro hub sees all of it. A null hubPlan means the tier
+  // has not resolved yet — show everything rather than hide-then-reveal, which
+  // would flash a cap the hub may not even have.
   const visibleCycles = useMemo(
-    () => visibleCycleWindow(cycles, getLimitsForTier(userPlan).historyMonthsVisible),
-    [cycles, userPlan]
+    () => visibleCycleWindow(cycles, hubPlan ? getLimitsForTier(hubPlan).historyMonthsVisible : Infinity),
+    [cycles, hubPlan]
   );
 
   // Gated loader (Commit 11) — the SOLE trigger of load(). Transactions read by

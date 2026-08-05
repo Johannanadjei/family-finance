@@ -11,7 +11,7 @@ import { mockCentre, mockFmt, mockTxs, mockWeeklyData } from '../test-utils/fixt
 
 let mockCan = () => true;
 vi.mock('../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: (p) => mockCan(p) }),
+  useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: (p) => mockCan(p), isOwner: true }),
 }));
 
 const mockFinance = {
@@ -175,7 +175,7 @@ describe('DailyView — cycle navigation', () => {
 
   it('free with hidden cycles at the oldest VISIBLE cycle: prev arrow is a tappable upgrade affordance', () => {
     // 4 cycles, free window = 3 (Jun/May/Apr); Mar hidden. Viewing Apr (oldest visible).
-    withCycles({ cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycleId: 'cyc-apr', userPlan: 'free' });
+    withCycles({ cycles: [JUN, MAY, APR, MAR], visibleCycles: [JUN, MAY, APR], activeCycleId: 'cyc-apr', hubPlan: 'free' });
     renderView();
     const affordance = screen.getByTestId('upgrade-history-affordance');
     expect(affordance.disabled).toBe(false);

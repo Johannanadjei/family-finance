@@ -42,6 +42,34 @@ export const getCurrentSubscription = async (userId) => {
 };
 
 /**
+ * Fetch a HUB's effective tier — the tier of the hub's OWNER, not the caller's.
+ *
+ * Why an RPC (CLAUDE.md §9.6): the owner's subscriptions row belongs to another
+ * user, and subscriptions RLS is own-row-only. A plain select would return nothing
+ * for a non-owner member and silently resolve every hub to 'free' — which is the
+ * false-cap bug this exists to fix. scripts/hub_tier.sql is SECURITY DEFINER,
+ * membership-gated, and returns only the tier string.
+ *
+ * DISPLAY CORRECTNESS ONLY. The caps are enforced server-side by create_category /
+ * create_invite / update_centre_skin, which resolve the same owner tier. This just
+ * lets the client show what the server will actually do.
+ *
+ * @param {string} centreId
+ * @returns {Promise<{ data: 'free'|'pro'|null, error: any }>}
+ */
+export const getHubTier = async (centreId) => {
+  if (!centreId) return { data: null, error: null };
+
+  const { data, error } = await supabase.rpc('hub_tier', { p_centre_id: centreId });
+
+  if (error) {
+    console.error('[subscriptions.service] getHubTier error:', error.message);
+    return { data: null, error };
+  }
+  return { data, error: null };
+};
+
+/**
  * Pure resolution of a subscription row into the app's plan view. No DB, no React.
  *
  * Rules:

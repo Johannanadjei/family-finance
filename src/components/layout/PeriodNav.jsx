@@ -25,9 +25,14 @@ import { useState }   from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UpgradeModal } from '../ui/UpgradeModal';
 import { HISTORY_CAP_BODY } from '../../lib/planCopy';
+import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
 
 export function PeriodNav({ periodLabel, isOldest, isLatest, onPrev, onNext, historyLocked = false, labelTestId }) {
   const navigate = useNavigate();
+  // Read directly rather than threading an isOwner prop through four views and two
+  // header components — the modal is owned here, so the gate belongs here too.
+  // Layout components reading this context is established (SidePanel.jsx).
+  const { isOwner } = useBudgetCentreContext();
   const [showHistoryUpgrade, setShowHistoryUpgrade] = useState(false);
   return (
     <>
@@ -49,7 +54,7 @@ export function PeriodNav({ periodLabel, isOldest, isLatest, onPrev, onNext, his
         </button>
       </div>
 
-      <UpgradeModal testid="upgrade-modal-history" open={showHistoryUpgrade} onClose={() => setShowHistoryUpgrade(false)} onUpgrade={() => { setShowHistoryUpgrade(false); navigate('/pricing'); }} body={HISTORY_CAP_BODY} />
+      <UpgradeModal testid="upgrade-modal-history" open={showHistoryUpgrade} onClose={() => setShowHistoryUpgrade(false)} onUpgrade={() => { setShowHistoryUpgrade(false); navigate('/pricing'); }} body={HISTORY_CAP_BODY} canUpgrade={isOwner} />
     </>
   );
 }

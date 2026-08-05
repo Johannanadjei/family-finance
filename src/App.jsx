@@ -22,6 +22,7 @@ import { useBudgetCentre }                       from './hooks/useBudgetCentre';
 import { useCentres }                            from './hooks/useCentres';
 import { useFinance }                            from './hooks/useFinance';
 import { useSubscription }                       from './hooks/useSubscription';
+import { useHubTier }                            from './hooks/useHubTier';
 import { DashboardProviders }                    from './components/providers/DashboardProviders';
 import { useBudgetCentreContext }                from './context/BudgetCentreContext';
 import { useFinanceContext }                     from './context/FinanceContext';
@@ -177,9 +178,17 @@ export default function App() {
           inviteMember, removeMember, updateMemberRole, getInvites, cancelInvite,
           loading: centreLoading, needsOnboarding, removedFromHub,
           error, onOnboardingComplete }                   = useBudgetCentre(user, activeCentreId);
+  // The ACTIVE HUB's tier = its OWNER's tier, which is what create_category /
+  // create_invite / update_centre_skin enforce against. Distinct from userPlan (the
+  // viewer's own account tier): they differ for every non-owner member, and gating
+  // the client on userPlan is what produced both the false-cap and the
+  // pay-for-nothing bugs. null until resolved → no cap renders. See useHubTier.
+  const { tier: hubPlan }                                 = useHubTier(centre, user?.id, subscription.tier, subscription.isLoading);
   // useFinance owns the current-cycle `categories` slice (Commit 11.5) — it has the
   // cycle state useBudgetCentre lacks. The Provider's categories prop sources from here.
-  const financeValues                                     = useFinance({ centre, allCategories, userPlan });
+  // hubPlan (not userPlan) drives the history window — history is a property of the
+  // hub, so a member of a Pro hub must see all of it.
+  const financeValues                                     = useFinance({ centre, allCategories, hubPlan });
 
   // Persist the active centre ID once the first centre resolves
   useEffect(() => {
@@ -190,10 +199,15 @@ export default function App() {
   }, [centre?.id, activeCentreId]);
 
   // Apply theme — delegates role/skin resolution to the pure resolveSkin function in lib/themes.
-  // userPlan drives the downgrade clamp (Pro→Free renders family_warmth, non-destructive).
+  // hubPlan drives the downgrade clamp (Pro→Free renders family_warmth, non-destructive).
+  // The hub's skin belongs to the hub, so it clamps on the OWNER's tier — matching
+  // update_centre_skin's SKN01 gate, and resolveSkin's own JSDoc ("owner tier").
+  // Hold while hubPlan is null: clamping on an unresolved tier would flash
+  // family_warmth over a Pro hub's real skin before snapping back.
   useEffect(() => {
-    applyTheme(resolveSkin(currentMemberRole, centre?.skin_id, financeValues?.prefs?.themeSkin, userPlan));
-  }, [centre?.skin_id, financeValues?.prefs?.themeSkin, currentMemberRole, userPlan]);
+    if (hubPlan == null) return;
+    applyTheme(resolveSkin(currentMemberRole, centre?.skin_id, financeValues?.prefs?.themeSkin, hubPlan));
+  }, [centre?.skin_id, financeValues?.prefs?.themeSkin, currentMemberRole, hubPlan]);
 
   const handleSwitchCentre = useCallback((id) => {
     saveActiveCentreId(id);
@@ -365,7 +379,7 @@ export default function App() {
       pin={{ hasPinSetup, pinLoading, pinUnlocked, attempts, lockedUntil, verifyPin, setupPin, removePin }}
       subscription={subscription}
       budgetCentre={budgetCentreValue}
-      finance={{ ...financeValues, userPlan }}
+      finance={{ ...financeValues, userPlan, hubPlan }}
     >
       <BrowserRouter>
         <DashboardShell

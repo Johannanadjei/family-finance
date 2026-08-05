@@ -7,8 +7,12 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { PaydayHeader }              from './PaydayHeader';
 import { mockFmt }                   from '../../test-utils/fixtures';
 
-// PaydayHeader renders <PeriodNav>, which calls useNavigate for its /pricing upgrade CTA.
+// PaydayHeader renders <PeriodNav>, which calls useNavigate for its /pricing upgrade CTA
+// and reads isOwner from BudgetCentreContext to decide whether to offer that CTA at all.
 vi.mock('react-router-dom', () => ({ useNavigate: () => () => {} }));
+vi.mock('../../context/BudgetCentreContext', () => ({
+  useBudgetCentreContext: () => ({ isOwner: true }),
+}));
 
 const base = {
   periodLabel: 'May 2026',
