@@ -147,7 +147,43 @@ so its access is intentional rather than incidental.
 
 ---
 
-## Freemium billing CTA escapes the settings gate — a standard member can pay for nothing — UX bug now, P0 on Paystack live-key swap
+## Freemium billing CTA escapes the settings gate — a standard member can pay for nothing — ✅ RESOLVED 2026-08-05 (display/CTA only — see "What this did NOT close")
+
+> **RESOLVED — shipped to production 2026-08-05.** dev `30ce474` → staging `333e822` →
+> main `dabd3e3`, 1700 tests / audit 299/0 green at each hop. Deploy confirmed live:
+> `assets/App-Cp7hvsBh.js` on moneybos.com is byte-identical to the local build of main and
+> carries the `hub_tier` / `p_centre_id` / ASK_OWNER_LINE markers. `hub_tier(uuid)` is live
+> in the shared Supabase project. Verified with test accounts: `standard` and `full_access`
+> members in a PAID hub see no false caps. Free-hub non-owner cases pending a follow-up
+> pass, but the mechanism is confirmed.
+>
+> **The fix, in order (order mattered):** `hub_tier(uuid)` — SECURITY DEFINER,
+> membership-gated, returns only `'free'|'pro'` — resolves the hub's OWNER's tier, exposed
+> client-side as `hubPlan` via `useHubTier` (owners take a fast path with no RPC).
+> **Step 1** re-keyed every hub-scoped cap off `userPlan` onto `hubPlan`: category, member,
+> skin, history, guests, and the `resolveSkin` clamp. That alone closed the **inverse**
+> bug — a member of a PAID hub was being shown "10 of 10", truncated history and PRO skin
+> badges while the server would have accepted the write. **Step 2** then gated the CTA: on
+> a free hub the cap MESSAGE stays visible to every role, but the pay button is owner-only
+> and non-owners get `ASK_OWNER_LINE`. Doing step 2 alone would have made things worse —
+> it would have told a paid hub's member to "ask your owner to upgrade" when the owner
+> already had.
+>
+> **⚠️ What this did NOT close — read before flipping the Paystack live key.** This was a
+> **DISPLAY-correctness** fix. `hub_tier` grants nothing and gates no write. The
+> **server-side enforcement gap is untouched and still open**: RLS carries no tier
+> awareness at all, so a modified client can still bypass the caps by writing directly to
+> PostgREST, and the history window is client-side only. Tracked in full below under
+> **"Plan caps are not enforced at the RLS layer — direct-write bypass + history REST
+> leak"**.
+>
+> So: the live-key swap is clear of **this specific UX blocker** — nobody can be charged
+> for an upgrade that does nothing. It is **not** thereby unconditionally clear. Weigh the
+> RLS sweep separately before real money moves; the two were always distinct risks and
+> closing this one does not close that one.
+>
+> Follow-on copy nit, non-blocking: see "PlanSection copy: 'upgrade your account' vs
+> 'upgrade this hub'".
 
 **Finding (CAT01 lineage).** The hub tier that governs Free-plan caps is the **owner's**,
 resolved server-side. The client decides whether to offer the "Upgrade to Pro" path from
@@ -191,8 +227,11 @@ non-owner-CTA hide) is deployed first. Treat "go live on Paystack" as blocked on
 `PricingView` is mounted and `BudgetView` navigates to `/pricing`. Correct the comment when
 this is picked up so it stops implying the endpoint is unreachable.
 
-**Schedule:** UX bug while Paystack stays in test mode — but a **release blocker on the
-Paystack live-key swap** (see OQ1). Ship `useHubTier()` before that swap, not after.
+**Schedule:** ~~UX bug while Paystack stays in test mode — but a **release blocker on the
+Paystack live-key swap** (see OQ1). Ship `useHubTier()` before that swap, not after.~~
+**DONE 2026-08-05** — `useHubTier()` shipped and live (see the RESOLVED banner at the top of
+this entry). This entry's blocker is discharged. The remaining live-key consideration is the
+**separate** RLS-enforcement entry below, which this fix did not address.
 
 ---
 
@@ -387,3 +426,63 @@ current strings). Copy-only; no logic, no gating, no tier plumbing changes.
 
 **Schedule:** launch-quality UX polish. Not blocking — the behaviour is already correct and
 no one can be charged for something they don't receive.
+
+---
+
+## Plan caps are not enforced at the RLS layer — direct-write bypass + history REST leak — OPEN, weigh before the Paystack live-key swap
+
+**Relationship to the freemium-CTA entry above.** That entry is RESOLVED: the client now
+reads the hub OWNER's tier (`hub_tier` RPC → `hubPlan`), so cap DISPLAY matches what the
+server enforces and nobody is sold an upgrade that does nothing. **CTA/display fixed there;
+server enforcement tracked here.** `hub_tier` is display-only — it grants nothing and gates
+no write. Everything below was true before that fix and is still true after it.
+
+**The gap.** Cap enforcement lives entirely in the SECURITY DEFINER RPCs — `create_category`
+(CAT01), `create_invite` (MEM01), `update_centre_skin` (SKN01), `create_hub` (HUB01). Those
+are correct and owner-tier-aware. But **no RLS policy references `subscriptions` or `tier`
+at all** (`grep -l 'subscriptions\|tier' scripts/rls_*.sql` → no matches). The RPCs are a
+front door with a lock; PostgREST is an unlocked side door onto the same tables.
+
+**Verified specifics** (read from the policy files, 2026-08-06):
+
+1. **Category cap — direct-write bypass.** `budget_categories_insert` is
+   `FOR INSERT TO public WITH CHECK (is_budget_centre_member(budget_centre_id))`
+   (`scripts/rls_budget_categories.sql:27-29`). Membership is the *only* condition — no
+   count, no tier. Any member of a Free hub can `POST /rest/v1/budget_categories` and add an
+   11th, 50th, 500th category. `create_category`'s advisory lock and CAT01 check are simply
+   not on that path.
+
+2. **History — no server-side enforcement whatsoever.** The 3-cycle Free window is
+   `visibleCycleWindow()` in `useFinance`, client-side only. `budget_cycles` SELECT is
+   *"Members can view cycles in their hubs"* (`scripts/migrate_cycles_schema.sql:76-78`) —
+   every cycle, no tier condition. A `GET /rest/v1/budget_cycles` returns the full history
+   regardless of plan; likewise the transactions and categories hanging off hidden cycles.
+   This was a deliberate call at the time (Decision D3: "soft Pro nudge over the user's OWN
+   data, not a privacy boundary") — worth re-confirming that framing still holds when money
+   is real, since it is the user's own data but it is also a *paid* feature.
+
+3. **Member cap — owner-only direct-write bypass.** `budget_centre_members` INSERT is
+   `WITH CHECK (is_budget_centre_owner(budget_centre_id))`
+   (`scripts/rls_budget_centre_members.sql:29-30`). Narrower — only the owner can do it —
+   but the owner is exactly the person who benefits from exceeding the member cap, so
+   MEM01 is bypassable by the party it constrains.
+
+**Severity framing.** This is a **revenue-integrity** issue, not a data-isolation one:
+membership scoping holds throughout, so nobody reaches another household's data. What leaks
+is *paid capability*. It needs someone willing to drive PostgREST directly with their own
+token — not a casual user, but the app ships an anon key to the browser and the schema is
+discoverable, so "modified client" is a realistic threat model for a paid product, not a
+theoretical one.
+
+**Shape of the fix (needs a design pass, not a patch).** Options, roughly ascending cost:
+tighten the write policies to defer to the RPCs (e.g. revoke direct INSERT on
+`budget_categories` from `authenticated` and route every write through the RPC — check what
+else INSERTs there first, incl. onboarding and rollforward); or push the tier predicate into
+RLS via a `hub_tier`-style STABLE helper. History is the awkward one — enforcing it server-
+side means filtering reads by cycle age, which is a different shape from the write caps and
+may not be worth it if D3's "soft nudge" framing stands.
+
+**Schedule:** OPEN. Not a blocker on the freemium *UX* work, which is done. **Weigh this
+before the Paystack live-key swap** — that decision should be made on this entry's merits
+rather than inherited from the resolved entry above. Reasonable to ship with the gap
+knowingly accepted; not reasonable to ship unaware of it.
