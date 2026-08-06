@@ -353,3 +353,37 @@ Fonts recipient check, 2026-07-23 — see the Google OAuth recipients entry abov
   about what actually renders.
 
 **Schedule:** POST-MVP. No functional or legal impact; visual polish only.
+
+---
+
+## PlanSection copy: "upgrade your account" vs "upgrade this hub" — launch-quality UX polish
+
+**Not a bug — a wording ambiguity.** A `full_access` non-owner viewing Settings in a hub
+that is already Pro sees the Plan card read **"Free"** with a **"Upgrade to Pro"** CTA. That
+is *correct*: `PlanSection` reads `isPro` from `SubscriptionContext`, i.e. the **viewer's own
+account tier**, and subscriptions are account-scoped (`subscriptions.user_id`). Buying Pro
+genuinely gets that member something — their own Pro hubs, up to 10 — so this is the same
+legitimate own-account purchase path deliberately left open at `/pricing` when the
+hub-scoped cap CTAs were owner-gated (see the freemium CTA entry above, and
+`src/context/FinanceContext.jsx` for the `hubPlan` vs `userPlan` split).
+
+**The confusion.** In a hub whose owner already pays, the member sees the hub behaving as
+Pro (no caps, full history, Pro skins) while the Plan card says "Free" and offers "Upgrade
+to Pro". Read as *"upgrade this hub"* that is nonsense — the hub is already Pro. Nothing
+on the card says which of the two things the tier refers to.
+
+**What:** make the card unambiguously about the viewer's own account.
+- CTA `plan-cta`: `'Upgrade to Pro'` → **`'Upgrade your account to Pro'`** (or similar).
+- Section heading `'Plan'` → consider **`'Your Plan'`**.
+- Sub-copy `'Upgrade for more hubs, members and themes'` — "more hubs" is already
+  account-scoped and correct; keep that framing and extend it to the CTA.
+- Check the `isPro` strings too: `'Manage Plan'` / `"You're on the Pro plan"` carry the
+  same ambiguity in reverse for an owner.
+- Watch width: the card is a flex row with `whiteSpace: 'nowrap'` on the button at 390px —
+  a longer label may need the CTA to wrap or move below the tier block.
+
+**Files:** `src/views/settings/PlanSection.jsx` (+ `PlanSection.test.jsx`, which asserts the
+current strings). Copy-only; no logic, no gating, no tier plumbing changes.
+
+**Schedule:** launch-quality UX polish. Not blocking — the behaviour is already correct and
+no one can be charged for something they don't receive.
