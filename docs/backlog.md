@@ -147,15 +147,26 @@ so its access is intentional rather than incidental.
 
 ---
 
-## Freemium billing CTA escapes the settings gate — a standard member can pay for nothing — ✅ RESOLVED 2026-08-05 (display/CTA only — see "What this did NOT close")
+## Freemium billing CTA escapes the settings gate — a standard member can pay for nothing — ✅ RESOLVED 2026-08-05, fully verified 2026-08-06 (display/CTA only — see "What this did NOT close")
 
 > **RESOLVED — shipped to production 2026-08-05.** dev `30ce474` → staging `333e822` →
 > main `dabd3e3`, 1700 tests / audit 299/0 green at each hop. Deploy confirmed live:
 > `assets/App-Cp7hvsBh.js` on moneybos.com is byte-identical to the local build of main and
 > carries the `hub_tier` / `p_centre_id` / ASK_OWNER_LINE markers. `hub_tier(uuid)` is live
-> in the shared Supabase project. Verified with test accounts: `standard` and `full_access`
-> members in a PAID hub see no false caps. Free-hub non-owner cases pending a follow-up
-> pass, but the mechanism is confirmed.
+> in the shared Supabase project.
+>
+> **Verification — COMPLETE 2026-08-06.** Walked with test accounts against production, the
+> full role × tier matrix, all three cells green:
+>
+> | Hub tier | Viewer | Expected | Observed |
+> |---|---|---|---|
+> | Free | non-owner | cap message + `ASK_OWNER_LINE`, **no** pay button | ✅ |
+> | Free | owner | working pay button → Paystack checkout | ✅ |
+> | Pro | non-owner (`standard` AND `full_access`) | no caps at all, no false "10 of 10" | ✅ |
+>
+> Both halves of the fix are therefore confirmed in lived use, not just in tests: the CTA
+> gate (row 1 vs row 2) and the `hubPlan` re-key that closed the inverse false-cap bug
+> (row 3). No follow-up pass outstanding.
 >
 > **The fix, in order (order mattered):** `hub_tier(uuid)` — SECURITY DEFINER,
 > membership-gated, returns only `'free'|'pro'` — resolves the hub's OWNER's tier, exposed
@@ -169,18 +180,48 @@ so its access is intentional rather than incidental.
 > it would have told a paid hub's member to "ask your owner to upgrade" when the owner
 > already had.
 >
-> **⚠️ What this did NOT close — read before flipping the Paystack live key.** This was a
-> **DISPLAY-correctness** fix. `hub_tier` grants nothing and gates no write. The
-> **server-side enforcement gap is untouched and still open**: RLS carries no tier
-> awareness at all, so a modified client can still bypass the caps by writing directly to
-> PostgREST, and the history window is client-side only. Tracked in full below under
-> **"Plan caps are not enforced at the RLS layer — direct-write bypass + history REST
-> leak"**.
+> **⚠️ What this did NOT close — read before flipping the Paystack live key.**
+> A green verification matrix above does **not** mean the live-key swap is clear. This was a
+> **DISPLAY/UX-correctness** fix and nothing more — `hub_tier` grants nothing and gates no
+> write. Draw the line precisely:
 >
-> So: the live-key swap is clear of **this specific UX blocker** — nobody can be charged
-> for an upgrade that does nothing. It is **not** thereby unconditionally clear. Weigh the
-> RLS sweep separately before real money moves; the two were always distinct risks and
-> closing this one does not close that one.
+> **CLOSED here — display / UX correctness:**
+> - Pay-for-nothing CTA: a non-owner can no longer be handed a checkout that upgrades their
+>   own account while the hub's cap stays put (the original CAT01 finding).
+> - The inverse false-cap bug: a member of a PAID hub is no longer shown "10 of 10",
+>   truncated history and locked Pro skins that the server would in fact have accepted.
+> - Both confirmed with test accounts across the full role × tier matrix.
+>
+> **STILL OPEN — server-side enforcement, bears directly on a real-money launch:**
+> - **History has no server enforcement at all.** The 3-cycle Free window is
+>   `visibleCycleWindow()` in `useFinance`, client-side only.
+> - **Direct-write cap bypass.** RLS carries no tier awareness anywhere — the category
+>   INSERT policy tests membership and nothing else, so a Free hub can be given an 11th
+>   (or 500th) category straight through PostgREST, routing around `create_category`'s
+>   CAT01 check entirely.
+> - **History REST leak.** `GET /rest/v1/budget_cycles` returns every cycle regardless of
+>   plan, along with the transactions and categories hanging off the hidden ones.
+>
+> In short: **a modified client can still bypass the caps server-side.** The caps are
+> currently enforced only by the front door (the SECURITY DEFINER RPCs); PostgREST is an
+> unlocked side door onto the same tables. What leaks is *paid capability*, not another
+> household's data — membership scoping holds throughout.
+>
+> → Tracked in full below under **"Plan caps are not enforced at the RLS layer —
+> direct-write bypass + history REST leak"** (the **P1 RLS sweep**). That entry, not this
+> one, is the item to weigh before real money moves. The two were always distinct risks;
+> closing this one does not close that one, and this entry's green matrix must not be read
+> as cover for it.
+>
+> **Smaller residual, same family:** the `/pricing` **route itself is still ungated**
+> (`App.jsx` mounts it with no role/tier guard; `PricingView` keys only on the viewer's own
+> `isPro`). No CTA leads a non-owner there any more, but one who types the URL directly
+> still reaches a live checkout that upgrades their own account and moves nothing for the
+> hub — the CAT01 path narrowed to manual URL entry rather than closed. This entry's stated
+> fix shape called for gating "the cap CTAs **and** the `/pricing` entry"; only the CTAs
+> landed. Low severity (requires deliberate URL entry, and an own-account Pro purchase is a
+> legitimate product path — see the PlanSection copy entry), but it should be a conscious
+> decision at live-key time rather than an oversight.
 >
 > Follow-on copy nit, non-blocking: see "PlanSection copy: 'upgrade your account' vs
 > 'upgrade this hub'".
@@ -426,6 +467,81 @@ current strings). Copy-only; no logic, no gating, no tier plumbing changes.
 
 **Schedule:** launch-quality UX polish. Not blocking — the behaviour is already correct and
 no one can be charged for something they don't receive.
+
+---
+
+## Invite link lands on "Sign in" when the invitee is almost always a NEW user — UX polish
+
+**Why it's backwards.** `JoinView.jsx:26` initialises `const [authMode, setAuthMode] =
+useState('signin')`. But an invite is, by definition, usually sent to someone who does not
+have an account yet — that's what inviting them is *for*. The default puts the most likely
+user on the wrong tab: they land on "Sign in", have no credentials, and must notice the
+"Create account" toggle to proceed. Worst case they try to sign in, fail, and read the
+failure as a broken invite link.
+
+**What:** default `authMode` to `'signup'` on the invite-accept route, keeping the "Sign in"
+toggle one tap away for the returning-user case (a member re-joining, or someone who
+already signed up before opening the link).
+
+**Refinement worth considering.** The invite row already carries `invited_email`, and
+`accept_invite` is now email-bound (P0-A, `a7bd607`). So the *right* default is knowable
+rather than guessed: if an account already exists for `invited_email`, default to sign-in;
+otherwise sign-up. Doing that well needs an enumeration-safe existence check — we
+deliberately avoid leaking "this email has an account" elsewhere (see the forgot-password
+flow, `11bc4b9`). Absent that, plain "default to signup" is the better guess and carries no
+disclosure risk.
+
+**Files:** `src/views/JoinView.jsx` (+ `JoinView.test.jsx`, which asserts the current
+default). Note the prefilled-email and signed-in-as-wrong-account branches
+(`JoinView.jsx:127`) already handle their own cases and shouldn't change.
+
+**Schedule:** UX polish. Not blocking — the path works, it just greets most invitees with
+the wrong form.
+
+---
+
+## CYC02: a hub that runs out of budget periods fails every write with a generic "could not save" — UX / robustness
+
+**Symptom.** Once a hub's last budget period elapses and no period covers the month being
+written to, every financial write fails. The user sees only **"Could not save transaction.
+Please try again."** — advice that is actively wrong, because retrying can never succeed.
+Nothing on screen says a budget period is missing, and nothing offers to create one. The hub
+looks broken.
+
+**Root cause — not a bug in the guard, a gap in the surfacing.** Every financial row is keyed
+on `cycle_id`, and the CYC02 invariant (client and server agreeing to refuse a NULL-cycle
+row) is *correct and deliberate* — see engineering-decisions.md, "NULL keying column =
+STRICT (raise CYC02)". The client guards refuse cleanly
+(`useBudgetCentre.js:320`, `useIncomeMutations.js:211,250` → `No cycle for month X (CYC02)`)
+and the DB trigger raises CYC02 behind them. The failure is that the views collapse that
+specific, actionable condition into the same generic string every other error gets
+(`AddTransactionSheet.jsx:105`, `AddCategorySheet.jsx:52`,
+`IncomeSourcesSection.jsx:57`, `GuestTransactionForm.jsx:51`). The system knows exactly
+what's wrong and doesn't tell anyone.
+
+**The four fixes (recorded 2026-08-05, in rough dependency order):**
+
+1. **End-of-period prompt — prevention.** Warn before the cliff: as the active period nears
+   its end with no successor, prompt the hub to create the next one. This is the fix that
+   stops most users ever meeting CYC02.
+2. **Quick-create the covering month — recovery.** When a write does hit CYC02, offer a
+   one-tap "create the budget period for {month}" inline, then retry the write. Turns a
+   dead end into a two-tap recovery.
+3. **Actionable CYC02 error on every write path — the floor.** Detect the CYC02 code and
+   render a specific message instead of "could not save". **There is already a working
+   precedent for exactly this shape**: `GuestTransactionForm` special-cases the `GST01`
+   expired-session error into a distinct `guest-session-expired` prompt precisely because
+   "retrying cannot help, only re-entering the PIN can" (`GuestTransactionForm.test.jsx:108`).
+   CYC02 is the same class of error and deserves the same treatment. Cheapest of the four
+   and worth doing even if the others slip.
+4. **Guest form period awareness.** A guest submitting through `submit_guest_transaction`
+   hits the same wall with even less context — they can't create a period, and may not know
+   what one is. They need a message that tells them to contact the hub owner, not "could
+   not save. Please try again."
+
+**Schedule:** UX / robustness. Not a data-integrity risk — the guard is doing its job and no
+bad row is written — but it presents as total breakage to the user, which makes it a poor
+thing to meet at launch. Fix 3 is the minimum bar; fixes 1 and 2 are the real solution.
 
 ---
 
