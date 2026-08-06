@@ -416,6 +416,59 @@ pass as the `cookies.md` rewrite.
 
 ---
 
+## Transactional email sends from a `supabase.io` address, not `moneybos.com` — ⚠️ NOT A LAUNCH BLOCKER — pre-scale
+
+**Read the status line first: this does NOT block launch.** The interim fix below is
+deployed and is sufficient to go live with early users. This entry exists so the remaining
+limitation is recorded, not to gate anything.
+
+**✅ INTERIM — DONE, sufficient to go live now.** The Supabase auth email templates are
+rebranded: subject lines and bodies say **Money B.O.S**. Password-reset and confirmation
+emails *read* as ours. Good enough for early users, who are arriving via a link we gave them
+and are not scrutinising the sender domain.
+
+**⚠️ STILL TRUE — the limitation, for later.**
+- **The sender is still a `supabase.io` address.** Supabase's SMTP settings are
+  all-or-nothing: you cannot change the From address without configuring full custom SMTP.
+  Template rebranding gets the *content*, never the *envelope*. Mail therefore arrives
+  branded Money B.O.S from a domain that is visibly not moneybos.com — phishing-adjacent,
+  and exactly the shape users are (rightly) trained to distrust for a **password reset on a
+  finance app**. It also costs deliverability: no SPF/DKIM/DMARC alignment with our domain.
+- **30 emails/hour rate limit** on Supabase's built-in sender. Fine at current volume;
+  a hard ceiling the moment signup + reset traffic grows, and it fails *silently* from the
+  user's side — they simply never receive the mail.
+
+**REAL FIX — pre-scale, not pre-launch.** Configure custom SMTP so mail sends from
+**moneybos.com** (e.g. `noreply@moneybos.com` as sender; keep `info@` as the human contact
+address). Removes both problems at once — the rate limit and the mismatched sender.
+
+**Blocker on doing it: no confirmed sending account.** The Mailgun DNS records exist, but
+the Mailgun account is **unverified and may not exist at all** — establish that first rather
+than assuming the DNS implies a working account. Alternatives if it's dead: **Resend** or
+**Postmark** (Postmark has the stronger transactional-deliverability reputation; Resend is
+the lighter integration).
+
+**⚠️ Whichever provider is chosen, it becomes a declared Subprocessor.** `privacy.md` §7.3
+currently lists exactly three — Supabase Inc., Vercel Inc., Paystack Payments Limited — and
+transactional email is covered *implicitly* by the Supabase entry, because Supabase's
+built-in sender is what we actually use. Commit `be790dd` removed Resend from that list
+precisely because it was named but not integrated. Adding custom SMTP inverts that: the
+provider becomes real and **must be added back to §7.3**, with its jurisdiction, as an
+international transfer. If DPC registration has already happened by then, the declared
+recipient list needs updating too (see the Google OAuth entry above). Don't let the
+provider go live ahead of the policy — that's the same misstatement as `be790dd`, just
+pointing the other way.
+
+**Config lives in external dashboards, not the repo.** Supabase Auth → SMTP settings, plus
+the provider's own console and the DNS records. There is no sender configuration in `api/`
+or `src/` to change, so this cannot be verified by reading the codebase — check the
+dashboards.
+
+**Schedule:** before a real launch *push* / when signup + reset volume approaches 30/hr.
+**Explicitly not blocking early testers.**
+
+---
+
 ## 'Nunito' font declared but never loaded — app renders in default sans-serif — UI decision (POST-MVP)
 
 **Not a compliance issue — purely visual.** `src/index.css` and inline styles across the app
