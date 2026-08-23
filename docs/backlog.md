@@ -598,6 +598,164 @@ thing to meet at launch. Fix 3 is the minimum bar; fixes 1 and 2 are the real so
 
 ---
 
+## `anon` holds full relation privileges on every app table, and every policy is `TO public` — defense-in-depth, not a live hole
+
+**Found by preflight P4 of the RLS cap-enforcement sweep** (2026-08-22, read-only).
+
+**The observation.** `pg_class.relacl` on `budget_categories` and `budget_centre_members` shows
+both `anon` **and** `authenticated` holding `arwdDxtm` — the full letter set (read, add, change,
+remove, empty, reference, trigger, maintain). Separately, **every** policy in `scripts/rls_*.sql`
+is scoped `TO public`, which includes `anon`. The two together mean the unauthenticated role can
+address every app table through PostgREST, and the *only* thing standing between it and the rows
+is each policy's predicate.
+
+**This is not a live vulnerability, and the reason is worth recording precisely.**
+`is_budget_centre_member` resolves to `EXISTS (… WHERE user_id = auth.uid() …)`
+(`scripts/is_budget_centre_member.sql`). For an anon request `auth.uid()` is NULL, so
+`user_id = NULL` is NULL, no row matches, and `EXISTS` returns **false** — never NULL. It fails
+closed, correctly, and `is_budget_centre_owner` has the same shape. Verified, not assumed.
+
+**Why it is still worth recording.** The entire anon boundary rests on one helper's null
+behaviour plus the discipline of never writing a permissive predicate. That discipline has
+already failed once in this codebase: the world-readable invite SELECT policy dropped by
+`migrate_26_invite_token_scope.sql` was exactly this class of bug — a policy open enough that
+anon reachability turned it into a real finding (P0-A). The grant is what converts "a policy was
+written too loosely" from a bug into an unauthenticated one.
+
+**The cheap hardening, and why it is not a one-liner.** Scoping policies `TO authenticated`
+instead of `TO public` removes the whole class. There is in-repo precedent — `rls_users.sql`
+already scopes one policy that way. But it cannot be applied blindly:
+
+- **The guest paths run as `anon`.** `authenticate_guest` and `submit_guest_transaction` are
+  anon-callable `SECURITY DEFINER` RPCs, so their *writes* are unaffected by policy scoping. What
+  is unknown is whether a guest session *reads* any table directly through PostgREST as `anon`.
+  That is the question the sweep's preflight P5 was going to answer before Leak 2 was dropped as
+  won't-fix, so it is now unanswered. **Trace the guest read path first** — this entry cannot be
+  actioned without it.
+- Withdrawing `anon`'s letters outright is the blunter version of the same fix and carries the
+  same unknown.
+
+**Explicitly out of scope for the RLS cap-enforcement sweep.** That sweep's invariant is that no
+step edits a membership or role predicate; re-scoping every policy's role list is a larger,
+different change with its own verification matrix. Recorded here so the P4 result is not lost.
+
+**Schedule:** OPEN, defense-in-depth. Not a launch blocker — the helpers fail closed today.
+Sequence: trace the guest read path, then re-scope policies `TO authenticated` table by table
+with a MUST-PASS for the guest flow on each.
+
+---
+
+## Re-inviting a REMOVED member fails with a raw duplicate-key error — OPEN, pre-existing, NOT caused by the RLS sweep
+
+**Found while preflighting Leak 3 of the RLS cap-enforcement sweep** (2026-08-22), answering a
+different question: *does `accept_invite` resurrect a soft-deleted member row?* It does not —
+and that is what exposes this. Recorded here so the sweep does not absorb the blame for a bug
+that predates it by months.
+
+**Symptom.** Owner removes a member, later re-invites the same person at the same email. The
+invite sends, the link works, the invitee accepts — and the accept fails with an unhandled
+Postgres `23505 duplicate key value violates unique constraint
+"budget_centre_members_budget_centre_id_user_id_key"`. No friendly message; the raw error
+surfaces through `JoinView`. The person cannot rejoin the hub, ever, at that address.
+
+**The chain — four things that are each individually correct:**
+
+1. `removeMember` **soft-deletes** (`src/services/members.service.js:55`) — sets `deleted_at`,
+   leaves the row. Correct per CLAUDE.md §11 (soft deletes everywhere, audit history).
+2. `budget_centre_members` carries a **FULL** unique constraint on `(budget_centre_id, user_id)`
+   — `budget_centre_members_budget_centre_id_user_id_key` (`scripts/schema_base.sql:193`). Not
+   partial: it does **not** exclude soft-deleted rows, so the removed member still occupies the
+   pair.
+3. `create_invite`'s already-a-member guard filters `deleted_at IS NULL`
+   (`scripts/create_invite.sql:140-149`), so a removed member is correctly re-invitable — the
+   invite issues normally.
+4. `accept_invite`'s duplicate-membership guard **also** filters `deleted_at IS NULL`
+   (`scripts/accept_invite.sql:117-125`), so it passes — and step 4 then runs a **plain
+   `INSERT`** with no `ON CONFLICT` (`scripts/accept_invite.sql:157-160`), which collides with
+   the leftover row.
+
+Soft-delete + full unique + both guards scoping to *active* rows = the write is unreachable.
+Each decision is defensible alone; together they close the door.
+
+**Not a cap problem.** MEM01 counts active members only (`accept_invite.sql:147-150`), so the
+cap arithmetic is right — the row never gets far enough for the cap to matter.
+
+**Explicitly NOT caused by, or worsened by, the Leak 3 `deleted_at IS NULL` guard.** That guard
+goes on the `budget_centre_members` **UPDATE policy**, which governs direct client `PATCH`
+only. `accept_invite` is `SECURITY DEFINER`, so RLS does not apply to it at all. This bug fires
+identically with the guard present or absent. The two are compatible by design and that is the
+point: **the RPC may resurrect a member row; a raw PostgREST `PATCH` may not.**
+
+*Status 2026-08-23:* that guard is now written — `scripts/rls_budget_centre_members.sql` v2 —
+but **not yet applied to production**. Nothing below changes when it is.
+
+**Shape of the fix.** In `accept_invite` step 4, replace the plain insert with an upsert that
+resurrects:
+
+```sql
+INSERT INTO budget_centre_members (budget_centre_id, user_id, role)
+VALUES (v_invite.budget_centre_id, v_user_id, v_invite.role)
+ON CONFLICT (budget_centre_id, user_id) DO UPDATE
+  SET deleted_at = NULL,
+      role       = EXCLUDED.role,
+      joined_at  = now()
+RETURNING id INTO v_member_id;
+```
+
+Safe because the function has already established, above that line, that the caller is the
+invitee (INV01 identity binding), that they are not currently an active member, and that the
+hub is under its MEM01 ceiling. The `DO UPDATE` can therefore only ever revive the exact row
+the invite names. Ships with its own verify block and a re-invite-after-removal test.
+
+**The fix that must NOT be taken — and it is the tempting one.** Do not move the resurrection
+to the client as a PostgREST upsert (`POST` with `Prefer: resolution=merge-duplicates`, or
+supabase-js `.upsert()`, carrying `deleted_at: null`). It reads as equivalent — same conflict
+target, same end state, no SQL function to touch — and it is the exact vector Leak 3's UPDATE
+guard exists to close:
+
+- **It bypasses MEM01 entirely.** The cap lives *inside* `accept_invite` (step 3b,
+  `accept_invite.sql:137-155`). A client upsert never enters the function, so a Free hub at 2/2
+  seats a third member with no ceiling anywhere in the path.
+- **It skips the INV01 identity binding**, so the party doing the resurrecting need not be the
+  invitee — it only needs to be someone the UPDATE policy lets through.
+- **Since Leak 3 v2 it fails anyway — but not for the reason most people would predict**, and
+  the reason is worth stating so nobody "simplifies" the guard later. Postgres applies an INSERT
+  policy's `WITH CHECK` **only to rows actually appended by the INSERT path**; when the conflict
+  path is taken instead, `WITH CHECK (false)` is never evaluated and the INSERT deny is silent
+  here. The write is governed by the UPDATE policy: `USING (... AND deleted_at IS NULL)` against
+  the existing row, which the soft-deleted row fails. `ON CONFLICT DO UPDATE` **raises** on a
+  `USING` failure rather than silently skipping the row the way a plain `UPDATE` does, so this
+  fails loudly with a 42501 rather than as a no-op.
+
+That last point is the one to carry forward: on this table the `deleted_at` guard on `USING` is
+the **only** thing closing the upsert door, and anyone reasoning "INSERT is already denied, so
+this clause is redundant" would reopen it. The split the two halves encode is
+**the RPC may resurrect a member row; a client may not** — keeping the fix inside
+`accept_invite` is what keeps that true.
+
+**Confidence / provenance.** Read from repo source, not from production. The `UNIQUE` is
+asserted in `scripts/schema_base.sql` and no later migration replaces it with a partial index
+(`grep` over `scripts/*.sql` finds no other unique/index/`ON CONFLICT` statement on this
+table). **Still to be confirmed against production** — a read-only check of the live
+constraint and the live function body should run before the fix is written. It was drafted
+into `scripts/rls_sweep_preflight.sql` and then removed: searching `pg_proc.prosrc` requires a
+regex literal spelling out a write keyword, and the Supabase editor's pre-run text scan
+matched that literal and warned of a schema change the read-only file did not contain. It
+needs its own paste, written to avoid the literal. If the live constraint
+turned out to be *partial* or absent, the bug changes shape rather than disappearing — the
+insert would then succeed and leave a live row alongside the soft-deleted one, i.e. duplicate
+member rows for one person, which `getMembers` would render twice.
+
+**Related.** Nothing in `scripts/` or `src/` writes `deleted_at = NULL` to any table today, on
+any path — the codebase has no resurrection flow at all. That is what makes the sweep's
+resurrection guards free of legitimate-flow risk, and it is also why this gap went unnoticed.
+
+**Schedule:** OPEN, low frequency but total when hit. Most likely on a **Free** hub, where the
+2-member cap makes remove-then-re-invite a natural way to swap who is in the household. Worth
+fixing before launch; a one-function change with no RLS interaction.
+
+---
+
 ## Plan caps are not enforced at the RLS layer — direct-write bypass + history REST leak — OPEN, weigh before the Paystack live-key swap
 
 **Relationship to the freemium-CTA entry above.** That entry is RESOLVED: the client now
