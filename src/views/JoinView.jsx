@@ -16,6 +16,7 @@ function JoinCard({ children }) {
 }
 
 const inputStyle = { width: '100%', padding: '12px 14px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 15, fontWeight: 700, marginBottom: 10, boxSizing: 'border-box', background: 'var(--c-input-bg, #f9fafb)', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)' };
+const toggleBtn = { width: '100%', padding: '6px 0 0', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700, color: 'var(--c-muted, #6b7280)' };
 const primaryBtn = { width: '100%', padding: 14, borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)', color: 'var(--c-btn-text, #ffffff)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginBottom: 8 };
 export function JoinView() {
   const [token]  = useState(() => new URLSearchParams(window.location.search).get('token'));
@@ -23,7 +24,8 @@ export function JoinView() {
   const [phase,     setPhase]     = useState('loading'); // loading | invalid | confirm | auth | joining | done | error
   const [invite,    setInvite]    = useState(null);
   const [user,      setUser]      = useState(null);
-  const [authMode,  setAuthMode]  = useState('signin'); // signin | signup
+  // Invite arrivals rarely have an account yet — default to signup, offer sign-in as a toggle.
+  const [authMode,  setAuthMode]  = useState('signup'); // signup | signin
   const [name,      setName]      = useState('');
   const [email,     setEmail]     = useState('');
   const [password,  setPassword]  = useState('');
@@ -144,15 +146,6 @@ export function JoinView() {
           as <strong>{ROLE_LABELS[invite?.role]}</strong> — {ROLE_DESCRIPTIONS[invite?.role]}
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 16 }}>
-          {['signin', 'signup'].map(m => (
-            <button key={m} onClick={() => setAuthMode(m)}
-              style={{ padding: '9px', borderRadius: 10, border: 'none', fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 800, cursor: 'pointer', background: authMode === m ? 'var(--c-primary, #064e3b)' : 'var(--c-bg, #f3f4f6)', color: authMode === m ? 'var(--c-btn-text, #ffffff)' : 'var(--c-muted, #6b7280)' }}>
-              {m === 'signin' ? 'Sign in' : 'Create account'}
-            </button>
-          ))}
-        </div>
-
         {authMode === 'signup' && (
           <input type="text" value={name} onChange={e => { setName(e.target.value); setAuthError(null); }} placeholder="Your full name" style={inputStyle} autoComplete="name" />
         )}
@@ -161,6 +154,11 @@ export function JoinView() {
         {authError && <p style={{ fontSize: 12, color: 'var(--c-danger, #dc2626)', margin: '0 0 8px', fontWeight: 700 }}>{authError}</p>}
         <button onClick={handleAuth} disabled={authBusy} style={{ ...primaryBtn, cursor: authBusy ? 'not-allowed' : 'pointer' }}>
           {authBusy ? 'Please wait…' : authMode === 'signup' ? 'Create account & join' : 'Sign in & join'}
+        </button>
+
+        <button data-testid="auth-mode-toggle" onClick={() => { setAuthMode(authMode === 'signup' ? 'signin' : 'signup'); setAuthError(null); }} style={toggleBtn}>
+          {authMode === 'signup' ? 'Already have an account? ' : 'New here? '}
+          <span style={{ color: 'var(--c-primary, #064e3b)', fontWeight: 800 }}>{authMode === 'signup' ? 'Sign in' : 'Create an account'}</span>
         </button>
       </JoinCard>
     );
