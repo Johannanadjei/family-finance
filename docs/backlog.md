@@ -192,26 +192,25 @@ so its access is intentional rather than incidental.
 >   truncated history and locked Pro skins that the server would in fact have accepted.
 > - Both confirmed with test accounts across the full role × tier matrix.
 >
-> **STILL OPEN — server-side enforcement, bears directly on a real-money launch:**
-> - **History has no server enforcement at all.** The 3-cycle Free window is
->   `visibleCycleWindow()` in `useFinance`, client-side only.
-> - **Direct-write cap bypass.** RLS carries no tier awareness anywhere — the category
->   INSERT policy tests membership and nothing else, so a Free hub can be given an 11th
->   (or 500th) category straight through PostgREST, routing around `create_category`'s
->   CAT01 check entirely.
-> - **History REST leak.** `GET /rest/v1/budget_cycles` returns every cycle regardless of
->   plan, along with the transactions and categories hanging off the hidden ones.
+> **What this left open at the time — now largely closed; updated 2026-08-25:**
+> - ~~**Direct-write cap bypass.**~~ **CLOSED 2026-08-25.** The category and member INSERT
+>   policies are now `WITH CHECK (false)` (`rls_budget_categories.sql` /
+>   `rls_budget_centre_members.sql` v2, applied to production and verified live). A Free hub
+>   can no longer be given an 11th category or an extra member through PostgREST — the RPCs
+>   are the only write doors.
+> - **History has no server enforcement — ACCEPTED, won't-fix (D3).** The 3-cycle Free window
+>   is still `visibleCycleWindow()` in `useFinance`, client-side only, and
+>   `GET /rest/v1/budget_cycles` still returns every cycle regardless of plan. Deliberate: a
+>   soft Pro nudge over the user's OWN data, not a privacy boundary.
 >
-> In short: **a modified client can still bypass the caps server-side.** The caps are
-> currently enforced only by the front door (the SECURITY DEFINER RPCs); PostgREST is an
-> unlocked side door onto the same tables. What leaks is *paid capability*, not another
-> household's data — membership scoping holds throughout.
+> So the "modified client can bypass the caps server-side" statement no longer holds for the
+> **write** caps; it holds only for the history nudge, knowingly. Membership scoping was never
+> in question — what was at stake throughout is *paid capability*, not another household's data.
 >
 > → Tracked in full below under **"Plan caps are not enforced at the RLS layer —
-> direct-write bypass + history REST leak"** (the **P1 RLS sweep**). That entry, not this
-> one, is the item to weigh before real money moves. The two were always distinct risks;
-> closing this one does not close that one, and this entry's green matrix must not be read
-> as cover for it.
+> direct-write bypass + history REST leak"** (the **P1 RLS sweep**), now RESOLVED for Leaks 1
+> and 3. The two entries were always distinct risks and were closed separately, three weeks
+> apart — this entry's green matrix was never cover for that one.
 >
 > **Smaller residual, same family:** the `/pricing` **route itself is still ungated**
 > (`App.jsx` mounts it with no role/tier guard; `PricingView` keys only on the viewer's own
@@ -686,8 +685,12 @@ only. `accept_invite` is `SECURITY DEFINER`, so RLS does not apply to it at all.
 identically with the guard present or absent. The two are compatible by design and that is the
 point: **the RPC may resurrect a member row; a raw PostgREST `PATCH` may not.**
 
-*Status 2026-08-23:* that guard is now written — `scripts/rls_budget_centre_members.sql` v2 —
-but **not yet applied to production**. Nothing below changes when it is.
+*Status 2026-08-25:* that guard is now **applied to production and verified live**
+(`scripts/rls_budget_centre_members.sql` v2 — see the RLS cap-enforcement entry below).
+Nothing below changed when it landed: this bug fires identically with the guard present or
+absent, because `accept_invite` is `SECURITY DEFINER` and RLS does not apply to it. The guard
+does, however, now actively close the tempting client-side upsert "fix" described below — so
+the only remaining route is the in-RPC `ON CONFLICT DO UPDATE`, which is still **unwritten**.
 
 **Shape of the fix.** In `accept_invite` step 4, replace the plain insert with an upsert that
 resurrects:
@@ -756,7 +759,50 @@ fixing before launch; a one-function change with no RLS interaction.
 
 ---
 
-## Plan caps are not enforced at the RLS layer — direct-write bypass + history REST leak — OPEN, weigh before the Paystack live-key swap
+## Plan caps are not enforced at the RLS layer — direct-write bypass + history REST leak — ✅ RESOLVED 2026-08-25 for Leaks 1 + 3 (applied + verified live); Leak 2 = deliberate WON'T-FIX (D3)
+
+> **RESOLVED — the write-cap leaks are closed in production.** Both `rls_*.sql` v2 files were
+> run in the Supabase SQL editor and verified live with test accounts on **2026-08-25**.
+> Code: dev `0737a01` → staging `b69cc72` → main `1d2e809`, 1700 tests green at each hop.
+>
+> **What was applied:**
+>
+> | Leak | Table | Change | State |
+> |---|---|---|---|
+> | 1 — category cap (CAT01) | `budget_categories` | `_insert` `WITH CHECK (false)`; `_update` `USING` gains `deleted_at IS NULL` + explicit `WITH CHECK` | ✅ applied + verified live |
+> | 3 — member cap (MEM01) | `budget_centre_members` | `_insert` `WITH CHECK (false)`; `_update` `USING` gains `deleted_at IS NULL` + explicit `WITH CHECK` | ✅ applied + verified live |
+> | 2 — history REST leak | `budget_cycles` | none | ❌ deliberate **WON'T-FIX** — see below |
+>
+> Both tables now have exactly one write door each: `create_category` /
+> `create_categories_bulk` for categories, `create_hub` / `accept_invite` for members. The
+> RPCs are unaffected — `SECURITY DEFINER`, and preflight P2 confirmed `FORCE ROW LEVEL
+> SECURITY` is off. Both SELECT policies were recreated byte-identical to v1.
+>
+> **Live verification (test accounts, 2026-08-25) — the lockout risk is what mattered here,
+> and it did not materialise:**
+> - Fresh signup + onboarding — works (bulk category creation via the RPC path unaffected).
+> - Add category / delete category — works.
+> - Owner adds a member, changes a member's role, removes a member — all work.
+>
+> That covers the failure mode the plan was biased against: *"an over-tight predicate locks a
+> real member out of their own hub, instantly, on shared prod."* It didn't.
+>
+> **Leak 2 — history REST leak — deliberate WON'T-FIX (Decision D3).** `GET /rest/v1/budget_cycles`
+> still returns every cycle regardless of plan, and the Free 3-cycle window remains
+> `visibleCycleWindow()` in `useFinance`, client-side only. The framing stands: this is a
+> **soft Pro nudge over the user's OWN data, not a privacy boundary** — no household reaches
+> another household's rows. Enforcing it server-side would mean filtering reads by cycle age,
+> a different shape from the write caps, for a benefit that only accrues against someone
+> hand-driving PostgREST to see data that is already theirs. Re-open only if history becomes a
+> hard paid boundary rather than a nudge.
+>
+> **Bearing on the Paystack live-key swap.** The two *write* caps a paying hub actually
+> depends on — categories and members — are now enforced at the RLS layer, not just behind the
+> RPC front door. What remains open at live-key time is the ungated `/pricing` route (see the
+> freemium-CTA entry above) and the accepted Leak 2 nudge. Neither is a cap bypass.
+>
+> **Historical record below** — the finding as originally written (2026-08-06). Kept for
+> provenance; item 1 and item 3 are closed by the banner above, item 2 is accepted.
 
 **Relationship to the freemium-CTA entry above.** That entry is RESOLVED: the client now
 reads the hub OWNER's tier (`hub_tier` RPC → `hubPlan`), so cap DISPLAY matches what the
@@ -809,7 +855,8 @@ RLS via a `hub_tier`-style STABLE helper. History is the awkward one — enforci
 side means filtering reads by cycle age, which is a different shape from the write caps and
 may not be worth it if D3's "soft nudge" framing stands.
 
-**Schedule:** OPEN. Not a blocker on the freemium *UX* work, which is done. **Weigh this
-before the Paystack live-key swap** — that decision should be made on this entry's merits
-rather than inherited from the resolved entry above. Reasonable to ship with the gap
-knowingly accepted; not reasonable to ship unaware of it.
+**Schedule:** ~~OPEN. Weigh this before the Paystack live-key swap.~~ **CLOSED 2026-08-25**
+for Leaks 1 and 3 — applied to production and verified live (see the RESOLVED banner at the
+top of this entry). Leak 2 is a knowing, recorded acceptance under D3, not an oversight — the
+bar this entry set was *"reasonable to ship with the gap knowingly accepted; not reasonable to
+ship unaware of it"*, and that bar is now met.
