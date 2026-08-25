@@ -3,8 +3,14 @@
 Design pass for the backlog entry *"Plan caps are not enforced at the RLS layer — direct-write
 bypass + history REST leak"* (`docs/backlog.md`, OPEN / P1).
 
-**Status: Step 0 preflight RAN 2026-08-22 (read-only) and came back GREEN. No policy or
-function has been changed.** Everything from Step 1 onward is still unwritten and unrun.
+**Status: COMPLETE 2026-08-25 — Leaks 1 and 3 APPLIED to production and verified live;
+Leak 2 is a deliberate WON'T-FIX (D3).** Step 0 preflight ran 2026-08-22 (read-only, GREEN);
+`rls_budget_categories.sql` v2 and `rls_budget_centre_members.sql` v2 were then written
+(dev `0737a01` → staging `b69cc72` → main `1d2e809`, 1700 tests) and **run in the Supabase SQL
+editor**, with live test-account verification: fresh signup + onboarding, add/delete category,
+and owner add / re-role / remove member all work — the lockout risk this plan was biased
+against did not materialise. See the RESOLVED banner in `docs/backlog.md` for the full record.
+The design below is kept as the provenance of what was applied.
 Every "before" state below was originally read from the in-repo policy files rather than from
 `pg_policies`; the preflight has now confirmed those files against production — see
 [Step 0 results](#step-0-results). Two scope changes since the first draft: **Leak 2 is a

@@ -111,9 +111,8 @@ describe('JoinView — name propagation to acceptInvite', () => {
     mockSignUpUser.mockResolvedValue({ data: { user: mockUser }, error: null });
 
     render(<JoinView />);
-    // Switch to signup mode and fill form
-    await waitFor(() => screen.getByText('Create account'));
-    fireEvent.click(screen.getByText('Create account'));
+    // Signup is the default for invite arrivals — no mode switch needed
+    await waitFor(() => screen.getByPlaceholderText('Your full name'));
     fireEvent.change(screen.getByPlaceholderText('Your full name'), { target: { value: 'Alice Mensah' } });
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pass123' } });
     fireEvent.click(screen.getByText('Create account & join'));
@@ -150,5 +149,37 @@ describe('JoinView — name propagation to acceptInvite', () => {
 
     await waitFor(() => expect(mockAcceptInvite).toHaveBeenCalled());
     expect(mockUpdateUserName).not.toHaveBeenCalled();
+  });
+});
+
+// ── Invite-arrival auth defaults ──────────────────────────────────────────────
+
+describe('JoinView — auth phase defaults for invite arrivals', () => {
+  beforeEach(() => {
+    mockGetInviteByToken.mockResolvedValue({ data: mockInvite, error: null });
+    mockGetUserSession.mockResolvedValue({ data: null, error: null });
+  });
+
+  it('defaults to signup mode', async () => {
+    render(<JoinView />);
+    await waitFor(() => expect(screen.getByText('Create account & join')).toBeTruthy());
+    expect(screen.getByPlaceholderText('Your full name')).toBeTruthy();
+    expect(screen.getByTestId('auth-mode-toggle').textContent).toContain('Already have an account?');
+  });
+
+  it('toggle switches to signin and hides the name field', async () => {
+    render(<JoinView />);
+    await waitFor(() => screen.getByTestId('auth-mode-toggle'));
+    fireEvent.click(screen.getByTestId('auth-mode-toggle'));
+    expect(screen.getByText('Sign in & join')).toBeTruthy();
+    expect(screen.queryByPlaceholderText('Your full name')).toBeNull();
+    expect(screen.getByTestId('auth-mode-toggle').textContent).toContain('New here?');
+  });
+
+  it('keeps the invite email pre-filled in both signup and signin panels', async () => {
+    render(<JoinView />);
+    await waitFor(() => expect(screen.getByPlaceholderText('Email').value).toBe('alice@test.com'));
+    fireEvent.click(screen.getByTestId('auth-mode-toggle'));
+    expect(screen.getByPlaceholderText('Email').value).toBe('alice@test.com');
   });
 });
