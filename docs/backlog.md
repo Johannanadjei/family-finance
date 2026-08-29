@@ -330,7 +330,90 @@ today all work lands directly on dev, which is covered.
 
 ---
 
-## Privacy/Cookie policy claims processing we don't do — analytics + email-open pixels aspirational — PARTIALLY RESOLVED (privacy/terms closed; cookies.md STILL OPEN)
+## DPC registration (Ghana, Act 843) — ✅ FORM SUBMITTED 2026-08-25, awaiting DPC review
+
+**This entry is the record of what we attested to.** If the DPC comes back with questions,
+or if any declared fact later changes (new subprocessor, new recipient, new transfer
+destination), this is the baseline to diff against — and a change to a declared fact means
+the registration needs updating, not just the policy.
+
+**Status:** submitted 2026-08-25. No decision yet; awaiting DPC review. Nothing to do until
+they respond.
+
+### What was declared
+
+| Field | Declared value |
+|---|---|
+| Role | **Data Controller** |
+| Organisation type | **Financial / fintech** |
+| Data subjects | *(see "Data subjects" below)* |
+| Security measures ticked | **Encryption**, **Password protected**, **Role-based access control** |
+| Security measure deliberately NOT ticked | **Pseudonymisation** |
+
+**Data subjects declared:** **`250+`** — the volume band entered on the form (confirmed
+2026-08-29). This is a **declared fact**: if the actual number of data subjects moves out of
+this band, the registration needs updating, not just an internal note.
+
+### Why pseudonymisation was NOT ticked — deliberate, do not "correct" it later
+
+Ticking it would have been a **false attestation**. Two independent reasons, both true of the
+shipped schema:
+
+1. **Transactions store names inline.** Transaction rows carry the member's name as text on
+   the row itself, not only a surrogate key — so the financial records are directly
+   identifying on their face, with no separate re-identification step.
+2. **The identity mapping is one JOIN away.** Even for the ID-keyed paths,
+   `budget_centre_members` → `auth.users` re-identifies any row in a single join inside the
+   same database. Pseudonymisation requires the additional information that permits
+   attribution to be **kept separately** and subject to technical/organisational measures
+   preventing re-attribution; ours is in the same Postgres instance, reachable by the same
+   credentials.
+
+The three measures we *did* tick are all genuinely in place: Supabase encryption at rest +
+TLS in transit (Encryption), Supabase Auth password/OAuth sign-in (Password protected), and
+the `PERMISSIONS` map in `src/lib/roles.js` + Postgres RLS (Role-based access control).
+
+**If pseudonymisation is ever ticked in a future filing, it must be earned first** — that
+means separating the identity mapping, not re-reading the definition more generously.
+
+### Open items that were flagged "resolve before DPC registration" and were NOT resolved first
+
+The form went in ahead of two entries below that were scheduled to close before registration.
+**Both are now ✅ CLOSED in the published policies** (2026-08-29, commit `592e1bd` → main
+`21980dd`, verified live in the production bundle 23/23). Neither was declared inaccurately
+on the form; the policies have now caught up with what the form said:
+
+- **`cookies.md` full rewrite** — ✅ **DONE.** Replaced wholesale: no cookies, localStorage /
+  sessionStorage only, no analytics or pixels, consent UI struck rather than built. Matches
+  the "no cookie identifiers" position declared to the DPC. See the "Privacy/Cookie policy
+  claims processing we don't do" entry.
+- **Google OAuth undeclared in `privacy.md` §7** — ✅ **DONE in the policy.** Declared in
+  §7.3 (recipient list) and new §7.4 (the transfer itself, Google as independent controller
+  in the US). See the "Undeclared data recipient / international transfer" entry.
+
+**⚠️ STILL OPEN — the submitted form, not the policy.** Fixing `privacy.md` does **not** fix
+the filing. If the recipient list on the **submitted** DPC form does not name Google, that is
+a gap to close **with the DPC**, not just in the policy — pull the submitted copy and check.
+The policy and the registration are two separate records and they must agree.
+
+**Also note:** the transactional-email entry warns that choosing a custom SMTP provider
+(Resend / Postmark / Mailgun) adds a new declared Subprocessor and international transfer.
+Registration having now been submitted, that change requires **updating the registration**,
+not only `privacy.md` §7.3.
+
+**Schedule:** no action while awaiting review. The two policy blockers above are now closed;
+the one remaining pre-response task is verifying the **submitted form's** recipient list names
+Google. On response: address whatever the DPC raises.
+
+---
+
+## Privacy/Cookie policy claims processing we don't do — analytics + email-open pixels aspirational — ✅ RESOLVED (privacy/terms `ffcf679`; cookies.md rewritten `592e1bd`)
+
+**STATUS (2026-08-29): ✅ FULLY RESOLVED.** `cookies.md` was replaced wholesale by commit
+`592e1bd` (promoted dev→staging→main as `21980dd`, 1703 tests, audit 299/299, CI green) and
+**verified live in the production bundle** — all 4 JS chunks fetched from
+family-finance-plum.vercel.app and grepped: 10/10 required new strings present, 13/13 phantom
+strings absent (23/23). Details in the resolution note at the end of this entry.
 
 **STATUS (2026-07-23): PARTIALLY RESOLVED.** The `privacy.md` + `terms.md` analytics claims
 are removed and live-verified in production. The `cookies.md` pixel/cookie claims remain
@@ -354,7 +437,8 @@ gtag / Google Analytics / Plausible / PostHog / Mixpanel / Sentry / Amplitude /
 (Part of the 15-edit legal-accuracy pass, `ffcf679` → promoted dev→staging→main, CI green
 on main run `30026893957`, then live-verified against the deployed bundle.)
 
-**❌ STILL OPEN — `cookies.md` was out of scope for that pass and still misstates processing:**
+**✅ NOW CLOSED (`592e1bd`) — was out of scope for that pass; the misstatements below are the
+historical record of what the document used to claim:**
 - **`cookies.md` §F.5 / §F.5.1** — "Analytics Technologies and Tracking Pixels"; "we **may
   use** analytics technologies and, in communications, **tracking pixels** to measure
   engagement (for example, whether an email was opened)". We run no email-open tracking:
@@ -363,8 +447,8 @@ on main run `30026893957`, then live-verified against the deployed bundle.)
 - **`cookies.md` §F.5 (line 26)** — an "Analytics / performance cookies" category described
   as in use; with no analytics SDK, no such cookies are actually set.
 
-**`cookies.md` needs a FULL REWRITE, not a strike-list.** The same audit found the document
-is wrong at a more basic level than the pixel claims:
+**Why it needed a FULL REWRITE, not a strike-list** (the reasoning that drove the fix — the
+same audit found the document was wrong at a more basic level than the pixel claims):
 - **We set no first-party cookies at all.** Client state is **localStorage / sessionStorage
   only** (`ffc_`-prefixed UI prefs; the Supabase auth token). A "Cookie Policy" built around
   first-party cookie *categories we set* is structurally inaccurate — the honest document
@@ -374,17 +458,43 @@ is wrong at a more basic level than the pixel claims:
   consent UI ships anywhere in `src/`. A live policy promising controls we don't provide is
   the same class of misstatement as the pixels.
 
-**Resolve before DPC registration:** rewrite `cookies.md` to match reality (no first-party
-cookies; localStorage/sessionStorage; declare the real third-party recipients), and either
-build the promised §F.3 consent/preference UI or strike those promises. Flag for the same
-Ghanaian counsel pass as the parked `feature/legal-counsel-review` items (DPO rename, §5.1
-rights — DO NOT MERGE until counsel opines) and the Act 843 privacy-policy-contents review.
+**✅ RESOLUTION (2026-08-29, commit `592e1bd` → main `21980dd`).** Option A taken: a short,
+truthful statement replacing the whole file. The promised §F.3 consent UI was **struck, not
+built** — there is nothing requiring consent, so a banner would be theatre.
 
-**Schedule:** before DPC registration / before launch. Blocks a clean, truthful cookie policy.
+`cookies.md` retitled **Part F — Cookies & Local Storage** and now states: no cookies of any
+kind; localStorage/sessionStorage only, with the actual keys named (`ffc_*` + the Supabase
+auth token); the PIN is **not** stored on-device (hash lives in Supabase — only an unlock
+flag + attempt/lockout counters are local); no analytics, pixels or advertising; no banner or
+preference centre, and why; how to clear device storage; Vercel + Supabase server logs
+including IP, on a legitimate-interests basis; and the Google/Paystack redirects. Added
+**F.7.3**: the app loads *no* third-party resource at all (no external fonts, scripts or
+CDNs), which makes the no-tracking claim structural rather than a promise.
+
+`privacy.md` aligned in the same commit so it cannot contradict Part F: §2.1(b) drops cookie
+collection *and* "pages and features accessed" (client-side routing never reaches a server,
+so it is not logged); §4.1(b) consent example is now Google sign-in; §6.3 drops consent
+records; §10 rewritten with a new §10.2 stating there is no banner. Nav labels + tests follow
+the rename; the `/cookies` route is unchanged.
+
+Verified against the code before publishing, not assumed: no analytics dependency in
+`package.json`, no tracking reference in `src/` or `index.html`, `createClient()` on defaults
+(localStorage, not cookies), and no `document.cookie` anywhere.
+
+**Still open for the counsel pass:** `feature/legal-counsel-review` (DPO rename, §5.1 rights —
+DO NOT MERGE until counsel opines) also edits `privacy.md` §5.1 and now **diverges from
+production — it will conflict**; rebase it onto `main` before it lands. The Act 843
+privacy-policy-contents review is likewise still outstanding. `privacy.md` §1.1 still carries
+"[PENDING — application in progress]" for the DPC number, which is accurate while under review.
 
 ---
 
-## Undeclared data recipient / international transfer — Google OAuth — RESOLVE BEFORE DPC REGISTRATION
+## Undeclared data recipient / international transfer — Google OAuth — ✅ RESOLVED (declared in `privacy.md` §7.3/§7.4, `592e1bd`)
+
+**STATUS (2026-08-29): ✅ RESOLVED.** Google is now declared as a US recipient in
+`privacy.md`, shipped in commit `592e1bd` (main `21980dd`) and verified live in the production
+bundle — `Google LLC, a recipient located in the United States` and `Google LLC (federated
+sign-in` both confirmed present in the deployed JS. See the resolution note at the end.
 
 **Finding (same audit, 2026-07-23; Google Fonts ruled out on re-check — see below).** One
 shipped third-party recipient receives user data — an international transfer to the **United
@@ -408,10 +518,35 @@ Google. A `runtimeCaching` rule only caches requests that are *made*; with none 
 so there is nothing to declare. Do **not** self-host to "fix" this — that would *newly*
 introduce a Nunito load; the purely-visual font gap is tracked separately below.
 
-**Resolve before DPC registration:** declare Google OAuth in `privacy.md` §7. Same counsel
-pass as the `cookies.md` rewrite.
+**✅ RESOLUTION (2026-08-29, commit `592e1bd` → main `21980dd`).** Google declared in two
+places, and `cookies.md` §F.7.1 cross-references the transfer:
 
-**Schedule:** before DPC registration / before launch.
+- **`privacy.md` §7.3** — list widened from "Our principal **Subprocessors**" to "Our
+  principal **Subprocessors and recipients**", adding `Google LLC (federated sign-in, where
+  you choose "Continue with Google" — United States)` alongside Supabase / Vercel / Paystack.
+- **`privacy.md` §7.4 (new)** — declares the transfer explicitly: what is exchanged (the auth
+  request; email address + basic profile returned), that it happens **only** on an explicit
+  "Continue with Google" click, that email/password sign-in is an alternative involving no
+  transfer, and that Google acts as an **independent controller, not our Processor**.
+
+**The "Subprocessor" wording was deliberately not reused.** In an OAuth flow Google does not
+process on our instructions — it is an independent controller we send an authentication
+request to. Filing it under "Subprocessors" would have misdescribed the relationship to the
+DPC. Hence "Subprocessors **and recipients**" in §7.3 and the explicit characterisation in
+§7.4. Do not "tidy" this back to a single word.
+
+**Scope verified against the code, not assumed.** `AuthScreen.jsx` passes **no `scopes`** to
+`signInWithOAuth` (only `redirectTo: window.location.origin`), so Google's default
+`openid email profile` applies — matching the declared "email address and basic profile
+information". Confirmed 2026-08-29 that the Supabase dashboard Google provider has **no
+scopes field at all** (only Client IDs, Client Secret, skip-nonce, allow-users-without-email,
+callback URL), so no broader scope can be configured server-side. Re-check this if the
+provider config ever gains a scopes field — a widened scope changes a **declared fact** and
+would require updating the DPC registration, not just the policy.
+
+Also confirmed: **no Google-domain resource loads on page load** (no Fonts, gstatic, or tag
+manager) — contact with Google happens only on an explicit click, which is what makes the
+"user-initiated and avoidable" framing accurate.
 
 ---
 
