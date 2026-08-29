@@ -7,10 +7,10 @@ import disclaimerRaw from '../content/legal/disclaimer.md?raw';
 // slug → { title (UI heading), content (raw markdown) }.
 // UI titles are deliberate display strings; the raw H1 still renders inside the markdown body.
 const DOCS = {
-  privacy:    { title: 'Privacy Policy',   content: privacyRaw },
-  terms:      { title: 'Terms of Service', content: termsRaw },
-  cookies:    { title: 'Cookie Policy',    content: cookiesRaw },
-  disclaimer: { title: 'Disclaimer',       content: disclaimerRaw },
+  privacy:    { title: 'Privacy Policy',          content: privacyRaw },
+  terms:      { title: 'Terms of Service',        content: termsRaw },
+  cookies:    { title: 'Cookies & Local Storage', content: cookiesRaw },
+  disclaimer: { title: 'Disclaimer',              content: disclaimerRaw },
 };
 
 // Resolve a URL path to a legal slug (or null). Lives here so App.jsx stays thin and
@@ -21,10 +21,10 @@ export function resolveLegalSlug(pathname) {
 
 // Order for the cross-navigation footer.
 const NAV = [
-  { slug: 'privacy',    label: 'Privacy Policy',   href: '/privacy' },
-  { slug: 'terms',      label: 'Terms of Service', href: '/terms' },
-  { slug: 'cookies',    label: 'Cookie Policy',    href: '/cookies' },
-  { slug: 'disclaimer', label: 'Disclaimer',       href: '/disclaimer' },
+  { slug: 'privacy',    label: 'Privacy Policy',          href: '/privacy' },
+  { slug: 'terms',      label: 'Terms of Service',        href: '/terms' },
+  { slug: 'cookies',    label: 'Cookies & Local Storage', href: '/cookies' },
+  { slug: 'disclaimer', label: 'Disclaimer',              href: '/disclaimer' },
 ];
 
 const fontStack = "'Nunito', sans-serif";
