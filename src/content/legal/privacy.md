@@ -35,7 +35,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 ### (b) Information collected automatically
 
-- Usage and device data — IP address, device and browser type, operating system, pages and features accessed, and dates and times of access, collected through cookies and similar technologies as described in Part F (Cookie Policy).
+- Usage and device data — IP address, device and browser type, operating system, resources requested, and dates and times of access. This data is recorded automatically in standard server logs by our hosting and database providers. It is not collected through cookies, analytics tools or tracking technologies; see Part F (Cookies & Local Storage).
 
 - Diagnostic data — logs and performance information used to maintain and secure the Service.
 
@@ -55,7 +55,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 (a) **Performance of a contract **— where Processing is necessary to provide the Service to you under the Terms of Service (for example, administering your Account and processing payments).
 
-(b) **Consent **— where you have given consent, for example for non-essential cookies. You may withdraw consent at any time without affecting Processing carried out before withdrawal.
+(b) **Consent **— where you have given consent, for example where you choose to sign in using Google and authentication data is exchanged with Google LLC in the United States. You may withdraw consent at any time without affecting Processing carried out before withdrawal.
 
 (c) **Compliance with a legal obligation **— where Processing is necessary to comply with Applicable Law, for example record-keeping and responding to lawful requests.
 
@@ -79,7 +79,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 **6.2 **Account and Customer Data are retained for the duration of your Account. Following closure of your Account, we delete or anonymise Customer Data within our routine deletion cycle, which removes data from active systems promptly and from encrypted backups within ninety (90) days, save where a longer period is required by Applicable Law.
 
-**6.3 **Certain records are retained for longer periods to meet statutory and regulatory obligations: transaction and billing records are retained for seven (7) years from the end of the relevant tax year in line with Ghanaian tax and accounting requirements; subscription, payment-confirmation and consent records are retained for twenty-four (24) months after Account closure; and records necessary to demonstrate compliance with the Data Protection Act, 2012 (Act 843) are retained for as long as the relevant compliance obligation requires.
+**6.3 **Certain records are retained for longer periods to meet statutory and regulatory obligations: transaction and billing records are retained for seven (7) years from the end of the relevant tax year in line with Ghanaian tax and accounting requirements; subscription and payment-confirmation records are retained for twenty-four (24) months after Account closure; and records necessary to demonstrate compliance with the Data Protection Act, 2012 (Act 843) are retained for as long as the relevant compliance obligation requires.
 
 ## 7. International Transfers
 
@@ -87,7 +87,9 @@ Effective date: 1 June 2026  |  Version 1.0
 
 **7.2 **Before transferring Personal Data internationally, we take steps to ensure an adequate level of protection, including: (a) transferring only to recipients in jurisdictions that provide an adequate level of protection, or (b) putting in place contractual safeguards (such as data-processing terms and appropriate security commitments) requiring the recipient to protect the data to a standard consistent with Act 843, or (c) relying on another lawful transfer mechanism, including your consent where appropriate.
 
-**7.3 **Our principal Subprocessors are: Supabase Inc. (database hosting and authentication — United States), Vercel Inc. (application hosting and edge delivery — United States), and Paystack Payments Limited (subscription payment processing — Nigeria / South Africa). We require each Subprocessor to maintain technical and organisational measures appropriate to the data they Process. We will update this list when material changes occur.
+**7.3 **Our principal Subprocessors and recipients are: Supabase Inc. (database hosting and authentication — United States), Vercel Inc. (application hosting and edge delivery — United States), Google LLC (federated sign-in, where you choose “Continue with Google” — United States), and Paystack Payments Limited (subscription payment processing — Nigeria / South Africa). We require each Subprocessor to maintain technical and organisational measures appropriate to the data they Process. We will update this list when material changes occur.
+
+**7.4 **Where you choose to sign in using Google, your authentication request and the resulting confirmation of your identity (your email address and basic profile information) are exchanged with Google LLC, a recipient located in the United States. This occurs only if you select “Continue with Google”; email and password sign-in is available as an alternative and involves no transfer to Google. In operating your Google Account, Google acts as an independent controller under its own privacy policy, not as our Processor.
 
 ## 8. Security Measures
 
@@ -101,9 +103,11 @@ Effective date: 1 June 2026  |  Version 1.0
 
 **9.2 **We do not sell your Personal Data.
 
-## 10. Cookies and Similar Technologies
+## 10. Cookies and Local Storage
 
-**10.1 **We use cookies and similar technologies to operate, secure and improve the Service. Full details, including the categories of cookies we use and how to manage them, are set out in Part F (Cookie Policy).
+**10.1 **The Service does not set cookies and does not use analytics, tracking pixels or advertising technologies. We use your browser’s local storage and session storage only — to keep you signed in, to remember your device preferences, and to hold app PIN lock state. Full details are set out in Part F (Cookies & Local Storage).
+
+**10.2 **Because we set no cookies and use no non-essential technologies, there is no cookie banner or preference centre. You can clear what is stored on your device at any time through your browser settings, as described in Part F.
 
 ## 11. Children’s Privacy
 
