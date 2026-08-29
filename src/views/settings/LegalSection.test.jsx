@@ -9,7 +9,7 @@ import { LegalSection }         from './LegalSection';
 const LINKS = [
   { slug: 'privacy',    href: '/privacy',    label: 'Privacy Policy' },
   { slug: 'terms',      href: '/terms',      label: 'Terms of Service' },
-  { slug: 'cookies',    href: '/cookies',    label: 'Cookie Policy' },
+  { slug: 'cookies',    href: '/cookies',    label: 'Cookies & Local Storage' },
   { slug: 'disclaimer', href: '/disclaimer', label: 'Disclaimer' },
 ];
 

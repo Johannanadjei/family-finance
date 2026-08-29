@@ -5,7 +5,7 @@ import { LegalView }             from './LegalView';
 const SLUGS = [
   { slug: 'privacy',    title: 'Privacy Policy' },
   { slug: 'terms',      title: 'Terms of Service' },
-  { slug: 'cookies',    title: 'Cookie Policy' },
+  { slug: 'cookies',    title: 'Cookies & Local Storage' },
   { slug: 'disclaimer', title: 'Disclaimer' },
 ];
 
