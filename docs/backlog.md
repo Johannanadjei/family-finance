@@ -995,3 +995,78 @@ for Leaks 1 and 3 — applied to production and verified live (see the RESOLVED 
 top of this entry). Leak 2 is a knowing, recorded acceptance under D3, not an oversight — the
 bar this entry set was *"reasonable to ship with the gap knowingly accepted; not reasonable to
 ship unaware of it"*, and that bar is now met.
+
+---
+
+## Privacy §2.3(c) ships the SOFTENED wording — restore the fuller clause if required/optional field indicators are ever added — POST-MVP (policy/UI drift risk)
+
+**Context.** §2.3 was added 2026-08-30 (`a25d4f3`, live on main `737b050`) to close the Act 843
+§23(d)+(e) gap — mandatory-vs-optional data, and the consequences of not providing it. Clauses
+(a) and (b) carry the statutory content. Clause (c) is additive transparency and is **not**
+required by §23.
+
+**What was cut and why.** The clause was drafted as: *"Where the Service asks you for a
+particular item of Personal Data, we will make clear at the point of collection whether that
+item is required to proceed."* That was **not true of the UI** and was softened before shipping.
+Verified at the time:
+
+- Zero `required` / `aria-required` attributes anywhere in `src/**/*.jsx`.
+- No asterisk or "(Required)" convention exists.
+- `AuthScreen.jsx:122-148` collects name, email and password as three bare placeholder inputs
+  with no required marking.
+- Onboarding is the same shape — `StepCentre.jsx:79`, `StepCategories.jsx:91,99`,
+  `StepIncome.jsx:52`, `StepTarget.jsx:57` are all bare placeholders.
+- The only optional marking anywhere is three `"(optional)"` placeholders —
+  `AddTransactionSheet.jsx:169`, `GuestTransactionForm.jsx:98`, `IncomeSourcesSection.jsx:106`.
+  None are on signup or any account field.
+
+**What shipped instead** (accurate to current behaviour): *"Optional fields are labelled as such
+where they are collected. If you leave out an item that is required, the Service will tell you
+before your entry can be submitted."* This describes **on-submit validation**, not
+point-of-collection marking — `authValidation.js:12-17` ("Email is required" / "Password is
+required" / "Please enter your name") and the empty-string reject at `lib/validation.js:63`.
+
+**Trigger to revisit.** If required/optional indicators are ever added to `AuthScreen.jsx` and
+the onboarding steps, (c) can be restored to the fuller point-of-collection wording — it would
+then be true, and it is the stronger transparency position.
+
+**Why this is flagged rather than left implicit.** The failure mode is silent drift in the
+*other* direction: someone adds field indicators, the UI becomes better than the policy claims,
+and nobody remembers the policy was deliberately weakened to match. Equally, nobody should
+"tidy up" (c) back to the fuller wording without shipping the UI first — that re-opens the same
+untruthful-claim problem this entry exists to record. Same class as the cookies.md rewrite: the
+public legal text must match what the app actually does.
+
+**Schedule:** POST-MVP. No action while the forms stay as they are — (c) is accurate today.
+
+---
+
+## §1.1 DPC number + the DRAFT banner — related, but NOT a single paired edit (banner has a second gate, and spans 4 files)
+
+**The ask was "these two update together once the registration number arrives."** They are
+related, but the pairing is not clean and the difference matters — recording it so the wrong
+edit doesn't get made on the day the number lands.
+
+**Piece 1 — `privacy.md` §1.1 (line 18).** Reads `Our Data Protection Commission registration
+number is [PENDING — application in progress].` This is the one that updates on the number
+arriving. **One file, one line.** See the DPC registration entry above for what was declared on
+2026-08-25 (submitted, awaiting review) — that entry is the baseline to diff against.
+
+**Piece 2 — the DRAFT banner.** Two things make it not a same-day edit:
+
+1. **It has TWO gates, not one.** The banner says the docs are draft *"while the Company
+   finalises its Data Protection Commission registration **and obtains formal counsel
+   sign-off**"*, and that the notice is replaced with a "v1.0 final" marker *"once that process
+   is complete."* The DPC number satisfies the first gate only. Counsel sign-off is a separate
+   workstream — cf. the `feature/legal-counsel-review` branch (`345a97f`), still marked
+   `[PENDING COUNSEL — DO NOT MERGE]`.
+2. **It is in all four legal docs, not just privacy.** Identical banner text at line 3 of
+   `privacy.md`, `terms.md`, `cookies.md` and `disclaimer.md`. Removing it is a four-file change,
+   and they must move together or the site ships docs that disagree about their own status.
+
+**So the sequencing is:** DPC number arrives → update §1.1 in `privacy.md` alone. Banner stays.
+Counsel sign-off lands → then remove the banner from all four files and stamp "v1.0 final" in
+one commit.
+
+**Schedule:** blocked on external parties (DPC review, then counsel). Nothing to do until one
+of them responds.
