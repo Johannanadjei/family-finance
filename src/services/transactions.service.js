@@ -112,6 +112,15 @@ export const getTransactionById = async (transactionId) => {
  * Add a new transaction.
  * Always records logged_by_user_id and logged_by_name.
  *
+ * logged_by_name NEVER falls back to the user's email address. It is a
+ * denormalised string copy with no FK, so anything landing here survives both
+ * soft delete and any future erasure of public.users/auth.users — an email here
+ * would be un-erasable personal data sitting in every transaction row. signUp
+ * sets user_metadata.full_name (auth.service.js:21) and signup rejects an empty
+ * name (authValidation.js:16), so the empty-string case is effectively
+ * unreachable; both display sites degrade cleanly on '' anyway
+ * (TransactionRow.jsx:54 renders nothing, RecentActivity.jsx:23 renders "You").
+ *
  * @param {string} centreId
  * @param {object} tx — transaction data
  */
@@ -122,7 +131,7 @@ export const addTransaction = async (centreId, tx) => {
   try {
     validated = validateTransaction({
       ...tx,
-      logged_by_name: tx.logged_by_name || user?.user_metadata?.full_name || user?.email || '',
+      logged_by_name: tx.logged_by_name || user?.user_metadata?.full_name || '',
     });
   } catch (e) {
     console.error('[transactions.service] addTransaction validation error:', e.message);

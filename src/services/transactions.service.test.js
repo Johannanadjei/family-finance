@@ -9,27 +9,43 @@ let orderCalls;
 // is what the terminal .single() resolves to; updateArgs/eqCalls assert the shape.
 let singleResult;
 let updateArgs;
+// Captures for addTransaction's INSERT. `inserted` flips when .insert() runs so
+// the shared .select() can act as a terminal (insert path) or stay chainable
+// (read path) without two mock factories. `mockUser` is what auth.getUser()
+// resolves to — the erasure guard below drives it directly.
+let insertArgs;
+let insertResult;
+let inserted;
+let mockUser;
 
 vi.mock('../lib/supabase', () => {
   const make = () => {
     const q = {
       from:   () => q,
-      select: () => q,
       is:     () => q,
       eq:     (col, val) => { eqCalls.push([col, val]); return q; },
       order:  (col, opts) => { orderCalls.push([col, opts]); return Promise.resolve(mockResult); },
       update: (vals) => { updateArgs.push(vals); return q; },
       single: () => Promise.resolve(singleResult),
+      insert: (vals) => { insertArgs.push(vals); inserted = true; return q; },
     };
+    // Chainable on the read path; terminal once .insert() has run.
+    q.select = () => (inserted ? Promise.resolve(insertResult) : q);
     return q;
   };
-  return { supabase: { from: () => make() } };
+  return {
+    supabase: {
+      from: () => make(),
+      auth: { getUser: () => Promise.resolve({ data: { user: mockUser }, error: null }) },
+    },
+  };
 });
 
 // warnOnEmptyColdLoad is a canary, not under test here — stub it out.
 vi.mock('../lib/auth', () => ({ warnOnEmptyColdLoad: vi.fn() }));
 
-import { getTransactionsByCycle, moveTransactionToCycle } from './transactions.service';
+import { getTransactionsByCycle, moveTransactionToCycle, addTransaction } from './transactions.service';
+import { mockNewTxPayload } from '../test-utils/fixtures';
 
 beforeEach(() => {
   mockResult   = { data: [], error: null };
@@ -37,6 +53,10 @@ beforeEach(() => {
   eqCalls      = [];
   orderCalls   = [];
   updateArgs   = [];
+  insertArgs   = [];
+  insertResult = { data: [{ id: 'tx-1' }], error: null };
+  inserted     = false;
+  mockUser     = { id: 'u-1', email: 'someone@example.com', user_metadata: { full_name: 'Ama Mensah' } };
 });
 
 describe('getTransactionsByCycle', () => {
@@ -97,5 +117,42 @@ describe('moveTransactionToCycle', () => {
     expect(data).toBeNull();
     expect(error).toBeInstanceOf(Error);
     expect(updateArgs).toHaveLength(0);   // no write attempted
+  });
+});
+
+// ── addTransaction: logged_by_name must never carry an email ──────────────────
+// logged_by_name is a denormalised string with no FK. Anything written here
+// survives soft delete AND any future erasure of public.users / auth.users, so
+// an email address landing here would be un-erasable personal data replicated
+// across every transaction row. The live audit (2026-08-30) found 417 rows with
+// an inline name and ZERO containing an email — these tests keep that at zero.
+describe('addTransaction — logged_by_name erasure guard', () => {
+  it('uses the display name from user metadata', async () => {
+    await addTransaction('centre-1', mockNewTxPayload);
+    expect(insertArgs[0].logged_by_name).toBe('Ama Mensah');
+  });
+
+  it('falls back to an EMPTY STRING, never the email, when no display name exists', async () => {
+    mockUser = { id: 'u-1', email: 'someone@example.com', user_metadata: {} };
+    await addTransaction('centre-1', mockNewTxPayload);
+    expect(insertArgs[0].logged_by_name).toBe('');
+    expect(insertArgs[0].logged_by_name).not.toBe('someone@example.com');
+  });
+
+  it('writes the email into NO column of the inserted row', async () => {
+    mockUser = { id: 'u-1', email: 'someone@example.com', user_metadata: {} };
+    await addTransaction('centre-1', mockNewTxPayload);
+    expect(JSON.stringify(insertArgs[0])).not.toContain('someone@example.com');
+  });
+
+  it('still honours an explicitly supplied logged_by_name', async () => {
+    await addTransaction('centre-1', { ...mockNewTxPayload, logged_by_name: 'Kofi' });
+    expect(insertArgs[0].logged_by_name).toBe('Kofi');
+  });
+
+  it('leaves logged_by_name empty when there is no signed-in user at all', async () => {
+    mockUser = null;
+    await addTransaction('centre-1', mockNewTxPayload);
+    expect(insertArgs[0].logged_by_name).toBe('');
   });
 });

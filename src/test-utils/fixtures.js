@@ -101,6 +101,23 @@ export const mockTxs = [
   },
 ];
 
+/**
+ * Minimal VALID payload for addTransaction(). Deliberately carries no
+ * logged_by_name, so the service's fallback chain is what a test exercises.
+ * Every field here has to satisfy validateTransaction() or the service returns
+ * early and never reaches the insert.
+ */
+export const mockNewTxPayload = {
+  type:          'expense',
+  amount:        200,
+  category_name: 'Groceries',
+  date:          '2026-05-19',
+  week:          'Week 3',
+  currency:      'GHS',
+  source:        'main_app',
+  description:   'Weekly shop',
+};
+
 export const mockWeeklyData = [
   { week: 'Week 1', plannedIncome: 9000, actualIncome: 0,     fixedExpenses: 5080, variableSpending: 0,   net: -5080 },
   { week: 'Week 2', plannedIncome: 9000, actualIncome: 0,     fixedExpenses: 5080, variableSpending: 0,   net: -5080 },
