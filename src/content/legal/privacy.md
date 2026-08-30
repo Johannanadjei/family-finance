@@ -25,7 +25,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 ### (a) Information you provide
 
-- Identity and contact data — your name, email address and, where provided, telephone number and organisation details.
+- Identity and contact data — your name and email address.
 
 - Account data — your username, password (stored only in hashed form), plan selection and account preferences.
 
@@ -44,6 +44,14 @@ Effective date: 1 June 2026  |  Version 1.0
 - Payment-status data — confirmation of payment and limited transaction references from our payment service providers. We do not receive or store full payment-card numbers.
 
 **2.2 **We do not intentionally collect special categories of Personal Data (such as data about health, religion or political opinions). You should not input such data into the Service.
+
+**2.3 **Whether the supply of Personal Data is mandatory or optional depends on the data in question:
+
+(a) Certain data is **mandatory** to create and use the Service. This includes your email address and password (or your use of a supported sign-in provider), which are necessary to create and secure your Account, and the budget, income and expense information you choose to record, which is the core function of the Service. If you do not provide the mandatory data, we will not be able to create your Account or provide the Service to you.
+
+(b) Certain data is **optional**. This includes any information you volunteer in support requests or feedback. If you do not provide optional data, you can still use the Service, though some features or communications may be limited.
+
+(c) Optional fields are labelled as such where they are collected. If you leave out an item that is required, the Service will tell you before your entry can be submitted.
 
 ## 3. Purposes of Processing
 
