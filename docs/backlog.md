@@ -330,15 +330,18 @@ today all work lands directly on dev, which is covered.
 
 ---
 
-## DPC registration (Ghana, Act 843) — ✅ FORM SUBMITTED 2026-08-25, awaiting DPC review
+## DPC registration (Ghana, Act 843) — ✅ GRANTED 2026-09-01, registration number C0067637698
 
 **This entry is the record of what we attested to.** If the DPC comes back with questions,
 or if any declared fact later changes (new subprocessor, new recipient, new transfer
 destination), this is the baseline to diff against — and a change to a declared fact means
 the registration needs updating, not just the policy.
 
-**Status:** submitted 2026-08-25. No decision yet; awaiting DPC review. Nothing to do until
-they respond.
+**Status:** ✅ **GRANTED.** Submitted 2026-08-25; registration number **C0067637698** issued and
+certificate received 2026-09-01. The number is live in `privacy.md` §1.1 and verified in the
+production bundle — see the "§1.1 DPC number + the DRAFT banner" entry below for the deploy trail
+(`908e3dc` → main `c355573`). What remains is maintenance, not an application: if any declared
+fact below changes, the registration must be updated with the DPC, not just the policy.
 
 ### What was declared
 
@@ -484,8 +487,12 @@ Verified against the code before publishing, not assumed: no analytics dependenc
 **Still open for the counsel pass:** `feature/legal-counsel-review` (DPO rename, §5.1 rights —
 DO NOT MERGE until counsel opines) also edits `privacy.md` §5.1 and now **diverges from
 production — it will conflict**; rebase it onto `main` before it lands. The Act 843
-privacy-policy-contents review is likewise still outstanding. `privacy.md` §1.1 still carries
-"[PENDING — application in progress]" for the DPC number, which is accurate while under review.
+privacy-policy-contents review is likewise still outstanding. **Note (2026-09-01):** `privacy.md`
+§1.1 no longer carries the "[PENDING — application in progress]" placeholder — registration was
+granted and the number **C0067637698** is live in production. The DRAFT banner was narrowed at the
+same time to cite the counsel gate only; it has NOT been removed, and removing it plus stamping
+"v1.0 final" across all four legal docs is still this branch's job. See the "§1.1 DPC number + the
+DRAFT banner" entry below.
 
 ---
 
@@ -1045,8 +1052,9 @@ public legal text must match what the app actually does.
 
 **Registration granted.** DPC registration number **C0067637698**, certificate received
 2026-09-01. `privacy.md` §1.1 now reads `Our Data Protection Commission registration number is
-C0067637698.` — the `[PENDING — application in progress]` placeholder is gone. This supersedes
-the "awaiting DPC review" status in the DPC registration entry above (submitted 2026-08-25).
+C0067637698.` — the `[PENDING — application in progress]` placeholder is gone. The DPC
+registration entry above (submitted 2026-08-25) has been updated to match: it now reads GRANTED,
+and carries the same number.
 
 **This entry originally concluded "Banner stays" until counsel. It didn't stay untouched — it was
 narrowed.** Recording the deviation so the sequencing doesn't later read as a broken plan.
