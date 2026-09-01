@@ -1041,32 +1041,40 @@ public legal text must match what the app actually does.
 
 ---
 
-## §1.1 DPC number + the DRAFT banner — related, but NOT a single paired edit (banner has a second gate, and spans 4 files)
+## §1.1 DPC number + the DRAFT banner — ✅ NUMBER LIVE, BANNER NARROWED 2026-09-01 (`908e3dc`); full removal still gated on counsel
 
-**The ask was "these two update together once the registration number arrives."** They are
-related, but the pairing is not clean and the difference matters — recording it so the wrong
-edit doesn't get made on the day the number lands.
+**Registration granted.** DPC registration number **C0067637698**, certificate received
+2026-09-01. `privacy.md` §1.1 now reads `Our Data Protection Commission registration number is
+C0067637698.` — the `[PENDING — application in progress]` placeholder is gone. This supersedes
+the "awaiting DPC review" status in the DPC registration entry above (submitted 2026-08-25).
 
-**Piece 1 — `privacy.md` §1.1 (line 18).** Reads `Our Data Protection Commission registration
-number is [PENDING — application in progress].` This is the one that updates on the number
-arriving. **One file, one line.** See the DPC registration entry above for what was declared on
-2026-08-25 (submitted, awaiting review) — that entry is the baseline to diff against.
+**This entry originally concluded "Banner stays" until counsel. It didn't stay untouched — it was
+narrowed.** Recording the deviation so the sequencing doesn't later read as a broken plan.
 
-**Piece 2 — the DRAFT banner.** Two things make it not a same-day edit:
+**Piece 1 — `privacy.md` §1.1. DONE.** One file, one line, exactly as predicted.
 
-1. **It has TWO gates, not one.** The banner says the docs are draft *"while the Company
-   finalises its Data Protection Commission registration **and obtains formal counsel
-   sign-off**"*, and that the notice is replaced with a "v1.0 final" marker *"once that process
-   is complete."* The DPC number satisfies the first gate only. Counsel sign-off is a separate
-   workstream — cf. the `feature/legal-counsel-review` branch (`345a97f`), still marked
-   `[PENDING COUNSEL — DO NOT MERGE]`.
-2. **It is in all four legal docs, not just privacy.** Identical banner text at line 3 of
-   `privacy.md`, `terms.md`, `cookies.md` and `disclaimer.md`. Removing it is a four-file change,
-   and they must move together or the site ships docs that disagree about their own status.
+**Piece 2 — the DRAFT banner. PARTIALLY DONE — narrowed, not removed.** The original reasoning
+still holds: the banner has TWO gates and spans FOUR files. What the original plan missed is that
+leaving it byte-for-byte intact would have left all four docs asserting the Company "finalises its
+Data Protection Commission registration" — untrue the moment the certificate landed, and untrue in
+a public legal document. So the registration clause was cut and the counsel caveat kept:
 
-**So the sequencing is:** DPC number arrives → update §1.1 in `privacy.md` alone. Banner stays.
-Counsel sign-off lands → then remove the banner from all four files and stamp "v1.0 final" in
-one commit.
+- Before: *"…while the Company finalises its Data Protection Commission registration **and obtains
+  formal counsel sign-off**. …once that process is complete."*
+- After: *"…while the Company obtains formal counsel sign-off. …once that sign-off is obtained."*
 
-**Schedule:** blocked on external parties (DPC review, then counsel). Nothing to do until one
-of them responds.
+The `⚠️ DRAFT — pending qualified Ghanaian counsel review.` heading and the "v1.0 final"
+replacement promise are UNCHANGED — the docs still declare themselves draft. The
+four-files-move-together rule was honoured: the narrowing went into `privacy.md`, `terms.md`,
+`cookies.md` and `disclaimer.md` in the same commit, so no doc disagrees with another about its
+own status.
+
+**Still to do — the counsel gate.** When counsel signs off: remove the banner from all four docs
+and stamp "v1.0 final", in one commit. That remains the `feature/legal-counsel-review` branch's
+job (`345a97f`, still marked `[PENDING COUNSEL — DO NOT MERGE]`).
+
+**Deploy note.** These docs are `?raw`-bundled into `App-*.js` via `LegalView.jsx:2-5`, so editing
+the `.md` is inert until rebuild + deploy. Verify the string in the built/production bundle, not
+just in the source file.
+
+**Schedule:** blocked on counsel only. The DPC side is closed.
