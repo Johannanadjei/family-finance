@@ -142,6 +142,31 @@ describe('mapEvent', () => {
     expect(args.p_event_type).toBe('subscription.disable');
     expect(args.p_subscription_id).toBe('SUB_abc');
   });
+
+  // A cancellation from Paystack's hosted manage page arrives as not_renew. It used
+  // to be 200-ignored, which meant the cancellation never reached our records at all.
+  it('maps subscription.not_renew and forwards next_payment_date as the period end', () => {
+    const args = mapEvent({
+      event: 'subscription.not_renew',
+      data: {
+        status: 'non-renewing',
+        subscription_code: 'SUB_abc',
+        next_payment_date: '2026-10-01T00:00:00.000Z',
+        customer: { email: 'aj@example.com', customer_code: 'CUS_1' },
+        plan: { plan_code: 'PLN_month', interval: 'monthly' },
+      },
+    });
+    expect(args.p_event_type).toBe('subscription.not_renew');
+    expect(args.p_subscription_id).toBe('SUB_abc');
+    // The paid-through date is what keeps the customer Pro until it passes.
+    expect(args.p_period_end).toBe('2026-10-01T00:00:00.000Z');
+    expect(args.p_paystack_status).toBe('non-renewing');
+  });
+
+  it('still ignores events outside the handled set', () => {
+    expect(mapEvent({ event: 'subscription.expiring_cards', data: {} })).toBeNull();
+    expect(mapEvent({ event: 'transfer.success', data: {} })).toBeNull();
+  });
 });
 
 // ── handler response contract + routing ─────────────────────────────────────

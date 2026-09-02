@@ -25,9 +25,16 @@ import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 
 // The only events we act on. Everything else is acknowledged and ignored.
+//
+// not_renew vs disable: Paystack emits `subscription.not_renew` when a subscription
+// is set to stop renewing (what the hosted manage page's cancel does) and
+// `subscription.disable` when it is actually disabled. We forward BOTH and let
+// apply_subscription_event decide, so the outcome is correct whichever one arrives
+// — see that file's EVENT -> STATE MAP.
 const HANDLED = new Set([
   'charge.success',
   'subscription.create',
+  'subscription.not_renew',
   'subscription.disable',
   'invoice.payment_failed',
 ]);
@@ -89,8 +96,10 @@ export function mapEvent(event) {
 
   const subCode = d.subscription_code || d.subscription?.subscription_code || null;
 
-  // Period end: subscription.* events carry next_payment_date (authoritative); a
-  // charge.success carries paid_at, from which we derive a provisional end.
+  // Period end: subscription.* events (create / not_renew / disable) carry
+  // next_payment_date (authoritative); a charge.success carries paid_at, from which
+  // we derive a provisional end. On a cancellation this is the date the customer
+  // has already paid through — which is exactly what keeps them Pro until then.
   let periodStart = null;
   let periodEnd   = null;
   if (type === 'charge.success') {
