@@ -3,8 +3,9 @@
  *
  * Covers the 7 Phase-2 cases: renders both cards with PRICING prices, billing toggle
  * switches price + savings badge, free-user CTA fires startCheckout and redirects,
- * Pro-user "Your plan" + suppressed CTA + manage placeholder, ?checkout=return polls
- * refresh(), loading → skeleton, and a checkout failure surfaces an error without redirect.
+ * Pro-user "Your plan" + suppressed CTA + a working manage button, ?checkout=return
+ * polls refresh(), loading → skeleton, and a checkout failure surfaces an error
+ * without redirect. Also covers the manage-link flow: fetch → redirect, and failure.
  *
  * Prices are asserted against PRICING (lib/pricing.js) — never hardcoded literals.
  */
@@ -25,6 +26,9 @@ vi.mock('../context/SubscriptionContext', () => ({
 const mockStartCheckout = vi.fn();
 vi.mock('../services/checkout.service', () => ({ startCheckout: (i) => mockStartCheckout(i) }));
 
+const mockGetManageLink = vi.fn();
+vi.mock('../services/billing.service', () => ({ getManageLink: () => mockGetManageLink() }));
+
 import { PricingView } from './PricingView';
 
 let assign;
@@ -33,6 +37,8 @@ beforeEach(() => {
   mockNavigate.mockReset();
   mockStartCheckout.mockReset();
   mockStartCheckout.mockResolvedValue({ data: { authorization_url: 'https://pay/abc' }, error: null });
+  mockGetManageLink.mockReset();
+  mockGetManageLink.mockResolvedValue({ data: { link: 'https://paystack.com/manage/xyz' }, error: null });
   ctx = { ...mockSubscriptionFree, refresh: vi.fn() };
 
   assign = vi.fn();
@@ -64,12 +70,37 @@ describe('PricingView', () => {
     await waitFor(() => expect(assign).toHaveBeenCalledWith('https://pay/abc'));
   });
 
-  it('Pro user: shows "Your plan", suppresses the Upgrade CTA, shows the manage placeholder', () => {
+  it('Pro user: shows "Your plan", suppresses the Upgrade CTA, offers manage subscription', () => {
     ctx = { ...mockSubscriptionPro, refresh: vi.fn() };
     render(<PricingView />);
     expect(screen.getByTestId('current-pro')).toBeTruthy();
     expect(screen.queryByTestId('upgrade-cta')).toBeNull();
-    expect(screen.getByTestId('manage-sub')).toBeTruthy();
+    const manage = screen.getByTestId('manage-sub');
+    expect(manage).toBeTruthy();
+    expect(manage.disabled).toBe(false);          // no longer a "coming soon" placeholder
+  });
+
+  it('free user: no manage button — there is no subscription to manage', () => {
+    render(<PricingView />);
+    expect(screen.queryByTestId('manage-sub')).toBeNull();
+  });
+
+  it('Pro user: manage button fetches the link and redirects to Paystack', async () => {
+    ctx = { ...mockSubscriptionPro, refresh: vi.fn() };
+    render(<PricingView />);
+    fireEvent.click(screen.getByTestId('manage-sub'));
+    expect(mockGetManageLink).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('https://paystack.com/manage/xyz'));
+  });
+
+  it('Pro user: a failed manage-link surfaces an error and never redirects', async () => {
+    ctx = { ...mockSubscriptionPro, refresh: vi.fn() };
+    mockGetManageLink.mockResolvedValue({ data: null, error: new Error('no_subscription') });
+    render(<PricingView />);
+    fireEvent.click(screen.getByTestId('manage-sub'));
+    await waitFor(() => expect(screen.getByTestId('manage-error')).toBeTruthy());
+    expect(assign).not.toHaveBeenCalled();
+    expect(screen.getByTestId('manage-sub').disabled).toBe(false);   // re-enabled to retry
   });
 
   it('?checkout=return polls refresh() and shows the processing banner', () => {
