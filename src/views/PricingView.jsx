@@ -9,12 +9,19 @@
  * startCheckout() and redirects to Paystack's hosted checkout. On return
  * (?checkout=return) we poll the subscription for ~30s to cover webhook lag (D2)
  * before showing a "may take a moment" note — never infinite-poll.
+ *
+ * A Pro user also gets "Manage subscription" — a Paystack-hosted card-update/cancel
+ * link. Gated on the VIEWER's own isPro, never hubPlan: a member of someone else's
+ * Pro hub has no subscription of their own to manage.
  */
 
 import { useState, useEffect }     from 'react';
 import { useNavigate }             from 'react-router-dom';
 import { useSubscriptionContext }  from '../context/SubscriptionContext';
 import { startCheckout }           from '../services/checkout.service';
+import { getManageLink }           from '../services/billing.service';
+import { ManageSubscriptionButton } from './pricing/ManageSubscriptionButton';
+import { BillingToggle }            from './pricing/BillingToggle';
 import { PRICING }                 from '../lib/pricing';
 
 const POLL_INTERVAL_MS = 2000;   // refresh cadence on checkout return (D2)
@@ -39,27 +46,6 @@ function Check() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M20 6 9 17l-5-5" stroke="var(--c-success, #059669)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-
-function BillingToggle({ billing, onChange }) {
-  const opt = (key, label) => {
-    const active = billing === key;
-    return (
-      <button key={key} data-testid={`toggle-${key}`} onClick={() => onChange(key)}
-        style={{ flex: 1, padding: '9px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', transition: 'background .15s',
-          background: active ? 'var(--c-primary, #064e3b)' : 'transparent',
-          color: active ? 'var(--c-btn-text, #fff)' : 'var(--c-muted, #6b7280)',
-          fontSize: 14, fontWeight: 800, fontFamily: "'Nunito', sans-serif" }}>
-        {label}
-      </button>
-    );
-  };
-  return (
-    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--c-input-bg, #f9fafb)', border: '1.5px solid var(--c-border, #e5e7eb)', borderRadius: 12, marginBottom: 16 }}>
-      {opt('monthly', 'Monthly')}
-      {opt('annual', `Annual · Save ${PRICING.annual.savings_percent}%`)}
-    </div>
   );
 }
 
@@ -104,6 +90,8 @@ export function PricingView() {
   const [billing,     setBilling]     = useState('monthly');
   const [checkingOut, setCheckingOut] = useState(false);
   const [ctaError,    setCtaError]    = useState(null);
+  const [managing,    setManaging]    = useState(false);
+  const [manageError, setManageError] = useState(null);
   const [returnState, setReturnState] = useState(
     () => (new URLSearchParams(window.location.search).get('checkout') === 'return' ? 'processing' : null),
   );
@@ -146,6 +134,19 @@ export function PricingView() {
     window.location.assign(data.authorization_url);
   };
 
+  // Paystack's hosted card-update/cancel page. The link is single-use, so it is
+  // fetched on click, never ahead of time.
+  const handleManage = async () => {
+    setManageError(null);
+    setManaging(true);
+    const { data, error: err } = await getManageLink();
+    if (err || !data?.link) {
+      setManaging(false);
+      return setManageError("Couldn't open the billing page. Please try again.");
+    }
+    window.location.assign(data.link);
+  };
+
   const plan   = PRICING[billing];
   const banner = returnState ? BANNERS[returnState] : null;
 
@@ -177,11 +178,7 @@ export function PricingView() {
       {ctaError && <p data-testid="cta-error" style={{ fontSize: 13, fontWeight: 700, color: 'var(--c-danger, #dc2626)', margin: '0 0 12px' }}>{ctaError}</p>}
 
       {isPro && (
-        <button data-testid="manage-sub" disabled
-          style={{ width: '100%', padding: 12, borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'transparent',
-            color: 'var(--c-muted, #6b7280)', fontSize: 14, fontWeight: 700, cursor: 'not-allowed', fontFamily: "'Nunito', sans-serif" }}>
-          Manage subscription (coming soon)
-        </button>
+        <ManageSubscriptionButton onClick={handleManage} loading={managing} error={manageError} />
       )}
     </div>
   );

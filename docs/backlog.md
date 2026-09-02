@@ -249,11 +249,20 @@ entry on `useHubTier()` + ownership so only someone who can actually lift the hu
 offered the purchase. Touches `BudgetView`, `LogView`, `DailyView`, and the `/pricing`
 route guard.
 
-**Open question 1 — severity switch — ANSWERED 2026-07-18: TEST mode.** Paystack is in
-**test mode** (confirmed in the Paystack dashboard), so `PAYSTACK_SECRET_KEY` is `sk_test_…`
-and **no real money can move**. Current severity: **UX/logic bug, not P0** — a standard
-member can walk the checkout flow, but the charge is a test-mode no-op. (`checkout.js:14`
-documents both key forms; the test hardcodes `sk_test_123`.)
+**Open question 1 — severity switch — ANSWERED 2026-07-18: TEST mode. RE-CONFIRMED
+2026-09-02.** Paystack is in **test mode**, so `PAYSTACK_SECRET_KEY` is `sk_test_…` and
+**no real money can move**. Current severity: **UX/logic bug, not P0** — a standard member
+can walk the checkout flow, but the charge is a test-mode no-op. (`checkout.js:14` documents
+both key forms; the test hardcodes `sk_test_123`.)
+
+> **Re-confirmed 2026-09-02, both halves this time** — the 2026-07-18 answer checked the
+> Paystack dashboard only, which cannot see what Vercel actually injects at runtime:
+>   • **Vercel Production `PAYSTACK_SECRET_KEY` = `sk_test_…`** (checked in the Vercel env UI)
+>   • **Paystack dashboard toggle = Test**
+> Both were verified as the safety gate on the cancel-flow deploy (see the cancel/downgrade
+> entry below). Check BOTH on any future re-confirmation: they can disagree if a key is
+> swapped in one environment and not another, and each serverless route inherits whichever
+> key its own environment holds.
 
 **BLOCKER ON THE LIVE-KEY SWAP.** Severity flips to **P0 the instant `PAYSTACK_SECRET_KEY`
 becomes `sk_live_…`** — at that point a standard member in a Free hub at a cap is charged
@@ -272,6 +281,99 @@ Paystack live-key swap** (see OQ1). Ship `useHubTier()` before that swap, not af
 **DONE 2026-08-05** — `useHubTier()` shipped and live (see the RESOLVED banner at the top of
 this entry). This entry's blocker is discharged. The remaining live-key consideration is the
 **separate** RLS-enforcement entry below, which this fix did not address.
+
+---
+
+## Cancel / downgrade flow — hosted manage link + mid-period fairness fix — ✅ SHIPPED 2026-09-02
+
+> **What existed before.** Nothing. `PricingView` rendered a `disabled` "Manage subscription
+> (coming soon)" button, there was no cancel RPC, no cancel UI and no outbound Paystack call
+> other than `transaction/initialize`. A user could only cancel from Paystack's side — and
+> `subscription.not_renew`, which is what a hosted-page cancel actually emits, was not in the
+> webhook's `HANDLED` set, so that cancellation reached our records not at all.
+
+**Piece 1 — the button.** New authenticated serverless route
+`api/paystack/manage-link.js` (patterned on `checkout.js`): identity from the verified
+Supabase JWT, never the body; looks up the caller's own newest live subscription
+(`user_id = user.id`, re-filtered explicitly rather than trusting RLS since it holds a
+service-role client); calls `GET /subscription/:code/manage/link`; returns the hosted link.
+`billing.service.getManageLink()` → `ManageSubscriptionButton` → `window.location.assign`.
+Paystack owns the cancel conversation; no card data and no cancel authority sits in this app.
+
+- **Any non-deleted row with a `paystack_subscription_id` qualifies, not just `status='active'`** —
+  a `past_due` customer needs that page most, it is where a failed card gets replaced.
+- **A failed lookup returns 500, not 404** — never mask a fetch failure as "you have no
+  subscription" (§12).
+- `PlanSection` unchanged: its "Manage Plan" already deep-links to `/pricing`, where the
+  button lives. Gated on the VIEWER's own `isPro`, never `hubPlan` — a member of someone
+  else's Pro hub has no subscription of their own to manage.
+- `BillingToggle` was extracted to `views/pricing/` in the same commit: `PricingView` was at
+  188 of its 200-line audit limit and the manage flow pushed it to 205.
+
+**Piece 2 — the mid-period-drop fairness fix (`apply_subscription_event.sql`).** Previously
+`subscription.disable` wrote `status='canceled'` unconditionally, so a customer who cancelled
+mid-period lost Pro the moment the webhook landed — access they had already paid for, with
+`current_period_end` sitting right there in the row. The function now maps an event to an
+*intent* and resolves status afterwards, because the disable branch depends on the located
+row's period end:
+
+| intent | status | `cancel_at_period_end` |
+|---|---|---|
+| `activate` (charge.success / subscription.create) | `active` | **false** (cleared — resubscribed) |
+| `past_due` (invoice.payment_failed) | `past_due` | preserved |
+| `wind_down` (subscription.not_renew) | **`active`** | true |
+| `disable`, period end in future | **`active`** | true |
+| `disable`, period end past **or NULL** | `canceled` | true |
+
+`subscription.not_renew` added to the webhook's `HANDLED` set. Both events are forwarded and
+the SQL decides, so the outcome is correct whichever one Paystack emits.
+
+- **NO READER CHANGES.** All eight readers key on
+  `status='active' AND (current_period_end IS NULL OR current_period_end > now())`
+  and are untouched: `resolveSubscription()`, `hub_tier()`, `create_hub`, `create_invite`,
+  `create_category`, `create_categories_bulk`, `update_centre_skin`, `accept_invite`.
+- **`cancel_at_period_end` gates no access** — display/audit only. `current_period_end`
+  remains the sole expiry authority, so a wrongly-set flag can never extend access. This is
+  the first thing to ever write that column; `migrate_19` shipped it in Jan and nothing had
+  used it since.
+- **The NULL-period trap stays shut.** A row with `current_period_end IS NULL` reads as
+  "period open forever", so the disable branch requires a NON-NULL, still-future end before
+  it preserves access.
+- **The disable branch tests the POST-merge end (`v_new_end`, after `GREATEST`)**, so a
+  disable payload can widen but never narrow the access window. Confirmed as intended
+  2026-09-02: generous-to-the-user is the correct bias for a cancellation rule.
+
+**SQL applied to the DB 2026-09-02 — all 9 dry-run scenarios PASSED.**
+`scripts/apply_subscription_event_dryrun.sql` (one transaction, `ROLLBACK` terminator, the
+`f3_erasure_runbook.sql` discipline) asserts row state AND the reader verdict for each case.
+There is no Docker/pgTAP harness in this repo — `npm test` covers JS only — so that file IS
+the test for the SQL half. Re-run it after any edit to `apply_subscription_event.sql`.
+
+| # | scenario | result |
+|---|---|---|
+| S1 | `not_renew`, period open | active, flag set, end untouched → reader **pro** |
+| S2 | `disable`, period open | active, flag set → reader **pro** ← the fairness fix |
+| S3 | `disable`, period elapsed | canceled → reader **free** |
+| S4 | `disable`, NULL end | canceled → reader **free** |
+| S5 | `not_renew`, no row | `skipped_no_row`, zero rows created |
+| S6 | charge after `not_renew` | re-activated, flag CLEARED, end moved forward |
+| S7 | `payment_failed` on a wound-down row | past_due, flag PRESERVED |
+| S8 | `charge.success`, no row | inserts pro/active/uncancelled |
+| S9 | `disable` on past_due, period open | active (they paid through it) |
+
+**Safety gate.** Deployed only after re-confirming Paystack TEST mode on **both** Vercel
+Production and the Paystack dashboard (see Open question 1 above). In live mode the
+manage-link route returns links that cancel real subscriptions the first time it is used.
+
+**Still open / not addressed here:**
+- The `/pricing` route remains ungated (`App.jsx` mounts it with no role/tier guard) — see
+  the freemium CTA entry above. Unchanged by this work.
+- No in-app confirmation or "your plan ends on X" copy yet: `cancel_at_period_end` is now
+  written but nothing reads it. That copy is the natural follow-up.
+- Which event Paystack actually emits on a hosted-page cancel (`not_renew` vs `disable`) has
+  not been observed end-to-end. The SQL is correct either way by construction, but the first
+  real test-mode cancellation should be watched in Paystack's delivery log to find out — the
+  webhook logs nothing for events it handles successfully.
 
 ---
 
