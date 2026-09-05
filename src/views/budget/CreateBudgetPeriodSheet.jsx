@@ -2,20 +2,20 @@
  * views/budget/CreateBudgetPeriodSheet.jsx — user-driven budget-period creator (Phase B).
  *
  * Two modes (Decision 1 = Option B):
- *   'choose' (default) — two big buttons: "Next calendar month" (one tap, auto-fills
- *                        from nextCalendarMonthRange + saves) and "Custom period".
+ *   'choose' (default) — one tap for nextUncoveredMonthRange, plus "Custom period".
  *   'custom'           — name + start/end (three-field DD/MM/YYYY, matching
  *                        AddTransactionSheet) + a "Copy from previous budget?" toggle.
- *                        Save creates the period; if copy is on, the PARENT opens the
+ *                        Save creates the period; if copy is on the PARENT opens its
  *                        CopyCategoriesSheet against the new period (Decision 5).
  *
- * Pure orchestration: it computes the range and validates dates, but the actual write
- * (createBudgetPeriod), the cycles refresh, and the copy follow-up all live in the
- * parent's onCreate. onCreate returns { error }; a falsy error means the parent has
- * closed the sheet (isOpen → false), which resets local state via the effect below.
+ * Pure orchestration: it computes the range and validates dates, but the write, the
+ * cycles refresh and the copy follow-up all live in the parent's onCreate, which
+ * returns { error }; a falsy error means the parent closed the sheet (isOpen → false),
+ * resetting local state via the effect below.
  *
  * @param {boolean}  isOpen
  * @param {function} onClose
+ * @param {object[]} cycles    — live cycles; the quick range skips covered months
  * @param {function} onCreate  — async ({ name, startDate, endDate, copyPrevious }) => { error }
  */
 
@@ -23,7 +23,7 @@ import { useState, useEffect } from 'react';
 import { createPortal }        from 'react-dom';
 import { useModalChrome }      from '../../hooks/useModalChrome';
 import { getToday, formatMonth } from '../../lib/dates';
-import { nextCalendarMonthRange, currentCalendarMonthRange, isWithinCurrentYear } from '../../lib/cycles';
+import { nextUncoveredMonthRange, currentCalendarMonthRange, isWithinCurrentYear } from '../../lib/cycles';
 
 const pad = (n) => String(n).padStart(2, '0');
 const isValidYMD = (y, m, d) => { const dt = new Date(y, m - 1, d); return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d; };
@@ -57,7 +57,7 @@ function DateFields({ label, parts, onChange, testid }) {
 
 const blank = { d: '', m: '', y: '' };
 
-export function CreateBudgetPeriodSheet({ isOpen, onClose, onCreate }) {
+export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate }) {
   const [mode,        setMode]        = useState('choose');
   const [name,        setName]        = useState('');
   const [nameDirty,   setNameDirty]   = useState(false);
@@ -77,9 +77,9 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, onCreate }) {
   useModalChrome({ isOpen, onClose });
   if (!isOpen) return null;
 
-  // Quick-create target: today + 1 calendar month — null in December (crosses the year).
+  // Quick range: first month from today's onward with no live period. Null → disabled.
   const today     = getToday();
-  const nextRange = nextCalendarMonthRange(today);
+  const nextRange = nextUncoveredMonthRange(cycles, today);
 
   // Suggested (auto) name follows the start month until the user edits the field.
   const suggested = (start.y && start.m) ? formatMonth(`${start.y}-${pad(start.m)}`) : '';
@@ -87,7 +87,7 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, onCreate }) {
 
   const openCustom = () => {
     // Pre-fill from next month; in December fall back to the current month (within-year).
-    const range = nextCalendarMonthRange(today) ?? currentCalendarMonthRange(today);
+    const range = nextUncoveredMonthRange(cycles, today) ?? currentCalendarMonthRange(today);
     const [sy, sm, sd] = range.start.split('-').map(Number);
     const [ey, em, ed] = range.end.split('-').map(Number);
     setStart({ d: String(sd), m: String(sm), y: String(sy) });
@@ -108,7 +108,7 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, onCreate }) {
   };
 
   const quickCreate = () => {
-    const range = nextCalendarMonthRange(getToday());   // null in December (button disabled)
+    const range = nextUncoveredMonthRange(cycles, getToday());   // null → button disabled
     if (range) save({ name: null, startDate: range.start, endDate: range.end, copyPrevious: false });
   };
 

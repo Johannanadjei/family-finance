@@ -8,18 +8,18 @@
  *
  * Visibility rule (single source of truth — Decision Q2, persistent / not dismissable):
  * render ONLY when no live cycle contains today. If a current period exists, render
- * null. Centralising the getCycleContainingDate check here means Home and Budget mount
+ * null. Centralising the cycleForToday check here means Home and Budget mount
  * it with one line each and never duplicate the rule.
  *
  * @param {object[]} cycles    — live cycle list (from FinanceContext)
  * @param {function} onCreate  — open the period creator (Budget) or route to it (Home)
  */
 
-import { getCycleContainingDate } from '../lib/cycles';
+import { cycleForToday }       from '../lib/cycles';
 import { getToday }               from '../lib/dates';
 
 export function NoCurrentPeriodPrompt({ cycles = [], onCreate }) {
-  if (getCycleContainingDate(cycles, getToday())) return null;
+  if (cycleForToday(cycles, getToday())) return null;
 
   return (
     <div data-testid="no-current-period-prompt" style={{

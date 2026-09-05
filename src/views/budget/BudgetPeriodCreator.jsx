@@ -49,6 +49,7 @@ export function BudgetPeriodCreator({ isOpen, onOpenChange, onCopyRequested, res
       <CreateBudgetPeriodSheet
         isOpen={isOpen}
         onClose={() => onOpenChange(false)}
+        cycles={cycles}
         onCreate={handleCreatePeriod}
       />
       {resetModal}

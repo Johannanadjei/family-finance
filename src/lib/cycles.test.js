@@ -1,53 +1,91 @@
 import { describe, it, expect } from 'vitest';
-import { getActiveCycle, getCycleContainingDate, getCycleNav, sliceByCycle, cycleIdForMonth, currentCalendarMonthRange, nextCalendarMonthRange, isWithinCurrentYear, visibleCycleWindow } from './cycles';
+import { landingCycle, cycleForToday, cycleForDate, cycleForMonth, getCycleNav, sliceByCycle, cycleIdForMonth, currentCalendarMonthRange, nextUncoveredMonthRange, isWithinCurrentYear, visibleCycleWindow } from './cycles';
 
 // Three non-overlapping calendar cycles. Dates are 'YYYY-MM-DD' strings.
 const APR = { id: 'apr', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
 const MAY = { id: 'may', start_date: '2026-05-01', end_date: '2026-05-31', deleted_at: null };
 const JUN = { id: 'jun', start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null };
 
-describe('getActiveCycle', () => {
+describe('landingCycle', () => {
   it('returns the cycle containing today when one matches', () => {
-    expect(getActiveCycle([APR, MAY, JUN], '2026-05-15')).toBe(MAY);
+    expect(landingCycle([APR, MAY, JUN], '2026-05-15')).toBe(MAY);
   });
 
   it('returns the cycle on its start/end boundary (inclusive)', () => {
-    expect(getActiveCycle([APR, MAY, JUN], '2026-05-01')).toBe(MAY);
-    expect(getActiveCycle([APR, MAY, JUN], '2026-05-31')).toBe(MAY);
+    expect(landingCycle([APR, MAY, JUN], '2026-05-01')).toBe(MAY);
+    expect(landingCycle([APR, MAY, JUN], '2026-05-31')).toBe(MAY);
   });
 
   it('returns the most recently ended cycle on a gap day', () => {
     // today is after JUN ended — no cycle contains it
-    expect(getActiveCycle([APR, MAY, JUN], '2026-07-10')).toBe(JUN);
+    expect(landingCycle([APR, MAY, JUN], '2026-07-10')).toBe(JUN);
   });
 
   it('returns the earliest future cycle when all cycles are ahead (brand-new hub)', () => {
-    expect(getActiveCycle([MAY, JUN], '2026-03-01')).toBe(MAY);
+    expect(landingCycle([MAY, JUN], '2026-03-01')).toBe(MAY);
   });
 
   it('returns null when there are no cycles', () => {
-    expect(getActiveCycle([], '2026-05-15')).toBeNull();
+    expect(landingCycle([], '2026-05-15')).toBeNull();
   });
 
   it('ignores soft-deleted cycles', () => {
     const deletedMay = { ...MAY, deleted_at: '2026-05-02T00:00:00Z' };
     // today is in May, but the only May cycle is deleted → falls back to nearest past (APR)
-    expect(getActiveCycle([APR, deletedMay], '2026-05-15')).toBe(APR);
+    expect(landingCycle([APR, deletedMay], '2026-05-15')).toBe(APR);
   });
 });
 
-describe('getCycleContainingDate', () => {
+describe('cycleForToday — the strict "is now covered?" predicate', () => {
+  it('returns the cycle containing today', () => {
+    expect(cycleForToday([APR, MAY, JUN], '2026-05-15')).toBe(MAY);
+  });
+
+  it('is inclusive of both boundaries', () => {
+    expect(cycleForToday([APR, MAY, JUN], '2026-05-01')).toBe(MAY);
+    expect(cycleForToday([APR, MAY, JUN], '2026-05-31')).toBe(MAY);
+  });
+
+  // THE distinction this whole predicate exists for. landingCycle falls back to the
+  // most recently ended period on a gap day, which is what made a stale past period
+  // read as "now"; cycleForToday refuses to answer at all.
+  it('returns null on a gap day where landingCycle falls back to the last ended period', () => {
+    expect(landingCycle([APR, MAY, JUN], '2026-07-10')).toBe(JUN);
+    expect(cycleForToday([APR, MAY, JUN], '2026-07-10')).toBeNull();
+  });
+
+  it('returns null when every cycle is still ahead (brand-new hub)', () => {
+    expect(landingCycle([MAY, JUN], '2026-03-01')).toBe(MAY);
+    expect(cycleForToday([MAY, JUN], '2026-03-01')).toBeNull();
+  });
+
+  it('returns null for an empty list', () => {
+    expect(cycleForToday([], '2026-05-15')).toBeNull();
+  });
+
+  it('ignores soft-deleted cycles', () => {
+    const deletedMay = { ...MAY, deleted_at: '2026-05-02T00:00:00Z' };
+    expect(cycleForToday([APR, deletedMay], '2026-05-15')).toBeNull();
+  });
+
+  it('defaults `today` to UTC today when called with no date', () => {
+    // Shape contract only — the clock is real here.
+    expect(cycleForToday([]) ).toBeNull();
+  });
+});
+
+describe('cycleForDate', () => {
   it('returns the cycle whose range contains the date', () => {
-    expect(getCycleContainingDate([APR, MAY, JUN], '2026-06-15')).toBe(JUN);
+    expect(cycleForDate([APR, MAY, JUN], '2026-06-15')).toBe(JUN);
   });
 
   it('returns null when the date falls in a gap (no cycle covers it)', () => {
-    expect(getCycleContainingDate([APR, JUN], '2026-05-15')).toBeNull();
+    expect(cycleForDate([APR, JUN], '2026-05-15')).toBeNull();
   });
 
   it('ignores soft-deleted cycles', () => {
     const deletedJun = { ...JUN, deleted_at: '2026-06-02T00:00:00Z' };
-    expect(getCycleContainingDate([deletedJun], '2026-06-15')).toBeNull();
+    expect(cycleForDate([deletedJun], '2026-06-15')).toBeNull();
   });
 });
 
@@ -163,41 +201,104 @@ describe('currentCalendarMonthRange', () => {
   });
 });
 
-describe('nextCalendarMonthRange', () => {
-  // Phase 2 (Bug 1): history-independent — always today + 1 calendar month, never
-  // anchored on the cycle list. Single `today` arg; stray future cycles are irrelevant.
-  it('returns the calendar month after the one containing today', () => {
-    expect(nextCalendarMonthRange('2026-06-15')).toEqual({
+describe('cycleForMonth', () => {
+  it('returns the cycle whose START month matches (the resolve_cycle_id month branch)', () => {
+    expect(cycleForMonth([APR, MAY, JUN], '2026-05')).toBe(MAY);
+  });
+
+  it('returns null when no live cycle starts in that month', () => {
+    expect(cycleForMonth([APR, JUN], '2026-05')).toBeNull();
+  });
+
+  it('ignores soft-deleted cycles', () => {
+    expect(cycleForMonth([{ ...MAY, deleted_at: '2026-05-02T00:00:00Z' }], '2026-05')).toBeNull();
+  });
+
+  it('cycleIdForMonth is its id form', () => {
+    expect(cycleIdForMonth([APR, MAY, JUN], '2026-05')).toBe('may');
+    expect(cycleIdForMonth([APR, JUN], '2026-05')).toBeNull();
+  });
+});
+
+describe('nextUncoveredMonthRange', () => {
+  // Replaces nextCalendarMonthRange (blindly today + 1 month). The offer is now the
+  // first month from today's onward that no live period covers — because with
+  // auto-continue the current month is USUALLY covered, but must be offered when it
+  // is not (auto-continue failed, standard member, legacy hub).
+  it('offers next month when a period already covers today', () => {
+    expect(nextUncoveredMonthRange([JUN], '2026-06-15')).toEqual({
       start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
     });
   });
 
-  it('is independent of any date within the current month (first/last day)', () => {
-    expect(nextCalendarMonthRange('2026-06-01')).toEqual({
+  it('offers THIS month when nothing covers today (the auto-continue-did-not-run case)', () => {
+    expect(nextUncoveredMonthRange([APR, MAY], '2026-06-15')).toEqual({
+      start: '2026-06-01', end: '2026-06-30', name: 'June 2026',
+    });
+    expect(nextUncoveredMonthRange([], '2026-06-15')).toEqual({
+      start: '2026-06-01', end: '2026-06-30', name: 'June 2026',
+    });
+  });
+
+  // The old function offered next month unconditionally, so a hub that already had it
+  // planned got CYC01 back from the server instead of a usable suggestion.
+  it('skips a month that is already planned and offers the first free one', () => {
+    const JUL = { id: 'jul', start_date: '2026-07-01', end_date: '2026-07-31', deleted_at: null };
+    expect(nextUncoveredMonthRange([JUN, JUL], '2026-06-15')).toEqual({
+      start: '2026-08-01', end: '2026-08-31', name: 'August 2026',
+    });
+  });
+
+  // Overlap, not start-month equality: a custom period straddling two months blocks both.
+  it('treats a straddling custom period as covering both months it touches', () => {
+    const STRADDLE = { id: 'str', start_date: '2026-06-15', end_date: '2026-07-14', deleted_at: null };
+    expect(nextUncoveredMonthRange([STRADDLE], '2026-06-20')).toEqual({
+      start: '2026-08-01', end: '2026-08-31', name: 'August 2026',
+    });
+  });
+
+  it('is independent of where in the month today falls', () => {
+    expect(nextUncoveredMonthRange([JUN], '2026-06-01')).toEqual({
       start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
     });
-    expect(nextCalendarMonthRange('2026-06-30')).toEqual({
+    expect(nextUncoveredMonthRange([JUN], '2026-06-30')).toEqual({
       start: '2026-07-01', end: '2026-07-31', name: 'July 2026',
     });
   });
 
-  it('lands on a 28/29-day February correctly (next month = Feb)', () => {
-    expect(nextCalendarMonthRange('2026-01-10')).toEqual({
+  it('lands on a 28/29-day February correctly', () => {
+    const JAN26 = { id: 'j26', start_date: '2026-01-01', end_date: '2026-01-31', deleted_at: null };
+    const JAN28 = { id: 'j28', start_date: '2028-01-01', end_date: '2028-01-31', deleted_at: null };
+    expect(nextUncoveredMonthRange([JAN26], '2026-01-10')).toEqual({
       start: '2026-02-01', end: '2026-02-28', name: 'February 2026',
     });
-    expect(nextCalendarMonthRange('2028-01-10')).toEqual({   // 2028 leap year
+    expect(nextUncoveredMonthRange([JAN28], '2028-01-10')).toEqual({   // 2028 leap year
       start: '2028-02-01', end: '2028-02-29', name: 'February 2028',
     });
   });
 
-  it('returns null when next month would cross into next year (December)', () => {
-    expect(nextCalendarMonthRange('2026-12-01')).toBeNull();
-    expect(nextCalendarMonthRange('2026-12-31')).toBeNull();
+  it('returns null in December once December itself is covered (never crosses the year)', () => {
+    const DEC = { id: 'dec', start_date: '2026-12-01', end_date: '2026-12-31', deleted_at: null };
+    expect(nextUncoveredMonthRange([DEC], '2026-12-01')).toBeNull();
+    expect(nextUncoveredMonthRange([DEC], '2026-12-31')).toBeNull();
   });
 
-  it('defaults `today` to UTC today when called with no argument', () => {
-    const r = nextCalendarMonthRange();
-    // Either a valid range or null (December) — never throws, always shaped right.
+  it('returns null when every month to year end is already planned', () => {
+    const ALL = [10, 11, 12].map(m => ({
+      id: `m${m}`, start_date: `2026-${m}-01`, end_date: `2026-${m}-31`, deleted_at: null,
+    }));
+    expect(nextUncoveredMonthRange(ALL, '2026-10-05')).toBeNull();
+  });
+
+  it('ignores soft-deleted cycles when deciding what is covered', () => {
+    const deletedJun = { ...JUN, deleted_at: '2026-06-02T00:00:00Z' };
+    expect(nextUncoveredMonthRange([deletedJun], '2026-06-15')).toEqual({
+      start: '2026-06-01', end: '2026-06-30', name: 'June 2026',
+    });
+  });
+
+  it('defaults its arguments (no cycles, UTC today) without throwing', () => {
+    const r = nextUncoveredMonthRange();
     expect(r === null || (typeof r.start === 'string' && typeof r.name === 'string')).toBe(true);
   });
 });

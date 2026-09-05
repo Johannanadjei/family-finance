@@ -188,7 +188,9 @@ export default function App() {
   // cycle state useBudgetCentre lacks. The Provider's categories prop sources from here.
   // hubPlan (not userPlan) drives the history window — history is a property of the
   // hub, so a member of a Pro hub must see all of it.
-  const financeValues                                     = useFinance({ centre, allCategories, hubPlan });
+  // memberRole gates the auto-continue write; reloadCategories re-syncs the categories
+  // it carries forward, so an auto-created period never lands behind a stale view.
+  const financeValues                                     = useFinance({ centre, allCategories, hubPlan, memberRole: currentMemberRole, reloadCategories });
 
   // Persist the active centre ID once the first centre resolves
   useEffect(() => {

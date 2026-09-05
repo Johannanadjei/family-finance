@@ -11,15 +11,42 @@
  */
 
 /**
- * Resolve the cycle that should be "active" for a given date.
+ * THE STRICT "IS NOW COVERED?" PREDICATE. Returns the live cycle containing
+ * `today`, or null — no fallback, no nearest neighbour.
+ *
+ * This is the single question the whole period UX turns on, and it is deliberately
+ * kept apart from landingCycle below. Conflating the two is what produced the
+ * period-state cluster: landingCycle's "most recently ended" fallback made a STALE
+ * PAST period answer the question "what period are we in?", so the app rendered
+ * September's activity under August's name and nothing ever prompted for September.
+ *
+ * Rule of thumb: ask cycleForToday for any DECISION (auto-continue fires? banner
+ * shows? which month label is real?); ask landingCycle only for what to SHOW when
+ * the answer is "nothing covers now".
+ *
+ * @param {Array<{ start_date: string, end_date: string, deleted_at?: string|null }>} cycles
+ * @param {string} [today] — 'YYYY-MM-DD'; defaults to UTC today (matches lib/dates.getToday)
+ * @returns {object|null}
+ */
+export function cycleForToday(cycles, today = new Date().toISOString().slice(0, 10)) {
+  return cycleForDate(cycles, today);
+}
+
+/**
+ * The cycle to LAND ON for navigation when the app opens — a display fallback chain,
+ * NOT a truth claim about "now".
  * Priority: the cycle containing `today` → the most recently ended (gap day) →
  * the earliest upcoming (brand-new hub before its first cycle) → null.
+ *
+ * NAV-ONLY. Never use this to decide whether a period exists for today, whether to
+ * create one, or what to label as the current month — use cycleForToday for all
+ * three. The second and third branches return a period that does NOT contain today.
  *
  * @param {Array<{ start_date: string, end_date: string, deleted_at?: string|null }>} cycles
  * @param {string} today — 'YYYY-MM-DD'
  * @returns {object|null}
  */
-export function getActiveCycle(cycles, today) {
+export function landingCycle(cycles, today) {
   const live = cycles.filter(c => !c.deleted_at);
   if (live.length === 0) return null;
 
@@ -40,13 +67,16 @@ export function getActiveCycle(cycles, today) {
 }
 
 /**
- * Return the cycle whose range contains `dateStr`, or null if none does.
+ * Return the live cycle whose range contains `dateStr`, or null if none does.
+ * The date-keyed WRITE path: transactions resolve their period by containment
+ * (unique under the no_overlapping_cycles GiST constraint), mirroring the
+ * resolve_cycle_id() trigger's date branch.
  *
  * @param {Array<{ start_date: string, end_date: string, deleted_at?: string|null }>} cycles
  * @param {string} dateStr — 'YYYY-MM-DD'
  * @returns {object|null}
  */
-export function getCycleContainingDate(cycles, dateStr) {
+export function cycleForDate(cycles, dateStr) {
   return cycles.find(c => !c.deleted_at && c.start_date <= dateStr && c.end_date >= dateStr) ?? null;
 }
 
@@ -115,7 +145,7 @@ export function sliceByCycle(rows, cycleId) {
 }
 
 /**
- * Resolve the cycle id a 'YYYY-MM' month maps to, mirroring the resolve_cycle_id()
+ * Resolve the cycle a 'YYYY-MM' month maps to, mirroring the resolve_cycle_id()
  * database trigger (Commit 10): match on the cycle's start-month
  * (to_char(start_date,'YYYY-MM') = month). Client and server share the cycles
  * table as the single source of truth. Returns null when no live cycle covers the
@@ -124,10 +154,24 @@ export function sliceByCycle(rows, cycleId) {
  *
  * @param {Array<{ id: string, start_date: string, deleted_at?: string|null }>} cycles
  * @param {string} month — 'YYYY-MM'
+ * @returns {object|null}
+ */
+export function cycleForMonth(cycles, month) {
+  return cycles.find(c => !c.deleted_at && c.start_date.startsWith(month)) ?? null;
+}
+
+/**
+ * The id form of cycleForMonth, for the write paths that stamp cycle_id directly
+ * (useIncomeMutations). Kept as a named wrapper rather than `cycleForMonth(...)?.id`
+ * at each call site so the CYC02 refusal ("no live cycle covers this month → do not
+ * insert a NULL cycle_id") reads the same everywhere.
+ *
+ * @param {Array<{ id: string, start_date: string, deleted_at?: string|null }>} cycles
+ * @param {string} month — 'YYYY-MM'
  * @returns {string|null}
  */
 export function cycleIdForMonth(cycles, month) {
-  return cycles.find(c => !c.deleted_at && c.start_date.startsWith(month))?.id ?? null;
+  return cycleForMonth(cycles, month)?.id ?? null;
 }
 
 // ── Budget-period range builders (Phase B) ──────────────────────────────────────
@@ -166,23 +210,47 @@ export function currentCalendarMonthRange(today) {
 }
 
 /**
- * The NEXT budget period to offer from the quick-create button: the calendar month
- * immediately AFTER the month containing `today`. History-INDEPENDENT (Phase 2 fix
- * for Bug 1): always today + 1 calendar month — never anchored on existing cycle data,
- * so stray future cycles can't drag the suggestion years out of range. Returns null
- * when next month would cross into next year (the December case), signalling the
- * caller to DISABLE quick-create rather than offer a cross-year period (the year
- * constraint — see isWithinCurrentYear and the create_budget_period CYC03 check).
+ * The next calendar month this hub does NOT already have a period for — the range the
+ * quick-create button offers. Scans forward from the month CONTAINING `today` to
+ * December of today's year and returns the first month no live cycle overlaps.
  *
+ * WHY IT TAKES `cycles` NOW (this replaced nextCalendarMonthRange, which was blindly
+ * today + 1 month). Auto-continue means the current month is normally already covered,
+ * so "today + 1" was right by accident, not by rule. Two cases broke it:
+ *   • The month containing today is UNCOVERED — auto-continue failed, or the viewer is
+ *     a standard member, or this is a legacy hub. The user needs THIS month offered,
+ *     not next; that is why the scan starts at `m`, not `m + 1`. Offering next month
+ *     while today has no period is the "create-period CTA that never resolves" bug.
+ *   • Next month is ALREADY planned (the old quick-create manufactured exactly these
+ *     stray future periods). Offering it again returns CYC01 from the server — an
+ *     error dialog where the button should simply have moved on to the free month.
+ *
+ * Overlap, not start-month equality: a custom period running 15 Sep – 14 Oct covers
+ * part of both months, and offering either would overlap it (CYC01). The test is the
+ * standard interval overlap `c.start <= monthEnd AND c.end >= monthStart`.
+ *
+ * Returns null when every month from today's through December is covered, and in
+ * December when December itself is covered — the caller DISABLES quick-create rather
+ * than offer a cross-year period (the year constraint — see isWithinCurrentYear and
+ * the create_budget_period CYC03 check). Still history-independent in the sense that
+ * matters: the scan is anchored on `today`, never on the newest cycle, so a stray
+ * future period can shift the answer by a month but can never drag it out of the year.
+ *
+ * @param {Array<{ start_date: string, end_date: string, deleted_at?: string|null }>} cycles
  * @param {string} today — 'YYYY-MM-DD' (default: UTC today, matching lib/dates.getToday)
  * @returns {{ start: string, end: string, name: string }|null}
  */
-export function nextCalendarMonthRange(today = new Date().toISOString().slice(0, 10)) {
+export function nextUncoveredMonthRange(cycles = [], today = new Date().toISOString().slice(0, 10)) {
   const [y, m] = today.split('-').map(Number);   // m is 1-based
-  if (m === 12) return null;                       // next month is next year → blocked
-  const nm    = m + 1;                             // next month, same year, still 1-based
-  const start = `${y}-${String(nm).padStart(2, '0')}-01`;
-  return { start, end: monthEnd(y, nm - 1), name: monthLabel(start) };
+  const live   = (cycles || []).filter(c => !c.deleted_at);
+
+  for (let mm = m; mm <= 12; mm++) {             // today's month first, then forward
+    const start = `${y}-${String(mm).padStart(2, '0')}-01`;
+    const end   = monthEnd(y, mm - 1);
+    const overlapped = live.some(c => c.start_date <= end && c.end_date >= start);
+    if (!overlapped) return { start, end, name: monthLabel(start) };
+  }
+  return null;                                   // nothing free inside this year
 }
 
 /**

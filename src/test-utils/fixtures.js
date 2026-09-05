@@ -56,7 +56,7 @@ export const mockMembers = [
 ];
 
 // Budget cycles (Commit 4+). THIS_CYCLE contains today (string-compared ISO dates
-// with a '-31' upper bound, matching getActiveCycle's containment test); LAST_CYCLE
+// with a '-31' upper bound, matching cycleForToday's containment test); LAST_CYCLE
 // backs cross-cycle fixtures. cycle_id on the rows below references these ids — the
 // storage-layer invariant (Commit 10 trigger) means every live row carries one.
 export const mockCycles = [
