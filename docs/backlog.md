@@ -4,6 +4,45 @@ Engineering work deferred past MVP. Cosmetic items live in `cosmetic-backlog.md`
 
 ---
 
+## No ESLint in the repo — a missing import white-screened production-shaped code — POST-MVP (tooling)
+
+**Why:** On 2026-09-05 `<PeriodSetupPrompt />` was mounted in `App.jsx`'s DashboardShell
+with no import. The dev preview served a blank page with
+`ReferenceError: PeriodSetupPrompt is not defined`, and **every layer of the safety net
+passed**:
+
+| Layer | Why it missed |
+|---|---|
+| 1846 unit tests | Component tests import the component directly. The file that MOUNTS it is never checked. |
+| `App.test.jsx` | Renders `<App/>` but lands on the ONBOARDING gate, which returns early and never evaluates DashboardShell. |
+| e2e smoke test | Its fixture owns 0 hubs → also lands on onboarding. Same branch, same blind spot. |
+| `vite build` | **Succeeded.** A bare undefined identifier is valid JavaScript; it throws at runtime, not at bundle time. Adding a build step to CI would NOT have caught this. |
+
+There is no ESLint in this repo at all — no config, no devDependency, no script. The rule
+that catches this class in under a second is `react/jsx-no-undef` (plus `no-undef`), and
+it would also catch unused imports, hooks-rule violations (§9.5 is currently a *manual*
+checklist), and missing effect dependencies.
+
+**Interim mitigation already shipped** (same commit as this entry):
+1. `scripts/check-jsx-imports.mjs` + audit check **P** — dependency-free scanner that
+   fails when a JSX tag has no matching import or local definition. Verified to fail on
+   the real bug and to report zero false positives across `src/` (its first draft
+   reported 16, all JSDoc prose mentioning `<Link>`/`<Routes>` — hence the comment and
+   string stripping).
+2. `src/App.dashboard.test.jsx` — renders `<App/>` on the DASHBOARD branch, so the shell
+   every real user sees is evaluated in CI. Reproduces the exact ReferenceError when the
+   import is removed.
+
+Those two close the specific hole. ESLint closes the category.
+
+**What it would take:** `eslint`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, a
+flat config, an `npm run lint` script, and a CI step before `npm test`. The one judgement
+call is how much of the existing codebase it flags on day one — expect a first-run
+backlog of unused imports and effect-dependency warnings that should be triaged, not
+bulk-suppressed. Land it as its own commit so the noise is separable from feature work.
+
+---
+
 ## `last_working_day` pay dates ignore Ghanaian public holidays — POST-MVP (accuracy)
 
 **Why:** `resolvePayDate` (lib/finance.js) resolves a `last_working_day` source to the
