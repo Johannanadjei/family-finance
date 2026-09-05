@@ -61,9 +61,20 @@
 -- exclusion_violation, caught it, adopted the racer's period and returned
 -- created=false — one live period on the hub, no duplicate, no error surfaced.
 --
--- HOW TO READ THE OUTPUT: the final SELECT prints one row per scenario. If you got
--- that far, every assertion passed — a failure aborts before the SELECT with the
--- scenario name in the error message.
+-- HOW TO READ THE OUTPUT — TWO CHANNELS, BOTH SHOWING THE SAME 11 VERDICTS.
+--   1. The NOTICES / "Logs" panel. The DO block ends by echoing every dryrun_log
+--      row as a NOTICE — same panel as the 'dry run as user …' line at the top of
+--      the run. This channel is ALWAYS rendered, so it is the one to read.
+--   2. The results grid. The last statement before ROLLBACK is a SELECT of the
+--      whole dryrun_log. Whether it renders depends on the client: the Supabase
+--      SQL editor returns only the LAST statement's result set, and the last
+--      statement in this file MUST stay ROLLBACK (safety — see the banner above),
+--      which returns no rows. So the grid may come back as "Success. No rows
+--      returned". That is not a failure, and it is why channel 1 exists.
+--
+-- If you got as far as ANY output at all, every assertion passed — a failure
+-- aborts the whole DO block, before either channel, with the scenario name in the
+-- error message. Silence plus an error = fail; verdict lines = pass.
 -- =============================================================================
 BEGIN;
 
@@ -393,17 +404,51 @@ BEGIN
   v_res := ensure_current_budget_period(v_hub);
   IF (v_res->>'created')::boolean IS NOT FALSE THEN RAISE EXCEPTION 'S11 FAIL: created a second period over an existing one'; END IF;
 
+  -- ── Footer row: every throwaway hub this file built. All of them are inside the
+  --    transaction about to be discarded; this is what the ROLLBACK erases. It was
+  --    a separate trailing SELECT, folded in here so that the dryrun_log SELECT can
+  --    be the LAST statement before ROLLBACK rather than being overwritten by it.
+  SELECT count(*) INTO v_n FROM budget_centres WHERE name LIKE 'DRYRUN %';
+  INSERT INTO dryrun_log VALUES (12, 'throwaway hubs built by this run', NULL, NULL, NULL, NULL, NULL,
+    v_n || ' DRYRUN hubs exist inside this transaction — the ROLLBACK below erases every one');
+
+  -- ── Echo the whole log to the NOTICES panel. The grid below can be swallowed by
+  --    the client (see HOW TO READ THE OUTPUT in the header): the last statement
+  --    must stay ROLLBACK, and the Supabase SQL editor returns only the last
+  --    statement's rows. NOTICES always render, so these lines are the
+  --    guaranteed-visible copy of the verdicts.
+  RAISE NOTICE '════════════════════════════════════════════════════════════════════════';
+  RAISE NOTICE '  ensure_current_budget_period — DRY RUN VERDICTS  (today = %)', v_today;
+  RAISE NOTICE '════════════════════════════════════════════════════════════════════════';
+  FOR v_row IN SELECT * FROM dryrun_log ORDER BY seq LOOP
+    RAISE NOTICE '%  %  %  %',
+      rpad('S' || v_row.seq::text, 4),
+      rpad(CASE WHEN v_row.seq >= 12                 THEN 'INFO'
+                WHEN v_row.note LIKE 'SKIPPED%'      THEN 'SKIP'
+                ELSE 'PASS' END, 4),
+      rpad(v_row.scenario, 38),
+      COALESCE(v_row.note, '');
+    IF v_row.cycle IS NOT NULL THEN
+      RAISE NOTICE '            created=%  cycle=%  window=%  categories=%  income=%',
+        COALESCE(v_row.created::text, 'n/a'), v_row.cycle, COALESCE(v_row.window_, 'n/a'),
+        COALESCE(v_row.cats, 'n/a'), COALESCE(v_row.income, 'n/a');
+    END IF;
+  END LOOP;
+  RAISE NOTICE '════════════════════════════════════════════════════════════════════════';
+
   RAISE NOTICE 'ALL SCENARIOS PASSED — nothing committed.';
 END $$;
 
-SELECT seq, scenario, created, cycle, window_ AS period_window, cats AS categories, income, note
+-- THE LAST STATEMENT BEFORE ROLLBACK, deliberately: the full dryrun_log, one row
+-- per scenario plus the throwaway-hub footer. Nothing may be added between this
+-- SELECT and the ROLLBACK — anything that does would overwrite the result grid,
+-- which is exactly the bug this ordering fixes.
+SELECT seq,
+       CASE WHEN seq >= 12            THEN 'INFO'
+            WHEN note LIKE 'SKIPPED%' THEN 'SKIP'
+            ELSE 'PASS' END           AS verdict,
+       scenario, created, cycle, window_ AS period_window, cats AS categories, income, note
 FROM dryrun_log ORDER BY seq;
-
--- Every throwaway hub this file built — all of them are inside the transaction
--- about to be discarded. This count is what ROLLBACK is about to erase.
-SELECT 'throwaway hubs built by this run (all discarded by the ROLLBACK below)' AS check,
-       count(*) AS n
-FROM budget_centres WHERE name LIKE 'DRYRUN %';
 
 -- ═════════════════════════════════════════════════════════════════════════════
 -- This is a TEST. Leave the next line as ROLLBACK — everything above ran and is
