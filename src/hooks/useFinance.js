@@ -34,7 +34,7 @@ import {
   getBudgetStatusFromBudget, calcTotalFixed, calcFixedSpent,
   calcSpareMoney,
   calcTotalExpected, calcTotalReceived,
-  calcWeeklyData, calcCategorySpend, calcTopCategories, calcDaysUntil,
+  calcWeeklyData, calcCategorySpend, calcTopCategories, pickNextUnpaid,
   getCurrentMonth,
 } from '../lib/finance';
 import { loadPrefs, saveThemeSkin as persistSkin, saveThemeAccent as persistAccent, saveNotifications as persistNotifs } from '../lib/storage';
@@ -246,25 +246,9 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
   const categorySpend  = useMemo(() => calcCategorySpend(txs, categories),                     [txs, categories]);
   const topCategories  = useMemo(() => calcTopCategories(txs),                                  [txs]);
 
-  const nextUnpaid = useMemo(() => {
-    const unpaid  = incomes.filter(i => !i.received);
-    if (!unpaid.length) return null;
-
-    const withDays = unpaid.map(i => ({
-      ...i,
-      label:     i.label,
-      daysUntil: i.pay_day ? calcDaysUntil(i.pay_day) : null,
-    }));
-
-    // Sort: sources with a pay day come first, flexible last
-    withDays.sort((a, b) => {
-      if (a.daysUntil === null) return 1;
-      if (b.daysUntil === null) return -1;
-      return a.daysUntil - b.daysUntil;
-    });
-
-    return withDays[0];
-  }, [incomes]);
+  // Pay dates resolve against the VIEWED PERIOD, never the clock's calendar month.
+  const viewedCycle = useMemo(() => cycles.find(c => c.id === viewedCycleId) ?? null, [cycles, viewedCycleId]);
+  const nextUnpaid  = useMemo(() => pickNextUnpaid(incomes, viewedCycle),             [incomes, viewedCycle]);
 
   // ── Transaction mutations ─────────────────────────────────────────────────
   // Extracted to useTransactionMutations (symmetric with useIncomeMutations) to
@@ -383,6 +367,7 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
                     // first paint on it so cycles resolve before any empty-state renders.
     activeCycle,
     currentCycle,   // cycleForToday — the STRICT "is now covered?" answer; null when it is not
+    viewedCycle,    // the cycle the loaded slices belong to — the frame for pay dates
     activeCycleId,
     viewedCycleId,  // activeCycleId ?? activeCycle?.id — single source for the cycle-id fallback (Commit 14a)
     loadCycle,

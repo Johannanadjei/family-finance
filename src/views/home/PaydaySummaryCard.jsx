@@ -15,7 +15,11 @@ export function PaydaySummaryCard({ nextUnpaid, totalReceived, totalExpected }) 
           ) : nextUnpaid ? (
             <>
               <p style={{ fontSize: 22, fontWeight: 900, color: 'var(--c-primary,#064e3b)', margin: '0 0 2px' }}>{fmt(nextUnpaid.expected_amount)}</p>
-              <p style={{ fontSize: 12, color: 'var(--c-muted,#6b7280)', margin: 0 }}>{nextUnpaid.label} · {nextUnpaid.daysUntil === 0 ? 'Due today' : nextUnpaid.daysUntil === null ? 'Flexible' : `${nextUnpaid.daysUntil} days away`}</p>
+              {/* daysUntil comes from pickNextUnpaid, which resolves the date against the
+                  PERIOD — so a last-working-day salary reads "3 days away" here instead of
+                  the "Flexible" its null pay_day used to force. Genuinely dateless
+                  (flexible) sources are the only ones that still say Flexible. */}
+              <p data-testid="next-unpaid-when" style={{ fontSize: 12, color: 'var(--c-muted,#6b7280)', margin: 0 }}>{nextUnpaid.label} · {nextUnpaid.daysUntil === null ? 'Flexible' : nextUnpaid.daysUntil === 0 ? 'Due today' : nextUnpaid.daysUntil < 0 ? 'Overdue' : `${nextUnpaid.daysUntil} days away`}</p>
             </>
           ) : (
             <p style={{ fontSize: 13, color: 'var(--c-muted,#6b7280)', margin: 0 }}>No upcoming income</p>

@@ -2,17 +2,29 @@
  * views/payday/IncomeCard.jsx — Single income source card for PaydayView.
  * Inline edit for expected amount + pay day type. Shows received-amount update
  * prompt when editing a confirmed income to a different amount.
+ *
+ * Pay dates resolve against `cycle`, not the wall clock, so "day 25" means the 25th of
+ * THIS period. `isCurrent` picks the register: a countdown ("in 3 days", "Due today")
+ * only means something in the period you are living in; any other period shows the
+ * date itself. PaydayIncomeBody renders this card for the current period only today,
+ * so that second branch is defensive — correct the moment that changes.
+ *
+ * @param {object|null} cycle     — the viewed budget period
+ * @param {boolean} isCurrent     — does that period contain today?
  */
 
 import { useState }                                                from 'react';
-import { getIncomeStatus, INCOME_STATUS_CONFIG, calcDaysUntil }   from '../../lib/finance';
+import { getIncomeStatus, INCOME_STATUS_CONFIG, calcDaysUntil, fmtNextPayDate } from '../../lib/finance';
 import { selectStyle }                                             from '../../lib/selectStyle';
 import { UpdateReceivedSheet }                                     from './UpdateReceivedSheet';
 
-export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpected, disabled }) {
-  const status    = getIncomeStatus(income);
+export function IncomeCard({ income, fmt, cycle = null, isCurrent = true, onConfirm, onMarkPending, onUpdateExpected, disabled }) {
+  const status    = getIncomeStatus(income, cycle);
   const config    = INCOME_STATUS_CONFIG[status];
-  const daysUntil = income.pay_day ? calcDaysUntil(income.pay_day) : null;
+  // No `income.pay_day &&` guard: that is null for a last_working_day source, which is
+  // exactly why its countdown never rendered. resolvePayDate answers for every type.
+  const daysUntil = calcDaysUntil(income, cycle);
+  const payDate   = fmtNextPayDate(income, cycle);
 
   const [editing,            setEditing]            = useState(false);
   const [editAmount,         setEditAmount]         = useState('');
@@ -122,7 +134,12 @@ export function IncomeCard({ income, fmt, onConfirm, onMarkPending, onUpdateExpe
         )}
         {!income.received && daysUntil !== null && (
           <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: '0 0 2px' }}>{daysUntil === 0 ? 'Due today' : `${daysUntil} days away`}</p>
+            <p data-testid={`income-next-pay-${income.id}`} style={{ fontSize: 11, color: 'var(--c-muted, #6b7280)', margin: '0 0 2px' }}>
+              {!isCurrent      ? payDate
+                : daysUntil === 0 ? 'Due today'
+                : daysUntil < 0   ? `Was due ${payDate}`
+                : `${daysUntil} days away`}
+            </p>
           </div>
         )}
       </div>

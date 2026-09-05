@@ -160,6 +160,7 @@ export function PaydayView() {
       <PaydayIncomeBody
         isFuture={isFuture}
         isPast={isPast}
+        isCurrent={isCurrent} cycle={viewedCycle}
         periodLabel={periodLabel}
         prevPeriodLabel={prevPeriodLabel}
         pastIncomeTxs={pastIncomeTxs}

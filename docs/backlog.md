@@ -4,6 +4,36 @@ Engineering work deferred past MVP. Cosmetic items live in `cosmetic-backlog.md`
 
 ---
 
+## `last_working_day` pay dates ignore Ghanaian public holidays — POST-MVP (accuracy)
+
+**Why:** `resolvePayDate` (lib/finance.js) resolves a `last_working_day` source to the
+last **Mon–Fri** on or before the period's `end_date`. That is the whole rule — it walks
+back off Saturday and Sunday and nothing else. When a Ghanaian public holiday falls on
+what we compute as the last working day, the real payment lands **earlier** than the app
+shows, so the countdown and the "Coming soon"/"Today" badge are a day or more late.
+
+This was a deliberate call when the period-aware pay-date work landed (2026-09-05): a
+documented gap beats pretend data, and faking a holiday calendar would make the app
+confidently wrong rather than honestly approximate. The limitation is stated in
+`resolvePayDate`'s JSDoc so nobody "fixes" the weekend walk-back without seeing it.
+
+**What it would take:** a Ghanaian public-holiday calendar with its own data source and
+an ongoing maintenance obligation — the statutory list moves (substitute days when a
+holiday falls on a weekend, and occasional one-off declarations). Options, cheapest first:
+1. A hardcoded per-year list in `lib/holidays.js`, refreshed annually. Simple, but a
+   forgotten refresh silently degrades to today's behaviour — which is at least safe.
+2. A `public_holidays` table keyed by country, so multi-country hubs work later.
+3. A third-party API — rejected on principle for a feature that must work offline.
+
+Whichever route, `resolvePayDate` should take the holiday set as an argument and stay
+pure. Multi-currency hubs already imply multi-country members, so the country key is not
+optional if this is ever built.
+
+**Not urgent:** the error is at most a couple of days on a countdown, never on an amount,
+and confirming income is a manual action either way.
+
+---
+
 ## Observability: error capture (Sentry or self-hosted) — POST-MVP
 
 **Why:** The data-loss-on-refresh bug (engineering-decisions.md [2026-05-29]) was

@@ -150,29 +150,151 @@ export const calcAvailableNow = (sources, txs) => {
   return received - spent;
 };
 
-export const calcDaysUntil = (dayOfMonth) => {
-  if (!dayOfMonth) return null;
-  const today  = new Date();
-  const target = new Date(today.getFullYear(), today.getMonth(), dayOfMonth);
-  if (target < today) target.setMonth(target.getMonth() + 1);
-  return Math.ceil((target - today) / 86400000);
+// ── Pay dates ─────────────────────────────────────────────────────────────────
+// Every pay-day question resolves through resolvePayDate. Before it, three of them
+// were answered independently and disagreed: the badge said "Flexible" while the
+// subtitle right beneath it said "Last working day", and the countdown block was
+// skipped entirely, because all three keyed off `pay_day` — which is NULL for a
+// last-working-day source.
+
+const UTC_DAY = 86400000;
+const utcDate = (str) => new Date(`${str}T00:00:00Z`);
+const ymd     = (d)   => d.toISOString().slice(0, 10);
+// UTC today, matching lib/dates.getToday (not imported — finance.js takes no app imports).
+const utcToday = () => new Date().toISOString().slice(0, 10);
+
+// Last day of the calendar month containing 'YYYY-MM-DD'.
+const monthLastDay = (str) => {
+  const [y, m] = str.split('-').map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
 };
 
-export const fmtNextPayDate = (source) => {
-  if (source.pay_day_type === 'last_working_day') return 'Last working day';
-  if (!source.pay_day)                            return 'Flexible';
-  const today  = new Date();
-  const target = new Date(today.getFullYear(), today.getMonth(), source.pay_day);
-  if (target < today) target.setMonth(target.getMonth() + 1);
-  return target.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+/**
+ * The date a source is expected to pay WITHIN a given budget period, or null.
+ *
+ * The period — not the wall clock — is the frame. "Pay day 25" means the 25th OF THIS
+ * PERIOD, so a period running 15 Sep – 14 Oct pays a day-25 source on 25 Sep and a
+ * day-5 source on 5 Oct. Anchoring on the clock's calendar month (the old behaviour)
+ * is only right when every period happens to be a calendar month.
+ *
+ * By pay_day_type:
+ *   fixed_date       — the FIRST date inside the period whose day-of-month is pay_day,
+ *                      clamped to the month's last day when pay_day overshoots (31 in a
+ *                      30-day month → the 30th, the usual salary convention). Null when
+ *                      the period contains no such date at all (a 1–10 Sep period has
+ *                      no 25th) — that period genuinely has no pay day.
+ *   last_working_day — the last Mon–Fri ON OR BEFORE the period's end_date. The period
+ *                      end is the pay cycle's close, so a custom range ending Wed 14 Oct
+ *                      pays on the 14th, while a calendar month ending Sat 31 Oct pays
+ *                      Fri the 30th.
+ *   flexible         — null, always. There is no date to compute, and keeping it null is
+ *                      what lets it stay visually distinct from last_working_day.
+ *
+ * ⚠️ WEEKENDS ONLY — PUBLIC HOLIDAYS ARE NOT MODELLED. last_working_day walks back off
+ * Saturday and Sunday and nothing else. If a Ghanaian public holiday falls on the last
+ * working day, the real payment lands earlier than this returns. Modelling that needs a
+ * holiday calendar with its own data source and maintenance; a documented gap is better
+ * than pretend data. See docs/backlog.md.
+ *
+ * @param {{ pay_day?: number|null, pay_day_type?: string }} source
+ * @param {{ start_date: string, end_date: string }|null} cycle — null falls back to the
+ *        calendar month containing today, so a source with no period still resolves.
+ * @returns {string|null} 'YYYY-MM-DD'
+ */
+export const resolvePayDate = (source, cycle = null) => {
+  if (!source) return null;
+
+  // No period: use the calendar month containing today, so callers without a cycle
+  // (a row not yet stamped, a hub between periods) still get a sensible answer.
+  const today = utcToday();
+  const start = cycle?.start_date ?? `${today.slice(0, 7)}-01`;
+  const end   = cycle?.end_date   ?? `${today.slice(0, 7)}-${String(monthLastDay(today)).padStart(2, '0')}`;
+  if (end < start) return null;
+
+  if (source.pay_day_type === 'last_working_day') {
+    const d = utcDate(end);
+    while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1);   // Sun / Sat
+    const resolved = ymd(d);
+    return resolved >= start ? resolved : null;   // a period made entirely of weekend days
+  }
+
+  if (!source.pay_day) return null;               // flexible, or fixed_date with no day set
+
+  // Walk the calendar months the period touches and take the first matching day. At most
+  // a handful of iterations: periods are constrained to within one year.
+  let cursor = `${start.slice(0, 7)}-01`;
+  while (cursor <= end) {
+    const day       = Math.min(source.pay_day, monthLastDay(cursor));   // 31st → month end
+    const candidate = `${cursor.slice(0, 7)}-${String(day).padStart(2, '0')}`;
+    if (candidate >= start && candidate <= end) return candidate;
+    const [y, m] = cursor.split('-').map(Number);
+    cursor = `${new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7)}-01`;
+  }
+  return null;
 };
 
-export const getIncomeStatus = (source) => {
+/**
+ * Whole days from `today` to this source's pay date in `cycle`. Negative once the date
+ * has passed, null when the source has no pay date in that period.
+ *
+ * Both ends are UTC midnight date strings, so a pay date of TODAY is exactly 0. The old
+ * implementation compared a midnight target against `new Date()` — the current instant —
+ * so on the actual payday `target < today` fired, the date rolled to next month, and the
+ * card read "30 days away". "Today! 🎉" was unreachable for the life of that code.
+ *
+ * @param {object} source
+ * @param {object|null} cycle
+ * @param {string} [today] — 'YYYY-MM-DD'
+ * @returns {number|null}
+ */
+export const calcDaysUntil = (source, cycle = null, today = utcToday()) => {
+  const payDate = resolvePayDate(source, cycle);
+  if (!payDate) return null;
+  return Math.round((utcDate(payDate) - utcDate(today)) / UTC_DAY);
+};
+
+/**
+ * Display form of the next pay date: '25 Sep 2026', or 'Flexible' when the source has
+ * no date in this period. Previously returned the literal 'Last working day' — a
+ * SCHEDULE label, not a date — which is why wiring it up would not have helped; that
+ * type now resolves to a real date like every other.
+ *
+ * @param {object} source
+ * @param {object|null} cycle
+ * @returns {string}
+ */
+export const fmtNextPayDate = (source, cycle = null) => {
+  const payDate = resolvePayDate(source, cycle);
+  if (!payDate) return 'Flexible';
+  return utcDate(payDate).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+  });
+};
+
+/**
+ * Badge state for an income source in a period.
+ *
+ * The countdown ladder (today / soon) only means anything against the period the user is
+ * actually living in, so it applies when `cycle` contains `today`; any other period
+ * resolves to 'upcoming' and the UI shows a date instead of a countdown. No 'missed'
+ * state: past periods render read-only cards, so it would be unreachable code.
+ *
+ * @param {object} source
+ * @param {object|null} cycle
+ * @param {string} [today] — 'YYYY-MM-DD'
+ * @returns {'received'|'today'|'soon'|'upcoming'|'flexible'}
+ */
+export const getIncomeStatus = (source, cycle = null, today = utcToday()) => {
   if (source.received) return 'received';
-  const days = calcDaysUntil(source.pay_day);
+  const days = calcDaysUntil(source, cycle, today);
   if (days === null) return 'flexible';
-  if (days === 0)    return 'today';
-  if (days <= 3)     return 'soon';
+
+  // Outside the period we are living in, "Today!" and "Coming soon" are nonsense.
+  const isCurrent = !cycle || (cycle.start_date <= today && cycle.end_date >= today);
+  if (!isCurrent) return 'upcoming';
+
+  if (days === 0)  return 'today';
+  if (days > 0 && days <= 3) return 'soon';
   return 'upcoming';
 };
 
@@ -182,6 +304,31 @@ export const INCOME_STATUS_CONFIG = {
   soon:     { label: 'Coming soon', bg: '#ffe4e6', color: '#9f1239', border: '#fda4af' },
   upcoming: { label: 'Upcoming',    bg: '#f3f4f6', color: '#6b7280', border: '#e5e7eb' },
   flexible: { label: 'Flexible',    bg: '#f3f4f6', color: '#6b7280', border: '#e5e7eb' },
+};
+
+/**
+ * The unreceived source to chase next: the one whose pay date lands soonest in this
+ * period, with flexible (dateless) sources last. Returns null when everything is in.
+ *
+ * Dates resolve against the PERIOD via resolvePayDate, so a last_working_day source is
+ * ranked on its real date. Keying the sort on `pay_day` — which is null for that type —
+ * sank the household's main salary below every ad-hoc source, as if it had no schedule.
+ *
+ * @param {object[]} incomes — the period's income sources
+ * @param {object|null} cycle
+ * @returns {object|null} the source, plus payDate ('YYYY-MM-DD'|null) and daysUntil
+ */
+export const pickNextUnpaid = (incomes, cycle = null) => {
+  const unpaid = (incomes || []).filter(i => !i.received);
+  if (!unpaid.length) return null;
+
+  return unpaid
+    .map(i => ({ ...i, payDate: resolvePayDate(i, cycle), daysUntil: calcDaysUntil(i, cycle) }))
+    .sort((a, b) => {
+      if (a.daysUntil === null) return 1;
+      if (b.daysUntil === null) return -1;
+      return a.daysUntil - b.daysUntil;
+    })[0];
 };
 
 export const calcWeekSummary = (txs, week) => {

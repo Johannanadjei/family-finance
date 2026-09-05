@@ -23,8 +23,6 @@ import {
   calcTotalExpected,
   calcTotalReceived,
   calcAvailableNow,
-  calcDaysUntil,
-  getIncomeStatus,
   calcWeekSummary,
   calcTopCategories,
   groupByDate,
@@ -532,21 +530,6 @@ describe('calcTopCategories', () => {
       makeTx({ type: 'expense', category_name: `Cat${i}`, amount: 100 })
     );
     expect(calcTopCategories(txs).length).toBe(5);
-  });
-});
-
-// ── getIncomeStatus ───────────────────────────────────────────────────────────
-
-describe('getIncomeStatus', () => {
-  it('returns received when received is true', () =>
-    expect(getIncomeStatus(makeIncome({ received: true }))).toBe('received'));
-
-  it('returns flexible when no pay_day', () =>
-    expect(getIncomeStatus(makeIncome({ pay_day: null, pay_day_type: 'flexible' }))).toBe('flexible'));
-
-  it('returns upcoming for future pay day', () => {
-    const status = getIncomeStatus(makeIncome({ pay_day: 28, received: false }));
-    expect(['upcoming', 'soon', 'today']).toContain(status);
   });
 });
 
