@@ -149,7 +149,7 @@ export function LogView({ onEditTx }) {
               </svg>
               <p style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 6px' }}>No results found</p>
               <p style={{ fontSize: 13, color: 'var(--c-muted, #9ca3af)', margin: 0, fontWeight: 600 }}>
-                {search ? `No transactions matching "${search}"` : `No ${filter} transactions this period`}
+                {search ? `No transactions matching "${search}"` : `No ${filter} transactions this month`}
               </p>
             </>
           )}

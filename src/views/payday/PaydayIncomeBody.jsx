@@ -28,7 +28,7 @@ export function PaydayIncomeBody({
     return (
       <MonthEmptyState
         title={`No payday data for ${periodLabel} yet`}
-        subtitle="Income will appear here once this period arrives."
+        subtitle="Income will appear here once this month begins."
       />
     );
   }

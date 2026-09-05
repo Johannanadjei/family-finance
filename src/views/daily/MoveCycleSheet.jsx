@@ -67,7 +67,7 @@ export function MoveCycleSheet({ isOpen, onClose, cycles = [], onMove, moving = 
 
         {cycles.length === 0 ? (
           <div data-testid="move-cycle-empty" style={{ textAlign: 'center', padding: '24px 0 28px' }}>
-            <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--c-text, #1c1917)', margin: '0 0 4px' }}>No other periods</p>
+            <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--c-text, #1c1917)', margin: '0 0 4px' }}>No other months</p>
             <p style={{ fontSize: 13, color: 'var(--c-muted, #9ca3af)', fontWeight: 600, margin: 0 }}>There's nowhere else to move this transaction yet.</p>
           </div>
         ) : (

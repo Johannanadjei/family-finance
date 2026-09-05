@@ -1,21 +1,27 @@
 /**
  * views/budget/BudgetPeriodCreator.test.jsx
  *
- * The Phase B period-creation cluster: mounts the passive prompt + the creator sheet,
- * reads cycles/createPeriod from FinanceContext, and on a successful create closes the
- * sheet and (when asked) signals the parent to open its copy sheet.
+ * The Phase B period-creation cluster: mounts the creator sheet, reads cycles /
+ * createPeriod from FinanceContext, and on a successful create closes the sheet and
+ * (when asked) signals the parent to open its copy sheet.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BudgetPeriodCreator } from './BudgetPeriodCreator';
 
-// The quick range is nextCalendarMonthRange(getToday()) — derived from the real
-// clock, NOT from cycles. Pin today to mid-June 2026 so "next month" is
-// deterministically July 2026 on any run date. (waitFor needs shouldAdvanceTime.)
+// The quick range is nextUncoveredMonthRange(cycles, getToday()). Pin today to
+// mid-June 2026 with June covered, so the offer is deterministically July 2026 on any
+// run date. (waitFor needs shouldAdvanceTime.)
 const CYCLES = [{ id: 'jun', start_date: '2026-06-01', end_date: '2026-06-30', deleted_at: null }];
 let mockFinance;
 vi.mock('../../context/FinanceContext', () => ({ useFinanceContext: () => mockFinance }));
+// The shell banner's "Choose different dates" arrives here as router state.
+const mockNavigate = vi.fn();
+let mockLocation;
+vi.mock('react-router-dom', async (orig) => ({
+  ...(await orig()), useNavigate: () => mockNavigate, useLocation: () => mockLocation,
+}));
 // useResetPeriod (mounted here) reads reloadCategories from BudgetCentreContext.
 const mockReloadCategories = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../context/BudgetCentreContext', () => ({ useBudgetCentreContext: () => ({ reloadCategories: mockReloadCategories }) }));
@@ -23,6 +29,8 @@ vi.mock('../../context/BudgetCentreContext', () => ({ useBudgetCentreContext: ()
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2026-06-15T00:00:00Z'));
+  mockNavigate.mockClear();
+  mockLocation = { pathname: '/budget', state: null };
   mockFinance = {
     cycles: CYCLES,
     createPeriod: vi.fn().mockResolvedValue({ data: { id: 'new' }, error: null }),
@@ -38,10 +46,34 @@ const base = { isOpen: false, onOpenChange: vi.fn(), onCopyRequested: vi.fn(), r
 const renderIt = (props = {}) => render(<BudgetPeriodCreator {...base} {...props} />);
 
 describe('BudgetPeriodCreator', () => {
-  it('renders the passive prompt when no live cycle covers today', () => {
+  // The "no budget month" banner is no longer mounted here — one mount in
+  // DashboardShell replaced the Home + Budget pair. See PeriodSetupPrompt.test.jsx.
+  it('does not mount the budget-month banner', () => {
     mockFinance.cycles = [{ id: 'old', start_date: '2000-01-01', end_date: '2000-12-31', deleted_at: null }];
     renderIt();
-    expect(screen.getByTestId('no-current-period-prompt')).toBeTruthy();
+    expect(screen.queryByTestId('period-setup')).toBeNull();
+  });
+
+  // ── "Choose different dates" hand-off from the shell banner ────────────────────
+  it('opens the custom creator when the banner asked for it via router state', () => {
+    mockLocation = { pathname: '/budget', state: { openPeriodCreator: true } };
+    const onOpenChange = vi.fn();
+    renderIt({ onOpenChange });
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+  });
+
+  // Otherwise a back-navigation or refresh would re-open the sheet every time.
+  it('clears the router state after honouring it', () => {
+    mockLocation = { pathname: '/budget', state: { openPeriodCreator: true } };
+    renderIt();
+    expect(mockNavigate).toHaveBeenCalledWith('/budget', { replace: true, state: null });
+  });
+
+  it('leaves the sheet alone on an ordinary visit', () => {
+    const onOpenChange = vi.fn();
+    renderIt({ onOpenChange });
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('mounts the creator sheet when open', () => {

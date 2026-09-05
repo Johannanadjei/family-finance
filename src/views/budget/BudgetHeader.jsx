@@ -47,10 +47,10 @@ export function BudgetHeader({ periodLabel, fmt, fixedTotal, fixedSpent, isLates
           Both gate on can('manageCycles') — disabled (greyed) for standard members;
           the server RPC rejects them too (role-denied) as belt-and-suspenders. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <button onClick={onNewPeriod} data-testid="new-period-btn" aria-label="New budget period" disabled={!canManage}
+        <button onClick={onNewPeriod} data-testid="new-period-btn" aria-label="New month" disabled={!canManage}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flex: 1, padding: '10px', borderRadius: 12, border: `1.5px dashed ${canManage ? 'var(--c-primary, #064e3b)' : 'var(--c-border, #e5e7eb)'}`, background: 'transparent', color: canManage ? 'var(--c-primary, #064e3b)' : 'var(--c-muted, #6b7280)', fontSize: 13, fontWeight: 800, cursor: canManage ? 'pointer' : 'not-allowed', fontFamily: "'Nunito', sans-serif" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New budget period
+          New month
         </button>
 
         {isFuture && (

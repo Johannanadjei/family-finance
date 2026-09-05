@@ -126,15 +126,15 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate
     <>
       <div onClick={onClose} aria-hidden="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 340 }} />
 
-      <div role="dialog" aria-label="Create budget period" data-testid="create-period-sheet" data-modal-scrollable="true"
+      <div role="dialog" aria-label="Start a new month" data-testid="create-period-sheet" data-modal-scrollable="true"
         style={{ position: 'fixed', bottom: 0, left: 'max(0px, calc(50vw - 220px))', width: '100%', maxWidth: 440,
           background: 'var(--c-card, #fff)', borderRadius: '20px 20px 0 0', padding: '24px 20px calc(24px + env(safe-area-inset-bottom))',
           zIndex: 350, boxShadow: '0 -8px 32px rgba(0,0,0,.12)', maxHeight: '88vh', overflowY: 'auto' }}>
         <div style={{ width: 40, height: 4, background: 'var(--c-border, #e5e7eb)', borderRadius: 2, margin: '0 auto 16px' }} />
 
-        <p style={{ fontSize: 18, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 4px' }}>New budget period</p>
+        <p style={{ fontSize: 18, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: '0 0 4px' }}>New month</p>
         <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: '0 0 20px', lineHeight: 1.5 }}>
-          A budget period is your spending window — typically a month. Custom periods are limited to within this year.
+          Start the next month you have no budget for, or set a custom budget period — a spending window that is not a calendar month, kept within this year.
         </p>
 
         {error && (
@@ -148,7 +148,7 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate
             <button data-testid="quick-next-month-btn" onClick={quickCreate} disabled={saving || !nextRange}
               style={{ ...primaryBtn, cursor: (saving || !nextRange) ? 'not-allowed' : 'pointer', opacity: (saving || !nextRange) ? 0.6 : 1 }}>
               {saving ? 'Creating…'
-                : nextRange ? `Next calendar month (${nextRange.name})`
+                : nextRange ? nextRange.name
                 : `Wait until ${Number(today.slice(0, 4)) + 1} to plan ahead`}
             </button>
             <button data-testid="custom-period-btn" onClick={openCustom} disabled={saving}

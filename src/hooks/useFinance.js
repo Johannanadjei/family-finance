@@ -139,7 +139,7 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
     // this fires once with centreId === null before the centre resolves. We must
     // NOT flip cyclesLoading false here — leaving it at its initial true keeps the
     // views' `if (cyclesLoading) return null` gate engaged so they never render a
-    // phantom empty/zero frame (NoCurrentPeriodPrompt + GHS 0) when the dashboard
+    // phantom empty/zero frame (the setup banner + GHS 0) when the dashboard
     // first mounts. Only a REAL loadCycles (valid centreId) settles the flag.
     // See docs/engineering-decisions.md (cold-load flash post-mortem).
     if (!centreId) { setCycles([]); return; }
@@ -172,7 +172,7 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
   // The guarded writer — role / already-covered / once-per-hub-and-month / no retry;
   // useAutoContinuePeriod.js explains why each of the four is load-bearing. It also
   // owns refreshAfterPeriodWrite, the single post-write refresh createPeriod shares.
-  const { refreshAfterPeriodWrite, autoPeriod, dismissAutoPeriod, autoWillFire, autoFiring } =
+  const { refreshAfterPeriodWrite, ensurePeriodNow, autoPeriod, dismissAutoPeriod, autoWillFire, autoFiring } =
     useAutoContinuePeriod({
       centreId, cycles, cyclesLoading, loadCycles, reloadCategories,
       canManageCycles: can(memberRole, 'manageCycles'),
@@ -318,7 +318,7 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
   }, [cycles, loadMonth]);
 
   // Create a user-driven budget period (Phase B), then refresh: re-fetch cycles so the
-  // new period appears (NoCurrentPeriodPrompt flips off, nav updates) and select it so
+  // new period appears (the setup banner flips off, nav updates) and select it so
   // the views land on the freshly-created window. The service gates on owner/full_access
   // and traps overlap as CYC01 — errors pass straight through to the caller's UI.
   const createPeriod = useCallback(async ({ name = null, startDate, endDate }) => {
@@ -391,6 +391,7 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
     resetPeriod,
     autoPeriod,        // receipt of a period auto-continue created this session, else null
     dismissAutoPeriod,
+    ensurePeriodNow,   // manual one-tap run of the same write (the banner's owner state)
 
     // Derived financial values
     monthlyIncome,

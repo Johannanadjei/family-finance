@@ -60,8 +60,10 @@
  * @param {function} opts.loadCycles       — async () => void; re-fetches the cycle list
  * @param {function} opts.reloadCategories — async () => void; useBudgetCentre's category re-sync
  * @param {function} opts.onPeriodSelected — (cycleId) => void; select the written period
- * @returns {{ refreshAfterPeriodWrite: function, autoPeriod: object|null,
- *            dismissAutoPeriod: function, autoWillFire: boolean, autoFiring: boolean }}
+ * @returns {{ refreshAfterPeriodWrite: function, ensurePeriodNow: function,
+ *            autoPeriod: object|null, dismissAutoPeriod: function,
+ *            autoWillFire: boolean, autoFiring: boolean }}
+ *   ensurePeriodNow — the banner's one-tap manual run of the same write
  *   autoPeriod   — receipt of a period THIS session created, else null (the banner reads it)
  *   autoWillFire — render-time "a write is pending"; the caller's loader holds on it
  *   autoFiring   — the write is in flight; the caller's loader holds on this too
@@ -114,58 +116,77 @@ export function useAutoContinuePeriod({
   const autoWillFire = !cyclesLoading && !!centreId && canManageCycles && !covered
     && !autoFiredRef.current.has(`${centreId}:${getToday().slice(0, 7)}`);
 
+  // The write itself, shared by the automatic path below and the manual "Set up
+  // September" button. One function so the manual tap cannot drift from the automatic
+  // one: same RPC, same clip, same carry-forward, same refresh, same receipt.
+  // It claims the once-key too, so a manual success stops the effect re-firing.
+  const runEnsure = useCallback(async () => {
+    autoFiredRef.current.add(`${centreId}:${getToday().slice(0, 7)}`);
+    setAutoFiring(true);
+
+    const { data, error } = await ensureCurrentBudgetPeriod(centreId);
+
+    // Hub switched mid-flight: this result describes a hub we no longer show.
+    if (centreIdRef.current !== centreId) { setAutoFiring(false); return { data: null, error }; }
+
+    if (error || !data) {
+      console.error('[useAutoContinuePeriod] ensure failed:', error?.message ?? 'empty payload');
+      setAutoFiring(false);
+      return { data: null, error: error ?? new Error('ensure_current_budget_period returned no payload') };
+    }
+
+    // created=false means a racer (another device, or the manual CTA) got there
+    // first. Still refresh — our list said today was uncovered and the server says
+    // otherwise, so the local list is stale — but show no receipt, because we did
+    // not create anything. THE RECEIPT IS STRICTLY created === true.
+    await refreshAfterPeriodWrite(data.cycle_id, { withCategories: data.created === true });
+
+    if (centreIdRef.current === centreId && data.created === true) {
+      setAutoPeriod({
+        cycleId:           data.cycle_id,
+        name:              data.name,
+        startDate:         data.start_date,
+        endDate:           data.end_date,
+        sourceCycleId:     data.source_cycle_id ?? null,
+        categoriesCarried: data.categories_carried ?? 0,
+        categoriesSkipped: data.categories_skipped ?? 0,
+        incomeCarried:     data.income_carried ?? 0,
+        incomeSkipped:     data.income_skipped ?? 0,
+        tier:              data.tier ?? null,
+      });
+    }
+    setAutoFiring(false);
+    return { data, error: null };
+  }, [centreId, refreshAfterPeriodWrite]);
+
   useEffect(() => {
     if (!centreId)        return;                  // pre-settle
     if (cyclesLoading)    return;                  // cycle list not settled yet
     if (!canManageCycles) return;                  // guard 1 — role
     const today = getToday();
     if (cycleForToday(cycles, today)) return;      // guard 2 — already covered
+    if (autoFiredRef.current.has(`${centreId}:${today.slice(0, 7)}`)) return;  // guard 3
 
-    const key = `${centreId}:${today.slice(0, 7)}`;
-    if (autoFiredRef.current.has(key)) return;     // guard 3 — once per hub+month
-    autoFiredRef.current.add(key);                 // claim BEFORE any await
-    setAutoFiring(true);
+    // guard 4 — runEnsure claims the key before awaiting and never reschedules on
+    // failure, so this is one attempt per hub+month per session.
+    runEnsure();
+  }, [centreId, cyclesLoading, cycles, canManageCycles, runEnsure]);
 
-    (async () => {
-      const { data, error } = await ensureCurrentBudgetPeriod(centreId);
-
-      // Hub switched mid-flight: this result describes a hub we no longer show.
-      if (centreIdRef.current !== centreId) { setAutoFiring(false); return; }
-
-      if (error || !data) {
-        console.error('[useAutoContinuePeriod] auto-continue failed:', error?.message ?? 'empty payload');
-        setAutoFiring(false);                      // guard 4 — key stays claimed, no retry
-        return;
-      }
-
-      // created=false means a racer (another device, or the manual CTA) got there
-      // first. Still refresh — our list said today was uncovered and the server says
-      // otherwise, so the local list is stale — but show no receipt, because we did
-      // not create anything.
-      await refreshAfterPeriodWrite(data.cycle_id, { withCategories: data.created === true });
-
-      if (centreIdRef.current !== centreId) { setAutoFiring(false); return; }
-      if (data.created === true) {
-        setAutoPeriod({
-          cycleId:           data.cycle_id,
-          name:              data.name,
-          startDate:         data.start_date,
-          endDate:           data.end_date,
-          sourceCycleId:     data.source_cycle_id ?? null,
-          categoriesCarried: data.categories_carried ?? 0,
-          categoriesSkipped: data.categories_skipped ?? 0,
-          incomeCarried:     data.income_carried ?? 0,
-          incomeSkipped:     data.income_skipped ?? 0,
-          tier:              data.tier ?? null,
-        });
-      }
-      setAutoFiring(false);
-    })();
-  }, [centreId, cyclesLoading, cycles, canManageCycles, refreshAfterPeriodWrite]);
+  // The manual one-tap for the banner's owner state, when auto-continue never ran
+  // (standard member promoted mid-session, offline, or a failed attempt). USER-
+  // initiated, so it deliberately bypasses guard 3 — guard 4 forbids the app
+  // retrying by itself, not the user asking again. Still gated on role, and still
+  // idempotent server-side, so a double tap cannot make two periods.
+  const ensurePeriodNow = useCallback(async () => {
+    if (!centreId || !canManageCycles) {
+      return { data: null, error: new Error('Not allowed to manage budget months in this hub') };
+    }
+    return runEnsure();
+  }, [centreId, canManageCycles, runEnsure]);
 
   // Decision Q3: the receipt is dismissable. Persisting that dismissal per hub+month
   // is the banner's business, not this hook's.
   const dismissAutoPeriod = useCallback(() => setAutoPeriod(null), []);
 
-  return { refreshAfterPeriodWrite, autoPeriod, dismissAutoPeriod, autoWillFire, autoFiring };
+  return { refreshAfterPeriodWrite, ensurePeriodNow, autoPeriod, dismissAutoPeriod, autoWillFire, autoFiring };
 }
