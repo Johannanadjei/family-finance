@@ -4,6 +4,166 @@ Engineering work deferred past MVP. Cosmetic items live in `cosmetic-backlog.md`
 
 ---
 
+## Income carries TWO period keys — `month` + `cycle_id` — and mis-stamps on a hub with two same-month periods — 🔨 NEXT UP (diagnosed 2026-09-05, approved in principle, NOT built)
+
+**Status:** diagnosed, approved-in-principle, **NOT built**. The period auto-continue fix
+(state-cluster bugs 1 / 2 / 4) is **verified working on a real hub, on `dev`, and is NOT
+promoted to `staging`/`main` pending this income fix.** Bug 3 (payday countdown) is the
+symptom this entry closes.
+
+**Two confirmed symptoms**, both below and both closed by step 1: **Payday empty** on
+"The house" (income stamped to the wrong September cycle `b7e336d0`), and
+**numbers-don't-reconcile** on "House of Yach" (£3,132 vs £2,500 received; spare £215
+shown beside 106% / over-budget).
+
+### The bug
+
+Income rows are keyed by period **twice**, and the two keys disagree:
+
+| Path | File | Key |
+|---|---|---|
+| **Read** (Payday, Home) | `useFinance.js:236` — `sliceByCycle(allIncomes, viewedCycleId)` | `cycle_id` — id equality, unambiguous |
+| **Write** | `useIncomeMutations.js:210` / `:249` — `cycleIdForMonth(cycles, source.month)` | `month` → first-wins **start-month** match |
+| **Settings display** | `IncomeSourcesSection.jsx:68` — `reduce` on `src.month` | `month` string |
+
+`cycleForMonth` (`lib/cycles.js:159`) is `cycles.find(c => c.start_date.startsWith(month))`.
+That is only correct while **at most one cycle starts in a given month**. The moment two do,
+it silently picks one — and it is not even arbitrary: `getCyclesForCentre` orders
+`start_date DESC` (`cycles.service.js:31`), so `Array.find` returns the **latest**-starting
+cycle of that month.
+
+The server has the identical hole: `resolve_cycle_id()` does
+`to_char(start_date,'YYYY-MM') = NEW.month ... LIMIT 1` with **no `ORDER BY`**
+(`migrate_cycle_id_trigger.sql:110–115`) — an arbitrary pick.
+
+`migrate_28_ensure_current_budget_period.sql:97–107` already documents this as the
+"KNOWN, PRE-EXISTING EDGE" — it predicted a stray 1–2 Sep period; production hit the
+mirror image.
+
+### Confirmed on "The house" (2026-09-05)
+
+Two live September cycles:
+
+- `50a8d1ff` — **Sept 1–17**, contains today. Created by auto-continue, clipped to end on
+  the 17th because the next period starts on the 18th.
+- `b7e336d0` — **Sept 18 – Oct 18**, does NOT contain today. A pre-fix
+  `nextCalendarMonthRange` artifact (mid-month, next-month-spanning).
+
+Both income sources (`Job`, `jobtest`) carry `cycle_id = b7e336d0`. Payday views
+`50a8d1ff` → slice returns `[]` → **Payday is empty**.
+
+It is also empty rather than merely wrong because auto-continue's carry-forward source is
+"most recent live cycle **starting before** the new start" (`migrate_28:277`). `b7e336d0`
+starts Sept 18, not before Sept 1, so it was correctly excluded — `50a8d1ff` carried from
+August or from nothing. **That rule is right and should NOT be loosened**; copying from a
+future period would fabricate a plan the user has not reached.
+
+**Live reproduction (verify before and after the fix):** on this hub, add a new income
+source for "September" in Settings. It will stamp to `b7e336d0` and be invisible in Payday.
+
+### Confirmed on "House of Yach" (2026-09-09) — the second symptom: numbers don't reconcile
+
+Same root cause, different surface. This hub does not show an empty Payday; it shows
+**two totals on the same screen that disagree**, because income-source figures and
+transaction figures resolve their period through **different keys**:
+
+| Figure | Derived from | Period key | Ambiguous? |
+|---|---|---|---|
+| `totalReceived` / `totalExpected` / `totalPending` | `incomes` = `sliceByCycle(allIncomes, viewedCycleId)` — rows stamped by `cycleIdForMonth` | income row's `month` → **start-month match, first wins** | **YES** |
+| `totalIncome` / `allIncome` → `spareMoney`, `healthPct` | `txs` = `getTransactionsByCycle` — rows stamped by the trigger's `NEW.date BETWEEN start_date AND end_date` | transaction's **date containment** | No — the `no_overlapping_cycles` GiST constraint guarantees ≤1 match |
+
+`markReceived` is a two-phase write (CLAUDE.md §11): phase 1 sets `income_sources.received`,
+phase 2 inserts an income **transaction**. On a hub with two same-month periods those two
+rows can land in **different cycles** — the source by start-month match, the tx by date
+containment. Every downstream number then splits along that seam.
+
+**Observed (2026-09-09):**
+
+- Income shown as **£3,132** against **£2,500** received.
+- **Spare £215** (tx-derived, `calcSpareMoney(allIncome, …)`) sitting next to
+  **106% / over-budget** (`calcBudgetUsedPct(budgetSpend, fixedTotal)`) — a spare-money
+  surplus and a blown budget asserted at the same time.
+
+**Status of this diagnosis:** the mechanism above is read off the code
+(`useFinance.js:230–243`, `useIncomeMutations.js:210`, `migrate_cycle_id_trigger.sql:90–120`)
+and matches the shape of the numbers exactly. It has **not** yet been confirmed against this
+hub's actual rows. Before the repair (sequence step 3), dump this hub's `budget_cycles`,
+`income_sources.cycle_id` and income-`transactions.cycle_id` and verify the split is real —
+do not assume it.
+
+**Why this one matters more than "The house":** an empty Payday reads as *broken* and the
+user distrusts the screen. Reconciling-but-wrong totals read as *working* and the user
+trusts a wrong number. Step 1 fixes both, because once `cycle_id` is income's only key,
+both sides of the seam resolve by containment.
+
+
+### Recommended fix — make `cycle_id` income's ONLY key
+
+This is the same shape as the `getActiveCycle`/`cycleForToday` fix, but the inverse move:
+that one **added** a predicate to split a conflated question; this one **deletes** a
+predicate, because *a month is not a period identity*. A month string structurally cannot
+name a custom period — "which month is Sept 18 – Oct 18?" has no answer.
+
+1. **Delete `cycleForMonth` / `cycleIdForMonth`** from `lib/cycles.js`. After this, nothing
+   in the client answers "which cycle is month X" — exactly as nothing answers "what period
+   are we in" except `cycleForToday`.
+2. **`addIncomeSource` takes `cycleId`** directly. No lookup. CYC02 ("No cycle for month X")
+   becomes unreachable on this path, because an uncovered month has no option to select.
+3. **Settings groups by `cycle_id`**, headers from `cycle.name` + date range, ordered
+   `start_date` desc. The two Septembers then render as two labelled groups — the user
+   *sees* the split instead of it silently merging.
+4. **"+ Add" offers cycles, not months** — id-valued options labelled by name/range,
+   replacing the `monthOptions` `offsetMonth` list (`IncomeSourcesSection.jsx:64`).
+5. **`copyIncomeSourcesToMonth` → `copyIncomeSourcesToCycle(fromCycleId, toCycleId)`.**
+6. **`month` stays written** (column, trigger and `validateIncomeSource` still require it)
+   but becomes **derived for display**: `cycle.start_date.slice(0,7)`. Stored, never a key.
+7. **Harden the trigger's month branch**: `RAISE` when the month match count > 1 instead of
+   `LIMIT 1`. A loud failure beats a silent wrong period.
+
+**Rejected alternative — "match income by month consistently."** That means making Payday
+group by month too, which (a) re-merges Sept 1–17 and Sept 18 – Oct 18 into one Payday view,
+(b) reverses Commit 11/13's direction (`cycle_id` is the canonical client filter), and
+(c) cannot key a period that spans two months. Dead end.
+
+### Also in scope
+
+- **"Move income to another period" action** — the income twin of `useMoveToCycle`
+  (`hooks/useMoveToCycle.jsx`, which does this for transactions). Once `cycle_id` is the
+  sole key, mis-stamped rows need a way home that is not a DB errand, and it makes this
+  whole class of mismatch user-fixable forever.
+- **One-time repair of `b7e336d0`'s mis-stamped rows.** Scoped SQL, dry-run-then-apply per
+  the migrate_28 convention. **Check first what is attached to `b7e336d0`** (transactions,
+  categories):
+  - *Empty apart from the two income sources* → soft-delete `b7e336d0`, extend `50a8d1ff`
+    to Sept 30, re-stamp both sources' `cycle_id`. Preserves rows and receipt state.
+  - *Has transactions* → leave it, re-stamp income to `50a8d1ff`. The two-September shape
+    persists and will recur monthly.
+
+  **This is a one-time repair, not a migration.** Going forward the logic is sound —
+  `nextUncoveredMonthRange` scans from today's month and tests interval overlap, so
+  quick-create can no longer manufacture these. And a mid-month, month-spanning period is
+  still a **legitimate** shape from `create_budget_period` with custom dates, so nothing may
+  bulk-delete "anything mid-month."
+- **Clipped-period receipt on auto-continue.** When `v_start > v_month_start` or
+  `v_end < v_month_end` (`migrate_28:216–229`), the returned jsonb should say so and the
+  banner should surface it: *"September 1–17 created — a later period (18 Sep – 18 Oct)
+  already exists."* No logic change; it turns an invisible state into one the user can act
+  on. Note the clip itself is **correct** and must not change — Sept 1–17 is exactly the
+  free gap containing today; the alternatives are CYC01 or leaving today uncovered, which is
+  the bug auto-continue exists to kill.
+
+### Sequence
+
+1. **Cycle-key income end-to-end** (items 1–7 above).
+2. **Move-income action.**
+3. **Repair this hub** (`b7e336d0`).
+4. **Clipped-period receipt** on auto-continue — small and independent.
+
+**Do NOT repair first.** Before step 1, Settings still groups by month, so you cannot see
+which period an income belongs to and cannot verify the repair worked.
+
+---
+
 ## No ESLint in the repo — a missing import white-screened production-shaped code — POST-MVP (tooling)
 
 **Why:** On 2026-09-05 `<PeriodSetupPrompt />` was mounted in `App.jsx`'s DashboardShell
