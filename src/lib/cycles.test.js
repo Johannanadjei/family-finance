@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { landingCycle, cycleForToday, cycleForDate, cycleForMonth, getCycleNav, sliceByCycle, cycleIdForMonth, currentCalendarMonthRange, nextUncoveredMonthRange, isWithinCurrentYear, visibleCycleWindow } from './cycles';
+import { landingCycle, cycleForToday, cycleForDate, getCycleNav, sliceByCycle, currentCalendarMonthRange, nextUncoveredMonthRange, isWithinCurrentYear, visibleCycleWindow } from './cycles';
 
 // Three non-overlapping calendar cycles. Dates are 'YYYY-MM-DD' strings.
 const APR = { id: 'apr', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
@@ -153,21 +153,6 @@ describe('sliceByCycle', () => {
   });
 });
 
-describe('cycleIdForMonth', () => {
-  it('returns the id of the cycle whose start-month matches (trigger parity)', () => {
-    expect(cycleIdForMonth([APR, MAY, JUN], '2026-05')).toBe('may');
-  });
-
-  it('returns null when no live cycle covers the month', () => {
-    expect(cycleIdForMonth([APR, JUN], '2026-05')).toBeNull();
-  });
-
-  it('ignores soft-deleted cycles', () => {
-    const deletedMay = { ...MAY, deleted_at: '2026-05-02T00:00:00Z' };
-    expect(cycleIdForMonth([deletedMay], '2026-05')).toBeNull();
-  });
-});
-
 describe('currentCalendarMonthRange', () => {
   it('returns the full calendar month containing today (mid-month)', () => {
     expect(currentCalendarMonthRange('2026-06-28')).toEqual({
@@ -198,25 +183,6 @@ describe('currentCalendarMonthRange', () => {
     expect(currentCalendarMonthRange('2026-12-31')).toEqual({
       start: '2026-12-01', end: '2026-12-31', name: 'December 2026',
     });
-  });
-});
-
-describe('cycleForMonth', () => {
-  it('returns the cycle whose START month matches (the resolve_cycle_id month branch)', () => {
-    expect(cycleForMonth([APR, MAY, JUN], '2026-05')).toBe(MAY);
-  });
-
-  it('returns null when no live cycle starts in that month', () => {
-    expect(cycleForMonth([APR, JUN], '2026-05')).toBeNull();
-  });
-
-  it('ignores soft-deleted cycles', () => {
-    expect(cycleForMonth([{ ...MAY, deleted_at: '2026-05-02T00:00:00Z' }], '2026-05')).toBeNull();
-  });
-
-  it('cycleIdForMonth is its id form', () => {
-    expect(cycleIdForMonth([APR, MAY, JUN], '2026-05')).toBe('may');
-    expect(cycleIdForMonth([APR, JUN], '2026-05')).toBeNull();
   });
 });
 
@@ -363,5 +329,17 @@ describe('visibleCycleWindow', () => {
     const copy  = [...input];
     visibleCycleWindow(input, 2);
     expect(input).toEqual(copy);
+  });
+});
+
+// The month→cycle resolvers (cycleForMonth / cycleIdForMonth) were DELETED, not
+// renamed: a month string cannot name a period, and the first-wins version silently
+// mis-stamped income on hubs with two same-month periods. This guards the deletion —
+// re-adding either export should fail here and send the author to the module comment.
+describe('no month→cycle resolver exists', () => {
+  it('does not export cycleForMonth or cycleIdForMonth', async () => {
+    const mod = await import('./cycles');
+    expect(mod.cycleForMonth).toBeUndefined();
+    expect(mod.cycleIdForMonth).toBeUndefined();
   });
 });

@@ -129,49 +129,50 @@ describe('useFinance — income mutation reconciliation', () => {
   });
 });
 
-// ── Phase 2B: income rollforward (copyIncomeSourcesToMonth) ──────────────────
-// allIncomes spans two months; May has two recurring sources plus one migration
-// "Other Income" bucket that must never carry forward.
-const PREV = '2026-04', FROM = '2026-05', TO = '2026-06';
-// Rollforward stamps cycle_id on the optimistic rows by resolving the TARGET month
-// (Commit 11.5, mirroring the Commit-10 trigger). Tests that insert must seed a cycle
-// whose start-month is TO, alongside CURRENT (which the gated loader needs for today).
-const CYC_TO = { id: 'cyc-jun', budget_centre_id: 'centre-1', name: 'Jun', start_date: TO + '-01', end_date: TO + '-30', anchor_type: 'calendar', deleted_at: null };
+// ── Phase 2B: income rollforward (copyIncomeSourcesToCycle) ─────────────────
+// Both ends of the copy are CYCLE IDS. allIncomes spans two periods; the source
+// period has two recurring sources plus one migration "Other Income" bucket that
+// must never carry forward.
+const FROM = '2026-05', TO = '2026-06';
+const CYC_FROM = { id: 'cyc-may', budget_centre_id: 'centre-1', name: 'May', start_date: FROM + '-01', end_date: FROM + '-31', anchor_type: 'calendar', deleted_at: null };
+const CYC_TO   = { id: 'cyc-jun', budget_centre_id: 'centre-1', name: 'Jun', start_date: TO   + '-01', end_date: TO   + '-30', anchor_type: 'calendar', deleted_at: null };
+const CYC_EMPTY= { id: 'cyc-apr', budget_centre_id: 'centre-1', name: 'Apr', start_date: '2026-04-01', end_date: '2026-04-30', anchor_type: 'calendar', deleted_at: null };
 const ALL_INCOMES = [
-  { id: 'inc-1',   label: 'Adjei Salary', icon: '💰', expected_amount: 30000, currency: 'GHS', pay_day: 31,   pay_day_type: 'last_working_day', received: true,  received_amount: 30000, month: FROM, notes: '' },
-  { id: 'inc-2',   label: 'Dita Salary',  icon: '💼', expected_amount: 15000, currency: 'GHS', pay_day: 25,   pay_day_type: 'fixed_date',       received: false, received_amount: 0,     month: FROM, notes: '' },
-  { id: 'bucket-1', label: 'Other Income', icon: '💰', expected_amount: 0,     currency: 'GHS', pay_day: null, pay_day_type: 'flexible',         received: true,  received_amount: 500,   month: FROM, notes: '__one_off_bucket__' },
+  { id: 'inc-1',    label: 'Adjei Salary', icon: '💰', expected_amount: 30000, currency: 'GHS', pay_day: 31,   pay_day_type: 'last_working_day', received: true,  received_amount: 30000, month: FROM, cycle_id: 'cyc-may', notes: '' },
+  { id: 'inc-2',    label: 'Dita Salary',  icon: '💼', expected_amount: 15000, currency: 'GHS', pay_day: 25,   pay_day_type: 'fixed_date',       received: false, received_amount: 0,     month: FROM, cycle_id: 'cyc-may', notes: '' },
+  { id: 'bucket-1', label: 'Other Income', icon: '💰', expected_amount: 0,     currency: 'GHS', pay_day: null, pay_day_type: 'flexible',         received: true,  received_amount: 500,   month: FROM, cycle_id: 'cyc-may', notes: '__one_off_bucket__' },
 ];
-const serverRow = (id, label, month) => ({ id, label, icon: '💰', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', received: false, received_amount: 0, month, notes: '' });
+const serverRow = (id, label, month, cycle_id) => ({ id, label, icon: '💰', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', received: false, received_amount: 0, month, cycle_id, notes: '' });
+const CYCLES = [CURRENT, CYC_FROM, CYC_TO, CYC_EMPTY];
 
-describe('useFinance — copyIncomeSourcesToMonth (Phase 2B rollforward)', () => {
+describe('useFinance — copyIncomeSourcesToCycle (Phase 2B rollforward)', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it('copies ALL non-bucket sources when no ids are passed, into the target month', async () => {
-    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), [CURRENT, CYC_TO]);
+  it('copies ALL non-bucket sources when no ids are passed, into the target PERIOD', async () => {
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), CYCLES);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-1', 'Adjei Salary', TO), serverRow('new-2', 'Dita Salary', TO)], error: null });
-    await act(async () => { await result.current.copyIncomeSourcesToMonth(FROM, TO); });
+    bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-1', 'Adjei Salary', TO, 'cyc-jun'), serverRow('new-2', 'Dita Salary', TO, 'cyc-jun')], error: null });
+    await act(async () => { await result.current.copyIncomeSourcesToCycle('cyc-may', 'cyc-jun'); });
 
     expect(bulkAddIncomeSources).toHaveBeenCalledTimes(1);
     const [cid, rows, cycleId] = bulkAddIncomeSources.mock.calls[0];
     expect(cid).toBe('centre-1');
-    expect(cycleId).toBe('cyc-jun');   // Commit 14a — TARGET cycle_id stamped into the DB insert too
+    expect(cycleId).toBe('cyc-jun');                               // the TARGET period id, passed straight through
     expect(rows).toHaveLength(2);                                  // the bucket is excluded
     expect(rows.map(r => r.label).sort()).toEqual(['Adjei Salary', 'Dita Salary']);
-    expect(rows.every(r => r.month === TO)).toBe(true);
+    expect(rows.every(r => r.month === TO)).toBe(true);            // month DERIVED from the target period
     expect(rows.every(r => r.notes === '')).toBe(true);
-    // Server rows land in allIncomes under the new month.
-    expect(result.current.allIncomes.filter(i => i.month === TO)).toHaveLength(2);
+    // Server rows land in allIncomes under the new period.
+    expect(result.current.allIncomes.filter(i => i.cycle_id === 'cyc-jun')).toHaveLength(2);
   });
 
   it('copies only the explicitly selected subset', async () => {
-    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), [CURRENT, CYC_TO]);
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), CYCLES);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-2', 'Dita Salary', TO)], error: null });
-    await act(async () => { await result.current.copyIncomeSourcesToMonth(FROM, TO, ['inc-2']); });
+    bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-2', 'Dita Salary', TO, 'cyc-jun')], error: null });
+    await act(async () => { await result.current.copyIncomeSourcesToCycle('cyc-may', 'cyc-jun', ['inc-2']); });
 
     const [, rows] = bulkAddIncomeSources.mock.calls[0];
     expect(rows).toHaveLength(1);
@@ -179,31 +180,45 @@ describe('useFinance — copyIncomeSourcesToMonth (Phase 2B rollforward)', () =>
   });
 
   it('excludes one-off buckets even when their id is passed explicitly (data-layer backstop)', async () => {
-    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), [CURRENT, CYC_TO]);
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), CYCLES);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-1', 'Adjei Salary', TO)], error: null });
-    await act(async () => { await result.current.copyIncomeSourcesToMonth(FROM, TO, ['inc-1', 'bucket-1']); });
+    bulkAddIncomeSources.mockResolvedValue({ data: [serverRow('new-1', 'Adjei Salary', TO, 'cyc-jun')], error: null });
+    await act(async () => { await result.current.copyIncomeSourcesToCycle('cyc-may', 'cyc-jun', ['inc-1', 'bucket-1']); });
 
     const [, rows] = bulkAddIncomeSources.mock.calls[0];
     expect(rows).toHaveLength(1);                                  // bucket-1 filtered out
     expect(rows[0].label).toBe('Adjei Salary');
   });
 
-  it('is a no-op (no insert) when the source month has no copyable sources', async () => {
-    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })));
+  it('is a no-op (no insert) when the source PERIOD has no copyable sources', async () => {
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), CYCLES);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      const r = await result.current.copyIncomeSourcesToMonth(PREV, TO);   // April is empty
+      const r = await result.current.copyIncomeSourcesToCycle('cyc-apr', 'cyc-jun');   // April is empty
       expect(r.error).toBeNull();
       expect(r.data).toEqual([]);
     });
     expect(bulkAddIncomeSources).not.toHaveBeenCalled();
   });
 
+  it('REFUSES (no insert) when the TARGET period id is unknown — validated before any work', async () => {
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), CYCLES);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let res;
+    await act(async () => { res = await result.current.copyIncomeSourcesToCycle('cyc-may', 'cyc-nope'); });
+
+    expect(res.error).toBeTruthy();
+    expect(res.error.message).toMatch(/cyc-nope/);
+    expect(bulkAddIncomeSources).not.toHaveBeenCalled();
+    // and nothing optimistic was left behind
+    expect(result.current.allIncomes).toHaveLength(ALL_INCOMES.length);
+  });
+
   it('inserts optimistic rows immediately, then rolls them ALL back when the bulk insert fails', async () => {
-    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), [CURRENT, CYC_TO]);
+    const { result } = mount([], ALL_INCOMES.map(s => ({ ...s })), CYCLES);
     await waitFor(() => expect(result.current.loading).toBe(false));
     const before = result.current.allIncomes.length;
 
@@ -211,39 +226,71 @@ describe('useFinance — copyIncomeSourcesToMonth (Phase 2B rollforward)', () =>
     bulkAddIncomeSources.mockReturnValue(new Promise(res => { resolveBulk = res; }));
 
     let pending;
-    await act(async () => { pending = result.current.copyIncomeSourcesToMonth(FROM, TO); });
-    // Optimistic: both new TO-month rows are present before the service settles.
-    expect(result.current.allIncomes.filter(i => i.month === TO)).toHaveLength(2);
+    await act(async () => { pending = result.current.copyIncomeSourcesToCycle('cyc-may', 'cyc-jun'); });
+    // Optimistic: both new rows carry the TARGET cycle_id before the service settles.
+    expect(result.current.allIncomes.filter(i => i.cycle_id === 'cyc-jun')).toHaveLength(2);
 
     await act(async () => { resolveBulk({ data: null, error: new Error('network') }); await pending; });
     // Rolled back — every optimistic row removed, list back to its original size.
     expect(result.current.allIncomes.length).toBe(before);
-    expect(result.current.allIncomes.filter(i => i.month === TO)).toHaveLength(0);
+    expect(result.current.allIncomes.filter(i => i.cycle_id === 'cyc-jun')).toHaveLength(0);
   });
 });
 
-// Commit 14a — addIncomeSource forwards the resolved cycle_id into the DB insert.
-describe('useFinance — addIncomeSource (cycle_id stamping)', () => {
+// cycle_id is income's ONLY period key: addIncomeSource takes a period id from the
+// caller and DERIVES `month` from it. Nothing resolves a month back to a period.
+describe('useFinance — addIncomeSource (cycle_id is the key, month is derived)', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it('threads the cycle_id resolved from the source month to the DB insert', async () => {
-    const { result } = mount([], [], [CURRENT, CYC_TO]);
+  it('stamps the caller-chosen period and derives month from its start_date', async () => {
+    const { result } = mount([], [], CYCLES);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    addIncomeSource.mockResolvedValue({ data: serverRow('new-1', 'Freelance', TO), error: null });
-    const newSource = { label: 'Freelance', icon: '💰', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', month: TO, notes: '' };
-    await act(async () => { await result.current.addIncomeSource(newSource); });
+    addIncomeSource.mockResolvedValue({ data: serverRow('new-1', 'Freelance', TO, 'cyc-jun'), error: null });
+    // NOTE: no `month` on the payload — the caller does not supply one any more.
+    const newSource = { label: 'Freelance', icon: '💰', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', notes: '' };
+    await act(async () => { await result.current.addIncomeSource(newSource, 'cyc-jun'); });
 
-    expect(addIncomeSource).toHaveBeenCalledWith('centre-1', newSource, 'cyc-jun');
+    expect(addIncomeSource).toHaveBeenCalledWith('centre-1', { ...newSource, month: TO }, 'cyc-jun');
   });
 
-  it('refuses (no insert) when no cycle covers the source month — CYC02 invariant', async () => {
-    const { result } = mount([], [], [CURRENT]);   // CURRENT starts 2000-01 — no cycle for TO
+  it('DERIVES month from the period even when the caller passes a contradictory one', async () => {
+    // The bug this workstream closes: month and cycle_id disagreeing. The period wins.
+    const { result } = mount([], [], CYCLES);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    const newSource = { label: 'Freelance', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', month: TO, notes: '' };
+    addIncomeSource.mockResolvedValue({ data: serverRow('new-1', 'Freelance', TO, 'cyc-jun'), error: null });
+    const newSource = { label: 'Freelance', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', month: '1999-01', notes: '' };
+    await act(async () => { await result.current.addIncomeSource(newSource, 'cyc-jun'); });
+
+    const [, row] = addIncomeSource.mock.calls[0];
+    expect(row.month).toBe(TO);            // NOT '1999-01'
+  });
+
+  it('picks the period by ID even when two periods start in the SAME month', async () => {
+    // The exact production shape ("The house"): Sept 1–17 and Sept 18 – Oct 18.
+    // Under the old month lookup this was a coin flip; by id there is no ambiguity.
+    const SEP_A = { id: 'cyc-sep-a', budget_centre_id: 'centre-1', name: 'Sep A', start_date: '2026-09-01', end_date: '2026-09-17', anchor_type: 'custom', deleted_at: null };
+    const SEP_B = { id: 'cyc-sep-b', budget_centre_id: 'centre-1', name: 'Sep B', start_date: '2026-09-18', end_date: '2026-10-18', anchor_type: 'custom', deleted_at: null };
+    const { result } = mount([], [], [CURRENT, SEP_A, SEP_B]);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    addIncomeSource.mockResolvedValue({ data: serverRow('new-1', 'Freelance', '2026-09', 'cyc-sep-b'), error: null });
+    const newSource = { label: 'Freelance', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', notes: '' };
+    await act(async () => { await result.current.addIncomeSource(newSource, 'cyc-sep-b'); });
+
+    const [, row, cycleId] = addIncomeSource.mock.calls[0];
+    expect(cycleId).toBe('cyc-sep-b');     // the one asked for, not the first September
+    expect(row.month).toBe('2026-09');     // both share this month — which is why it can't be the key
+  });
+
+  it('refuses (no insert) when the period id is unknown — CYC02 invariant', async () => {
+    const { result } = mount([], [], CYCLES);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const newSource = { label: 'Freelance', expected_amount: 1, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', notes: '' };
     let res;
-    await act(async () => { res = await result.current.addIncomeSource(newSource); });
+    await act(async () => { res = await result.current.addIncomeSource(newSource, 'cyc-nope'); });
 
     expect(res.error).toBeTruthy();
     expect(addIncomeSource).not.toHaveBeenCalled();

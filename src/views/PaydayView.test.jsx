@@ -35,7 +35,7 @@ const mockFinance = {
   markReceived:   vi.fn().mockResolvedValue({ error: null }),
   markPending:    vi.fn().mockResolvedValue({ error: null }),
   updateExpectedAmount: vi.fn().mockResolvedValue({ error: null }),
-  copyIncomeSourcesToMonth: vi.fn().mockResolvedValue({ data: [], error: null }),
+  copyIncomeSourcesToCycle: vi.fn().mockResolvedValue({ data: [], error: null }),
 };
 
 vi.mock('../context/FinanceContext', () => ({
@@ -140,15 +140,32 @@ describe('PaydayView', () => {
   });
 
   // ── Phase 2B rollforward empty-state ──────────────────────────────────────
+  // The rollforward source is the PREVIOUS PERIOD, resolved by cycle id. There is
+  // no month fallback any more, so these tests must supply real periods: without a
+  // previous period there is, correctly, nothing to roll forward from.
+  const CYC_PREV = { id: 'cyc-apr', budget_centre_id: 'c1', name: 'April 2026', start_date: '2026-04-01', end_date: '2026-04-30', anchor_type: 'calendar', deleted_at: null };
+  const CYC_CUR  = { id: 'cyc-may', budget_centre_id: 'c1', name: 'May 2026',   start_date: '2026-05-01', end_date: '2026-05-31', anchor_type: 'calendar', deleted_at: null };
   const PREV_SOURCES = [
-    { id: 'p1', label: 'Adjei Salary', icon: '💰', expected_amount: 30000, currency: 'GHS', month: '2026-04', notes: '' },
-    { id: 'p2', label: 'Dita Salary',  icon: '💼', expected_amount: 15000, currency: 'GHS', month: '2026-04', notes: '' },
+    { id: 'p1', label: 'Adjei Salary', icon: '💰', expected_amount: 30000, currency: 'GHS', month: '2026-04', cycle_id: 'cyc-apr', notes: '' },
+    { id: 'p2', label: 'Dita Salary',  icon: '💼', expected_amount: 15000, currency: 'GHS', month: '2026-04', cycle_id: 'cyc-apr', notes: '' },
   ];
-  const resetIncomes = () => { mockFinance.incomes = mockIncomes; mockFinance.allIncomes = mockIncomes; };
+  // Put the view in the CURRENT period with the previous one navigable behind it.
+  const withPeriods = () => {
+    mockFinance.cycles        = [CYC_CUR, CYC_PREV];
+    mockFinance.visibleCycles = [CYC_CUR, CYC_PREV];
+    mockFinance.activeCycle   = CYC_CUR;
+    mockFinance.activeCycleId = CYC_CUR.id;
+  };
+  const resetIncomes = () => {
+    mockFinance.incomes = mockIncomes; mockFinance.allIncomes = mockIncomes;
+    mockFinance.cycles = []; mockFinance.visibleCycles = undefined;
+    mockFinance.activeCycle = null; mockFinance.activeCycleId = null;
+  };
 
-  it('rollforward State 3: shows the "Yes, copy N sources" CTA when the previous month had sources', () => {
+  it('rollforward State 3: shows the "Yes, copy N sources" CTA when the previous PERIOD had sources', () => {
     mockFinance.incomes    = [];
     mockFinance.allIncomes = PREV_SOURCES;
+    withPeriods();
     renderView();
     expect(screen.getByText(/Income same as/)).toBeTruthy();
     expect(screen.getByTestId('copy-all-btn').textContent).toBe('Yes, copy 2 sources');
@@ -156,30 +173,49 @@ describe('PaydayView', () => {
     resetIncomes();
   });
 
-  it('rollforward: a bucket-only previous month falls back to State 1 (no copy CTA)', () => {
+  it('rollforward: a bucket-only previous period falls back to State 1 (no copy CTA)', () => {
     mockFinance.incomes    = [];
-    mockFinance.allIncomes = [{ id: 'b1', label: 'Other Income', icon: '💰', expected_amount: 0, currency: 'GHS', month: '2026-04', notes: '__one_off_bucket__' }];
+    mockFinance.allIncomes = [{ id: 'b1', label: 'Other Income', icon: '💰', expected_amount: 0, currency: 'GHS', month: '2026-04', cycle_id: 'cyc-apr', notes: '__one_off_bucket__' }];
+    withPeriods();
     renderView();
     expect(screen.queryByTestId('copy-all-btn')).toBeNull();
     expect(screen.getByTestId('add-manually-btn')).toBeTruthy();
     resetIncomes();
   });
 
-  it('rollforward: tapping "Yes, copy N" calls copyIncomeSourcesToMonth(prevMonth, activeMonth) with no subset', async () => {
+  it('rollforward: tapping "Yes, copy N" calls copyIncomeSourcesToCycle(prevCycleId, viewedCycleId) with no subset', async () => {
     mockFinance.incomes    = [];
     mockFinance.allIncomes = PREV_SOURCES;
+    withPeriods();
     const copyFn = vi.fn().mockResolvedValue({ data: [{ id: 'n1' }, { id: 'n2' }], error: null });
-    mockFinance.copyIncomeSourcesToMonth = copyFn;
+    mockFinance.copyIncomeSourcesToCycle = copyFn;
     renderView();
     fireEvent.click(screen.getByTestId('copy-all-btn'));
-    await waitFor(() => expect(copyFn).toHaveBeenCalledWith('2026-04', '2026-05', undefined));
-    mockFinance.copyIncomeSourcesToMonth = vi.fn().mockResolvedValue({ data: [], error: null });
+    // PERIOD IDS on both ends — never month strings.
+    await waitFor(() => expect(copyFn).toHaveBeenCalledWith('cyc-apr', 'cyc-may', undefined));
+    mockFinance.copyIncomeSourcesToCycle = vi.fn().mockResolvedValue({ data: [], error: null });
+    resetIncomes();
+  });
+
+  it('rollforward: NO copy CTA when there is no previous period (nothing to copy from)', () => {
+    // Previously an offsetMonth(-1) fallback invented a "previous month" here and
+    // could pull sources from a period that was never navigable.
+    mockFinance.incomes    = [];
+    mockFinance.allIncomes = PREV_SOURCES;
+    mockFinance.cycles        = [CYC_CUR];
+    mockFinance.visibleCycles = [CYC_CUR];
+    mockFinance.activeCycle   = CYC_CUR;
+    mockFinance.activeCycleId = CYC_CUR.id;
+    renderView();
+    expect(screen.queryByTestId('copy-all-btn')).toBeNull();
+    expect(screen.getByTestId('add-manually-btn')).toBeTruthy();
     resetIncomes();
   });
 
   it('rollforward: tapping "Choose which to copy" opens the multi-select sheet', () => {
     mockFinance.incomes    = [];
     mockFinance.allIncomes = PREV_SOURCES;
+    withPeriods();
     renderView();
     fireEvent.click(screen.getByTestId('choose-which-btn'));
     expect(screen.getByTestId('copy-income-sheet')).toBeTruthy();

@@ -8,9 +8,9 @@ import { useNavigate }            from 'react-router-dom';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { AccessBlocked }         from '../components/ui/AccessBlocked';
-import { getCurrentMonth, offsetMonth } from '../lib/finance';
+import { getCurrentMonth }         from '../lib/finance';
 import { formatMonth, getToday }   from '../lib/dates';
-import { getCycleNav }             from '../lib/cycles';
+import { getCycleNav, sliceByCycle } from '../lib/cycles';
 import { Skeleton }               from '../components/ui/Skeleton';
 import { PaydayHeader }           from './payday/PaydayHeader';
 import { PaydayIncomeBody }       from './payday/PaydayIncomeBody';
@@ -63,7 +63,7 @@ export function PaydayView() {
   const {
     incomes, allIncomes = [], error, totalReceived, totalExpected, totalPending, totalIncome, txs,
     activeMonth, cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, hubPlan,
-    markReceived, markPending, updateExpectedAmount, copyIncomeSourcesToMonth,
+    markReceived, markPending, updateExpectedAmount, copyIncomeSourcesToCycle,
   } = financeValues;
 
   // Viewed period: navigated cycle → auto-resolved current cycle → month fallback
@@ -77,19 +77,17 @@ export function PaydayView() {
   const isCurrent      = viewedCycle ? (viewedCycle.start_date <= today && viewedCycle.end_date >= today) : activeMonth === currentMonth;
   const isPast         = viewedCycle ? viewedCycle.end_date   < today : activeMonth < currentMonth;
   const isFuture       = viewedCycle ? viewedCycle.start_date > today : activeMonth > currentMonth;
-  const viewedMonth    = viewedCycle ? viewedCycle.start_date.slice(0, 7) : activeMonth;
   const periodLabel    = viewedCycle?.name ?? formatMonth(activeMonth);
   const pastIncomeTxs  = isPast ? txs.filter(t => t.type === 'income') : [];   // past = read-only, tx-derived
-  // History gate (D6/D8): at the oldest VISIBLE cycle with older periods hidden, this
-  // both (a) stops the offsetMonth fallback pulling income from a hidden period (Phase 1
-  // §F leak) and (b) drives the prev-arrow upgrade affordance in <PeriodNav> via PaydayHeader.
+  // History gate (D6/D8): drives the prev-arrow upgrade affordance in <PeriodNav>.
+  // It no longer has to block the Phase 1 §F income leak — nav.prev comes from
+  // visibleCycles, so a hidden period can't be a rollforward source by construction.
   const historyLocked  = hubPlan === 'free' && cycles.length > visibleCycles.length && nav.isOldest;
-  // Rollforward source = the PREVIOUS CYCLE (not prev calendar month; cycles can gap).
-  const prevMonth      = nav.prev ? nav.prev.start_date.slice(0, 7)
-                       : historyLocked ? null
-                       : offsetMonth(activeMonth, -1);
-  const prevSources    = prevMonth ? allIncomes.filter(i => i.month === prevMonth && i.notes !== ONE_OFF_MARKER && !i.deleted_at) : [];
-  const prevPeriodLabel = nav.prev?.name ?? (prevMonth ? formatMonth(prevMonth) : '');
+  // Rollforward source = the PREVIOUS CYCLE, keyed by id. The old offsetMonth(-1)
+  // fallback is gone: a month can't name a period (and named the wrong one of two).
+  const prevCycleId    = nav.prev?.id ?? null;
+  const prevSources    = prevCycleId ? sliceByCycle(allIncomes, prevCycleId).filter(i => i.notes !== ONE_OFF_MARKER && !i.deleted_at) : [];
+  const prevPeriodLabel = nav.prev?.name ?? '';
 
   const handleOpenSheet = (income) => {
     setSelectedIncome(income);
@@ -120,9 +118,11 @@ export function PaydayView() {
   // Roll income forward from the previous cycle. sourceIds undefined → copy all
   // non-bucket sources; an array → the sheet-selected subset. incomes re-derives.
   const handleCopy = async (sourceIds) => {
+    // Both ends must be real periods — never dispatch a copy with a null key (CYC02).
+    if (!prevCycleId || !viewedCycle) { setCopyError("Couldn't copy. Try again."); return; }
     setCopying(true);
     setCopyError(null);
-    const { data, error: err } = await copyIncomeSourcesToMonth(prevMonth, viewedMonth, sourceIds);
+    const { data, error: err } = await copyIncomeSourcesToCycle(prevCycleId, viewedCycle.id, sourceIds);
     setCopying(false);
     if (err) { setCopyError("Couldn't copy. Try again."); return; }
     setCopySheetOpen(false);

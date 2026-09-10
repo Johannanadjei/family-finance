@@ -144,35 +144,14 @@ export function sliceByCycle(rows, cycleId) {
   return rows.filter(r => r.cycle_id === cycleId);
 }
 
-/**
- * Resolve the cycle a 'YYYY-MM' month maps to, mirroring the resolve_cycle_id()
- * database trigger (Commit 10): match on the cycle's start-month
- * (to_char(start_date,'YYYY-MM') = month). Client and server share the cycles
- * table as the single source of truth. Returns null when no live cycle covers the
- * month — callers stamp on the result and refuse the write rather than insert a
- * NULL cycle_id (the CYC02 invariant).
- *
- * @param {Array<{ id: string, start_date: string, deleted_at?: string|null }>} cycles
- * @param {string} month — 'YYYY-MM'
- * @returns {object|null}
- */
-export function cycleForMonth(cycles, month) {
-  return cycles.find(c => !c.deleted_at && c.start_date.startsWith(month)) ?? null;
-}
-
-/**
- * The id form of cycleForMonth, for the write paths that stamp cycle_id directly
- * (useIncomeMutations). Kept as a named wrapper rather than `cycleForMonth(...)?.id`
- * at each call site so the CYC02 refusal ("no live cycle covers this month → do not
- * insert a NULL cycle_id") reads the same everywhere.
- *
- * @param {Array<{ id: string, start_date: string, deleted_at?: string|null }>} cycles
- * @param {string} month — 'YYYY-MM'
- * @returns {string|null}
- */
-export function cycleIdForMonth(cycles, month) {
-  return cycleForMonth(cycles, month)?.id ?? null;
-}
+// NOTE: there is deliberately NO month→cycle resolver in this file. A month string
+// cannot name a period — "which month is Sept 18 – Oct 18?" has no answer — and the
+// first-wins version of that function (cycleForMonth/cycleIdForMonth, deleted here)
+// silently mis-stamped income on hubs with two same-month periods: getCyclesForCentre
+// orders start_date DESC, so Array.find returned the LATEST-starting cycle of the
+// month. cycle_id is income's only period key; `month` is derived from the cycle's
+// start_date for the NOT NULL column and display, never resolved back from. See
+// docs/backlog.md (income's two period keys).
 
 // ── Budget-period range builders (Phase B) ──────────────────────────────────────
 // Unlike the pickers above (string compares, no Date), these compute month

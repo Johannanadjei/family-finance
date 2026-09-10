@@ -159,6 +159,41 @@ group by month too, which (a) re-merges Sept 1–17 and Sept 18 – Oct 18 into 
 3. **Repair this hub** (`b7e336d0`).
 4. **Clipped-period receipt** on auto-continue — small and independent.
 
+### 🚫 PROMOTION BLOCKER — the move handler is a STUB until step 2
+
+`IncomeSourcesSection` ships the Unallocated group's "Move to a period →" action wired
+to a **stub** (`moveIncomeSourceToCycle`, marked `STUB (sequence step 2 …)` in that file)
+that always returns an error, so tapping it surfaces *"Couldn't move this income source."*
+
+This is acceptable ONLY on the unpromoted `dev` branch, where the whole sequence lands
+together. **Do NOT promote to `staging` or `main` until step 2 replaces that stub with
+the real `moveIncomeSourceToCycle` mutation.** A "Couldn't move" error must never reach a
+promoted environment — it is a visible dead end on the exact screen this workstream
+exists to make trustworthy.
+
+Check before any promotion:
+
+```
+grep -rn "STUB (sequence step 2" src/    # must return zero hits
+```
+
+### Tidy — move affordance ideally lives in `IncomeSourceRow`
+
+The Unallocated group's "Move to a period →" button is rendered by
+`IncomeSourcesSection`, immediately below each orphaned row, rather than inside
+`IncomeSourceRow` alongside that row's own edit/delete actions — which is where it
+belongs.
+
+**Why it isn't there:** adding it to `IncomeSourceRow` pushed that file to 213 lines
+against the audit's 200-line cap, and the only way under was to extract its ~55-line
+inline edit form — which would have meant reworking its existing 169-line test file. A
+169-line-test rework to absorb 13 lines of overflow is a bad trade, and it widens a
+refactor that already turns 30 tests red. Deferred deliberately.
+
+**When picking it up:** extract `IncomeSourceEditForm.jsx` (the same cut already made
+for `AddIncomeSourceForm.jsx`), then move the button into the row's action cluster and
+delete the section-level wrapper `<div>` that exists only to host it.
+
 **Do NOT repair first.** Before step 1, Settings still groups by month, so you cannot see
 which period an income belongs to and cannot verify the repair worked.
 

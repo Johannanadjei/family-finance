@@ -305,7 +305,7 @@ export function useBudgetCentre(user, centreId) {
   // as a fresh row. `categoryIds` omitted → copy all; an array → only that subset.
   // Sources from the already-loaded `prevMonthCategories`. Optimistic N-row insert
   // (each keyed by a tempId), the whole block swapped for server rows on success
-  // and removed on failure — mirrors useIncomeMutations.copyIncomeSourcesToMonth.
+  // and removed on failure — mirrors useIncomeMutations.copyIncomeSourcesToCycle.
   // `targetCycleId` is resolved by the caller (BudgetView has the cycles list this
   // hook lacks) and stamped on the optimistic rows so they appear in useFinance's
   // cycle_id slice immediately. Refuse rather than insert NULL-cycle rows (CYC02).

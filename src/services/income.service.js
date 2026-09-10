@@ -16,29 +16,23 @@ import { validateIncomeSource, validateAmount, validateDate, validateCurrency } 
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
-/**
- * Fetch active income sources. Month-scoped (Phase 2A): pass a 'YYYY-MM' month
- * for one month; omit it for every month (Settings' all-months view).
- */
-export const getIncomeSources = async (centreId, month) => {
-  let query = supabase
+/** Fetch ALL active income sources for a centre. Deliberately unscoped: callers slice
+ * by cycle_id client-side (sliceByCycle), income's only period key. The old 'YYYY-MM'
+ * month filter (Phase 2A) is gone — a month cannot name a period. */
+export const getIncomeSources = async (centreId) => {
+  const { data, error } = await supabase
     .from('income_sources')
     .select('*')
     .eq('budget_centre_id', centreId)
-    .is('deleted_at', null);
-
-  if (month) query = query.eq('month', month);
-
-  const { data, error } = await query.order('created_at', { ascending: true });
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true });
 
   if (error) console.error('[income.service] getIncomeSources error:', error.message);
   // Never mask a failure as []: error → data null; success → always an array. See CLAUDE.md §12.
   return { data: error ? null : (data || []), error };
 };
 
-/**
- * Fetch a single income source by ID.
- */
+/** Fetch a single income source by ID. */
 export const getIncomeSourceById = async (sourceId) => {
   const { data, error } = await supabase
     .from('income_sources')
@@ -53,9 +47,19 @@ export const getIncomeSourceById = async (sourceId) => {
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
+// Every income write is period-keyed. Refuse a missing cycleId without touching the
+// database, mirroring the transactions.service CYC02 guard.
+const cycleIdRequired = (fn) => {
+  const error = new Error(`${fn} requires a cycleId (CYC02)`);
+  console.error(`[income.service] ${fn} error:`, error.message);
+  return { data: null, error };
+};
+
 /** Add a new income source. `source` is validated (month required) before insert.
- * `cycleId` (optional, Commit 14a): stamped client-side; the trigger resolves from month if omitted. */
+ * `cycleId` is REQUIRED — income's only period key; the caller derives `source.month`
+ * from that same cycle. */
 export const addIncomeSource = async (centreId, source, cycleId) => {
+  if (!cycleId) return cycleIdRequired('addIncomeSource');
   let validated;
   try {
     validated = validateIncomeSource(source);
@@ -66,11 +70,7 @@ export const addIncomeSource = async (centreId, source, cycleId) => {
 
   const { data, error } = await supabase
     .from('income_sources')
-    .insert({
-      budget_centre_id: centreId,
-      ...validated,
-      ...(cycleId && { cycle_id: cycleId }),
-    })
+    .insert({ budget_centre_id: centreId, ...validated, cycle_id: cycleId })
     .select()
     .single();
 
@@ -78,15 +78,15 @@ export const addIncomeSource = async (centreId, source, cycleId) => {
   return { data, error };
 };
 
-/** Bulk insert income sources — used during onboarding / hub creation. `cycleId`
- * (optional) stamped when supplied; onboarding omits it (no cycle yet → trigger resolves). */
+/** Bulk insert income sources — onboarding / hub creation. `cycleId` is REQUIRED: both
+ * callers create the hub's first period BEFORE this call and bail out if that fails. */
 export const bulkAddIncomeSources = async (centreId, sources, cycleId) => {
+  if (!cycleId) return cycleIdRequired('bulkAddIncomeSources');
   const rows = [];
-
   for (const source of sources) {
     try {
       const validated = validateIncomeSource(source);
-      rows.push({ budget_centre_id: centreId, ...validated, ...(cycleId && { cycle_id: cycleId }) });
+      rows.push({ budget_centre_id: centreId, ...validated, cycle_id: cycleId });
     } catch (e) {
       console.error('[income.service] bulkAddIncomeSources validation error:', e.message, source);
       return { data: null, error: e };

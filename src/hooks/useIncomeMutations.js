@@ -17,7 +17,7 @@ import { useCallback } from 'react';
 import { markReceived as dbMarkReceived, markPending as dbMarkPending, updateExpectedAmount as dbUpdateExpectedAmount, updateIncomeSource as dbUpdateIncomeSource, addIncomeSource as dbAddIncomeSource, bulkAddIncomeSources as dbBulkAddIncomeSources, deleteIncomeSource as dbDeleteIncomeSource } from '../services/income.service';
 import { addTransaction as dbAddTransaction, deleteTransaction as dbDeleteTransaction, updateTransaction as dbUpdateTransaction } from '../services/transactions.service';
 import { getWeekForDate } from '../lib/finance';
-import { cycleIdForMonth } from '../lib/cycles';
+import { sliceByCycle } from '../lib/cycles';
 
 // Load-bearing marker on migration-created "Other Income" buckets (see
 // docs/engineering-decisions.md income-month-scoping). One-off buckets are
@@ -202,18 +202,28 @@ export function useIncomeMutations({ centreId, currency, cycles, incomes, txs, s
     return { data, error: null };
   }, [incomes, txs, setIncomes, setTxs]);
 
-  const addIncomeSource = useCallback(async (source) => {
+  /**
+   * Add an income source to a SPECIFIC budget period. `cycle_id` is the only period
+   * key: it comes in from the caller's period picker, and `month` is DERIVED from the
+   * cycle's start_date for the NOT NULL column and the display paths — stored, never
+   * resolved back from. The old month→cycle lookup mis-stamped on hubs with two
+   * same-month periods; see lib/cycles.js and docs/backlog.md.
+   *
+   * @param {object} source   — validated income-source fields (month is set here)
+   * @param {string} cycleId  — the target period's id
+   */
+  const addIncomeSource = useCallback(async (source, cycleId) => {
     if (!centreId) return { data: null, error: new Error('No active budget centre') };
-    // Stamp cycle_id client-side from the source month (same resolution as the
-    // Commit-10 trigger) so the optimistic row appears in the cycle_id slice
-    // immediately. Refuse rather than insert a NULL-cycle row (CYC02 invariant).
-    const cycleId = cycleIdForMonth(cycles, source.month);
-    if (!cycleId) return { data: null, error: new Error(`No cycle for month ${source.month} (CYC02)`) };
+    // Resolve the target period before any work. Refuse rather than insert a
+    // NULL-cycle or wrong-cycle row (CYC02 invariant).
+    const cycle = cycles.find(c => c.id === cycleId && !c.deleted_at);
+    if (!cycle) return { data: null, error: new Error(`Unknown budget period ${cycleId} (CYC02)`) };
+    const row        = { ...source, month: cycle.start_date.slice(0, 7) };   // derived, never a key
     const tempId     = crypto.randomUUID();
-    const optimistic = { ...source, id: tempId, budget_centre_id: centreId, cycle_id: cycleId, received: false, received_amount: 0, _optimistic: true };
+    const optimistic = { ...row, id: tempId, budget_centre_id: centreId, cycle_id: cycleId, received: false, received_amount: 0, _optimistic: true };
     setIncomes(prev => [...prev, optimistic]);
     // Stamp cycle_id into the DB insert too (Commit 14a) — explicit write, not trigger-resolved.
-    const { data, error } = await dbAddIncomeSource(centreId, source, cycleId);
+    const { data, error } = await dbAddIncomeSource(centreId, row, cycleId);
     if (error) {
       setIncomes(prev => prev.filter(i => i.id !== tempId));
       console.error('[useIncomeMutations] addIncomeSource rollback:', error.message);
@@ -223,31 +233,36 @@ export function useIncomeMutations({ centreId, currency, cycles, incomes, txs, s
     return { data, error: null };
   }, [centreId, cycles, setIncomes]);
 
-  // Roll forward income sources from one month to another (Phase 2B). Copies the
-  // recurring "shape" of each source (label, icon, amount, schedule) into the new
-  // month as a fresh PENDING source (received=false / received_amount=0 via DB
+  // Roll forward income sources from one budget PERIOD to another (Phase 2B). Copies
+  // the recurring "shape" of each source (label, icon, amount, schedule) into the new
+  // period as a fresh PENDING source (received=false / received_amount=0 via DB
   // defaults). One-off buckets are filtered out at this data layer too — a
   // backstop to the UI filter — so they never carry forward even if their id is
-  // passed explicitly. `incomes` here is the full cross-month allIncomes list.
+  // passed explicitly. `incomes` here is the full cross-period allIncomes list.
   //
-  // @param {string}   fromMonth — 'YYYY-MM' to copy from
-  // @param {string}   toMonth   — 'YYYY-MM' to copy into
+  // Both ends are cycle ids, never months: two periods can start in the same month,
+  // so a month string cannot name either end unambiguously.
+  //
+  // @param {string}   fromCycleId — period to copy from
+  // @param {string}   toCycleId   — period to copy into
   // @param {string[]} [sourceIds] — optional subset; omit to copy ALL non-bucket
-  const copyIncomeSourcesToMonth = useCallback(async (fromMonth, toMonth, sourceIds) => {
+  const copyIncomeSourcesToCycle = useCallback(async (fromCycleId, toCycleId, sourceIds) => {
     if (!centreId) return { data: null, error: new Error('No active budget centre') };
 
-    const toCopy = incomes.filter(i =>
-      i.month === fromMonth &&
+    // Resolve the TARGET period first — validate the input before building rows,
+    // rather than discovering it after (CYC02: never insert a NULL-cycle row).
+    const toCycle = cycles.find(c => c.id === toCycleId && !c.deleted_at);
+    if (!toCycle) return { data: null, error: new Error(`Unknown budget period ${toCycleId} (CYC02)`) };
+
+    const toCopy = sliceByCycle(incomes, fromCycleId).filter(i =>
       i.notes !== ONE_OFF_MARKER &&
       !i.deleted_at &&
       (!sourceIds || sourceIds.includes(i.id))
     );
     if (toCopy.length === 0) return { data: [], error: null };   // nothing to copy — not an error
 
-    // Resolve the target cycle once (same logic as the Commit-10 trigger). Refuse
-    // rather than insert NULL-cycle rows (CYC02). Stamped on the optimistic rows below.
-    const cycleId = cycleIdForMonth(cycles, toMonth);
-    if (!cycleId) return { data: null, error: new Error(`No cycle for month ${toMonth} (CYC02)`) };
+    const cycleId = toCycleId;
+    const toMonth = toCycle.start_date.slice(0, 7);   // derived, never a key
 
     // Only the fields a recurring source carries forward. received / received_amount
     // are intentionally omitted — the DB defaults them (pending in the new month),
@@ -272,7 +287,7 @@ export function useIncomeMutations({ centreId, currency, cycles, incomes, txs, s
     const { data, error } = await dbBulkAddIncomeSources(centreId, newRows, cycleId);
     if (error) {
       setIncomes(prev => prev.filter(i => !tempIds.has(i.id)));
-      console.error('[useIncomeMutations] copyIncomeSourcesToMonth rollback:', error.message);
+      console.error('[useIncomeMutations] copyIncomeSourcesToCycle rollback:', error.message);
       return { data: null, error };
     }
 
@@ -319,5 +334,5 @@ export function useIncomeMutations({ centreId, currency, cycles, incomes, txs, s
     return { error: null };
   }, [incomes, txs, setIncomes, setTxs]);
 
-  return { markReceived, markPending, updateExpectedAmount, updateIncomeSource, addIncomeSource, copyIncomeSourcesToMonth, deleteIncomeSource };
+  return { markReceived, markPending, updateExpectedAmount, updateIncomeSource, addIncomeSource, copyIncomeSourcesToCycle, deleteIncomeSource };
 }
