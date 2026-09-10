@@ -22,12 +22,12 @@ import { useFinance } from './useFinance';
 
 vi.mock('../lib/auth', () => ({ waitForSession: vi.fn().mockResolvedValue({ data: { session: { expires_at: 9999999999 } }, error: null }), warnOnEmptyColdLoad: vi.fn(), sessionAgeMs: vi.fn(() => 0) }));
 vi.mock('../services/transactions.service', () => ({ getTransactionsByCycle: vi.fn(), addTransaction: vi.fn(), updateTransaction: vi.fn(), deleteTransaction: vi.fn() }));
-vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn(), addIncomeSource: vi.fn(), bulkAddIncomeSources: vi.fn(), deleteIncomeSource: vi.fn(), updateIncomeSource: vi.fn() }));
+vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn(), addIncomeSource: vi.fn(), bulkAddIncomeSources: vi.fn(), deleteIncomeSource: vi.fn(), updateIncomeSource: vi.fn(), moveIncomeSourceToCycle: vi.fn() }));
 vi.mock('../services/cycles.service', () => ({ getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }) }));
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
 
 import { getTransactionsByCycle, addTransaction, updateTransaction, deleteTransaction } from '../services/transactions.service';
-import { getIncomeSources, markReceived, markPending, addIncomeSource, bulkAddIncomeSources, deleteIncomeSource, updateIncomeSource } from '../services/income.service';
+import { getIncomeSources, markReceived, markPending, addIncomeSource, bulkAddIncomeSources, deleteIncomeSource, updateIncomeSource, moveIncomeSourceToCycle as dbMove } from '../services/income.service';
 import { getCyclesForCentre } from '../services/cycles.service';
 
 const C    = { id: 'centre-1', currency: 'GHS', surplus_target: 0 };
@@ -294,5 +294,126 @@ describe('useFinance — addIncomeSource (cycle_id is the key, month is derived)
 
     expect(res.error).toBeTruthy();
     expect(addIncomeSource).not.toHaveBeenCalled();
+  });
+});
+
+// ── Step 2: moveIncomeSourceToCycle ─────────────────────────────────────────
+// The income twin of useMoveToCycle. One owned-row UPDATE writing cycle_id AND
+// month; refuses a RECEIVED source because its income transaction is date-keyed
+// and would be left behind in the old period.
+describe('useFinance — moveIncomeSourceToCycle', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  const PENDING = { id: 'mv-1', label: 'Job', expected_amount: 2000, currency: 'GHS', pay_day: 25, pay_day_type: 'fixed_date', received: false, received_amount: 0, month: FROM, cycle_id: 'cyc-may', notes: '' };
+  const RECEIVED = { ...PENDING, id: 'mv-2', received: true, received_amount: 2000 };
+
+  it('writes the target cycle_id AND the month derived from that period', async () => {
+    const { result } = mount([], [{ ...PENDING }], CYCLES);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    dbMove.mockResolvedValue({ data: { ...PENDING, cycle_id: 'cyc-jun', month: TO }, error: null });
+    await act(async () => { await result.current.moveIncomeSourceToCycle('mv-1', 'cyc-jun'); });
+
+    // month is DERIVED from cyc-jun's start_date — the caller never supplies one.
+    expect(dbMove).toHaveBeenCalledWith('mv-1', 'cyc-jun', TO);
+  });
+
+  it('applies the move optimistically, then swaps in the server row', async () => {
+    const { result } = mount([], [{ ...PENDING }], CYCLES);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let resolveMove;
+    dbMove.mockReturnValue(new Promise(res => { resolveMove = res; }));
+
+    let pending;
+    await act(async () => { pending = result.current.moveIncomeSourceToCycle('mv-1', 'cyc-jun'); });
+    // Optimistic: both keys already moved before the service settles.
+    let row = result.current.allIncomes.find(i => i.id === 'mv-1');
+    expect(row.cycle_id).toBe('cyc-jun');
+    expect(row.month).toBe(TO);
+
+    await act(async () => {
+      resolveMove({ data: { ...PENDING, cycle_id: 'cyc-jun', month: TO }, error: null });
+      await pending;
+    });
+    row = result.current.allIncomes.find(i => i.id === 'mv-1');
+    expect(row.cycle_id).toBe('cyc-jun');
+    expect(row._optimistic).toBe(false);
+  });
+
+  it('rolls back BOTH keys when the write fails', async () => {
+    const { result } = mount([], [{ ...PENDING }], CYCLES);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    dbMove.mockResolvedValue({ data: null, error: new Error('RLS denied') });
+    let res;
+    await act(async () => { res = await result.current.moveIncomeSourceToCycle('mv-1', 'cyc-jun'); });
+
+    expect(res.error).toBeTruthy();
+    const row = result.current.allIncomes.find(i => i.id === 'mv-1');
+    expect(row.cycle_id).toBe('cyc-may');   // back where it started
+    expect(row.month).toBe(FROM);           // and month rolled back with it
+  });
+
+  // The fork: a received source's income TRANSACTION is keyed by date containment,
+  // so moving the source alone would split the totals. Refuse, don't half-move.
+  it('REFUSES a received source with a signal the view can act on', async () => {
+    const { result } = mount([], [{ ...RECEIVED }], CYCLES);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let res;
+    await act(async () => { res = await result.current.moveIncomeSourceToCycle('mv-2', 'cyc-jun'); });
+
+    expect(res.error.message).toBe('RECEIVED_SOURCE');
+    expect(dbMove).not.toHaveBeenCalled();
+    // and nothing moved optimistically
+    const row = result.current.allIncomes.find(i => i.id === 'mv-2');
+    expect(row.cycle_id).toBe('cyc-may');
+  });
+
+  it('refuses an unknown or soft-deleted target period (CYC02)', async () => {
+    const { result } = mount([], [{ ...PENDING }], CYCLES);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let res;
+    await act(async () => { res = await result.current.moveIncomeSourceToCycle('mv-1', 'cyc-nope'); });
+
+    expect(res.error.message).toMatch(/cyc-nope/);
+    expect(dbMove).not.toHaveBeenCalled();
+  });
+
+  it('moves an UNALLOCATED row (cycle_id matching no live period) into a real one', async () => {
+    // The remediation case Settings exposes: cycle_id points at a period that is gone.
+    const orphan = { ...PENDING, id: 'mv-3', cycle_id: 'cyc-gone' };
+    const { result } = mount([], [orphan], CYCLES);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    dbMove.mockResolvedValue({ data: { ...orphan, cycle_id: 'cyc-jun', month: TO }, error: null });
+    await act(async () => { await result.current.moveIncomeSourceToCycle('mv-3', 'cyc-jun'); });
+
+    expect(dbMove).toHaveBeenCalledWith('mv-3', 'cyc-jun', TO);
+    expect(result.current.allIncomes.find(i => i.id === 'mv-3').cycle_id).toBe('cyc-jun');
+  });
+
+  it('is a no-op (no write) when the source is already in the target period', async () => {
+    const { result } = mount([], [{ ...PENDING }], CYCLES);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let res;
+    await act(async () => { res = await result.current.moveIncomeSourceToCycle('mv-1', 'cyc-may'); });
+
+    expect(res.error).toBeNull();
+    expect(dbMove).not.toHaveBeenCalled();
+  });
+
+  it('refuses a row that is still saving (_optimistic)', async () => {
+    const { result } = mount([], [{ ...PENDING, _optimistic: true }], CYCLES);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let res;
+    await act(async () => { res = await result.current.moveIncomeSourceToCycle('mv-1', 'cyc-jun'); });
+
+    expect(res.error).toBeTruthy();
+    expect(dbMove).not.toHaveBeenCalled();
   });
 });

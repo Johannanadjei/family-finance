@@ -154,28 +154,75 @@ group by month too, which (a) re-merges Sept 1–17 and Sept 18 – Oct 18 into 
 
 ### Sequence
 
-1. **Cycle-key income end-to-end** (items 1–7 above).
-2. **Move-income action.**
+1. **Cycle-key income end-to-end** (items 1–7 above). ✅ SHIPPED to `dev` (2bc1241).
+2. **Move-income action.** ✅ BUILT — `moveIncomeSourceToCycle`, pending sources only.
 3. **Repair this hub** (`b7e336d0`).
 4. **Clipped-period receipt** on auto-continue — small and independent.
 
-### 🚫 PROMOTION BLOCKER — the move handler is a STUB until step 2
+### ✅ CLEARED — the move handler is real (was a promotion blocker)
 
-`IncomeSourcesSection` ships the Unallocated group's "Move to a period →" action wired
-to a **stub** (`moveIncomeSourceToCycle`, marked `STUB (sequence step 2 …)` in that file)
-that always returns an error, so tapping it surfaces *"Couldn't move this income source."*
-
-This is acceptable ONLY on the unpromoted `dev` branch, where the whole sequence lands
-together. **Do NOT promote to `staging` or `main` until step 2 replaces that stub with
-the real `moveIncomeSourceToCycle` mutation.** A "Couldn't move" error must never reach a
-promoted environment — it is a visible dead end on the exact screen this workstream
-exists to make trustworthy.
-
-Check before any promotion:
+Resolved by sequence step 2: the Unallocated group's "Move to a period →" now calls the
+real `moveIncomeSourceToCycle` mutation. The check below returns zero hits, and a test
+asserts the two distinct error surfaces (received-source hint vs generic failure).
 
 ```
-grep -rn "STUB (sequence step 2" src/    # must return zero hits
+grep -rn "STUB (sequence step 2" src/    # zero hits — verified
 ```
+
+Kept here as the record of why the check exists. Steps 3 and 4 remain open, but neither
+is a user-visible dead end, so promotion is no longer blocked on this item.
+
+### Move a RECEIVED income source — needs an atomic two-table RPC — POST-STEP-2
+
+`moveIncomeSourceToCycle` refuses when `source.received` is true, returning the sentinel
+`RECEIVED_SOURCE`; Settings renders *"Un-confirm this income first, then move it."*
+
+**Why it refuses rather than half-moving.** `markReceived` is two-phase (CLAUDE.md §11):
+it sets `income_sources.received` AND inserts an income **transaction** linked by
+`income_source_id`. Income sources are keyed by `cycle_id`; transactions are keyed by
+**date containment** (the trigger's `NEW.date BETWEEN start_date AND end_date`). Moving
+only the source would leave its transaction in the old period and split
+`totalReceived`/`totalExpected` from `totalIncome`/`spareMoney` — reopening the exact
+seam this workstream closed on "House of Yach".
+
+**Why it cannot be fixed client-side.** `useFinance` loads `txs` via
+`getTransactionsByCycle` — only the **viewed** period's rows. A mis-stamped source's
+linked transaction is usually not in local state, so a `markPending`-style phase 2 would
+find nothing and silently no-op (`if (matchingTx)`).
+
+**What it would take** — a `SECURITY DEFINER` RPC per §9.6 (spans two tables, must be
+atomic), roughly:
+
+```sql
+-- move_income_source_to_cycle(p_source uuid, p_cycle uuid)
+--   1. gate: can_view_income(hub) for auth.uid()
+--   2. assert p_cycle belongs to the SAME hub as the source (see integrity gap below)
+--   3. UPDATE income_sources SET cycle_id = p_cycle, month = <p_cycle start month>
+--   4. UPDATE transactions SET cycle_id = p_cycle
+--        WHERE income_source_id = p_source AND type = 'income' AND deleted_at IS NULL
+--   5. RETURN both row counts as json so the client can reconcile state
+```
+
+Note step 4 deliberately does NOT move the transaction's `date` — same
+move-by-cycle_id decision as Commit 12 (`migrate_move_cycle_trigger.sql`): the payment
+really did happen on that date; only its budget assignment changes.
+
+**Not urgent:** the rows that actually need moving are mis-stamped/orphaned ones, which
+are pending. The refusal is one tap from its own fix.
+
+### Integrity gap — nothing ties a row's `cycle_id` to its `budget_centre_id` — POST-MVP
+
+`income_sources.cycle_id` FKs to `budget_cycles.id` with no constraint that the cycle
+belongs to the same hub as the row. RLS does not catch it either: a move leaves
+`budget_centre_id` unchanged, so `can_view_income()` passes on both images. The client
+guards it (`moveIncomeSourceToCycle` and `addIncomeSource` both resolve the target
+against the hub's loaded `cycles`), but the database would accept a cross-hub
+`cycle_id` written by any other caller.
+
+Applies equally to `transactions.cycle_id` and `budget_categories.cycle_id` — this is
+pre-existing, not introduced by the cycle-key work. The fix is a trigger or a composite
+FK on `(budget_centre_id, cycle_id)`, which needs a matching unique key on
+`budget_cycles (budget_centre_id, id)`. Worth doing before any multi-hub bulk tooling.
 
 ### Tidy — move affordance ideally lives in `IncomeSourceRow`
 
@@ -196,6 +243,116 @@ delete the section-level wrapper `<div>` that exists only to host it.
 
 **Do NOT repair first.** Before step 1, Settings still groups by month, so you cannot see
 which period an income belongs to and cannot verify the repair worked.
+
+---
+
+## Installed PWA never auto-updates — users must uninstall + reinstall to get a new deploy — 🔍 INVESTIGATE, NEXT PHASE (captured 2026-09-10, not built)
+
+**Priority within the next phase.** Reported by real users: after a deploy, the installed
+PWA keeps serving the old build. The only reliable fix they have found is **uninstall +
+reinstall**. That should never be required — a correctly-wired service worker replaces
+itself on the next launch.
+
+**Why it is consequential:** if updates cannot reach installed users, every shipped fix
+stops at the deploy. Every entry in this backlog that ends in "fixed and promoted" is only
+real once the user's installed app actually runs it. Worth resolving **before/around real
+user installs**, while the installed base is still small enough that a stuck client costs
+nothing.
+
+### What the config actually looks like today (verified 2026-09-10, do not re-derive)
+
+The pieces are mostly present, which is why this is an investigation and not a
+known-missing-feature build:
+
+| Piece | State |
+|---|---|
+| `vite-plugin-pwa` | `^1.3.0`, configured in `vite.config.js` |
+| `registerType` | `'autoUpdate'` |
+| `skipWaiting` / `clientsClaim` | **both present** in the built `dist/sw.js` |
+| `cleanupOutdatedCaches` | present |
+| `NavigationRoute` (index.html fallback) | present |
+| `runtimeCaching` | deliberately none (`71cdedb` — no cross-origin assets) |
+| `manifest` | `false` — `public/manifest.json` is canonical (`67664c7`) |
+
+### The two gaps worth checking first (hypotheses, NOT yet confirmed)
+
+1. **Registration only ever runs on `window.load`.** `injectRegister` is left at its
+   default, so the plugin injects a bare script tag into `index.html` and the whole of the
+   registration is:
+
+   ```js
+   // dist/registerSW.js — generated
+   if('serviceWorker' in navigator) {
+     window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js', { scope: '/' }))
+   }
+   ```
+
+   There is **no periodic `registration.update()`**, and no re-check on
+   `visibilitychange` / app resume. An installed PWA is normally *resumed* from the
+   background, not freshly loaded — so on a phone that never fully closes the app, the
+   `load` event may not fire for days and the update check never happens. This matches the
+   reported symptom better than anything else: uninstall/reinstall works because it forces
+   a cold registration.
+
+2. **No `onNeedRefresh` path, so no "update available — reload" prompt.** Nothing in `src/`
+   imports `virtual:pwa-register` — `grep -rn "registerSW\|virtual:pwa-register" src/`
+   returns zero hits. App code does not participate in the SW lifecycle at all. Even when
+   `skipWaiting` + `clientsClaim` do fire, **the already-open document keeps running the
+   old JS bundle until a full reload**; with no prompt and no forced reload, a standalone
+   PWA that is never closed can sit on stale code indefinitely.
+
+   Note `CLAUDE.md` §10 describes `main.jsx` as "React root mount + **PWA service worker
+   registration**". That is not accurate today — registration is auto-injected by the
+   plugin, `main.jsx` only handles `beforeinstallprompt` (`src/lib/pwa.js`). Fix the doc
+   line as part of whatever lands here.
+
+### Investigate (the actual question list)
+
+- Which platform(s) are the reports from — iOS standalone, Android/Chrome, or both? iOS
+  has its own well-known resume/update quirks and would change the fix.
+- Does the deployed `/sw.js` actually change hash between deploys, and is Vercel serving it
+  with a cache header that would let a stale copy stick? (Browsers bypass the HTTP cache for
+  the SW script itself, but confirm rather than assume.)
+- Does a new SW reach `activate` on a second launch, and is the stale page simply the
+  no-reload gap (hypothesis 2) rather than a missing update (hypothesis 1)?
+- Is the precached `index.html` being served by the `NavigationRoute` fallback long after a
+  new build exists?
+
+### Likely shape of the fix (do not build yet)
+
+Move to an explicit `registerSW({ immediate: true, onNeedRefresh, onRegisteredSW })` from
+`virtual:pwa-register`, add a periodic `registration.update()` plus a re-check on app
+resume, and surface a small in-app "New version available — reload" affordance
+(`components/ui/` — reuse `Toast`). Reload must be user-visible, not silent, so a mid-entry
+transaction is never dropped under the user. Tests: registration wiring + the prompt's
+shown/hidden states, per §8.
+
+**Related but does NOT solve this:** pull-to-refresh (next entry) re-fetches *data*, never
+the app version.
+
+---
+
+## Pull-to-refresh — re-fetch current data without a page reload — POST-MVP feature (captured 2026-09-10)
+
+Standard mobile gesture: pull down at the top of a view to re-fetch the current period's
+data from Supabase and re-render, without a browser reload.
+
+**Scope — data only.** It re-runs the existing hook fetches (`useFinance` for the viewed
+cycle, plus whatever the current view owns) and shows a spinner during the in-flight
+fetch. It does **not** re-download the app bundle and **does not** solve the stale-PWA
+problem above — the two are easy to conflate and must not be treated as one item.
+
+**Notes for whoever builds it:**
+
+- `useFinance` is called **once** in `App.jsx` (CLAUDE.md §11), so the refresh entry point
+  belongs on `FinanceContext` (e.g. a `refresh()` alongside `loadMonth`), not per-view.
+- Must respect §12: a failed refresh sets `error` and leaves existing data in place — it
+  must never collapse to an empty state.
+- The gesture has to not fight the 440px scroll container or iOS rubber-banding; check
+  `overscroll-behavior` before reaching for a library.
+
+**No prior entry existed** — this is the consolidated one. Any future pull-to-refresh note
+folds in here.
 
 ---
 

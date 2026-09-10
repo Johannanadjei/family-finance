@@ -100,6 +100,7 @@ export function makeFinanceMock(overrides = {}) {
       addIncomeSource:      vi.fn().mockResolvedValue({ error: null }),
       deleteIncomeSource:   vi.fn().mockResolvedValue({ error: null }),
       copyIncomeSourcesToCycle: vi.fn().mockResolvedValue({ data: [], error: null }),
+      moveIncomeSourceToCycle:  vi.fn().mockResolvedValue({ data: null, error: null }),
       loadCycle:            vi.fn(),
       saveThemeSkin:        vi.fn(),
       ...overrides,

@@ -21,7 +21,7 @@
 -- file does not call — fixtures insert into budget_cycles directly, exactly as
 -- migrate_28's dry run does.
 --
--- WHAT IT PROVES (9 scenarios; any failure RAISES and rolls the whole thing back)
+-- WHAT IT PROVES (10 scenarios; any failure RAISES and rolls the whole thing back)
 --   S1  ONE live period starting in the month → an INSERT with NO cycle_id still
 --       resolves and stamps that period. The working case is UNCHANGED — this is
 --       the regression guard on the ordinary path.
@@ -45,8 +45,13 @@
 --       period S7 moved it into), and an out-of-range date still raises CYC02.
 --   S9  The CYC05 message NAMES BOTH candidate periods with their ranges, so
 --       whoever hits it can see which one they meant without a query.
+--   S10 ⭐ THE INCOME-MOVE PATH that sequence step 2 rides on: writing cycle_id AND
+--       month in ONE statement lands in the CHOSEN period even on an ambiguous hub
+--       (the Commit-12 trust branch honours it, both directions) — while touching
+--       month ALONE still re-resolves and raises CYC05. That contrast is precisely
+--       why moveIncomeSourceToCycle must write both columns together.
 --
--- HOW TO READ THE OUTPUT — TWO CHANNELS, BOTH SHOWING THE SAME 9 VERDICTS.
+-- HOW TO READ THE OUTPUT — TWO CHANNELS, BOTH SHOWING THE SAME 10 VERDICTS.
 --   1. The NOTICES / "Logs" panel. The DO block ends by echoing every dryrun_log
 --      row as a NOTICE. This channel is ALWAYS rendered, so it is the one to read.
 --   2. The results grid. The Supabase SQL editor returns only the LAST statement's
@@ -64,8 +69,8 @@
 --   • RED FIRST — against the UN-hardened trigger (today's production state) this
 --     file fails at S2 with "ambiguous month was accepted — the arbitrary pick is
 --     still live". The test genuinely detects the bug; it is not vacuous.
---   • GREEN — after applying migrate_29_harden_month_resolution.sql: 9/9 PASS.
---   • IDEMPOTENT — applying migrate_29 twice, then re-running: still 9/9.
+--   • GREEN — after applying migrate_29_harden_month_resolution.sql: 10/10 PASS.
+--   • IDEMPOTENT — applying migrate_29 twice, then re-running: still 10/10.
 --   • ROLLBACK PROVEN — re-running migrate_move_cycle_trigger.sql (the documented
 --     rollback) puts S2 back to failing, i.e. the revert really reverts.
 --   • NO LEAKAGE — 'DRYRUN29 %' hub count was 0 afterwards.
@@ -279,6 +284,43 @@ BEGIN
   INSERT INTO dryrun_log VALUES (8, 'S8 date branch unchanged', 'PASS',
     'date-only edit re-resolves; out-of-range date still CYC02');
 
+  -- ── S10 — THE INCOME-MOVE PATH (sequence step 2 depends on this) ───────────
+  -- moveIncomeSourceToCycle writes cycle_id AND month in ONE statement. The month in
+  -- the SET list is what fires this table's trigger (scoped to UPDATE OF month); the
+  -- Commit-12 trust branch must then honour the explicit cycle_id rather than
+  -- re-resolving from the new month. Proven here on the AMBIGUOUS hub, because that
+  -- is where re-resolution would now raise CYC05 instead of landing correctly.
+  v_hub := pg_temp.mk_hub(v_owner, 'S10 income move');
+  v_c1  := pg_temp.mk_cycle(v_hub, DATE '2031-03-01', DATE '2031-03-17');
+  v_c2  := pg_temp.mk_cycle(v_hub, DATE '2031-03-18', DATE '2031-04-18');
+  v_id  := pg_temp.mk_income(v_hub, 'Job', '2031-03', v_c1);
+
+  -- The move: both columns, one statement, into the OTHER same-month period.
+  UPDATE income_sources SET cycle_id = v_c2, month = '2031-03' WHERE id = v_id;
+  SELECT cycle_id INTO v_got FROM income_sources WHERE id = v_id;
+  IF v_got IS DISTINCT FROM v_c2 THEN
+    RAISE EXCEPTION 'S10 FAIL: move was re-resolved to % instead of the chosen period % — income moves are broken', v_got, v_c2;
+  END IF;
+
+  -- And the move back, to prove it is not a one-way accident.
+  UPDATE income_sources SET cycle_id = v_c1, month = '2031-03' WHERE id = v_id;
+  SELECT cycle_id INTO v_got FROM income_sources WHERE id = v_id;
+  IF v_got IS DISTINCT FROM v_c1 THEN
+    RAISE EXCEPTION 'S10 FAIL: move back landed on % instead of %', v_got, v_c1;
+  END IF;
+
+  -- Contrast: touching month ALONE (no cycle_id change) still re-resolves, and on
+  -- this ambiguous hub that is exactly the CYC05 the harden exists to raise. This is
+  -- why the client must always write both columns together.
+  BEGIN
+    UPDATE income_sources SET month = '2031-03' WHERE id = v_id;
+    RAISE EXCEPTION 'S10 FAIL: a month-only UPDATE on an ambiguous hub was accepted';
+  EXCEPTION WHEN SQLSTATE 'CYC05' THEN
+    NULL;
+  END;
+  INSERT INTO dryrun_log VALUES (10, 'S10 income move honours the chosen period', 'PASS',
+    'cycle_id + month in one statement wins both directions; month alone still CYC05');
+
   -- ── S9 — the CYC05 message names both candidates (v_msg captured in S2) ────
   IF v_msg IS NULL THEN
     RAISE EXCEPTION 'S9 FAIL: no CYC05 message was captured in S2';
@@ -292,7 +334,7 @@ BEGIN
   INSERT INTO dryrun_log VALUES (9, 'S9 error names both candidates', 'PASS', v_msg);
 
   -- ── Echo every verdict as a NOTICE (the channel that always renders) ───────
-  RAISE NOTICE '── migrate_29 dry run — 9/9 scenarios passed ──────────────────';
+  RAISE NOTICE '── migrate_29 dry run — 10/10 scenarios passed ────────────────';
   FOR v_row IN SELECT * FROM dryrun_log ORDER BY seq LOOP
     RAISE NOTICE '% — %', v_row.verdict, v_row.scenario;
     RAISE NOTICE '       %', v_row.detail;

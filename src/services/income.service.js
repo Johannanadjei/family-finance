@@ -32,19 +32,6 @@ export const getIncomeSources = async (centreId) => {
   return { data: error ? null : (data || []), error };
 };
 
-/** Fetch a single income source by ID. */
-export const getIncomeSourceById = async (sourceId) => {
-  const { data, error } = await supabase
-    .from('income_sources')
-    .select('*')
-    .eq('id', sourceId)
-    .is('deleted_at', null)
-    .maybeSingle();
-
-  if (error) console.error('[income.service] getIncomeSourceById error:', error.message);
-  return { data, error };
-};
-
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
 // Every income write is period-keyed. Refuse a missing cycleId without touching the
@@ -143,14 +130,9 @@ export const updateIncomeSource = async (sourceId, updates) => {
   return { data, error };
 };
 
-/**
- * Mark an income source as received.
- * Creates the income transaction separately in transactions.service.js.
- *
- * @param {string} sourceId
- * @param {number} receivedAmount
- * @param {string} actualPayDate — 'YYYY-MM-DD'
- */
+/** Mark an income source as received. The matching income TRANSACTION is created
+ * separately (transactions.service.js) — see the two-phase rule in CLAUDE.md §11.
+ * @param {string} actualPayDate — 'YYYY-MM-DD' */
 export const markReceived = async (sourceId, receivedAmount, actualPayDate) => {
   let amount, date;
   try {
@@ -177,11 +159,7 @@ export const markReceived = async (sourceId, receivedAmount, actualPayDate) => {
   return { data, error };
 };
 
-/**
- * Mark an income source as pending — undo a received marking.
- *
- * @param {string} sourceId
- */
+/** Mark an income source as pending — undo a received marking. */
 export const markPending = async (sourceId) => {
   const { data, error } = await supabase
     .from('income_sources')
@@ -199,12 +177,7 @@ export const markPending = async (sourceId) => {
   return { data, error };
 };
 
-/**
- * Update expected amount for an income source.
- *
- * @param {string} sourceId
- * @param {number} newAmount
- */
+/** Update the expected amount, plus optional pay_day_type / pay_day, for a source. */
 export const updateExpectedAmount = async (sourceId, newAmount, extras = {}) => {
   let amount;
   try {
@@ -235,9 +208,33 @@ export const updateExpectedAmount = async (sourceId, newAmount, extras = {}) => 
   return { data, error };
 };
 
-/**
- * Soft delete an income source.
- */
+/** Move an income source to another budget period. cycle_id AND month go in ONE
+ * statement: the trigger is scoped to UPDATE OF month, so a cycle_id-only update
+ * would never fire it (leaving month stale); both together fire it and reach the
+ * Commit-12 trust branch, which honours the explicit cycle_id instead of re-resolving
+ * from the new month. NOT an RPC (CLAUDE.md §9.6) — budget_centre_id is unchanged, so
+ * income_sources_update gates both images with can_view_income() on the same hub.
+ * Twin of transactions.moveTransactionToCycle. */
+export const moveIncomeSourceToCycle = async (sourceId, cycleId, month) => {
+  if (!cycleId || !month) {
+    const error = new Error('moveIncomeSourceToCycle requires a target cycleId and month (CYC02)');
+    console.error('[income.service] moveIncomeSourceToCycle validation error:', error.message);
+    return { data: null, error };
+  }
+
+  const { data, error } = await supabase
+    .from('income_sources')
+    .update({ cycle_id: cycleId, month })
+    .eq('id', sourceId)
+    .is('deleted_at', null)
+    .select()
+    .maybeSingle();
+
+  if (error) console.error('[income.service] moveIncomeSourceToCycle error:', error.message);
+  return { data, error };
+};
+
+/** Soft delete an income source. */
 export const deleteIncomeSource = async (sourceId) => {
   const { error } = await supabase
     .from('income_sources')

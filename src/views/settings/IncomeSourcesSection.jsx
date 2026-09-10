@@ -14,7 +14,9 @@
  * An UNALLOCATED group catches sources whose `cycle_id` matches no live period —
  * legacy mis-stamped rows and rows orphaned by a deleted period. They are invisible
  * in Payday, so the group renders expanded and every row carries a "Move to period"
- * action rather than being a dead-end heading.
+ * action rather than being a dead-end heading. A RECEIVED source cannot move (its
+ * income transaction is date-keyed and would be left behind); the sheet's error
+ * points at un-confirming rather than failing opaquely.
  */
 
 import { useState }               from 'react';
@@ -39,7 +41,7 @@ export function IncomeSourcesSection() {
   const { fmt, centre } = useBudgetCentreContext();
   const {
     allIncomes, cycles = [], activeCycleId, loading,
-    addIncomeSource, deleteIncomeSource, updateIncomeSource,
+    addIncomeSource, deleteIncomeSource, updateIncomeSource, moveIncomeSourceToCycle,
   } = useFinanceContext();
 
   const [addingSource,   setAddingSource]   = useState(false);
@@ -56,12 +58,6 @@ export function IncomeSourcesSection() {
                             .sort((a, b) => b.start_date.localeCompare(a.start_date));
   const periodIds   = new Set(livePeriods.map(c => c.id));
 
-  // STUB (sequence step 2 — move-income action): swap for the real
-  // moveIncomeSourceToCycle mutation, the income twin of useMoveToCycle. The UI
-  // below is already wired to it, so step 2 is a one-line swap plus its tests.
-  const moveIncomeSourceToCycle = async () =>
-    ({ error: new Error('Moving income between periods is not wired up yet') });
-
   const handleMove = async (cycleId) => {
     if (!moveSource) return;
     setMoving(true);
@@ -69,7 +65,15 @@ export function IncomeSourcesSection() {
     const { error } = await moveIncomeSourceToCycle(moveSource.id, cycleId);
     setMoving(false);
     setMoveSource(null);
-    if (error) { setMoveError("Couldn't move this income source. Please try again."); return; }
+    if (error) {
+      // A received source cannot move: its income TRANSACTION is keyed by date, so
+      // moving the source alone would split the totals. Point at the fix instead of
+      // showing a generic failure — un-confirming is one tap away on Payday.
+      setMoveError(error.message === 'RECEIVED_SOURCE'
+        ? 'Un-confirm this income first, then move it.'
+        : "Couldn't move this income source. Please try again.");
+      return;
+    }
     setExpandedGroups(prev => ({ ...prev, [cycleId]: true }));   // reveal it in its new home
   };
 

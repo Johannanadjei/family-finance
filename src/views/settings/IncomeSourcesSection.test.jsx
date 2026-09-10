@@ -16,6 +16,7 @@ import {
 } from '../../test-utils/fixtures';
 
 const mockAddIncomeSource    = vi.fn().mockResolvedValue({ error: null });
+const mockMoveIncomeSource   = vi.fn().mockResolvedValue({ error: null });
 const mockDeleteIncomeSource = vi.fn().mockResolvedValue({ error: null });
 const mockUpdateIncomeSource = vi.fn().mockResolvedValue({ error: null });
 
@@ -34,6 +35,7 @@ const LAST_CYCLE = mockCycles[1].id;   // 'cyc-last'
 
 beforeEach(() => {
   mockAddIncomeSource.mockClear();
+  mockMoveIncomeSource.mockClear().mockResolvedValue({ error: null });
   financeValue = {
     allIncomes:         mockIncomes,            // both fixtures sit in cyc-this
     cycles:             mockCycles,
@@ -42,6 +44,7 @@ beforeEach(() => {
     addIncomeSource:    mockAddIncomeSource,
     deleteIncomeSource: mockDeleteIncomeSource,
     updateIncomeSource: mockUpdateIncomeSource,
+    moveIncomeSourceToCycle: mockMoveIncomeSource,
   };
 });
 
@@ -155,6 +158,40 @@ describe('IncomeSourcesSection', () => {
       render(<IncomeSourcesSection />);
       fireEvent.click(screen.getByTestId('income-move-orph-1'));
       expect(screen.getByTestId('move-cycle-sheet')).toBeTruthy();
+    });
+
+    it('dispatches the move with the chosen period id', async () => {
+      render(<IncomeSourcesSection />);
+      fireEvent.click(screen.getByTestId('income-move-orph-1'));
+      fireEvent.click(screen.getByTestId(`move-cycle-option-${THIS_CYCLE}`));
+      await act(async () => { screen.getByTestId('move-confirm-btn').click(); });
+
+      expect(mockMoveIncomeSource).toHaveBeenCalledWith('orph-1', THIS_CYCLE);
+      expect(screen.queryByTestId('income-move-error')).toBeNull();
+    });
+
+    // A received source cannot move (its income transaction is date-keyed), so the
+    // view must name the fix rather than showing a generic failure.
+    it('tells the user to un-confirm first when the move is refused as RECEIVED_SOURCE', async () => {
+      mockMoveIncomeSource.mockResolvedValue({ error: new Error('RECEIVED_SOURCE') });
+      render(<IncomeSourcesSection />);
+      fireEvent.click(screen.getByTestId('income-move-orph-1'));
+      fireEvent.click(screen.getByTestId(`move-cycle-option-${THIS_CYCLE}`));
+      await act(async () => { screen.getByTestId('move-confirm-btn').click(); });
+
+      expect(screen.getByTestId('income-move-error').textContent)
+        .toMatch(/Un-confirm this income first/);
+    });
+
+    it('shows the generic error for any other move failure', async () => {
+      mockMoveIncomeSource.mockResolvedValue({ error: new Error('RLS denied') });
+      render(<IncomeSourcesSection />);
+      fireEvent.click(screen.getByTestId('income-move-orph-1'));
+      fireEvent.click(screen.getByTestId(`move-cycle-option-${THIS_CYCLE}`));
+      await act(async () => { screen.getByTestId('move-confirm-btn').click(); });
+
+      expect(screen.getByTestId('income-move-error').textContent)
+        .toMatch(/Couldn't move this income source/);
     });
   });
 

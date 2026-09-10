@@ -72,6 +72,12 @@
 --   with ONLY the month branch changed, and the verify block asserts both the new
 --   ambiguity raise AND that Commit 12's branch and trigger scope survived.
 --
+--   That trust branch is ALSO what makes "move an income source to another period"
+--   work: the client writes cycle_id + month in one statement, and the branch honours
+--   the explicit cycle_id rather than re-resolving from the new month (which on a
+--   two-same-month hub would now be a CYC05). Its in-body comment is corrected here —
+--   the Commit-12 text claimed the branch was reachable for transactions only.
+--
 -- SCOPE — the transactions branch is NOT touched
 --   It resolves by date containment, and the no_overlapping_cycles GiST constraint
 --   guarantees at most one live match. Its LIMIT 1 is provably unambiguous and
@@ -114,12 +120,22 @@ BEGIN
   END IF;
 
   -- Case 4 (Commit 12) — UPDATE where the caller explicitly CHANGED cycle_id (a
-  -- move). Trust the caller; do NOT re-resolve from date. IS DISTINCT FROM is
-  -- null-safe and false when cycle_id is untouched (case 3: a date-only UPDATE
-  -- leaves NEW.cycle_id = OLD.cycle_id, so this falls through to re-resolve).
-  -- This branch is reachable for transactions only — its trigger fires on
-  -- UPDATE OF (date, cycle_id); the categories/income triggers fire on
-  -- UPDATE OF month, where cycle_id never changes within the SET list.
+  -- move). Trust the caller; do NOT re-resolve. IS DISTINCT FROM is null-safe and
+  -- false when cycle_id is untouched (case 3: a date-only UPDATE leaves
+  -- NEW.cycle_id = OLD.cycle_id, so this falls through and re-resolves).
+  --
+  -- REACHABLE FROM TWO PATHS, not one (corrected in migrate_29):
+  --   • transactions — trigger fires on UPDATE OF (date, cycle_id), so a move that
+  --     touches either column arrives here and the explicit cycle_id wins.
+  --   • income_sources — the "move income to another period" action writes cycle_id
+  --     AND month in ONE statement. The month in the SET list is what fires that
+  --     table's trigger (it is scoped to UPDATE OF month); this branch then honours
+  --     the explicit cycle_id instead of re-resolving from the NEW month. That
+  --     matters: re-resolving would send the row to whichever period starts in that
+  --     month — ambiguous, and now a CYC05 — rather than the period the user picked.
+  --     So this branch is load-bearing for income moves, not just transaction moves.
+  --   • budget_categories has no move action yet; if one is added it must write both
+  --     columns together for the same reason.
   IF TG_OP = 'UPDATE' AND OLD.cycle_id IS DISTINCT FROM NEW.cycle_id THEN
     RETURN NEW;
   END IF;

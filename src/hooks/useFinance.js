@@ -275,6 +275,7 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
     updateIncomeSource,
     addIncomeSource,
     copyIncomeSourcesToCycle,
+    moveIncomeSourceToCycle,
     deleteIncomeSource,
     // Mutations operate on the full cross-month list (find-by-id is month-agnostic);
     // the activeMonth `incomes` slice re-derives automatically.
@@ -413,6 +414,7 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
     updateIncomeSource,
     addIncomeSource,
     copyIncomeSourcesToCycle,
+    moveIncomeSourceToCycle,
     deleteIncomeSource,
 
     // Navigation

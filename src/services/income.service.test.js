@@ -4,6 +4,7 @@ let mockRows;     // rows returned by a terminal .order()/.then()
 let mockSingle;   // row returned by a terminal .single()
 let eqCalls;      // [col, val] pairs passed to .eq()
 let insertArgs;   // payloads passed to .insert()
+let updateArgs;   // payloads passed to .update()
 
 vi.mock('../lib/supabase', () => {
   const make = () => {
@@ -11,10 +12,11 @@ vi.mock('../lib/supabase', () => {
       from:   () => q,
       select: () => q,
       insert: (payload) => { insertArgs.push(payload); return q; },
-      update: () => q,
+      update: (payload) => { updateArgs.push(payload); return q; },
       is:     () => q,
       eq:     (col, val) => { eqCalls.push([col, val]); return q; },
-      single: () => Promise.resolve(mockSingle),
+      single:      () => Promise.resolve(mockSingle),
+      maybeSingle: () => Promise.resolve(mockSingle),
       order:  () => Promise.resolve({ data: mockRows, error: null }),
       then:   (fn) => Promise.resolve({ data: mockRows, error: null }).then(fn),
     };
@@ -23,13 +25,14 @@ vi.mock('../lib/supabase', () => {
   return { supabase: { from: () => make() } };
 });
 
-import { getIncomeSources, addIncomeSource, bulkAddIncomeSources } from './income.service';
+import { getIncomeSources, addIncomeSource, bulkAddIncomeSources, moveIncomeSourceToCycle } from './income.service';
 
 beforeEach(() => {
   mockRows   = [];
   mockSingle = { data: null, error: null };
   eqCalls    = [];
   insertArgs = [];
+  updateArgs = [];
 });
 
 // ── getIncomeSources — centre-scoped, never month-scoped ─────────────────────
@@ -109,5 +112,45 @@ describe('bulkAddIncomeSources (cycle_id stamping)', () => {
     expect(data).toBeNull();
     expect(error.message).toMatch(/cycleId/i);
     expect(insertArgs).toHaveLength(0);   // never reached the DB
+  });
+});
+
+// ── moveIncomeSourceToCycle — cycle_id and month move TOGETHER ────────────────
+// A cycle_id-only update would not fire the UPDATE OF month trigger and would leave
+// `month` pointing at the old period. Both columns in one statement is the contract.
+
+describe('moveIncomeSourceToCycle', () => {
+  it('updates cycle_id AND month in a single statement', async () => {
+    mockSingle = { data: { id: 's-1', cycle_id: 'cyc-b', month: '2026-09' }, error: null };
+    const { error } = await moveIncomeSourceToCycle('s-1', 'cyc-b', '2026-09');
+    expect(error).toBeNull();
+    expect(updateArgs[0]).toEqual({ cycle_id: 'cyc-b', month: '2026-09' });
+  });
+
+  it('never writes cycle_id without month', async () => {
+    mockSingle = { data: null, error: null };
+    await moveIncomeSourceToCycle('s-1', 'cyc-b', '2026-09');
+    expect('month' in updateArgs[0]).toBe(true);
+  });
+
+  it('refuses without a target cycleId — no update reaches the DB', async () => {
+    const { data, error } = await moveIncomeSourceToCycle('s-1', null, '2026-09');
+    expect(data).toBeNull();
+    expect(error.message).toMatch(/cycleId/i);
+    expect(updateArgs).toHaveLength(0);
+  });
+
+  it('refuses without a month — no update reaches the DB', async () => {
+    const { data, error } = await moveIncomeSourceToCycle('s-1', 'cyc-b', null);
+    expect(data).toBeNull();
+    expect(error.message).toMatch(/month/i);
+    expect(updateArgs).toHaveLength(0);
+  });
+
+  it('surfaces a DB error truthfully (never masks it as data)', async () => {
+    mockSingle = { data: null, error: { message: 'RLS denied' } };
+    const { data, error } = await moveIncomeSourceToCycle('s-1', 'cyc-b', '2026-09');
+    expect(data).toBeNull();
+    expect(error.message).toBe('RLS denied');
   });
 });

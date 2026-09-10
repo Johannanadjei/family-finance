@@ -14,7 +14,7 @@
  */
 
 import { useCallback } from 'react';
-import { markReceived as dbMarkReceived, markPending as dbMarkPending, updateExpectedAmount as dbUpdateExpectedAmount, updateIncomeSource as dbUpdateIncomeSource, addIncomeSource as dbAddIncomeSource, bulkAddIncomeSources as dbBulkAddIncomeSources, deleteIncomeSource as dbDeleteIncomeSource } from '../services/income.service';
+import { markReceived as dbMarkReceived, markPending as dbMarkPending, updateExpectedAmount as dbUpdateExpectedAmount, updateIncomeSource as dbUpdateIncomeSource, addIncomeSource as dbAddIncomeSource, bulkAddIncomeSources as dbBulkAddIncomeSources, deleteIncomeSource as dbDeleteIncomeSource, moveIncomeSourceToCycle as dbMoveIncomeSourceToCycle } from '../services/income.service';
 import { addTransaction as dbAddTransaction, deleteTransaction as dbDeleteTransaction, updateTransaction as dbUpdateTransaction } from '../services/transactions.service';
 import { getWeekForDate } from '../lib/finance';
 import { sliceByCycle } from '../lib/cycles';
@@ -334,5 +334,56 @@ export function useIncomeMutations({ centreId, currency, cycles, incomes, txs, s
     return { error: null };
   }, [incomes, txs, setIncomes, setTxs]);
 
-  return { markReceived, markPending, updateExpectedAmount, updateIncomeSource, addIncomeSource, copyIncomeSourcesToCycle, deleteIncomeSource };
+  /**
+   * Move an income source to another budget period — the income twin of
+   * useMoveToCycle (which does this for transactions). Once cycle_id is income's
+   * only period key, a mis-stamped row needs a way home that is not a DB errand.
+   *
+   * REFUSES A RECEIVED SOURCE, deliberately. markReceived is two-phase (CLAUDE.md
+   * §11): it also inserts an income TRANSACTION, and transactions are keyed by DATE
+   * CONTAINMENT, not cycle_id. Moving the source alone would leave that transaction
+   * in the old period and split every downstream total along exactly the seam this
+   * workstream closed. It cannot be fixed from here either: `txs` holds only the
+   * VIEWED period's transactions, so a mis-stamped source's linked row is usually
+   * not in local state at all and a markPending-style phase 2 would silently no-op.
+   * A PENDING source provably has no linked income transaction (markPending
+   * soft-deletes it), so for pending rows cycle_id + month IS the whole period
+   * identity and this single write moves everything. Moving a received source needs
+   * an atomic two-table RPC — backlogged, not built.
+   *
+   * @param {string} sourceId
+   * @param {string} cycleId — the target period's id
+   */
+  const moveIncomeSourceToCycle = useCallback(async (sourceId, cycleId) => {
+    const source = incomes.find(i => i.id === sourceId);
+    if (!source) return { data: null, error: new Error('Income source not found') };
+    if (source._optimistic) return { data: null, error: new Error('This income source is still saving') };
+    if (source.received) {
+      return { data: null, error: new Error('RECEIVED_SOURCE') };   // caller renders the un-confirm hint
+    }
+
+    // Validate the target period BEFORE any work — same guard as addIncomeSource.
+    // This also blocks a cycle from ANOTHER hub, which RLS would not catch: the move
+    // leaves budget_centre_id untouched, so can_view_income() passes either way.
+    const cycle = cycles.find(c => c.id === cycleId && !c.deleted_at);
+    if (!cycle) return { data: null, error: new Error(`Unknown budget period ${cycleId} (CYC02)`) };
+    if (source.cycle_id === cycleId) return { data: source, error: null };   // no-op, not an error
+
+    const month = cycle.start_date.slice(0, 7);   // derived, never a key
+    const prev  = incomes;
+    setIncomes(p => p.map(i => (i.id === sourceId ? { ...i, cycle_id: cycleId, month } : i)));
+
+    const { data, error } = await dbMoveIncomeSourceToCycle(sourceId, cycleId, month);
+    if (error) {
+      setIncomes(prev);
+      console.error('[useIncomeMutations] moveIncomeSourceToCycle rollback:', error.message);
+      return { data: null, error };
+    }
+
+    // Swap the optimistic row for the server row when the read-back returned one.
+    if (data) setIncomes(p => p.map(i => (i.id === sourceId ? { ...data, _optimistic: false } : i)));
+    return { data, error: null };
+  }, [incomes, cycles, setIncomes]);
+
+  return { markReceived, markPending, updateExpectedAmount, updateIncomeSource, addIncomeSource, copyIncomeSourcesToCycle, moveIncomeSourceToCycle, deleteIncomeSource };
 }
