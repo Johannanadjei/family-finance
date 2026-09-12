@@ -4,6 +4,498 @@ Engineering work deferred past MVP. Cosmetic items live in `cosmetic-backlog.md`
 
 ---
 
+## Income carries TWO period keys — `month` + `cycle_id` — and mis-stamps on a hub with two same-month periods — 🔨 NEXT UP (diagnosed 2026-09-05, approved in principle, NOT built)
+
+**Status:** diagnosed, approved-in-principle, **NOT built**. The period auto-continue fix
+(state-cluster bugs 1 / 2 / 4) is **verified working on a real hub, on `dev`, and is NOT
+promoted to `staging`/`main` pending this income fix.** Bug 3 (payday countdown) is the
+symptom this entry closes.
+
+**Two confirmed symptoms**, both below and both closed by step 1: **Payday empty** on
+"The house" (income stamped to the wrong September cycle `b7e336d0`), and
+**numbers-don't-reconcile** on "House of Yach" (£3,132 vs £2,500 received; spare £215
+shown beside 106% / over-budget).
+
+### The bug
+
+Income rows are keyed by period **twice**, and the two keys disagree:
+
+| Path | File | Key |
+|---|---|---|
+| **Read** (Payday, Home) | `useFinance.js:236` — `sliceByCycle(allIncomes, viewedCycleId)` | `cycle_id` — id equality, unambiguous |
+| **Write** | `useIncomeMutations.js:210` / `:249` — `cycleIdForMonth(cycles, source.month)` | `month` → first-wins **start-month** match |
+| **Settings display** | `IncomeSourcesSection.jsx:68` — `reduce` on `src.month` | `month` string |
+
+`cycleForMonth` (`lib/cycles.js:159`) is `cycles.find(c => c.start_date.startsWith(month))`.
+That is only correct while **at most one cycle starts in a given month**. The moment two do,
+it silently picks one — and it is not even arbitrary: `getCyclesForCentre` orders
+`start_date DESC` (`cycles.service.js:31`), so `Array.find` returns the **latest**-starting
+cycle of that month.
+
+The server has the identical hole: `resolve_cycle_id()` does
+`to_char(start_date,'YYYY-MM') = NEW.month ... LIMIT 1` with **no `ORDER BY`**
+(`migrate_cycle_id_trigger.sql:110–115`) — an arbitrary pick.
+
+`migrate_28_ensure_current_budget_period.sql:97–107` already documents this as the
+"KNOWN, PRE-EXISTING EDGE" — it predicted a stray 1–2 Sep period; production hit the
+mirror image.
+
+### Confirmed on "The house" (2026-09-05)
+
+Two live September cycles:
+
+- `50a8d1ff` — **Sept 1–17**, contains today. Created by auto-continue, clipped to end on
+  the 17th because the next period starts on the 18th.
+- `b7e336d0` — **Sept 18 – Oct 18**, does NOT contain today. A pre-fix
+  `nextCalendarMonthRange` artifact (mid-month, next-month-spanning).
+
+Both income sources (`Job`, `jobtest`) carry `cycle_id = b7e336d0`. Payday views
+`50a8d1ff` → slice returns `[]` → **Payday is empty**.
+
+It is also empty rather than merely wrong because auto-continue's carry-forward source is
+"most recent live cycle **starting before** the new start" (`migrate_28:277`). `b7e336d0`
+starts Sept 18, not before Sept 1, so it was correctly excluded — `50a8d1ff` carried from
+August or from nothing. **That rule is right and should NOT be loosened**; copying from a
+future period would fabricate a plan the user has not reached.
+
+**Live reproduction (verify before and after the fix):** on this hub, add a new income
+source for "September" in Settings. It will stamp to `b7e336d0` and be invisible in Payday.
+
+### Confirmed on "House of Yach" (2026-09-09) — the second symptom: numbers don't reconcile
+
+Same root cause, different surface. This hub does not show an empty Payday; it shows
+**two totals on the same screen that disagree**, because income-source figures and
+transaction figures resolve their period through **different keys**:
+
+| Figure | Derived from | Period key | Ambiguous? |
+|---|---|---|---|
+| `totalReceived` / `totalExpected` / `totalPending` | `incomes` = `sliceByCycle(allIncomes, viewedCycleId)` — rows stamped by `cycleIdForMonth` | income row's `month` → **start-month match, first wins** | **YES** |
+| `totalIncome` / `allIncome` → `spareMoney`, `healthPct` | `txs` = `getTransactionsByCycle` — rows stamped by the trigger's `NEW.date BETWEEN start_date AND end_date` | transaction's **date containment** | No — the `no_overlapping_cycles` GiST constraint guarantees ≤1 match |
+
+`markReceived` is a two-phase write (CLAUDE.md §11): phase 1 sets `income_sources.received`,
+phase 2 inserts an income **transaction**. On a hub with two same-month periods those two
+rows can land in **different cycles** — the source by start-month match, the tx by date
+containment. Every downstream number then splits along that seam.
+
+**Observed (2026-09-09):**
+
+- Income shown as **£3,132** against **£2,500** received.
+- **Spare £215** (tx-derived, `calcSpareMoney(allIncome, …)`) sitting next to
+  **106% / over-budget** (`calcBudgetUsedPct(budgetSpend, fixedTotal)`) — a spare-money
+  surplus and a blown budget asserted at the same time.
+
+**Status of this diagnosis:** the mechanism above is read off the code
+(`useFinance.js:230–243`, `useIncomeMutations.js:210`, `migrate_cycle_id_trigger.sql:90–120`)
+and matches the shape of the numbers exactly. It has **not** yet been confirmed against this
+hub's actual rows. Before the repair (sequence step 3), dump this hub's `budget_cycles`,
+`income_sources.cycle_id` and income-`transactions.cycle_id` and verify the split is real —
+do not assume it.
+
+**Why this one matters more than "The house":** an empty Payday reads as *broken* and the
+user distrusts the screen. Reconciling-but-wrong totals read as *working* and the user
+trusts a wrong number. Step 1 fixes both, because once `cycle_id` is income's only key,
+both sides of the seam resolve by containment.
+
+
+### Recommended fix — make `cycle_id` income's ONLY key
+
+This is the same shape as the `getActiveCycle`/`cycleForToday` fix, but the inverse move:
+that one **added** a predicate to split a conflated question; this one **deletes** a
+predicate, because *a month is not a period identity*. A month string structurally cannot
+name a custom period — "which month is Sept 18 – Oct 18?" has no answer.
+
+1. **Delete `cycleForMonth` / `cycleIdForMonth`** from `lib/cycles.js`. After this, nothing
+   in the client answers "which cycle is month X" — exactly as nothing answers "what period
+   are we in" except `cycleForToday`.
+2. **`addIncomeSource` takes `cycleId`** directly. No lookup. CYC02 ("No cycle for month X")
+   becomes unreachable on this path, because an uncovered month has no option to select.
+3. **Settings groups by `cycle_id`**, headers from `cycle.name` + date range, ordered
+   `start_date` desc. The two Septembers then render as two labelled groups — the user
+   *sees* the split instead of it silently merging.
+4. **"+ Add" offers cycles, not months** — id-valued options labelled by name/range,
+   replacing the `monthOptions` `offsetMonth` list (`IncomeSourcesSection.jsx:64`).
+5. **`copyIncomeSourcesToMonth` → `copyIncomeSourcesToCycle(fromCycleId, toCycleId)`.**
+6. **`month` stays written** (column, trigger and `validateIncomeSource` still require it)
+   but becomes **derived for display**: `cycle.start_date.slice(0,7)`. Stored, never a key.
+7. **Harden the trigger's month branch**: `RAISE` when the month match count > 1 instead of
+   `LIMIT 1`. A loud failure beats a silent wrong period.
+
+**Rejected alternative — "match income by month consistently."** That means making Payday
+group by month too, which (a) re-merges Sept 1–17 and Sept 18 – Oct 18 into one Payday view,
+(b) reverses Commit 11/13's direction (`cycle_id` is the canonical client filter), and
+(c) cannot key a period that spans two months. Dead end.
+
+### Also in scope
+
+- **"Move income to another period" action** — the income twin of `useMoveToCycle`
+  (`hooks/useMoveToCycle.jsx`, which does this for transactions). Once `cycle_id` is the
+  sole key, mis-stamped rows need a way home that is not a DB errand, and it makes this
+  whole class of mismatch user-fixable forever.
+- **One-time repair of `b7e336d0`'s mis-stamped rows.** Scoped SQL, dry-run-then-apply per
+  the migrate_28 convention. **Check first what is attached to `b7e336d0`** (transactions,
+  categories):
+  - *Empty apart from the two income sources* → soft-delete `b7e336d0`, extend `50a8d1ff`
+    to Sept 30, re-stamp both sources' `cycle_id`. Preserves rows and receipt state.
+  - *Has transactions* → leave it, re-stamp income to `50a8d1ff`. The two-September shape
+    persists and will recur monthly.
+
+  **This is a one-time repair, not a migration.** Going forward the logic is sound —
+  `nextUncoveredMonthRange` scans from today's month and tests interval overlap, so
+  quick-create can no longer manufacture these. And a mid-month, month-spanning period is
+  still a **legitimate** shape from `create_budget_period` with custom dates, so nothing may
+  bulk-delete "anything mid-month."
+- **Clipped-period receipt on auto-continue.** When `v_start > v_month_start` or
+  `v_end < v_month_end` (`migrate_28:216–229`), the returned jsonb should say so and the
+  banner should surface it: *"September 1–17 created — a later period (18 Sep – 18 Oct)
+  already exists."* No logic change; it turns an invisible state into one the user can act
+  on. Note the clip itself is **correct** and must not change — Sept 1–17 is exactly the
+  free gap containing today; the alternatives are CYC01 or leaving today uncovered, which is
+  the bug auto-continue exists to kill.
+
+### Sequence
+
+1. **Cycle-key income end-to-end** (items 1–7 above). ✅ SHIPPED to `dev` (2bc1241).
+2. **Move-income action.** ✅ BUILT — `moveIncomeSourceToCycle`, pending sources only.
+3. **Repair this hub** (`b7e336d0`).
+4. **Clipped-period receipt** on auto-continue — small and independent.
+
+### ✅ CLEARED — the move handler is real (was a promotion blocker)
+
+Resolved by sequence step 2: the Unallocated group's "Move to a period →" now calls the
+real `moveIncomeSourceToCycle` mutation. The check below returns zero hits, and a test
+asserts the two distinct error surfaces (received-source hint vs generic failure).
+
+```
+grep -rn "STUB (sequence step 2" src/    # zero hits — verified
+```
+
+Kept here as the record of why the check exists. Steps 3 and 4 remain open, but neither
+is a user-visible dead end, so promotion is no longer blocked on this item.
+
+### Move a RECEIVED income source — needs an atomic two-table RPC — POST-STEP-2
+
+`moveIncomeSourceToCycle` refuses when `source.received` is true, returning the sentinel
+`RECEIVED_SOURCE`; Settings renders *"Un-confirm this income first, then move it."*
+
+**Why it refuses rather than half-moving.** `markReceived` is two-phase (CLAUDE.md §11):
+it sets `income_sources.received` AND inserts an income **transaction** linked by
+`income_source_id`. Income sources are keyed by `cycle_id`; transactions are keyed by
+**date containment** (the trigger's `NEW.date BETWEEN start_date AND end_date`). Moving
+only the source would leave its transaction in the old period and split
+`totalReceived`/`totalExpected` from `totalIncome`/`spareMoney` — reopening the exact
+seam this workstream closed on "House of Yach".
+
+**Why it cannot be fixed client-side.** `useFinance` loads `txs` via
+`getTransactionsByCycle` — only the **viewed** period's rows. A mis-stamped source's
+linked transaction is usually not in local state, so a `markPending`-style phase 2 would
+find nothing and silently no-op (`if (matchingTx)`).
+
+**What it would take** — a `SECURITY DEFINER` RPC per §9.6 (spans two tables, must be
+atomic), roughly:
+
+```sql
+-- move_income_source_to_cycle(p_source uuid, p_cycle uuid)
+--   1. gate: can_view_income(hub) for auth.uid()
+--   2. assert p_cycle belongs to the SAME hub as the source (see integrity gap below)
+--   3. UPDATE income_sources SET cycle_id = p_cycle, month = <p_cycle start month>
+--   4. UPDATE transactions SET cycle_id = p_cycle
+--        WHERE income_source_id = p_source AND type = 'income' AND deleted_at IS NULL
+--   5. RETURN both row counts as json so the client can reconcile state
+```
+
+Note step 4 deliberately does NOT move the transaction's `date` — same
+move-by-cycle_id decision as Commit 12 (`migrate_move_cycle_trigger.sql`): the payment
+really did happen on that date; only its budget assignment changes.
+
+**Not urgent:** the rows that actually need moving are mis-stamped/orphaned ones, which
+are pending. The refusal is one tap from its own fix.
+
+### Integrity gap — nothing ties a row's `cycle_id` to its `budget_centre_id` — POST-MVP
+
+`income_sources.cycle_id` FKs to `budget_cycles.id` with no constraint that the cycle
+belongs to the same hub as the row. RLS does not catch it either: a move leaves
+`budget_centre_id` unchanged, so `can_view_income()` passes on both images. The client
+guards it (`moveIncomeSourceToCycle` and `addIncomeSource` both resolve the target
+against the hub's loaded `cycles`), but the database would accept a cross-hub
+`cycle_id` written by any other caller.
+
+Applies equally to `transactions.cycle_id` and `budget_categories.cycle_id` — this is
+pre-existing, not introduced by the cycle-key work. The fix is a trigger or a composite
+FK on `(budget_centre_id, cycle_id)`, which needs a matching unique key on
+`budget_cycles (budget_centre_id, id)`. Worth doing before any multi-hub bulk tooling.
+
+### Tidy — move affordance ideally lives in `IncomeSourceRow`
+
+The Unallocated group's "Move to a period →" button is rendered by
+`IncomeSourcesSection`, immediately below each orphaned row, rather than inside
+`IncomeSourceRow` alongside that row's own edit/delete actions — which is where it
+belongs.
+
+**Why it isn't there:** adding it to `IncomeSourceRow` pushed that file to 213 lines
+against the audit's 200-line cap, and the only way under was to extract its ~55-line
+inline edit form — which would have meant reworking its existing 169-line test file. A
+169-line-test rework to absorb 13 lines of overflow is a bad trade, and it widens a
+refactor that already turns 30 tests red. Deferred deliberately.
+
+**When picking it up:** extract `IncomeSourceEditForm.jsx` (the same cut already made
+for `AddIncomeSourceForm.jsx`), then move the button into the row's action cluster and
+delete the section-level wrapper `<div>` that exists only to host it.
+
+**Do NOT repair first.** Before step 1, Settings still groups by month, so you cannot see
+which period an income belongs to and cannot verify the repair worked.
+
+---
+
+## migrate_30 clipped-period receipt — SQL shipped, CLIENT MESSAGE NOT WIRED — 🔨 FOLLOW-UP (deferred 2026-09-12, needs a stable session)
+
+**Status:** the SQL half is committed (`7ec31ae`) and being applied to Supabase in the same
+session this entry was written. The client half is **not started — zero references in
+`src/`.** Deliberately deferred: the period bugs are
+fixed by the `cycle_id` work + migrate_29, and this message is **polish, not a fix**. It was
+split off rather than rushed on a crashing machine.
+
+**Safe to sit unbuilt indefinitely.** migrate_30 is purely additive to a jsonb payload —
+the live client reads keys by name and ignores unknown ones, so the six new keys sit unread
+and nothing regresses. There is no half-shipped state to clean up.
+
+### What the user sees today (the gap)
+
+`ensure_current_budget_period` clips an auto-continued period to the free gap around today.
+It has never said so. A user whose hub carries a future period opens the app on 12 September,
+gets "September 1–17", and has no way to learn why it stopped on the 17th. The period is
+correct; the silence is the bug.
+
+The target sentence:
+
+> September 1–17 created — you already have a later period (18 Sep – 18 Oct)
+
+### What the server already provides
+
+`scripts/migrate_30_clipped_period_receipt.sql` adds six keys to the RPC payload:
+
+| Key | Meaning |
+|---|---|
+| `clipped_start` / `clipped_end` | boolean — the window came out shorter than the calendar month |
+| `prev_start` / `prev_end` | the whole range of the period immediately BEFORE today |
+| `next_start` / `next_end` | the whole range of the period immediately AFTER today — the one the message names |
+
+Both `created=false` branches (already-covered, and the exclusion-violation adoption) return
+flags false and all four dates NULL. Neither computed a window, so neither has clipping to
+describe.
+
+### The four steps
+
+1. **`src/hooks/useAutoContinuePeriod.js:145`** — `setAutoPeriod({…})` maps ten keys
+   (`cycle_id` → `tier`). Add the six. `cycles.service.js:124` needs **no** change; it
+   already passes `data` through whole.
+
+2. **`src/components/PeriodSetupPrompt.jsx:104–137`** — the State A receipt branch renders
+   title + "carried over from …" + the skipped-limit warning. Add the clip sentence there.
+
+3. **A shared range formatter.** There isn't one. `src/lib/dates.js` exports only
+   `getCurrentMonth`, `getToday`, `isPastMonth`, `formatMonth`. `src/views/daily/MoveCycleSheet.jsx:24`
+   has a local `formatRange(cycle)` producing exactly the `18 Sep – 18 Oct` shape, but it is
+   file-local and takes a **cycle object**, not two dates. Lift a two-date version into
+   `lib/dates.js` and repoint MoveCycleSheet at it.
+
+4. **Tests** — `PeriodSetupPrompt.test.jsx` and `useFinance.autocontinue.test.js` have no
+   clipped-period cases. Cover clipped-start, clipped-end, both, and the trap below.
+
+### The one trap
+
+**Gate the message on the FLAG, never on the presence of the dates.** A neighbour can exist
+without having clipped anything — a previous period that ended last month sets
+`prev_start`/`prev_end` but leaves `clipped_start` false. The dates are reported whenever the
+neighbour exists; the flags say whether it actually shortened the window. `if (next_start)`
+is the wrong condition and will show the message on hubs that were never clipped.
+
+### Housekeeping when picking this up
+
+The SQL file's header comment (line 62) reads "(PeriodSetupPrompt does exactly that.)" —
+that describes **intent, not shipped code**. Correct it once the wiring lands, or it will
+keep reading as done.
+
+---
+
+## Installed PWA never auto-updates — users must uninstall + reinstall to get a new deploy — 🔍 INVESTIGATE, NEXT PHASE (captured 2026-09-10, not built)
+
+**Priority within the next phase.** Reported by real users: after a deploy, the installed
+PWA keeps serving the old build. The only reliable fix they have found is **uninstall +
+reinstall**. That should never be required — a correctly-wired service worker replaces
+itself on the next launch.
+
+**Why it is consequential:** if updates cannot reach installed users, every shipped fix
+stops at the deploy. Every entry in this backlog that ends in "fixed and promoted" is only
+real once the user's installed app actually runs it. Worth resolving **before/around real
+user installs**, while the installed base is still small enough that a stuck client costs
+nothing.
+
+### What the config actually looks like today (verified 2026-09-10, do not re-derive)
+
+The pieces are mostly present, which is why this is an investigation and not a
+known-missing-feature build:
+
+| Piece | State |
+|---|---|
+| `vite-plugin-pwa` | `^1.3.0`, configured in `vite.config.js` |
+| `registerType` | `'autoUpdate'` |
+| `skipWaiting` / `clientsClaim` | **both present** in the built `dist/sw.js` |
+| `cleanupOutdatedCaches` | present |
+| `NavigationRoute` (index.html fallback) | present |
+| `runtimeCaching` | deliberately none (`71cdedb` — no cross-origin assets) |
+| `manifest` | `false` — `public/manifest.json` is canonical (`67664c7`) |
+
+### The two gaps worth checking first (hypotheses, NOT yet confirmed)
+
+1. **Registration only ever runs on `window.load`.** `injectRegister` is left at its
+   default, so the plugin injects a bare script tag into `index.html` and the whole of the
+   registration is:
+
+   ```js
+   // dist/registerSW.js — generated
+   if('serviceWorker' in navigator) {
+     window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js', { scope: '/' }))
+   }
+   ```
+
+   There is **no periodic `registration.update()`**, and no re-check on
+   `visibilitychange` / app resume. An installed PWA is normally *resumed* from the
+   background, not freshly loaded — so on a phone that never fully closes the app, the
+   `load` event may not fire for days and the update check never happens. This matches the
+   reported symptom better than anything else: uninstall/reinstall works because it forces
+   a cold registration.
+
+2. **No `onNeedRefresh` path, so no "update available — reload" prompt.** Nothing in `src/`
+   imports `virtual:pwa-register` — `grep -rn "registerSW\|virtual:pwa-register" src/`
+   returns zero hits. App code does not participate in the SW lifecycle at all. Even when
+   `skipWaiting` + `clientsClaim` do fire, **the already-open document keeps running the
+   old JS bundle until a full reload**; with no prompt and no forced reload, a standalone
+   PWA that is never closed can sit on stale code indefinitely.
+
+   Note `CLAUDE.md` §10 describes `main.jsx` as "React root mount + **PWA service worker
+   registration**". That is not accurate today — registration is auto-injected by the
+   plugin, `main.jsx` only handles `beforeinstallprompt` (`src/lib/pwa.js`). Fix the doc
+   line as part of whatever lands here.
+
+### Investigate (the actual question list)
+
+- Which platform(s) are the reports from — iOS standalone, Android/Chrome, or both? iOS
+  has its own well-known resume/update quirks and would change the fix.
+- Does the deployed `/sw.js` actually change hash between deploys, and is Vercel serving it
+  with a cache header that would let a stale copy stick? (Browsers bypass the HTTP cache for
+  the SW script itself, but confirm rather than assume.)
+- Does a new SW reach `activate` on a second launch, and is the stale page simply the
+  no-reload gap (hypothesis 2) rather than a missing update (hypothesis 1)?
+- Is the precached `index.html` being served by the `NavigationRoute` fallback long after a
+  new build exists?
+
+### Likely shape of the fix (do not build yet)
+
+Move to an explicit `registerSW({ immediate: true, onNeedRefresh, onRegisteredSW })` from
+`virtual:pwa-register`, add a periodic `registration.update()` plus a re-check on app
+resume, and surface a small in-app "New version available — reload" affordance
+(`components/ui/` — reuse `Toast`). Reload must be user-visible, not silent, so a mid-entry
+transaction is never dropped under the user. Tests: registration wiring + the prompt's
+shown/hidden states, per §8.
+
+**Related but does NOT solve this:** pull-to-refresh (next entry) re-fetches *data*, never
+the app version.
+
+---
+
+## Pull-to-refresh — re-fetch current data without a page reload — POST-MVP feature (captured 2026-09-10)
+
+Standard mobile gesture: pull down at the top of a view to re-fetch the current period's
+data from Supabase and re-render, without a browser reload.
+
+**Scope — data only.** It re-runs the existing hook fetches (`useFinance` for the viewed
+cycle, plus whatever the current view owns) and shows a spinner during the in-flight
+fetch. It does **not** re-download the app bundle and **does not** solve the stale-PWA
+problem above — the two are easy to conflate and must not be treated as one item.
+
+**Notes for whoever builds it:**
+
+- `useFinance` is called **once** in `App.jsx` (CLAUDE.md §11), so the refresh entry point
+  belongs on `FinanceContext` (e.g. a `refresh()` alongside `loadMonth`), not per-view.
+- Must respect §12: a failed refresh sets `error` and leaves existing data in place — it
+  must never collapse to an empty state.
+- The gesture has to not fight the 440px scroll container or iOS rubber-banding; check
+  `overscroll-behavior` before reaching for a library.
+
+**No prior entry existed** — this is the consolidated one. Any future pull-to-refresh note
+folds in here.
+
+---
+
+## No ESLint in the repo — a missing import white-screened production-shaped code — POST-MVP (tooling)
+
+**Why:** On 2026-09-05 `<PeriodSetupPrompt />` was mounted in `App.jsx`'s DashboardShell
+with no import. The dev preview served a blank page with
+`ReferenceError: PeriodSetupPrompt is not defined`, and **every layer of the safety net
+passed**:
+
+| Layer | Why it missed |
+|---|---|
+| 1846 unit tests | Component tests import the component directly. The file that MOUNTS it is never checked. |
+| `App.test.jsx` | Renders `<App/>` but lands on the ONBOARDING gate, which returns early and never evaluates DashboardShell. |
+| e2e smoke test | Its fixture owns 0 hubs → also lands on onboarding. Same branch, same blind spot. |
+| `vite build` | **Succeeded.** A bare undefined identifier is valid JavaScript; it throws at runtime, not at bundle time. Adding a build step to CI would NOT have caught this. |
+
+There is no ESLint in this repo at all — no config, no devDependency, no script. The rule
+that catches this class in under a second is `react/jsx-no-undef` (plus `no-undef`), and
+it would also catch unused imports, hooks-rule violations (§9.5 is currently a *manual*
+checklist), and missing effect dependencies.
+
+**Interim mitigation already shipped** (same commit as this entry):
+1. `scripts/check-jsx-imports.mjs` + audit check **P** — dependency-free scanner that
+   fails when a JSX tag has no matching import or local definition. Verified to fail on
+   the real bug and to report zero false positives across `src/` (its first draft
+   reported 16, all JSDoc prose mentioning `<Link>`/`<Routes>` — hence the comment and
+   string stripping).
+2. `src/App.dashboard.test.jsx` — renders `<App/>` on the DASHBOARD branch, so the shell
+   every real user sees is evaluated in CI. Reproduces the exact ReferenceError when the
+   import is removed.
+
+Those two close the specific hole. ESLint closes the category.
+
+**What it would take:** `eslint`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, a
+flat config, an `npm run lint` script, and a CI step before `npm test`. The one judgement
+call is how much of the existing codebase it flags on day one — expect a first-run
+backlog of unused imports and effect-dependency warnings that should be triaged, not
+bulk-suppressed. Land it as its own commit so the noise is separable from feature work.
+
+---
+
+## `last_working_day` pay dates ignore Ghanaian public holidays — POST-MVP (accuracy)
+
+**Why:** `resolvePayDate` (lib/finance.js) resolves a `last_working_day` source to the
+last **Mon–Fri** on or before the period's `end_date`. That is the whole rule — it walks
+back off Saturday and Sunday and nothing else. When a Ghanaian public holiday falls on
+what we compute as the last working day, the real payment lands **earlier** than the app
+shows, so the countdown and the "Coming soon"/"Today" badge are a day or more late.
+
+This was a deliberate call when the period-aware pay-date work landed (2026-09-05): a
+documented gap beats pretend data, and faking a holiday calendar would make the app
+confidently wrong rather than honestly approximate. The limitation is stated in
+`resolvePayDate`'s JSDoc so nobody "fixes" the weekend walk-back without seeing it.
+
+**What it would take:** a Ghanaian public-holiday calendar with its own data source and
+an ongoing maintenance obligation — the statutory list moves (substitute days when a
+holiday falls on a weekend, and occasional one-off declarations). Options, cheapest first:
+1. A hardcoded per-year list in `lib/holidays.js`, refreshed annually. Simple, but a
+   forgotten refresh silently degrades to today's behaviour — which is at least safe.
+2. A `public_holidays` table keyed by country, so multi-country hubs work later.
+3. A third-party API — rejected on principle for a feature that must work offline.
+
+Whichever route, `resolvePayDate` should take the holiday set as an argument and stay
+pure. Multi-currency hubs already imply multi-country members, so the country key is not
+optional if this is ever built.
+
+**Not urgent:** the error is at most a couple of days on a countdown, never on an amount,
+and confirming income is a manual action either way.
+
+---
+
 ## Observability: error capture (Sentry or self-hosted) — POST-MVP
 
 **Why:** The data-loss-on-refresh bug (engineering-decisions.md [2026-05-29]) was

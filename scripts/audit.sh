@@ -162,6 +162,19 @@ header "O: No TODO or FIXME"
 result=$(grep -rn "TODO\|FIXME" "$SRC" --include="*.jsx" --include="*.js" | grep -v "node_modules\|\.test\.")
 [ -z "$result" ] && green "No TODO or FIXME" || red "TODO/FIXME found" "$result"
 
+# ── P: Every rendered component is imported ──────────────────
+# A JSX tag with no matching import is valid JavaScript that throws at RUNTIME, so
+# neither the unit suite nor `vite build` catches it — it white-screens the app with a
+# fully green pipeline. See scripts/check-jsx-imports.mjs for the post-mortem.
+header "P: Every rendered component is imported"
+
+result=$(node "$ROOT/scripts/check-jsx-imports.mjs" 2>&1)
+if [ $? -eq 0 ]; then
+  green "Every rendered component is imported or defined"
+else
+  red "Component rendered but never imported" "$result"
+fi
+
 # ── Summary ──────────────────────────────────────────────────
 echo ""
 echo "============================================"

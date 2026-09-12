@@ -24,6 +24,61 @@ const renderCard = (props = {}) =>
     />
   );
 
+// A period whose end (Sat 31 Oct 2026) falls on a weekend, so a last-working-day
+// source resolves to Fri 30 Oct — the case that used to resolve to nothing at all.
+const OCT = { start_date: '2026-10-01', end_date: '2026-10-31' };
+const lastWorkIncome = { ...pendingIncome, pay_day: null, pay_day_type: 'last_working_day' };
+
+describe('IncomeCard — pay dates resolve against the period', () => {
+  // THE bug: pay_day is null for this type, so the badge read "Flexible" directly above
+  // a subtitle reading "Last working day", and the countdown block was skipped entirely.
+  it('gives a last_working_day source a countdown and a real badge, not "Flexible"', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-28T12:00:00Z'));       // 2 days before Fri 30 Oct
+    renderCard({ income: lastWorkIncome, cycle: OCT });
+    expect(screen.getByTestId(`income-next-pay-${lastWorkIncome.id}`).textContent).toBe('2 days away');
+    expect(screen.getByText('Coming soon')).toBeTruthy();     // not the Flexible badge
+    expect(screen.queryByText('Flexible')).toBeNull();
+    vi.useRealTimers();
+  });
+
+  // Bug 4: the old midnight-vs-now comparison rolled the date to next month on the day
+  // itself, so "Due today" and the "Today! 🎉" badge were unreachable.
+  it('says Due today on the pay day itself', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));       // pendingIncome pays day 25
+    renderCard({ cycle: OCT });
+    expect(screen.getByTestId(`income-next-pay-${pendingIncome.id}`).textContent).toBe('Due today');
+    vi.useRealTimers();
+  });
+
+  it('counts against the PERIOD, not the clock’s calendar month', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-20T12:00:00Z'));
+    // Period runs 15 Sep – 14 Oct; a day-5 source pays 5 Oct, 15 days out. Anchored on
+    // the clock's month it would have resolved to 5 Oct too — but as "next month", not
+    // as a date inside this period.
+    renderCard({ income: { ...pendingIncome, pay_day: 5 }, cycle: { start_date: '2026-09-15', end_date: '2026-10-14' } });
+    expect(screen.getByTestId(`income-next-pay-${pendingIncome.id}`).textContent).toBe('15 days away');
+    vi.useRealTimers();
+  });
+
+  // Countdown language belongs to the period you are living in; any other shows a date.
+  it('shows a date instead of a countdown for a non-current period', () => {
+    renderCard({ cycle: OCT, isCurrent: false });
+    expect(screen.getByTestId(`income-next-pay-${pendingIncome.id}`).textContent).toBe('25 Oct 2026');
+  });
+
+  it('still shows no date for a genuinely flexible source, badge and subtitle agreeing', () => {
+    renderCard({ income: { ...pendingIncome, pay_day: null, pay_day_type: 'flexible' }, cycle: OCT });
+    expect(screen.queryByTestId(`income-next-pay-${pendingIncome.id}`)).toBeNull();
+    // Both the schedule subtitle and the badge read "Flexible" — and for THIS type that
+    // agreement is correct. The bug was a last_working_day source getting the same
+    // badge while its subtitle said something else entirely.
+    expect(screen.getAllByText('Flexible')).toHaveLength(2);
+  });
+});
+
 describe('IncomeCard', () => {
   it('shows income label', () => {
     renderCard();

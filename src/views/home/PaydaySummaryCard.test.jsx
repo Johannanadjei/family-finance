@@ -20,6 +20,27 @@ const renderCard = (props = {}) =>
     </MemoryRouter>
   );
 
+describe('PaydaySummaryCard — the last-working-day null no longer kills the summary', () => {
+  // pickNextUnpaid resolves the date against the period, so this arrives with a real
+  // daysUntil. Before, pay_day was null for last_working_day → daysUntil null → the
+  // household's main salary was announced on Home as "Flexible".
+  it('shows the countdown for a last-working-day salary', () => {
+    renderCard({ nextUnpaid: { id: 'inc-1', label: 'Adjei Salary', expected_amount: 30000, daysUntil: 3, payDate: '2026-10-30' } });
+    expect(screen.getByTestId('next-unpaid-when').textContent).toContain('3 days away');
+    expect(screen.getByTestId('next-unpaid-when').textContent).not.toContain('Flexible');
+  });
+
+  it('reserves Flexible for a source that genuinely has no date', () => {
+    renderCard({ nextUnpaid: { id: 'inc-3', label: 'Side gig', expected_amount: 500, daysUntil: null, payDate: null } });
+    expect(screen.getByTestId('next-unpaid-when').textContent).toContain('Flexible');
+  });
+
+  it('says Overdue once the date has passed unreceived', () => {
+    renderCard({ nextUnpaid: { id: 'inc-2', label: 'Dita Salary', expected_amount: 15000, daysUntil: -2, payDate: '2026-10-25' } });
+    expect(screen.getByTestId('next-unpaid-when').textContent).toContain('Overdue');
+  });
+});
+
 describe('PaydaySummaryCard', () => {
   it('shows next unpaid income label', () => {
     renderCard();

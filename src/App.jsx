@@ -41,6 +41,7 @@ import { BottomNav }                             from './components/layout/Botto
 import { FAB }                                   from './components/layout/FAB';
 import { SidePanel }                             from './components/layout/SidePanel';
 import { CreateHubSheet }                        from './features/hubs/CreateHubSheet';
+import { PeriodSetupPrompt }                     from './components/PeriodSetupPrompt';
 import { ErrorBoundary }                         from './components/ui/ErrorBoundary';
 import { LoadingScreen, ErrorScreen, RemovedScreen } from './components/ui/StateScreens';
 import { HomeView }                              from './views/HomeView';
@@ -98,6 +99,7 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, hu
       <Header onOpenPanel={() => setPanelOpen(true)} />
       <ErrorBoundary>
         <main style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
+          {!isPricing && <PeriodSetupPrompt />}{/* ONE mount for the whole dashboard — self-hiding, self-routing */}
           <Routes>
             <Route path="/"         element={<HomeView />} />
             <Route path="/payday"   element={<PaydayView />} />
@@ -188,7 +190,7 @@ export default function App() {
   // cycle state useBudgetCentre lacks. The Provider's categories prop sources from here.
   // hubPlan (not userPlan) drives the history window — history is a property of the
   // hub, so a member of a Pro hub must see all of it.
-  const financeValues                                     = useFinance({ centre, allCategories, hubPlan });
+  const financeValues                                     = useFinance({ centre, allCategories, hubPlan, memberRole: currentMemberRole, reloadCategories });
 
   // Persist the active centre ID once the first centre resolves
   useEffect(() => {

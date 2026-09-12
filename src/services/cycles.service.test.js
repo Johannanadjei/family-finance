@@ -34,6 +34,7 @@ vi.mock('../lib/supabase', () => {
 
 import {
   getCyclesForCentre, getCycleForDate, getCycleById, createBudgetPeriod, resetBudgetPeriod,
+  ensureCurrentBudgetPeriod,
 } from './cycles.service';
 
 const mockCycle = {
@@ -146,6 +147,54 @@ describe('createBudgetPeriod', () => {
     const { data, error } = await createBudgetPeriod('c-1', { name: 'X', startDate: '2026-09-01', endDate: '2026-09-30' });
     expect(data).toBeNull();
     expect(error.code).toBe('42501');
+  });
+});
+
+// ── ensureCurrentBudgetPeriod (auto-continue) ───────────────────────────────
+describe('ensureCurrentBudgetPeriod', () => {
+  const created = {
+    cycle_id: 'cyc-sep', name: 'September 2026', start_date: '2026-09-01', end_date: '2026-09-30',
+    created: true, source_cycle_id: 'cyc-aug',
+    categories_carried: 5, categories_skipped: 0, income_carried: 2, income_skipped: 0, tier: 'free',
+  };
+
+  it('calls the ensure_current_budget_period RPC with the centre id and returns the payload', async () => {
+    mockRpc.mockResolvedValue({ data: created, error: null });
+    const { data, error } = await ensureCurrentBudgetPeriod('c-1');
+    expect(mockRpc).toHaveBeenCalledWith('ensure_current_budget_period', { p_centre_id: 'c-1' });
+    expect(data).toEqual(created);
+    expect(error).toBeNull();
+  });
+
+  // The idempotent path: a period already covered today, so the server wrote nothing.
+  it('passes through created:false without treating it as an error', async () => {
+    const existing = { ...created, created: false, source_cycle_id: null, categories_carried: 0, income_carried: 0 };
+    mockRpc.mockResolvedValue({ data: existing, error: null });
+    const { data, error } = await ensureCurrentBudgetPeriod('c-1');
+    expect(data.created).toBe(false);
+    expect(error).toBeNull();
+  });
+
+  it('reports the clamp counts when the owner tier caps the carry-forward', async () => {
+    mockRpc.mockResolvedValue({ data: { ...created, categories_carried: 10, categories_skipped: 3, income_skipped: 1 }, error: null });
+    const { data } = await ensureCurrentBudgetPeriod('c-1');
+    expect(data.categories_carried).toBe(10);
+    expect(data.categories_skipped).toBe(3);
+    expect(data.income_skipped).toBe(1);
+  });
+
+  it('returns data:null + error when the role gate refuses (42501)', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: '42501', message: 'not an owner' } });
+    const { data, error } = await ensureCurrentBudgetPeriod('c-1');
+    expect(data).toBeNull();
+    expect(error.code).toBe('42501');
+  });
+
+  it('surfaces an unresolvable overlap (CYC01) truthfully rather than masking it', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: 'CYC01', message: 'overlap' } });
+    const { data, error } = await ensureCurrentBudgetPeriod('c-1');
+    expect(data).toBeNull();
+    expect(error).toEqual({ code: 'CYC01', message: 'overlap' });
   });
 });
 
