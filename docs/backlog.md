@@ -246,6 +246,77 @@ which period an income belongs to and cannot verify the repair worked.
 
 ---
 
+## migrate_30 clipped-period receipt — SQL shipped, CLIENT MESSAGE NOT WIRED — 🔨 FOLLOW-UP (deferred 2026-09-12, needs a stable session)
+
+**Status:** the SQL half is committed (`7ec31ae`) and being applied to Supabase in the same
+session this entry was written. The client half is **not started — zero references in
+`src/`.** Deliberately deferred: the period bugs are
+fixed by the `cycle_id` work + migrate_29, and this message is **polish, not a fix**. It was
+split off rather than rushed on a crashing machine.
+
+**Safe to sit unbuilt indefinitely.** migrate_30 is purely additive to a jsonb payload —
+the live client reads keys by name and ignores unknown ones, so the six new keys sit unread
+and nothing regresses. There is no half-shipped state to clean up.
+
+### What the user sees today (the gap)
+
+`ensure_current_budget_period` clips an auto-continued period to the free gap around today.
+It has never said so. A user whose hub carries a future period opens the app on 12 September,
+gets "September 1–17", and has no way to learn why it stopped on the 17th. The period is
+correct; the silence is the bug.
+
+The target sentence:
+
+> September 1–17 created — you already have a later period (18 Sep – 18 Oct)
+
+### What the server already provides
+
+`scripts/migrate_30_clipped_period_receipt.sql` adds six keys to the RPC payload:
+
+| Key | Meaning |
+|---|---|
+| `clipped_start` / `clipped_end` | boolean — the window came out shorter than the calendar month |
+| `prev_start` / `prev_end` | the whole range of the period immediately BEFORE today |
+| `next_start` / `next_end` | the whole range of the period immediately AFTER today — the one the message names |
+
+Both `created=false` branches (already-covered, and the exclusion-violation adoption) return
+flags false and all four dates NULL. Neither computed a window, so neither has clipping to
+describe.
+
+### The four steps
+
+1. **`src/hooks/useAutoContinuePeriod.js:145`** — `setAutoPeriod({…})` maps ten keys
+   (`cycle_id` → `tier`). Add the six. `cycles.service.js:124` needs **no** change; it
+   already passes `data` through whole.
+
+2. **`src/components/PeriodSetupPrompt.jsx:104–137`** — the State A receipt branch renders
+   title + "carried over from …" + the skipped-limit warning. Add the clip sentence there.
+
+3. **A shared range formatter.** There isn't one. `src/lib/dates.js` exports only
+   `getCurrentMonth`, `getToday`, `isPastMonth`, `formatMonth`. `src/views/daily/MoveCycleSheet.jsx:24`
+   has a local `formatRange(cycle)` producing exactly the `18 Sep – 18 Oct` shape, but it is
+   file-local and takes a **cycle object**, not two dates. Lift a two-date version into
+   `lib/dates.js` and repoint MoveCycleSheet at it.
+
+4. **Tests** — `PeriodSetupPrompt.test.jsx` and `useFinance.autocontinue.test.js` have no
+   clipped-period cases. Cover clipped-start, clipped-end, both, and the trap below.
+
+### The one trap
+
+**Gate the message on the FLAG, never on the presence of the dates.** A neighbour can exist
+without having clipped anything — a previous period that ended last month sets
+`prev_start`/`prev_end` but leaves `clipped_start` false. The dates are reported whenever the
+neighbour exists; the flags say whether it actually shortened the window. `if (next_start)`
+is the wrong condition and will show the message on hubs that were never clipped.
+
+### Housekeeping when picking this up
+
+The SQL file's header comment (line 62) reads "(PeriodSetupPrompt does exactly that.)" —
+that describes **intent, not shipped code**. Correct it once the wiring lands, or it will
+keep reading as done.
+
+---
+
 ## Installed PWA never auto-updates — users must uninstall + reinstall to get a new deploy — 🔍 INVESTIGATE, NEXT PHASE (captured 2026-09-10, not built)
 
 **Priority within the next phase.** Reported by real users: after a deploy, the installed
