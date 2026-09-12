@@ -4,6 +4,7 @@ let mockRows;     // rows returned by a terminal .order()/.then()
 let mockSingle;   // row returned by a terminal .single()
 let eqCalls;      // [col, val] pairs passed to .eq()
 let insertArgs;   // payloads passed to .insert()
+let updateArgs;   // payloads passed to .update()
 
 vi.mock('../lib/supabase', () => {
   const make = () => {
@@ -11,10 +12,11 @@ vi.mock('../lib/supabase', () => {
       from:   () => q,
       select: () => q,
       insert: (payload) => { insertArgs.push(payload); return q; },
-      update: () => q,
+      update: (payload) => { updateArgs.push(payload); return q; },
       is:     () => q,
       eq:     (col, val) => { eqCalls.push([col, val]); return q; },
-      single: () => Promise.resolve(mockSingle),
+      single:      () => Promise.resolve(mockSingle),
+      maybeSingle: () => Promise.resolve(mockSingle),
       order:  () => Promise.resolve({ data: mockRows, error: null }),
       then:   (fn) => Promise.resolve({ data: mockRows, error: null }).then(fn),
     };
@@ -23,33 +25,36 @@ vi.mock('../lib/supabase', () => {
   return { supabase: { from: () => make() } };
 });
 
-import { getIncomeSources, addIncomeSource, bulkAddIncomeSources } from './income.service';
+import { getIncomeSources, addIncomeSource, bulkAddIncomeSources, moveIncomeSourceToCycle } from './income.service';
 
 beforeEach(() => {
   mockRows   = [];
   mockSingle = { data: null, error: null };
   eqCalls    = [];
   insertArgs = [];
+  updateArgs = [];
 });
 
-// ── getIncomeSources — T1 red-first: month filtering ──────────────────────────
+// ── getIncomeSources — centre-scoped, never month-scoped ─────────────────────
+// The month filter (Phase 2A) is GONE: callers slice by cycle_id client-side,
+// because a month cannot name a period. A stray second argument must be ignored
+// rather than quietly re-introducing a month filter.
 
 describe('getIncomeSources', () => {
-  it('T1: filters by month with .eq("month", month) when a month is provided', async () => {
-    await getIncomeSources('c-1', '2026-05');
-    expect(eqCalls).toContainEqual(['budget_centre_id', 'c-1']);
-    expect(eqCalls).toContainEqual(['month', '2026-05']);   // pre-2A ignored the arg → RED
-  });
-
-  it('does NOT filter by month when no month is provided (all-months view)', async () => {
+  it('filters by centre only — never by month', async () => {
     await getIncomeSources('c-1');
     expect(eqCalls).toContainEqual(['budget_centre_id', 'c-1']);
     expect(eqCalls.some(([col]) => col === 'month')).toBe(false);
   });
 
+  it('ignores a month argument if one is passed by a stale caller', async () => {
+    await getIncomeSources('c-1', '2026-05');
+    expect(eqCalls.some(([col]) => col === 'month')).toBe(false);
+  });
+
   it('returns an array on success and null on error (never masks failure)', async () => {
     mockRows = [{ id: 's-1', month: '2026-05' }];
-    const ok = await getIncomeSources('c-1', '2026-05');
+    const ok = await getIncomeSources('c-1');
     expect(ok.data).toHaveLength(1);
     expect(ok.error).toBeNull();
   });
@@ -62,13 +67,13 @@ describe('addIncomeSource', () => {
 
   it('inserts and returns the row when month is valid', async () => {
     mockSingle = { data: { id: 's-1', ...base, month: '2026-05' }, error: null };
-    const { data, error } = await addIncomeSource('c-1', { ...base, month: '2026-05' });
+    const { data, error } = await addIncomeSource('c-1', { ...base, month: '2026-05' }, 'cyc-9');
     expect(error).toBeNull();
     expect(data.month).toBe('2026-05');
   });
 
   it('returns a validation error (no insert) when month is missing', async () => {
-    const { data, error } = await addIncomeSource('c-1', base);   // no month
+    const { data, error } = await addIncomeSource('c-1', base, 'cyc-9');   // no month
     expect(data).toBeNull();
     expect(error).toBeTruthy();
     expect(error.message).toMatch(/month/i);
@@ -82,12 +87,14 @@ describe('addIncomeSource', () => {
     expect(insertArgs[0]).toMatchObject({ budget_centre_id: 'c-1', cycle_id: 'cyc-9' });
   });
 
-  // No-regression contract for onboarding: no cycle exists yet, so no cycleId is
-  // passed → the payload must OMIT cycle_id and let the trigger resolve from month.
-  it('OMITS cycle_id from the insert when no cycleId supplied', async () => {
+  // cycle_id is income's ONLY period key, so a missing one is refused BEFORE the
+  // database is touched — the trigger must never be asked to resolve from month.
+  it('REFUSES the insert (CYC02) when no cycleId is supplied', async () => {
     mockSingle = { data: { id: 's-1' }, error: null };
-    await addIncomeSource('c-1', { ...base, month: '2026-05' });
-    expect('cycle_id' in insertArgs[0]).toBe(false);
+    const { data, error } = await addIncomeSource('c-1', { ...base, month: '2026-05' });
+    expect(data).toBeNull();
+    expect(error.message).toMatch(/cycleId/i);
+    expect(insertArgs).toHaveLength(0);   // never reached the DB
   });
 });
 
@@ -100,8 +107,50 @@ describe('bulkAddIncomeSources (cycle_id stamping)', () => {
     expect(insertArgs[0].every(r => r.cycle_id === 'cyc-9')).toBe(true);
   });
 
-  it('OMITS cycle_id from every row when no cycleId supplied (onboarding path)', async () => {
-    await bulkAddIncomeSources('c-1', [base]);
-    expect(insertArgs[0].every(r => !('cycle_id' in r))).toBe(true);
+  it('REFUSES the whole bulk insert (CYC02) when no cycleId is supplied', async () => {
+    const { data, error } = await bulkAddIncomeSources('c-1', [base]);
+    expect(data).toBeNull();
+    expect(error.message).toMatch(/cycleId/i);
+    expect(insertArgs).toHaveLength(0);   // never reached the DB
+  });
+});
+
+// ── moveIncomeSourceToCycle — cycle_id and month move TOGETHER ────────────────
+// A cycle_id-only update would not fire the UPDATE OF month trigger and would leave
+// `month` pointing at the old period. Both columns in one statement is the contract.
+
+describe('moveIncomeSourceToCycle', () => {
+  it('updates cycle_id AND month in a single statement', async () => {
+    mockSingle = { data: { id: 's-1', cycle_id: 'cyc-b', month: '2026-09' }, error: null };
+    const { error } = await moveIncomeSourceToCycle('s-1', 'cyc-b', '2026-09');
+    expect(error).toBeNull();
+    expect(updateArgs[0]).toEqual({ cycle_id: 'cyc-b', month: '2026-09' });
+  });
+
+  it('never writes cycle_id without month', async () => {
+    mockSingle = { data: null, error: null };
+    await moveIncomeSourceToCycle('s-1', 'cyc-b', '2026-09');
+    expect('month' in updateArgs[0]).toBe(true);
+  });
+
+  it('refuses without a target cycleId — no update reaches the DB', async () => {
+    const { data, error } = await moveIncomeSourceToCycle('s-1', null, '2026-09');
+    expect(data).toBeNull();
+    expect(error.message).toMatch(/cycleId/i);
+    expect(updateArgs).toHaveLength(0);
+  });
+
+  it('refuses without a month — no update reaches the DB', async () => {
+    const { data, error } = await moveIncomeSourceToCycle('s-1', 'cyc-b', null);
+    expect(data).toBeNull();
+    expect(error.message).toMatch(/month/i);
+    expect(updateArgs).toHaveLength(0);
+  });
+
+  it('surfaces a DB error truthfully (never masks it as data)', async () => {
+    mockSingle = { data: null, error: { message: 'RLS denied' } };
+    const { data, error } = await moveIncomeSourceToCycle('s-1', 'cyc-b', '2026-09');
+    expect(data).toBeNull();
+    expect(error.message).toBe('RLS denied');
   });
 });

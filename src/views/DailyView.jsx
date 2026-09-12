@@ -107,7 +107,7 @@ export function DailyView() {
 
       {/* Period total */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', fontWeight: 700, margin: 0 }}>Total spent this period</p>
+        <p style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', fontWeight: 700, margin: 0 }}>Total spent this month</p>
         <span data-testid="daily-total-spent" style={{ fontSize: 15, fontWeight: 900, color: 'var(--c-text, #1c1917)' }}>{fmt(totalSpent)}</span>
       </div>
 

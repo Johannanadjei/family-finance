@@ -56,7 +56,7 @@ export const mockMembers = [
 ];
 
 // Budget cycles (Commit 4+). THIS_CYCLE contains today (string-compared ISO dates
-// with a '-31' upper bound, matching getActiveCycle's containment test); LAST_CYCLE
+// with a '-31' upper bound, matching cycleForToday's containment test); LAST_CYCLE
 // backs cross-cycle fixtures. cycle_id on the rows below references these ids — the
 // storage-layer invariant (Commit 10 trigger) means every live row carries one.
 export const mockCycles = [
@@ -68,6 +68,33 @@ export const mockIncomes = [
   { id: 'inc-1', label: 'Adjei Salary', expected_amount: 30000, received: true,  received_amount: 30000, currency: 'GHS', pay_day: 31, pay_day_type: 'last_working_day', month: THIS_MONTH, cycle_id: 'cyc-this' },
   { id: 'inc-2', label: 'Dita Salary',  expected_amount: 15000, received: false, received_amount: 0,     currency: 'GHS', pay_day: 25, pay_day_type: 'fixed_date',       month: THIS_MONTH, cycle_id: 'cyc-this' },
 ];
+
+// ── The two-same-month shape (the bug this workstream closes) ────────────────
+// Two LIVE periods that both START in September — the production shape on "The
+// house" (Sept 1–17, then Sept 18 – Oct 18). They do not overlap, so the
+// no_overlapping_cycles constraint is satisfied; but the month '2026-09' names
+// BOTH, which is exactly why a month cannot be income's period key. Use these
+// wherever a test needs to prove that resolution happens by cycle_id, not month.
+export const mockSplitMonthCycles = [
+  { id: 'cyc-sep-a', budget_centre_id: 'c1', name: 'September (1–17)',    start_date: '2026-09-01', end_date: '2026-09-17', anchor_type: 'custom', deleted_at: null },
+  { id: 'cyc-sep-b', budget_centre_id: 'c1', name: 'September (18–18 Oct)', start_date: '2026-09-18', end_date: '2026-10-18', anchor_type: 'custom', deleted_at: null },
+];
+
+// One income source in each of the two Septembers. Identical `month`, different
+// `cycle_id` — under the old month lookup these merged into one group and one of
+// them became invisible in Payday.
+export const mockSplitMonthIncomes = [
+  { id: 'sp-1', label: 'Job',     expected_amount: 20000, received: false, received_amount: 0, currency: 'GHS', pay_day: 25, pay_day_type: 'fixed_date', month: '2026-09', cycle_id: 'cyc-sep-a' },
+  { id: 'sp-2', label: 'jobtest', expected_amount:  5000, received: false, received_amount: 0, currency: 'GHS', pay_day: 28, pay_day_type: 'fixed_date', month: '2026-09', cycle_id: 'cyc-sep-b' },
+];
+
+// An income source pointing at NO live period — a legacy mis-stamped row, or one
+// orphaned by a deleted period. Settings must surface these as "Not in any period"
+// rather than dropping them silently; they are invisible in Payday.
+export const mockOrphanIncome = {
+  id: 'orph-1', label: 'Stray Income', expected_amount: 1200, received: false, received_amount: 0,
+  currency: 'GHS', pay_day: null, pay_day_type: 'flexible', month: '2026-09', cycle_id: 'cyc-gone',
+};
 
 export const mockTxs = [
   {

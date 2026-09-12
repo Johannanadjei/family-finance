@@ -11,7 +11,7 @@
 
 import { vi } from 'vitest';
 import {
-  mockCentre, mockFmt, mockCategories, mockMembers, mockIncomes, mockTxs,
+  mockCentre, mockFmt, mockCategories, mockMembers, mockIncomes, mockTxs, mockCycles,
   mockWeeklyData, mockCategorySpend,
 } from './fixtures';
 
@@ -63,6 +63,13 @@ export function makeFinanceMock(overrides = {}) {
       txs:                  mockTxs,
       incomes:              mockIncomes,
       allIncomes:           mockIncomes,
+      // Period state. Income is keyed by cycle_id, so a mock without these renders
+      // NO income groups at all — an incomplete mock here hides real breakage (§9.5).
+      cycles:               mockCycles,
+      visibleCycles:        mockCycles,
+      activeCycle:          mockCycles[0],
+      activeCycleId:        mockCycles[0].id,
+      cyclesLoading:        false,
       totalReceived:        30000,
       totalExpected:        45000,
       totalPending:         15000,
@@ -92,6 +99,9 @@ export function makeFinanceMock(overrides = {}) {
       updateIncomeSource:   vi.fn().mockResolvedValue({ error: null }),
       addIncomeSource:      vi.fn().mockResolvedValue({ error: null }),
       deleteIncomeSource:   vi.fn().mockResolvedValue({ error: null }),
+      copyIncomeSourcesToCycle: vi.fn().mockResolvedValue({ data: [], error: null }),
+      moveIncomeSourceToCycle:  vi.fn().mockResolvedValue({ data: null, error: null }),
+      loadCycle:            vi.fn(),
       saveThemeSkin:        vi.fn(),
       ...overrides,
     }),

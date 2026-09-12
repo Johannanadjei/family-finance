@@ -8,14 +8,12 @@
  */
 
 import { useState, useEffect }    from 'react';
-import { useNavigate }            from 'react-router-dom';
 import { useBudgetCentreContext } from '../context/BudgetCentreContext';
 import { useFinanceContext }      from '../context/FinanceContext';
 import { getCurrentMonth }        from '../lib/finance';
 import { formatMonth }            from '../lib/dates';
 import { AccessBlocked }         from '../components/ui/AccessBlocked';
 import { Skeleton }               from '../components/ui/Skeleton';
-import { NoCurrentPeriodPrompt }  from '../components/NoCurrentPeriodPrompt';
 import { MonthlyIncomeCard }      from './home/MonthlyIncomeCard';
 import { BudgetHealthBar }        from './home/BudgetHealthBar';
 import { PaydaySummaryCard }      from './home/PaydaySummaryCard';
@@ -58,14 +56,13 @@ function HomeViewSkeleton() {
 export function HomeView() {
   const { fmt, can }    = useBudgetCentreContext();
   const financeValues   = useFinanceContext();
-  const navigate        = useNavigate();
   const [activeInfo, setActiveInfo] = useState(null);
 
   const {
     totalReceived, monthlyIncome, totalSpent, allIncome,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
     fixedTotal, spareMoney, budgetRemaining, txs,
-    loading, cyclesLoading, activeCycle, activeCycleId, loadCycle, cycles = [],
+    loading, cyclesLoading, activeCycle, currentCycle, activeCycleId, loadCycle,
   } = financeValues;
 
   // Home is the "now" dashboard — snap the shared period selection back to the
@@ -85,7 +82,7 @@ export function HomeView() {
   }, [activeCycle?.id, activeCycleId]);
 
   // Hold the first paint until cycles resolve — rendering now would flash
-  // NoCurrentPeriodPrompt + GHS 0 before the current period loads (cold-load flash).
+  // an empty month label + GHS 0 before the current month loads (cold-load flash).
   if (cyclesLoading) return null;
   if (loading) return <HomeViewSkeleton />;
 
@@ -95,15 +92,15 @@ export function HomeView() {
   return (
     <div style={{ padding: '16px' }}>
 
-      {/* Passive prompt — only when no live period covers today; CTA routes to Budget,
-          where the period creator lives (the sheet is mounted there, not on Home). */}
-      <NoCurrentPeriodPrompt cycles={cycles} onCreate={() => navigate('/budget')} />
-
-      {/* Period label — the current cycle's name, ungated (visible without viewIncome).
-          Home always shows "now", so this is the active cycle, never a navigable label. */}
+      {/* Month label — the name of the month that actually CONTAINS today, and never
+          another month's name standing in for "now". currentCycle is the strict
+          predicate; activeCycle would fall back to the most recently ended month, which
+          is exactly how August's name came to sit over September's dashboard. With no
+          month covering today we show the plain calendar month, and the banner in the
+          shell explains why there is no budget behind it. Ungated (no viewIncome). */}
       <div style={{ marginBottom: 16, textAlign: 'center' }}>
         <p data-testid="home-month-label" style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
-          {activeCycle?.name ?? formatMonth(getCurrentMonth())}
+          {currentCycle?.name ?? formatMonth(getCurrentMonth())}
         </p>
       </div>
 

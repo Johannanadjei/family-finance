@@ -8,7 +8,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter }             from 'react-router-dom';
 import { HomeView }                 from './HomeView';
 import { getCurrentMonth }          from '../lib/finance';
-import { getToday }                 from '../lib/dates';
+import { getToday, formatMonth }    from '../lib/dates';
 import { mockCentre, mockFmt }      from '../test-utils/fixtures';
 
 const mockNavigate = vi.fn();
@@ -41,6 +41,7 @@ const mockFinance = {
   // the mount-reset is a no-op (existing tests unaffected). activeCycleId defaults null
   // (no navigation yet) — the guard's truthiness check makes the reset a no-op.
   activeCycle:   null,
+  currentCycle:  null,   // the STRICT now-cycle — drives the month label
   activeCycleId: null,
   activeMonth:   getCurrentMonth(),
   loadCycle:     vi.fn(),
@@ -177,13 +178,28 @@ describe('HomeView', () => {
   });
 
   // ── Cycles: current-cycle label + "now"-dashboard mount-reset (Commit 9) ──────
-  const restoreCycle = () => { mockFinance.activeCycle = null; mockFinance.activeCycleId = null; mockFinance.activeMonth = getCurrentMonth(); mockFinance.loadCycle = vi.fn(); };
+  const restoreCycle = () => { mockFinance.activeCycle = null; mockFinance.currentCycle = null; mockFinance.activeCycleId = null; mockFinance.activeMonth = getCurrentMonth(); mockFinance.loadCycle = vi.fn(); };
 
-  it('labels the header with the active cycle name when one exists', () => {
-    mockFinance.activeCycle = { id: 'cyc-may', name: 'May 2026', start_date: '2026-05-01', end_date: '2026-05-31' };
-    mockFinance.activeMonth = '2026-05';   // matches → no reset
+  it('labels the header with the CURRENT month name when one covers today', () => {
+    mockFinance.currentCycle = { id: 'cyc-may', name: 'May 2026', start_date: '2026-05-01', end_date: '2026-05-31' };
+    mockFinance.activeCycle  = mockFinance.currentCycle;
+    mockFinance.activeMonth  = '2026-05';   // matches → no reset
     renderHome();
     expect(screen.getByTestId('home-month-label').textContent).toBe('May 2026');
+    restoreCycle();
+  });
+
+  // THE label rule. activeCycle falls back to the most recently ended month, so
+  // before the split this rendered "August 2026" over September's dashboard — a past
+  // month's name presented as "now". The label must never borrow another month's name.
+  it('falls back to the plain calendar month when no month covers today, never a past month name', () => {
+    mockFinance.currentCycle = null;                                        // nothing covers today
+    mockFinance.activeCycle  = { id: 'cyc-aug', name: 'August 2026', start_date: '2026-08-01', end_date: '2026-08-31' };
+    mockFinance.activeCycleId = null;                                        // no drift reset
+    renderHome();
+    const label = screen.getByTestId('home-month-label').textContent;
+    expect(label).not.toBe('August 2026');
+    expect(label).toBe(formatMonth(getCurrentMonth()));
     restoreCycle();
   });
 
@@ -218,28 +234,14 @@ describe('HomeView', () => {
     restoreCycle();
   });
 
-  // ── Passive "no current period" prompt (Phase B) ──────────────────────────────
-  it('shows the no-current-period prompt when no live cycle covers today', () => {
-    mockFinance.cycles = [];   // brand-new / lapsed hub
+  // The "no budget month" banner is NOT mounted here any more — it has a single mount
+  // in DashboardShell (it used to render on both Home and Budget, showing twice on the
+  // Home → Budget journey). Its behaviour is covered by PeriodSetupPrompt.test.jsx.
+  it('does not mount the budget-month banner (single mount lives in the shell)', () => {
+    mockFinance.cycles = [];   // would have triggered the old in-view prompt
     renderHome();
-    expect(screen.getByTestId('no-current-period-prompt')).toBeTruthy();
-    mockFinance.cycles = undefined;
-  });
-
-  it('hides the prompt when a live cycle covers today', () => {
-    const today = getToday();
-    mockFinance.cycles = [{ id: 'now', start_date: today, end_date: today, deleted_at: null }];
-    renderHome();
-    expect(screen.queryByTestId('no-current-period-prompt')).toBeNull();
-    mockFinance.cycles = undefined;
-  });
-
-  it('routes to /budget when the prompt CTA is tapped', () => {
-    mockFinance.cycles = [];
-    mockNavigate.mockClear();
-    renderHome();
-    fireEvent.click(screen.getByTestId('create-period-cta'));
-    expect(mockNavigate).toHaveBeenCalledWith('/budget');
+    expect(screen.queryByTestId('period-setup')).toBeNull();
+    expect(screen.queryByTestId('period-receipt')).toBeNull();
     mockFinance.cycles = undefined;
   });
 
@@ -249,17 +251,6 @@ describe('HomeView', () => {
     const { container } = renderHome();
     expect(container.firstChild).toBeNull();
     mockFinance.cyclesLoading = false;
-  });
-
-  it('does NOT flash the no-current-period prompt while cycles are loading', () => {
-    // cycles=[] would normally show the prompt — the gate must suppress it until
-    // cycles resolve, so the cold-load flash never paints the banner.
-    mockFinance.cyclesLoading = true;
-    mockFinance.cycles = [];
-    renderHome();
-    expect(screen.queryByTestId('no-current-period-prompt')).toBeNull();
-    mockFinance.cyclesLoading = false;
-    mockFinance.cycles = undefined;
   });
 
   it('renders real content once cycles have loaded', () => {

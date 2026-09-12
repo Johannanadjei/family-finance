@@ -101,6 +101,34 @@ export const createBudgetPeriod = async (centreId, { name = null, startDate, end
 };
 
 /**
+ * AUTO-CONTINUE: guarantee a budget period covers today, carrying the previous
+ * period's plan forward so the new one is never empty. Wraps the
+ * ensure_current_budget_period SECURITY DEFINER RPC (scripts/migrate_28…sql).
+ *
+ * IDEMPOTENT — this is the property the client depends on. If a period already
+ * covers today the server returns it with created=false and writes NOTHING: no
+ * second period, no re-copied categories, no duplicates. That is what makes it safe
+ * for the client to call this on hub open. The server also owns the role gate
+ * (role-denied otherwise), the clipped range, and the tier clamp.
+ *
+ * The caller must STILL gate on can(role, 'manageCycles') before calling: a standard
+ * member's call would be refused by the server, but firing a doomed write on every
+ * hub open for every standard member is noise, not defence. See useFinance.
+ *
+ * @param {string} centreId
+ * @returns {Promise<{ data: { cycle_id: string, name: string, start_date: string,
+ *   end_date: string, created: boolean, source_cycle_id: string|null,
+ *   categories_carried: number, categories_skipped: number,
+ *   income_carried: number, income_skipped: number, tier: string }|null, error: any }>}
+ */
+export const ensureCurrentBudgetPeriod = async (centreId) => {
+  const { data, error } = await supabase.rpc('ensure_current_budget_period', { p_centre_id: centreId });
+
+  if (error) { console.error('[cycles.service] ensureCurrentBudgetPeriod error:', error.message); return { data: null, error }; }
+  return { data, error: null };
+};
+
+/**
  * Reset a FUTURE budget period: soft-delete its categories + transactions, leaving the
  * cycle row itself intact (it becomes empty → existing empty-state UX takes over).
  * Wraps the reset_budget_period SECURITY DEFINER RPC (scripts/migrate_18…sql): the

@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter }                          from 'react-router-dom';
 import { SettingsView }                          from './SettingsView';
-import { mockCentre, mockFmt, mockCategories, mockIncomes } from '../test-utils/fixtures';
+import { mockCentre, mockFmt, mockCategories, mockIncomes, mockCycles } from '../test-utils/fixtures';
 import { getCurrentMonth } from '../lib/dates';
 
 const mockUpdateCentre       = vi.fn().mockResolvedValue({ error: null });
@@ -62,6 +62,8 @@ vi.mock('../context/FinanceContext', () => ({
   useFinanceContext: () => ({
     incomes:             mockIncomes,
     allIncomes:          mockIncomes,
+    cycles:              mockCycles,
+    activeCycleId:       'cyc-this',
     viewedCycleId:       'cyc-this',
     loading:             false,
     prefs:               { themeSkin: 'family_warmth' },
@@ -146,17 +148,17 @@ describe('SettingsView', () => {
     expect(screen.getByTestId('income-label-inc-2')).toBeTruthy();
   });
 
-  // T4 (Phase 2A) — income sources are grouped under a month section header,
-  // and the current month is expanded by default. Collapsing hides its rows.
-  it('groups income sources under a month section, expanded by default', () => {
+  // Income sources group under a PERIOD section header (never a month — two
+  // periods can start in the same month), active period expanded by default.
+  it('groups income sources under a period section, expanded by default', () => {
     renderSettings();
-    expect(screen.getByTestId(`income-month-header-${getCurrentMonth()}`)).toBeTruthy();
+    expect(screen.getByTestId('income-period-header-cyc-this')).toBeTruthy();
     expect(screen.getByTestId('income-label-inc-1')).toBeTruthy();   // visible while expanded
   });
 
-  it('collapsing a month section hides its income rows', () => {
+  it('collapsing a period section hides its income rows', () => {
     renderSettings();
-    fireEvent.click(screen.getByTestId(`income-month-header-${getCurrentMonth()}`));
+    fireEvent.click(screen.getByTestId('income-period-header-cyc-this'));
     expect(screen.queryByTestId('income-label-inc-1')).toBeNull();
   });
 
@@ -192,7 +194,8 @@ describe('SettingsView', () => {
     });
     await act(async () => { screen.getByTestId('save-income-source-btn').click(); });
     expect(mockAddIncomeSource).toHaveBeenCalledWith(
-      expect.objectContaining({ label: 'Salary', pay_day_type: 'last_working_day', pay_day: null })
+      expect.objectContaining({ label: 'Salary', pay_day_type: 'last_working_day', pay_day: null }),
+      'cyc-this',
     );
   });
 
@@ -204,7 +207,8 @@ describe('SettingsView', () => {
     });
     await act(async () => { screen.getByTestId('save-income-source-btn').click(); });
     expect(mockAddIncomeSource).toHaveBeenCalledWith(
-      expect.objectContaining({ label: 'Freelance' })
+      expect.objectContaining({ label: 'Freelance' }),
+      'cyc-this',
     );
   });
 

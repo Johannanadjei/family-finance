@@ -18,7 +18,7 @@ import { MonthEmptyState }      from './MonthEmptyState';
 import { NoIncomeSourcesEmpty } from './NoIncomeSourcesEmpty';
 
 export function PaydayIncomeBody({
-  isFuture, isPast, periodLabel, prevPeriodLabel,
+  isFuture, isPast, isCurrent = true, cycle = null, periodLabel, prevPeriodLabel,
   pastIncomeTxs, incomes, fmt, mutating,
   prevSourceCount, copying, copyError,
   onCopyAll, onChooseWhich, onAddManually,
@@ -28,7 +28,7 @@ export function PaydayIncomeBody({
     return (
       <MonthEmptyState
         title={`No payday data for ${periodLabel} yet`}
-        subtitle="Income will appear here once this period arrives."
+        subtitle="Income will appear here once this month begins."
       />
     );
   }
@@ -62,6 +62,8 @@ export function PaydayIncomeBody({
       key={income.id}
       income={income}
       fmt={fmt}
+      cycle={cycle}
+      isCurrent={isCurrent}
       onConfirm={onConfirm}
       onMarkPending={onMarkPending}
       onUpdateExpected={onUpdateExpected}

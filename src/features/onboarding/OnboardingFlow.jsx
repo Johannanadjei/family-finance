@@ -39,6 +39,9 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
   const [surplusTarget, setSurplusTarget] = useState(0);
   const [centreId,      setCentreId]      = useState(existingCentreId || null);
   const [firstCycleId,  setFirstCycleId]  = useState(null);
+  // The first period's start month, kept so the RETRY path (which reuses firstCycleId
+  // without recomputing a range) still derives income's month from the cycle.
+  const [firstCycleMonth, setFirstCycleMonth] = useState(null);
   const [plan,          setPlan]          = useState('free');
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState(null);
@@ -96,7 +99,8 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
     // a sensible default — the calendar month containing today (Decision Q3) — via the
     // user-driven create_budget_period RPC. The user can edit/replace it later from the
     // Budget screen; onboarding doesn't make them choose. Retry skips this once created.
-    let activeCycleId = firstCycleId;
+    let activeCycleId    = firstCycleId;
+    let activeCycleMonth = firstCycleMonth;
     if (!activeCycleId) {
       const range = currentCalendarMonthRange(getToday());
       const { data: cycle, error: cycleErr } = await createBudgetPeriod(activeCentreId, {
@@ -107,8 +111,12 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
         setLoading(false);
         return;
       }
-      activeCycleId = cycle.id;
+      activeCycleId    = cycle.id;
+      // Prefer the server row (create_budget_period RETURNS budget_cycles); fall back to
+      // the range we asked for. Either way it is the PERIOD's month, never the clock's.
+      activeCycleMonth = cycle.start_date?.slice(0, 7) ?? range.start.slice(0, 7);
       setFirstCycleId(activeCycleId);
+      setFirstCycleMonth(activeCycleMonth);
     }
 
     // Step 2 — bulk insert categories, stamped with the first cycle's id
@@ -124,7 +132,9 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
     }
 
     // Step 3 — bulk insert income sources, stamped with the first cycle's id
-    const incomeRows = incomes.map(({ id, ...income }) => ({ ...income, month: getCurrentMonth() }));
+    // month is DERIVED from the period we just created, not from the clock — the
+    // cycle is the key, month is the stored label. (catRows above is a separate key path.)
+    const incomeRows = incomes.map(({ id, ...income }) => ({ ...income, month: activeCycleMonth }));
     const { error: incomeErr } = await bulkAddIncomeSources(activeCentreId, incomeRows, activeCycleId);
     if (incomeErr) {
       setError('We could not save your income streams. Please try again.');

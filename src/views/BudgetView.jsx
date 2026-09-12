@@ -115,8 +115,8 @@ export function BudgetView() {
     setCopiedCount(data?.length || 0);
   };
 
-  // Hold first paint until cycles resolve — else BudgetPeriodCreator's
-  // NoCurrentPeriodPrompt + empty categories flash before the period loads.
+  // Hold first paint until cycles resolve — else the header and an empty category
+  // list flash before the month loads.
   if (cyclesLoading) return null;
   if (loading) return <BudgetViewSkeleton />;
 
