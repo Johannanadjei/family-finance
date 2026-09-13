@@ -7,7 +7,8 @@
  *
  * @param {Category[]} data  — initial categories from OnboardingFlow
  * @param {function} fmt     — currency formatter from OnboardingFlow
- * @param {string}   plan    — 'free' | 'pro'; free is capped at the category limit
+ * @param {'free'|'pro'|null} plan — user's tier; free is capped at the category
+ *   limit, null (unresolved) renders no cap
  * @param {function} onNext  — (categories) => void
  * @param {function} onBack  — () => void
  */
@@ -23,7 +24,7 @@ const inputStyle = {
   fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)', boxSizing: 'border-box',
 };
 
-export function StepCategories({ data, fmt, plan = 'free', onNext, onBack }) {
+export function StepCategories({ data, fmt, plan = null, onNext, onBack }) {
   const [categories,   setCategories]   = useState(data);
   const [error,        setError]        = useState(null);
   const [openPickerId, setOpenPickerId] = useState(null); // row whose icon grid is open (one at a time)

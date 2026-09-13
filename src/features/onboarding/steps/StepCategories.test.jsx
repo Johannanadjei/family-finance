@@ -65,6 +65,19 @@ describe('StepCategories', () => {
     expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(false);
   });
 
+  // Unresolved tier renders NO cap — a brief uncapped beat on a free hub is harmless,
+  // a false "10 of 10" on a paid one is the bug this gate exists to avoid.
+  it('unresolved plan (null): the + Add button stays enabled at 10 categories', () => {
+    renderStep({ data: tenCats, plan: null });
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(false);
+    expect(screen.queryByText(/Free hubs can have up to/)).toBeNull();
+  });
+
+  it('omitted plan: the + Add button stays enabled at 10 categories', () => {
+    renderStep({ data: tenCats });
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(false);
+  });
+
   it('shows validation error when no categories', async () => {
     renderStep({ data: [] });
     await act(async () => { screen.getByText('Continue →').click(); });

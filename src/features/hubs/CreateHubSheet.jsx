@@ -4,6 +4,9 @@
  * Bottom sheet — 5-step flow to create an additional control centre.
  * Steps: Hub Type → Name / Currency → Categories → Income → Confirm
  * On completion calls onComplete(centreId) so App can switch hubs.
+ *
+ * `plan` is the caller's tier (App's newHubPlan) — the SECOND door to hub creation,
+ * fed exactly like the first; rule and rationale in OnboardingFlow's JSDoc.
  */
 
 import { useState, useMemo } from 'react';
@@ -33,7 +36,7 @@ const inputStyle = {
   fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
 };
 
-export function CreateHubSheet({ isOpen, onClose, onComplete }) {
+export function CreateHubSheet({ isOpen, onClose, onComplete, plan = null }) {
   const [step,       setStep]       = useState(0);
   const [hubType,    setHubType]    = useState(null);
   const [hubName,    setHubName]    = useState('');
@@ -159,17 +162,10 @@ export function CreateHubSheet({ isOpen, onClose, onComplete }) {
             </div>
           )}
 
-          {step === 2 && <StepCategories data={categories} fmt={fmt} onNext={handleCatsNext} onBack={() => setStep(1)} />}
+          {/* Both capped steps read the caller's real tier — never a literal. */}
+          {step === 2 && <StepCategories data={categories} fmt={fmt} plan={plan} onNext={handleCatsNext} onBack={() => setStep(1)} />}
 
-          {step === 3 && (
-            <StepIncome
-              data={incomes}
-              centreCurrency={currency}
-              plan="free"
-              onNext={handleIncomeNext}
-              onBack={() => setStep(2)}
-            />
-          )}
+          {step === 3 && <StepIncome data={incomes} centreCurrency={currency} plan={plan} onNext={handleIncomeNext} onBack={() => setStep(2)} />}
 
           {step === 4 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

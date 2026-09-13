@@ -62,17 +62,24 @@ vi.mock('./hooks/useFinance', () => ({
   useFinance: () => ({}),
 }));
 
+// Mutable so each test can land the subscription hook on a different tier/state.
+// Read lazily (inside the returned function), never at factory time.
+let subState = { tier: 'free', isLoading: false, error: null };
 vi.mock('./hooks/useSubscription', () => ({
   useSubscription: () => ({
-    subscription: null, tier: 'free', isActive: false, isPro: false,
-    isLoading: false, error: null, refresh: vi.fn(),
+    subscription: null, isActive: false, isPro: subState.tier === 'pro',
+    refresh: vi.fn(), ...subState,
   }),
 }));
 
-// OnboardingFlow stub — exposes the onComplete handoff as a clickable button.
+// OnboardingFlow stub — exposes the onComplete handoff as a clickable button and
+// renders the `plan` it was handed, so the App → onboarding tier seam is assertable.
 vi.mock('./features/onboarding/OnboardingFlow', () => ({
-  OnboardingFlow: ({ onComplete }) => (
-    <button data-testid="finish-onboarding" onClick={onComplete}>finish</button>
+  OnboardingFlow: ({ onComplete, plan }) => (
+    <>
+      <span data-testid="onboarding-plan">{String(plan)}</span>
+      <button data-testid="finish-onboarding" onClick={onComplete}>finish</button>
+    </>
   ),
 }));
 
@@ -82,6 +89,7 @@ describe('App — onboarding handoff', () => {
   beforeEach(() => {
     callOrder.length = 0;
     resolveReload = undefined;
+    subState = { tier: 'free', isLoading: false, error: null };
     reloadCentresSpy.mockClear();
     onOnboardingCompleteSpy.mockClear();
   });
@@ -105,5 +113,36 @@ describe('App — onboarding handoff', () => {
 
     expect(onOnboardingCompleteSpy).toHaveBeenCalledTimes(1);
     expect(callOrder).toEqual(['reload', 'complete']);
+  });
+
+  // ── Tier seam ─────────────────────────────────────────────────────────────
+  // OnboardingFlow used to resolve its own tier off users.plan — the column the
+  // subscriptions table replaced — so a Pro user was onboarded under free caps.
+  // The tier now comes from the same useSubscription read the dashboard uses.
+  // It is the VIEWER's tier, not a hub tier: the hub does not exist yet, and
+  // create_hub/create_category gate on the caller (see useHubTier's "NOT for the
+  // hub cap" note). Unresolved stays null — every step gate is `plan === 'free' && …`,
+  // so null renders no cap; 'free' would render a false one on a paid account.
+  it('passes the subscription tier into onboarding (pro)', async () => {
+    subState = { tier: 'pro', isLoading: false, error: null };
+    await act(async () => { render(<App />); });
+    expect(screen.getByTestId('onboarding-plan').textContent).toBe('pro');
+  });
+
+  it('passes the subscription tier into onboarding (free)', async () => {
+    await act(async () => { render(<App />); });
+    expect(screen.getByTestId('onboarding-plan').textContent).toBe('free');
+  });
+
+  it('passes null while the subscription is still loading', async () => {
+    subState = { tier: 'free', isLoading: true, error: null };
+    await act(async () => { render(<App />); });
+    expect(screen.getByTestId('onboarding-plan').textContent).toBe('null');
+  });
+
+  it('passes null when the subscription fetch failed (§12 — no cap off a failed read)', async () => {
+    subState = { tier: 'free', isLoading: false, error: 'network down' };
+    await act(async () => { render(<App />); });
+    expect(screen.getByTestId('onboarding-plan').textContent).toBe('null');
   });
 });

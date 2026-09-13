@@ -10,7 +10,9 @@ import { getCurrentMonth } from '../../lib/dates';
 
 export const STEPS = ['Hub', 'Income', 'Categories', 'Target', 'Complete'];
 
-export const MAX_FREE_INCOMES  = 2;
+// NOTE — there is no MAX_FREE_INCOMES here any more. Every tier cap comes from
+// lib/plans.js (FREE_LIMITS.maxIncomeStreams); StepIncome reads it via
+// getLimitsForTier(plan), the same way StepCategories reads the category cap.
 export const MAX_FREE_MEMBERS  = 2;
 export const MAX_FREE_CENTRES  = 1;
 export const MAX_PRO_CENTRES   = 10;

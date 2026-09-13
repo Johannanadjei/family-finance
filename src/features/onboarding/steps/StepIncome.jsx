@@ -2,13 +2,13 @@
  * features/onboarding/steps/StepIncome.jsx
  *
  * Step 2 — Income streams.
- * Free plan: max 2 income streams.
+ * Free plan is capped at FREE_LIMITS.maxIncomeStreams.
  * Each stream has label, icon, expected amount, pay day. Currency is hub-wide
  * (seeded from centreCurrency at insert), never picked per-stream.
  *
  * @param {IncomeStream[]} data    — initial income streams
  * @param {string} centreCurrency  — default currency for new streams
- * @param {string} plan            — 'free' | 'pro'
+ * @param {'free'|'pro'|null} plan — user's tier; null = unresolved → no cap renders
  * @param {function} onNext        — (incomes) => void
  * @param {function} onBack        — () => void
  */
@@ -16,7 +16,8 @@
 import { useState } from 'react';
 import { selectStyle }    from '../../../lib/selectStyle';
 import { validateIncomeStep } from '../onboarding.validation';
-import { INCOME_ICONS, MAX_FREE_INCOMES, emptyIncome } from '../onboarding.constants';
+import { getLimitsForTier } from '../../../lib/plans';
+import { INCOME_ICONS, emptyIncome } from '../onboarding.constants';
 
 const inputStyle = {
   width: '100%', padding: '12px 14px', borderRadius: 10,
@@ -55,19 +56,25 @@ function IncomeCard({ income, idx, total, onUpdate, onRemove }) {
   );
 }
 
-export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
+export function StepIncome({ data, centreCurrency, plan = null, onNext, onBack }) {
   const [incomes, setIncomes] = useState(
     data.length ? data : [emptyIncome(centreCurrency)]
   );
   const [error, setError] = useState(null);
 
-  const canAdd = plan === 'pro' || incomes.length < MAX_FREE_INCOMES;
+  // Income cap — same shape as StepCategories' CAT01 gate: the limit comes from
+  // lib/plans (one source of truth for every tier cap), and the gate is written
+  // `plan === 'free' && …` so an UNRESOLVED tier (null) renders no cap. The old
+  // `plan === 'pro' || count < MAX` polarity did the opposite: anything that was not
+  // literally 'pro' — including a tier still loading — got capped at 2.
+  const limit = getLimitsForTier(plan).maxIncomeStreams;
+  const atCap = plan === 'free' && incomes.length >= limit;
 
   const update = (id, field, value) =>
     setIncomes(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
 
   const addIncome = () => {
-    if (!canAdd) return;
+    if (atCap) return;
     setIncomes(prev => [...prev, emptyIncome(centreCurrency)]);
   };
 
@@ -89,7 +96,7 @@ export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
         </p>
         <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
           Add each source of income for this BOS Hub.
-          {plan === 'free' && ` Free plan includes ${MAX_FREE_INCOMES} income streams.`}
+          {plan === 'free' && ` Free plan includes ${limit} income streams.`}
         </p>
       </div>
 
@@ -108,7 +115,7 @@ export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
       </div>
 
       {/* Add income button */}
-      {canAdd ? (
+      {!atCap ? (
         <button
           onClick={addIncome}
           data-testid="income-stream-add-btn"
@@ -124,7 +131,7 @@ export function StepIncome({ data, centreCurrency, plan, onNext, onBack }) {
       ) : (
         <div style={{ background: '#fef3c7', borderRadius: 10, padding: '12px 14px' }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: '#92400e', margin: 0 }}>
-            Free plan includes {MAX_FREE_INCOMES} income streams. Upgrade to Pro for unlimited.
+            Free plan includes {limit} income streams. Upgrade to Pro for unlimited.
           </p>
         </div>
       )}

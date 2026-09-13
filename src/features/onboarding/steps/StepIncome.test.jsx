@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, act }      from '@testing-library/react';
 import { StepIncome }               from './StepIncome';
-import { MAX_FREE_INCOMES }         from '../onboarding.constants';
+import { FREE_LIMITS }              from '../../../lib/plans';
+
+// The cap the step renders — read from the single source of truth, not a local copy.
+const MAX_FREE_INCOMES = FREE_LIMITS.maxIncomeStreams;
 
 const renderStep = (props = {}) =>
   render(
@@ -41,13 +44,42 @@ describe('StepIncome', () => {
     expect(screen.getByText(/Upgrade to Pro/)).toBeTruthy();
   });
 
+  // A stream list of any length, for cap assertions.
+  const streams = (n) => Array.from({ length: n }, (_, i) => ({
+    id: `inc-${i}`, label: `Income ${i}`, icon: '💰',
+    expected_amount: 1000, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', notes: '',
+  }));
+
   it('shows add button on pro plan regardless of count', () => {
-    const maxIncomes = Array.from({ length: MAX_FREE_INCOMES }, (_, i) => ({
-      id: `inc-${i}`, label: `Income ${i}`, icon: '💰',
-      expected_amount: 1000, currency: 'GHS', pay_day: null, pay_day_type: 'flexible', notes: '',
-    }));
-    renderStep({ plan: 'pro', data: maxIncomes });
+    renderStep({ plan: 'pro', data: streams(MAX_FREE_INCOMES) });
     expect(screen.getByText('+ Add income stream')).toBeTruthy();
+  });
+
+  // Pro is UNCAPPED, not "capped one higher" — well past the free limit it still adds.
+  it('pro: add button stays visible far above the free limit', () => {
+    renderStep({ plan: 'pro', data: streams(MAX_FREE_INCOMES + 8) });
+    expect(screen.getByText('+ Add income stream')).toBeTruthy();
+    expect(screen.queryByText(/Upgrade to Pro/)).toBeNull();
+  });
+
+  // Polarity: the gate is `plan === 'free' && …`, so an UNRESOLVED tier renders no
+  // cap. The old `plan === 'pro' || count < MAX` form capped anything not literally
+  // 'pro' — including a Pro user whose tier had not loaded yet.
+  it('unresolved plan (null): no cap at the free limit', () => {
+    renderStep({ plan: null, data: streams(MAX_FREE_INCOMES) });
+    expect(screen.getByText('+ Add income stream')).toBeTruthy();
+    expect(screen.queryByText(/Upgrade to Pro/)).toBeNull();
+  });
+
+  it('omitted plan: no cap at the free limit', () => {
+    renderStep({ plan: undefined, data: streams(MAX_FREE_INCOMES) });
+    expect(screen.getByText('+ Add income stream')).toBeTruthy();
+  });
+
+  // Under the cap, so only the intro copy carries the number (the upgrade box is absent).
+  it('free: the intro copy quotes the limit from lib/plans', () => {
+    renderStep({ plan: 'free', data: streams(1) });
+    expect(screen.getByText(new RegExp(`Free plan includes ${MAX_FREE_INCOMES} income streams`))).toBeTruthy();
   });
 
   it('shows pay day input only when fixed_date selected', () => {
