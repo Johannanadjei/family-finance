@@ -10,10 +10,31 @@
  *
  * @param {function}    onComplete        — called after all writes succeed
  * @param {string|null} existingCentreId  — set when resuming after partial write
+ * @param {'free'|'pro'|null} plan        — the signed-in user's tier, threaded from
+ *   App.jsx. This component does NOT resolve it.
+ *
+ * TIER — why it arrives as a prop
+ *   This flow used to fetch its own tier from users.plan, the column the
+ *   subscriptions table replaced (see useSubscription). That read returned free for
+ *   everyone, so a paying user was onboarded under the FREE caps — 10 categories,
+ *   2 income streams — on the very hub they had paid to make bigger, with no way to
+ *   tell until after setup. App.jsx already holds the resolved tier; threading it in
+ *   deletes the fetch rather than duplicating it (same shape as existingCentreId).
+ *
+ *   It is the VIEWER's tier (userPlan), not a hub tier: there is no hub yet, and
+ *   create_hub/create_category gate on the CALLER — a hub you create is one you will
+ *   own. See useHubTier's "NOT for the hub cap" note.
+ *
+ *   null means UNRESOLVED (still loading, or the fetch failed), never 'free'. Both
+ *   capped steps gate on `plan === 'free' && …`, so null renders no cap — a false cap
+ *   on a paid account is the bug above, and an uncapped beat on a free one is the
+ *   cheaper failure. Same bias as useHubTier. The two caps are NOT equally backed
+ *   though: categories are re-checked server-side (create_categories_bulk → CAT01, on
+ *   the OWNER's tier), income sources are a plain insert with no server cap today, so
+ *   for income this gate is the only enforcement there is.
  */
 
 import { useState, useMemo } from 'react';
-import { supabase }           from '../../lib/supabase';
 import { makeFmt, getCurrentMonth } from '../../lib/finance';
 import { getToday }           from '../../lib/dates';
 import { currentCalendarMonthRange } from '../../lib/cycles';
@@ -29,7 +50,7 @@ import { StepCategories }     from './steps/StepCategories';
 import { StepTarget }         from './steps/StepTarget';
 import { StepComplete }       from './steps/StepComplete';
 
-export function OnboardingFlow({ onComplete, existingCentreId }) {
+export function OnboardingFlow({ onComplete, existingCentreId, plan = null }) {
   const [step,          setStep]          = useState(0);
   const [centreData,    setCentreData]    = useState({ name: '', currency: 'GHS', icon: '🏠' });
   const [incomes,       setIncomes]       = useState([]);
@@ -42,22 +63,8 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
   // The first period's start month, kept so the RETRY path (which reuses firstCycleId
   // without recomputing a range) still derives income's month from the cycle.
   const [firstCycleMonth, setFirstCycleMonth] = useState(null);
-  const [plan,          setPlan]          = useState('free');
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState(null);
-
-  // Fetch user plan on mount
-  useState(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      supabase
-        .from('users')
-        .select('plan')
-        .eq('id', user.id)
-        .single()
-        .then(({ data }) => { if (data?.plan) setPlan(data.plan); });
-    });
-  });
 
   const fmt          = useMemo(() => makeFmt(centreData.currency), [centreData.currency]);
   const totalIncome  = useMemo(() => incomes.reduce((s, i) => s + Number(i.expected_amount || 0), 0), [incomes]);
@@ -165,6 +172,9 @@ export function OnboardingFlow({ onComplete, existingCentreId }) {
         </div>
         <OnboardingProgress currentStep={step} totalSteps={STEPS.length} steps={STEPS} />
 
+        {/* `plan` is threaded straight through to the two capped steps — this component
+            never fetches it. Both gates are written `plan === 'free' && …`, so a null
+            (unresolved) tier renders no cap rather than a false one. */}
         {step === 0 && <StepCentre     data={centreData}    onNext={handleCentreNext} />}
         {step === 1 && <StepIncome     data={incomes}       centreCurrency={centreData.currency} plan={plan} onNext={handleIncomeNext} onBack={goBack} />}
         {step === 2 && <StepCategories data={categories}    fmt={fmt} plan={plan} onNext={handleCatsNext}   onBack={goBack} />}
