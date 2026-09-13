@@ -10,11 +10,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { OnboardingFlow } from './OnboardingFlow';
 
+// Inert Supabase stub — OnboardingFlow no longer touches the client (the tier now
+// arrives as a prop from App.jsx), but a transitive import must never construct a
+// real client. Any read through this stub would throw, which is the point.
 vi.mock('../../lib/supabase', () => ({
-  supabase: {
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } }, error: null }) },
-    from: () => ({ select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { plan: 'free' }, error: null }) }) }) }),
-  },
+  supabase: { auth: {}, from: () => ({}), rpc: () => ({}) },
 }));
 vi.mock('../../services/centres.service', () => ({
   createCentre: vi.fn().mockResolvedValue({ data: { id: 'c-new' }, error: null }),
@@ -125,5 +125,68 @@ describe('OnboardingFlow — first-cycle CYC02 closure', () => {
   it('exposes the onboarding-flow testid on the root', () => {
     render(<OnboardingFlow onComplete={vi.fn()} />);
     expect(screen.getByTestId('onboarding-flow')).toBeTruthy();
+  });
+});
+
+// ── Tier threading ──────────────────────────────────────────────────────────
+// The flow does not resolve the user's tier — App.jsx passes it in. It used to
+// fetch users.plan itself, a column the subscriptions table replaced, so a paying
+// user was silently onboarded under the FREE caps: 10 categories, 2 income streams,
+// on the very hub they had paid to make bigger. These tests pin the seam.
+describe('OnboardingFlow — tier threading', () => {
+  const goToCategories = () => {
+    fireEvent.change(screen.getByPlaceholderText("e.g. The Adjei's"), { target: { value: 'My Hub' } });
+    fireEvent.click(screen.getByText('Continue →'));   // step 0 → 1
+    fireEvent.click(screen.getByText('Skip for now')); // step 1 → 2
+  };
+
+  // The onboarding seed is exactly 10 categories — the free cap — so a Pro user
+  // hits the gate on arrival at the step, before touching anything.
+  it('pro: the categories step is uncapped at the 10 seeded defaults', () => {
+    render(<OnboardingFlow onComplete={vi.fn()} plan="pro" />);
+    goToCategories();
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(false);
+    expect(screen.queryByText(/Free hubs can have up to/)).toBeNull();
+  });
+
+  it('free: the categories step caps at the 10 seeded defaults', () => {
+    render(<OnboardingFlow onComplete={vi.fn()} plan="free" />);
+    goToCategories();
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(true);
+    expect(screen.getByText(/Free hubs can have up to 10 categories/)).toBeTruthy();
+  });
+
+  it('unresolved tier (null, the default): no cap renders on the categories step', () => {
+    render(<OnboardingFlow onComplete={vi.fn()} />);
+    goToCategories();
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(false);
+  });
+
+  it('pro: the income step adds past the free limit of 2', () => {
+    render(<OnboardingFlow onComplete={vi.fn()} plan="pro" />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. The Adjei's"), { target: { value: 'My Hub' } });
+    fireEvent.click(screen.getByText('Continue →'));                    // step 0 → 1
+    fireEvent.click(screen.getByTestId('income-stream-add-btn'));       // 1 → 2 streams
+    fireEvent.click(screen.getByTestId('income-stream-add-btn'));       // 2 → 3 streams
+    expect(screen.getAllByText(/Income Stream/)).toHaveLength(3);
+    expect(screen.getByTestId('income-stream-add-btn')).toBeTruthy();
+  });
+
+  it('free: the income step stops at 2 streams with the upgrade note', () => {
+    render(<OnboardingFlow onComplete={vi.fn()} plan="free" />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. The Adjei's"), { target: { value: 'My Hub' } });
+    fireEvent.click(screen.getByText('Continue →'));
+    fireEvent.click(screen.getByTestId('income-stream-add-btn'));       // 1 → 2 streams
+    expect(screen.queryByTestId('income-stream-add-btn')).toBeNull();
+    expect(screen.getByText(/Upgrade to Pro/)).toBeTruthy();
+  });
+
+  it('unresolved tier (null): the income step does not cap at 2 streams', () => {
+    render(<OnboardingFlow onComplete={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. The Adjei's"), { target: { value: 'My Hub' } });
+    fireEvent.click(screen.getByText('Continue →'));
+    fireEvent.click(screen.getByTestId('income-stream-add-btn'));       // 1 → 2 streams
+    expect(screen.getByTestId('income-stream-add-btn')).toBeTruthy();
+    expect(screen.queryByText(/Upgrade to Pro/)).toBeNull();
   });
 });

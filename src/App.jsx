@@ -58,7 +58,7 @@ import { JoinView }                              from './views/JoinView';
 import { LegalView, resolveLegalSlug }           from './views/LegalView';
 import { ResetPasswordScreen, isResetPasswordPath } from './views/ResetPasswordScreen';
 
-function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, hubCount, onSwitchCentre, onHubCreated, onRestoreHub }) {
+function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, newHubPlan, hubCount, onSwitchCentre, onHubCreated, onRestoreHub }) {
   const navigate                           = useNavigate();
   const isPricing                          = useLocation().pathname === '/pricing';  // chrome-less full-screen route
   const { can }                            = useBudgetCentreContext();
@@ -150,7 +150,7 @@ function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, hu
         hubCount={hubCount}
       />
       <CreateHubSheet
-        isOpen={createHubOpen}
+        isOpen={createHubOpen} plan={newHubPlan}
         onClose={() => setCreateHubOpen(false)}
         onComplete={handleHubCreatedNav}
       />
@@ -173,6 +173,9 @@ export default function App() {
   // Spread into FinanceContext below as `userPlan`; consumers migrate to useIsPro() in gate work.
   const subscription                                       = useSubscription(user);
   const userPlan                                           = subscription.tier;
+  // Tier for a hub you are about to CREATE — both doors (onboarding, CreateHubSheet).
+  // Caller's own tier, null while unresolved/failed. See OnboardingFlow's JSDoc.
+  const newHubPlan = subscription.isLoading || subscription.error ? null : userPlan;
   const { centre, allCategories, reloadCategories, members, currentMemberRole,
           addCategory, updateCentre, updateCentreSkin, updateCategory, deleteCategory,
           prevMonthCategories, loadPrevMonthCategories, copyCategoriesToMonth,
@@ -335,10 +338,7 @@ export default function App() {
   if (centreLoading)   return <LoadingScreen message="Setting up your dashboard..." />;
   if (error)           return <ErrorScreen message={error} />;
   if (needsOnboarding) return (
-    <OnboardingFlow
-      onComplete={handleOnboardingComplete}
-      existingCentreId={centre?.id || null}
-    />
+    <OnboardingFlow onComplete={handleOnboardingComplete} existingCentreId={centre?.id || null} plan={newHubPlan} />
   );
   if (removedFromHub) return (
     <RemovedScreen
@@ -388,7 +388,7 @@ export default function App() {
           centres={centres}
           archivedCentres={archivedCentres}
           activeCentreId={centre?.id || null}
-          userPlan={userPlan}
+          userPlan={userPlan} newHubPlan={newHubPlan}
           hubCount={centres.filter(c => c.owner_id === user?.id).length}
           onSwitchCentre={handleSwitchCentre}
           onHubCreated={handleHubCreated}

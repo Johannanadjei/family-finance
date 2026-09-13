@@ -211,3 +211,49 @@ describe('CreateHubSheet', () => {
     expect(onComplete).not.toHaveBeenCalled();                        // stop-before-submit honoured
   });
 });
+
+// ── Tier threading (the second door) ────────────────────────────────────────
+// This sheet is only reachable on a PAID account — free tier allows one hub — yet it
+// used to hardcode plan="free" on the income step and pass nothing to the categories
+// step. Both now take the caller's real tier from App (newHubPlan), exactly as
+// OnboardingFlow does. The family_home preset seeds 13 categories, already past the
+// free cap of 10, so the categories gate shows on arrival with no interaction.
+describe('CreateHubSheet — tier threading', () => {
+  it('pro: the categories step is uncapped on the 13-category family_home preset', () => {
+    renderSheet({ plan: 'pro' });
+    goToStep2();
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(false);
+    expect(screen.queryByText(/Free hubs can have up to/)).toBeNull();
+  });
+
+  it('pro: the income step adds past the free limit of 2', () => {
+    renderSheet({ plan: 'pro' });
+    goToStep3();
+    fireEvent.click(screen.getByTestId('income-stream-add-btn'));   // 1 → 2 streams
+    fireEvent.click(screen.getByTestId('income-stream-add-btn'));   // 2 → 3 streams
+    expect(screen.getAllByText(/Income Stream/)).toHaveLength(3);
+    expect(screen.getByTestId('income-stream-add-btn')).toBeTruthy();
+    expect(screen.queryByText(/Upgrade to Pro/)).toBeNull();
+  });
+
+  // Defensive: the sheet should never open on a free account, but if it is handed
+  // 'free' it must honour it rather than quietly running uncapped.
+  it('free: both steps cap', () => {
+    renderSheet({ plan: 'free' });
+    goToStep2();
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(true);
+    fireEvent.click(screen.getByText('Continue →'));                // → income step
+    fireEvent.click(screen.getByTestId('income-stream-add-btn'));   // 1 → 2 streams
+    expect(screen.queryByTestId('income-stream-add-btn')).toBeNull();
+    expect(screen.getByText(/Upgrade to Pro/)).toBeTruthy();
+  });
+
+  it('unresolved tier (null, the default): neither step caps', () => {
+    renderSheet();
+    goToStep2();
+    expect(screen.getByTestId('onboarding-add-category-btn').disabled).toBe(false);
+    fireEvent.click(screen.getByText('Continue →'));                // → income step
+    fireEvent.click(screen.getByTestId('income-stream-add-btn'));   // 1 → 2 streams
+    expect(screen.getByTestId('income-stream-add-btn')).toBeTruthy();
+  });
+});
