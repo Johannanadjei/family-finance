@@ -317,6 +317,115 @@ keep reading as done.
 
 ---
 
+## Journey (e2e) coverage — three shipped bugs passed 1882 green unit tests — 🧭 WORKSTREAM (captured 2026-09-13, not started)
+
+**The systemic lesson from the week of 2026-09-08.** Three bugs reached a user with the
+full suite green:
+
+| Bug | What broke | Why unit tests missed it |
+|---|---|---|
+| White-screen (`PeriodSetupPrompt` unimported, 2026-09-05) | Dashboard rendered a blank page | Component tests import the component directly; the file that MOUNTS it is never rendered |
+| Pro account gets the FREE 10-category cap in onboarding (diagnosed 2026-09-13) | `OnboardingFlow` reads the dead `users.plan` column instead of `subscriptions` | `StepCategories.test.jsx` passes `plan` as a **prop**. The prop is always what the test says it is — the resolution of that prop is what's broken, and nothing tests it |
+| Income invisible on Payday (income's two period keys) | Payday empty on a real hub | Read path and write path are each unit-tested and each correct **in isolation**; they disagree only when a real hub holds two same-month cycles |
+
+The common shape: **every one of these lives in the seam between units, not inside one.**
+Unit-green ≠ works. Journey coverage is the gap, and it is a standing investment, not a
+one-off fix.
+
+### Correction to the framing — the harness already exists, and CI already runs it
+
+Priority 3 ("wire it into CI") is **already done** and has been since `ce46234`:
+
+- `playwright.config.js` — Chromium, dev server auto-booted, `e2e/` excluded from vitest
+- `.github/workflows/ci.yml` — job "Test, Audit & E2E" runs `npm test` → `scripts/audit.sh`
+  → `npm run test:e2e` on **every push to `main` / `staging` / `dev`** and on PRs
+- `e2e/helpers/test-base.js` — the §0 write-rail
+- `docs/qa/phase-1-stage-1-coverage.md` — the full Stage 1 spec, all questions closed
+- `docs/qa/fixture-accounts.md` + `src/lib/fixtures.js` — 7 manually seeded fixtures
+
+What actually runs is **one spec**: `e2e/smoke-signin.spec.js`, which signs the `fresh`
+fixture in and asserts it lands on onboarding. That is the entire journey suite. So the
+gap is not infrastructure — it is **specs**. The plan for those specs is already written
+(Phase 3 in the QA docs: "Playwright + visual baselines"); it was never executed past the
+harness-proving smoke test.
+
+Two structural facts that shape everything below:
+
+1. **The §0 write-rail ABORTS every POST/PUT/PATCH/DELETE to `/rest/v1/*`** and fails the
+   test if one fires. Stage 1 is stop-before-submit by design. So any journey that ends in
+   a Save **cannot be written today** — not "hasn't been", *cannot*.
+2. **There is no test database.** `oxpwgpugvucsqnzixafi` is shared across dev / staging /
+   main (see memory: single Supabase project). `docs/qa/ci-setup.md` § Known gaps is
+   explicit: *"Before any write-exercising test lands, this needs a scratch project."*
+   That is the keystone blocker for Stage 2, and it is a real piece of work — a second
+   project, a schema replay (`scripts/REPLAY.md`), programmatic role/state seeding, and a
+   reset mechanism.
+
+### The insight that makes this investable NOW
+
+The instinct is "we're blocked on the test DB." **We are not, for most of it.** Split the
+five requested journeys by whether the assertion needs a write:
+
+**Tier A — READ-ONLY, buildable today inside Stage 1, no test DB, no rail change:**
+
+| Journey | What it asserts | What it needs |
+|---|---|---|
+| Dashboard renders after login | Sign in a **seeded** fixture → `#app-shell` visible, no console error, each of the 5 routes renders | Nothing new. `App.dashboard.test.jsx` covers the unit side; this covers the real one. **Would have caught the white-screen.** |
+| Onboarding category step as a PRO user | Sign in Pro-with-0-hubs → step 3 → "+ Add category" **enabled** at 10, no "Free hubs can have up to 10" copy | **An 8th fixture: `proFresh`** — a Pro subscription with zero hubs. The existing `pro` fixture owns hubs, so it renders the dashboard and can never reach onboarding. The assertion is pre-write. **Would have caught the Pro-cap bug.** |
+| Income shows on Payday | Sign in a fixture whose hub holds two same-month cycles → Payday lists the income source | A fixture seeded into that data shape. Pure read. **Would have caught the Payday bug.** |
+
+All three of this week's bugs sit in Tier A. None of them needed a write. The suite that
+would have caught all three is buildable against the existing harness.
+
+**Tier B — genuinely write-dependent, blocked on the scratch project (Stage 2):**
+
+| Journey | Why it's blocked |
+|---|---|
+| Expense saves on today's date | Terminal Save → rail aborts it. Needs a writable DB + reset. |
+| Create hub + add categories (the full onboarding *completion*) | `create_hub` / `create_categories_bulk` RPCs are writes. Stage 1 can drive steps 0-4 and stop at Confirm; only the Confirm is Stage 2. |
+| Subscription cancel | Paystack hosted flow + webhook. The furthest out — needs test-mode keys as well as the scratch project. |
+
+### Priority order (as agreed, re-sequenced against what exists)
+
+1. **ESLint** — unchanged, still first, cheapest. Already captured in full below:
+   *"No ESLint in the repo — a missing import white-screened production-shaped code"*
+   (`react/jsx-no-undef` + `no-undef`, ~30 min, catches the whole class). Interim
+   mitigation (`scripts/check-jsx-imports.mjs` audit check **P** + `App.dashboard.test.jsx`)
+   already shipped; ESLint closes the category. **Do this one on its own, first.**
+2. **Tier A journey specs** — three specs, incremental, one per commit, against the
+   existing harness. Blocked only on seeding the `proFresh` fixture + the two-cycle hub
+   fixture (manual, by hand, per `docs/qa/fixture-accounts.md` — the sanctioned exception
+   to the no-writes rule). Highest value per hour in this whole entry.
+3. **Scratch Supabase project** — the Stage 2 keystone. Unblocks Tier B, and also removes
+   the standing CI smell that every run signs a fixture into **production** auth logs.
+4. **Tier B journey specs** — after 3. Expense-save first, onboarding-confirm second,
+   cancel last.
+
+### Guardrails when picking this up
+
+- **Target journeys, not coverage.** Five specs that walk what users actually do beat
+  fifty that assert DOM trivia. The QA doc's §2 CTA matrix is a menu, not a mandate.
+- **Do NOT loosen the §0 write-rail to make a Tier-B test pass.** The rail is what keeps
+  the shared production project intact. The rail is not the problem; the missing test DB
+  is. Loosening it trades a caught bug for a corrupted fixture and silently-drifted
+  baselines.
+- **Every Tier A spec must be shown to FAIL against the bug it targets** before it lands —
+  revert the fix locally, watch it go red, restore. A journey test that has never failed
+  is decoration. (`App.dashboard.test.jsx` was verified this way; keep the habit.)
+- **Fixture seeding is a one-time manual write by a human, never by the suite.** New
+  fixtures get a numbered section in `docs/qa/fixture-accounts.md` and an entry in
+  `src/lib/fixtures.js` in the same commit, or the two drift.
+- The seven existing fixtures are **read-only by construction**. Signing in is fine;
+  anything else corrupts a baseline.
+
+**Related:** the ESLint entry (priority 1) · `docs/qa/phase-1-stage-1-coverage.md` §7
+(Stage 2 pre-requisites — the definitive list, already written) · `docs/qa/ci-setup.md`
+§ Known gaps (production-DB caveat) · "CI does not run on feature branches" (a separate
+hole in the same safety net: journey specs that only run on `dev`/`staging`/`main` still
+miss a feature branch).
+
+---
+
 ## Installed PWA never auto-updates — users must uninstall + reinstall to get a new deploy — 🔍 INVESTIGATE, NEXT PHASE (captured 2026-09-10, not built)
 
 **Priority within the next phase.** Reported by real users: after a deploy, the installed
@@ -457,6 +566,10 @@ checklist), and missing effect dependencies.
    import is removed.
 
 Those two close the specific hole. ESLint closes the category.
+
+**This entry is priority 1 of the journey-coverage workstream** — see *"Journey (e2e)
+coverage — three shipped bugs passed 1882 green unit tests"* above. Same root cause
+(unit-green ≠ works), and this is the cheapest slice of it: land it first, on its own.
 
 **What it would take:** `eslint`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, a
 flat config, an `npm run lint` script, and a CI step before `npm test`. The one judgement
@@ -1492,6 +1605,96 @@ resurrection guards free of legitimate-flow risk, and it is also why this gap we
 **Schedule:** OPEN, low frequency but total when hit. Most likely on a **Free** hub, where the
 2-member cap makes remove-then-re-invite a natural way to swap who is in the household. Worth
 fixing before launch; a one-function change with no RLS interaction.
+
+---
+
+## `HubFooter` offers "Upgrade to add more hubs" to a PRO user while the subscription is still loading — OPEN, POST-MVP (transient false cap)
+
+**Same class as the two tier bugs fixed 2026-09-13** (`OnboardingFlow` reading the dead
+`users.plan`; `CreateHubSheet` hardcoding `plan="free"`): a tier read that answers **'free'
+before it knows**. This is the last one left in the hub-creation path, and it sits one layer
+IN FRONT of the sheet those fixes corrected — it is the button that opens it.
+
+**The mechanism** (verified 2026-09-13, do not re-derive):
+
+- `useSubscription` starts at `subscription: null`, and `resolveSubscription(null)` returns
+  `tier: 'free'` (`subscriptions.service.js:87`). So `userPlan` is a truthy `'free'` for the
+  whole load window — and after a failed fetch — not a null meaning "unknown".
+- `App.jsx` passes that `userPlan` → `SidePanel` → `HubFooter`, which computes
+  `maxHubs = getLimitsForTier(userPlan).maxHubs` (1 on free) and `atCap = hubCount >= maxHubs`.
+- A Pro user with ≥1 hub who opens the panel inside that window gets the
+  `upgrade-add-hub-btn` CTA instead of `new-hub-btn` — offered an upgrade they already bought,
+  and unable to reach the create-hub sheet until the fetch lands.
+
+**Why it is DEFERRED, not fixed with the 2026-09-13 pair** (decided 2026-09-13): it is
+transient and self-correcting — the CTA flips to "+ New BOS Hub" as soon as the subscription
+resolves, and reopening the panel is enough. Nothing is granted or written; a button is briefly
+wrong. The other two were permanent-for-the-session state on a screen the user was actively
+filling in.
+
+**Why it is NOT the same one-line swap.** `App.jsx` already computes `newHubPlan`
+(null while unresolved or failed) for both creation doors, and passing it straight through
+makes this WORSE: `getLimitsForTier(null)` falls back to `FREE_LIMITS`, so `maxHubs` is still
+1, `atCap` is still true, but `userPlan === 'free'` is now false — dropping the user into the
+`"Maximum 1 hubs reached"` branch, which has no CTA at all. `HubFooter` needs its OWN null
+branch first, honouring the convention the rest of the codebase already uses (null = tier
+unknown = render NO cap — see `useHubTier` and `OnboardingFlow`'s JSDoc): while `plan == null`,
+render the plain `new-hub-btn` and let `create_hub`'s HUB01 be the authority if the user is in
+fact at their cap. Then thread `newHubPlan` in.
+
+**Scope when picked up:** `HubFooter` (null branch + prop), `SidePanel` (pass-through),
+`App.jsx` (swap the prop — note the file sits exactly on its 400-line audit cap), plus a
+`HubFooter` test for the unresolved state. Check `UpgradeModal` / `/pricing` routing is
+untouched; the CTA itself is correct on a genuinely free account at cap.
+
+**Schedule:** OPEN. Bundle with the next tier-gate pass. Not launch-blocking — worst case is a
+Pro user waiting a beat or reopening the drawer.
+
+---
+
+## Free income-stream cap (`maxIncomeStreams`) is gated in ONE screen and enforced nowhere server-side — OPEN, POST-MVP (revenue integrity)
+
+**Decision already taken** — `docs/engineering-decisions.md` (caps sweep, 2026-07-30):
+`maxIncomeStreams` **ENFORCE, PER-CYCLE**. Per-cycle rather than per-hub because rollforward
+copies income sources into every new period, so a per-hub cap would self-breach on the second
+period; per-cycle also matches the category cap (D1), so both caps share one mental model.
+This entry is the ready-to-build record of that decision, plus what is true in the code today.
+
+**What exists today** (verified 2026-09-13, do not re-derive):
+
+| Layer | State |
+|---|---|
+| `lib/plans.js` | `FREE_LIMITS.maxIncomeStreams = 2` declared |
+| Client gate | **`StepIncome` only** — `getLimitsForTier(plan).maxIncomeStreams`, reached from onboarding and `CreateHubSheet` |
+| Post-setup add (Settings → Income sources → `addIncomeSource`) | **no gate at all** — no tier read, no cap |
+| Server | **none** — `addIncomeSource` / `bulkAddIncomeSources` are direct `income_sources` inserts, no RPC, no `INC01`, and no RLS predicate references tier |
+
+So the cap applies on exactly one screen, during hub setup, and a free user can add a third
+income stream from Settings a minute later through the ordinary UI. Contrast the category cap,
+which has both an RPC (`create_categories_bulk` → CAT01) and, since 2026-08-25, an RLS door.
+
+**Accepted edge case — the unresolved-tier window (recorded 2026-09-13).** The hub-creation
+steps now render NO cap while the tier is unresolved (`plan === null`: subscription still
+loading, or its fetch failed), because a false cap on a paid account is the worse failure —
+see `OnboardingFlow`'s JSDoc and `useHubTier`. For categories that is free of consequence: the
+server re-checks CAT01 on the owner's tier. For income it means a free user whose subscription
+read fails could seed a third stream during setup and keep it. **Knowingly accepted** until the
+server enforcement above lands, on three grounds: it needs a failed/slow fetch to reach, the
+same user can do it unconditionally from Settings one screen later anyway (row 3 above), and the
+alternative bias — cap on unresolved — reintroduces the exact false-cap bug the null was chosen
+to kill. Revisit as part of the enforcement work, not before.
+
+**Shape of the fix.** Mirror the category path: a `create_income_source` (and bulk sibling)
+`SECURITY DEFINER` RPC that counts live rows for the target `cycle_id`, resolves the hub
+OWNER's tier, and raises `INC01` past the cap; then close the direct-insert door on
+`income_sources` the way Leak 1 was closed (`_insert WITH CHECK (false)`, all writes through
+the RPC). Add the client gate to the Settings add path at the same time so the UI stops
+promising something the server will refuse. Check every other `income_sources` INSERT first —
+rollforward copies sources into each new period and MUST be exempt from (or run above) the cap.
+
+**Schedule:** OPEN. Not launch-blocking — it is revenue integrity over the user's own hub, like
+the other cap work, and the affected number is 2 vs 3 income streams. Do it with, or just
+after, the next paid-capability pass.
 
 ---
 
