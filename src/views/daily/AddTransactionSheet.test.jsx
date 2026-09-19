@@ -23,11 +23,14 @@ const mockUpdateTransaction = vi.fn().mockResolvedValue({ error: null });
 let mockSpareMoney          = 5000;
 let mockCan                 = () => true;
 
+let mockIncomes = [{ id: 'src-1', label: 'Adjei' }];
+
 vi.mock('../../context/FinanceContext', () => ({
   useFinanceContext: () => ({
     addTransaction:    mockAddTransaction,
     updateTransaction: mockUpdateTransaction,
     spareMoney:        mockSpareMoney,
+    incomes:           mockIncomes,
   }),
 }));
 
@@ -113,15 +116,58 @@ describe('AddTransactionSheet', () => {
     );
   });
 
-  it('saves as Other when no source selected for income', async () => {
+  // #4b — income with no source is what produced unattributable money in production.
+  // Saving is now blocked until the user picks one, including "Other / one-off".
+  it('refuses to save income until a source is chosen', async () => {
     renderSheet();
     await act(async () => { screen.getByText('Income').click(); });
     await act(async () => {
       fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '500' } });
     });
     await act(async () => { screen.getByText('Save').click(); });
+    expect(mockAddTransaction).not.toHaveBeenCalled();
+    expect(screen.getByText('Choose an income source')).toBeTruthy();
+  });
+
+  it('links the transaction to the chosen source and uses its label', async () => {
+    renderSheet();
+    await act(async () => { screen.getByText('Income').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '27942' } });
+    });
+    await act(async () => { screen.getByTestId('income-source-src-1').click(); });
+    await act(async () => { screen.getByText('Save').click(); });
     expect(mockAddTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'income', category_name: 'Other' })
+      expect.objectContaining({ type: 'income', income_source_id: 'src-1', category_name: 'Adjei' })
+    );
+  });
+
+  // The escape hatch must stay open: genuinely ad-hoc income has no source, and a
+  // NULL FK here is deliberate, not an accident. Payday shows it as Unassigned.
+  it('saves one-off income with a NULL source id and the typed name', async () => {
+    renderSheet();
+    await act(async () => { screen.getByText('Income').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '500' } });
+    });
+    await act(async () => { screen.getByTestId('income-source-other').click(); });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('add-category-input'), { target: { value: 'Gift' } });
+    });
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(mockAddTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'income', income_source_id: null, category_name: 'Gift' })
+    );
+  });
+
+  it('never stamps a source id on an expense', async () => {
+    renderSheet();
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('add-amount-input'), { target: { value: '100' } });
+    });
+    await act(async () => { screen.getByText('Save').click(); });
+    expect(mockAddTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'expense', income_source_id: null })
     );
   });
 
