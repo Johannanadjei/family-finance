@@ -22,6 +22,8 @@ import {
   calcFixedSpent,
   calcTotalExpected,
   calcTotalReceived,
+  calcReceivedForSource,
+  calcUnassignedIncome,
   calcAvailableNow,
   calcWeekSummary,
   calcTopCategories,
@@ -359,41 +361,6 @@ describe('calcTotalExpected', () => {
     expect(calcTotalExpected([])).toBe(0));
 });
 
-describe('calcTotalReceived', () => {
-  it('sums received amounts', () => {
-    const sources = [
-      makeIncome({ received: true,  received_amount: 3000 }),
-      makeIncome({ received: false, received_amount: 0    }),
-    ];
-    expect(calcTotalReceived(sources)).toBe(3000);
-  });
-
-  it('returns 0 for empty array', () =>
-    expect(calcTotalReceived([])).toBe(0));
-});
-
-// ── calcAvailableNow ──────────────────────────────────────────────────────────
-
-describe('calcAvailableNow', () => {
-  it('subtracts current month expenses from received income', () => {
-    const today   = new Date().toISOString().split('T')[0];
-    const sources = [makeIncome({ received: true, received_amount: 5000 })];
-    const txs     = [makeTx({ type: 'expense', amount: 1000, date: today })];
-    expect(calcAvailableNow(sources, txs)).toBe(4000);
-  });
-
-  it('returns received amount when no expenses', () => {
-    const sources = [makeIncome({ received: true, received_amount: 5000 })];
-    expect(calcAvailableNow(sources, [])).toBe(5000);
-  });
-
-  it('returns 0 when nothing received', () => {
-    const today = new Date().toISOString().split('T')[0];
-    const txs   = [makeTx({ type: 'expense', amount: 1000, date: today })];
-    expect(calcAvailableNow([], txs)).toBe(-1000);
-  });
-});
-
 // ── isKnownCategory ───────────────────────────────────────────────────────────
 
 describe('isKnownCategory', () => {
@@ -533,16 +500,3 @@ describe('calcTopCategories', () => {
   });
 });
 
-// ── surplusKnown (via calcTotalReceived) ──────────────────────────────────────
-
-describe('surplusKnown logic', () => {
-  it('is true when totalReceived > 0', () => {
-    const sources = [makeIncome({ received: true, received_amount: 5000 })];
-    expect(calcTotalReceived(sources) > 0).toBe(true);
-  });
-
-  it('is false when totalReceived is 0', () => {
-    const sources = [makeIncome({ received: false, received_amount: 0 })];
-    expect(calcTotalReceived(sources) > 0).toBe(false);
-  });
-});

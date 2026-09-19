@@ -13,13 +13,14 @@
  */
 
 import { IncomeCard }           from './IncomeCard';
+import { UnassignedIncomeRow }  from './UnassignedIncomeRow';
 import { PastIncomeCard }       from './PastIncomeCard';
 import { MonthEmptyState }      from './MonthEmptyState';
 import { NoIncomeSourcesEmpty } from './NoIncomeSourcesEmpty';
 
 export function PaydayIncomeBody({
   isFuture, isPast, isCurrent = true, cycle = null, periodLabel, prevPeriodLabel,
-  pastIncomeTxs, incomes, fmt, mutating,
+  pastIncomeTxs, incomes, fmt, mutating, unassignedIncome = 0,
   prevSourceCount, copying, copyError,
   onCopyAll, onChooseWhich, onAddManually,
   onConfirm, onMarkPending, onUpdateExpected,
@@ -42,32 +43,42 @@ export function PaydayIncomeBody({
     ));
   }
 
+  // Unassigned income shows even with NO sources configured — that is precisely the
+  // state AJ was in when the money went missing from this screen (#4b).
   if (incomes.length === 0) {
     return (
-      <NoIncomeSourcesEmpty
-        monthLabel={periodLabel}
-        lastMonthLabel={prevPeriodLabel}
-        prevSourceCount={prevSourceCount}
-        onCopyAll={onCopyAll}
-        onChooseWhich={onChooseWhich}
-        onAddManually={onAddManually}
-        copying={copying}
-        copyError={copyError}
-      />
+      <>
+        <UnassignedIncomeRow amount={unassignedIncome ? fmt(unassignedIncome) : ''} />
+        <NoIncomeSourcesEmpty
+          monthLabel={periodLabel}
+          lastMonthLabel={prevPeriodLabel}
+          prevSourceCount={prevSourceCount}
+          onCopyAll={onCopyAll}
+          onChooseWhich={onChooseWhich}
+          onAddManually={onAddManually}
+          copying={copying}
+          copyError={copyError}
+        />
+      </>
     );
   }
 
-  return incomes.map(income => (
-    <IncomeCard
-      key={income.id}
-      income={income}
-      fmt={fmt}
-      cycle={cycle}
-      isCurrent={isCurrent}
-      onConfirm={onConfirm}
-      onMarkPending={onMarkPending}
-      onUpdateExpected={onUpdateExpected}
-      disabled={mutating}
-    />
-  ));
+  return (
+    <>
+      {incomes.map(income => (
+        <IncomeCard
+          key={income.id}
+          income={income}
+          fmt={fmt}
+          cycle={cycle}
+          isCurrent={isCurrent}
+          onConfirm={onConfirm}
+          onMarkPending={onMarkPending}
+          onUpdateExpected={onUpdateExpected}
+          disabled={mutating}
+        />
+      ))}
+      <UnassignedIncomeRow amount={unassignedIncome ? fmt(unassignedIncome) : ''} />
+    </>
+  );
 }

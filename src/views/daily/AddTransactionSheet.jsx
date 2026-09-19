@@ -13,22 +13,18 @@ import { useFinanceContext }          from '../../context/FinanceContext';
 import { AccessBlocked }             from '../../components/ui/AccessBlocked';
 import { getWeekForDate }            from '../../lib/finance';
 import { FromSpareToggle }           from './FromSpareToggle';
-
-const inputStyle = {
-  width: '100%', padding: '12px 14px', borderRadius: 10,
-  border: '1.5px solid var(--c-border, #e5e7eb)', fontSize: 15, fontWeight: 700,
-  outline: 'none', background: 'var(--c-input-bg, #f9fafb)', boxSizing: 'border-box',
-  fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
-};
+import { IncomeSourcePicker }        from './IncomeSourcePicker';
+import { inputStyle }                from './fieldStyles';
 
 export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null }) {
   const { centre, categories, getCatIcon, can } = useBudgetCentreContext();
-  const { addTransaction, updateTransaction, spareMoney } = useFinanceContext();
+  const { addTransaction, updateTransaction, spareMoney, incomes = [] } = useFinanceContext();
 
   const [type,         setType]         = useState('expense');
   const [amount,       setAmount]       = useState('');
   const [categoryName, setCategoryName] = useState('');
   const [categoryId,   setCategoryId]   = useState(null);
+  const [incomeSrcId,  setIncomeSrcId]  = useState(undefined);
   const [description,  setDescription]  = useState('');
   const [fromSpare,    setFromSpare]    = useState(false);
   const [day,          setDay]          = useState(() => String(new Date().getDate()));
@@ -44,6 +40,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
       setAmount(editTx ? String(editTx.amount) : '');
       setCategoryName(editTx?.category_name || '');
       setCategoryId(editTx?.category_id || null);
+      setIncomeSrcId(editTx ? (editTx.income_source_id ?? null) : undefined);
       setDescription(editTx?.description || '');
       setFromSpare(!!editTx?.from_spare);
       const d = editTx?.date || new Date().toISOString().split('T')[0];
@@ -82,7 +79,11 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
     if (!year  || isNaN(yearNum)  || yearNum < 2020 || yearNum > 2030) { setError('Please enter a valid year (2020-2030)'); return; }
     if (new Date(yearNum, monthNum - 1, dayNum).getDate() !== dayNum)  { setError('Please enter a valid date'); return; }
     const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-    const finalCategory   = categoryName.trim() || 'Other';
+    // #4b: income must be attributable. undefined = untouched picker; null is a
+    // deliberate one-off and is allowed through.
+    if (type === 'income' && incomeSrcId === undefined) { setError('Choose an income source'); return; }
+    const pickedSource    = incomeSrcId ? incomes.find(i => i.id === incomeSrcId) : null;
+    const finalCategory   = pickedSource?.label || categoryName.trim() || 'Other';
     const finalCategoryId = categoryName.trim() ? categoryId : null;
     setLoading(true);
     const base = {
@@ -93,6 +94,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
       date:          dateStr,
       week:          getWeekForDate(dateStr),
       from_spare:    type === 'expense' && fromSpare,
+      income_source_id: type === 'income' ? (incomeSrcId ?? null) : null,
     };
     const result = editTx
       ? await updateTransaction(editTx.id, base)
@@ -122,7 +124,7 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
         {/* Type toggle — income tab hidden for standard members */}
         <div style={{ display: 'grid', gridTemplateColumns: can('logIncome') ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 16 }}>
           {['expense', ...(can('logIncome') ? ['income'] : [])].map(t => (
-            <button key={t} onClick={() => { setType(t); setCategoryName(''); setCategoryId(null); setFromSpare(false); setError(null); }}
+            <button key={t} onClick={() => { setType(t); setCategoryName(''); setCategoryId(null); setIncomeSrcId(undefined); setFromSpare(false); setError(null); }}
               style={{ padding: '10px', borderRadius: 10, border: 'none', fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 800, cursor: 'pointer', background: type === t ? 'var(--c-primary, #064e3b)' : 'var(--c-bg, #f3f4f6)', color: type === t ? 'var(--c-btn-text, #ffffff)' : 'var(--c-muted, #6b7280)' }}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
@@ -157,12 +159,15 @@ export function AddTransactionSheet({ isOpen, onClose, onSaved, editTx = null })
             />
           )}
 
-          {/* Source — income only */}
+          {/* Source — income only. Required: see IncomeSourcePicker's header (#4b). */}
           {type === 'income' && (
-            <div>
-              <p style={{ fontSize: 12, fontWeight: 800, color: 'var(--c-muted, #6b7280)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 1 }}>Source</p>
-              <input data-testid="add-category-input" type="text" value={categoryName} onChange={e => { setCategoryName(e.target.value); setError(null); }} placeholder="e.g. Freelance, Gift, Sale" style={inputStyle} />
-            </div>
+            <IncomeSourcePicker
+              sources={incomes}
+              value={incomeSrcId}
+              onChange={id => { setIncomeSrcId(id); setError(null); }}
+              name={categoryName}
+              onNameChange={v => { setCategoryName(v); setError(null); }}
+            />
           )}
 
           {/* Description */}
