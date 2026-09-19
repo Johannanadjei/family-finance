@@ -81,6 +81,30 @@ export function cycleForDate(cycles, dateStr) {
 }
 
 /**
+ * The live cycle that [start, end] intersects, or null if the range is free.
+ * Inclusive at both ends, matching the no_overlapping_cycles GiST constraint's
+ * daterange(start_date, end_date, '[]') — so adjacent periods (one ending the day
+ * before the next begins) do NOT count as overlapping, exactly as the DB sees it.
+ *
+ * ADVISORY ONLY. The constraint remains the authority and create_budget_period
+ * still raises CYC01. This exists so the creator sheet can refuse before the round
+ * trip and name the period being clashed with, instead of showing a bare error.
+ * A stale `cycles` array can miss a conflict; that case still lands on CYC01.
+ *
+ * @param {Array<{ id: string, name: string, start_date: string, end_date: string, deleted_at?: string|null }>} cycles
+ * @param {string} start — 'YYYY-MM-DD'
+ * @param {string} end   — 'YYYY-MM-DD'
+ * @param {string|null} [excludeId] — ignore this cycle (for a future edit flow)
+ * @returns {object|null} the first conflicting cycle, or null
+ */
+export function overlapsExistingCycle(cycles = [], start, end, excludeId = null) {
+  if (!start || !end) return null;
+  return (cycles || []).find(c =>
+    !c.deleted_at && c.id !== excludeId && c.start_date <= end && c.end_date >= start
+  ) ?? null;
+}
+
+/**
  * The N most-recent cycles a tier may see — the history visibility gate (client-side,
  * Commit: history gate). Anchored on the NEWEST cycle (Decision D2): sort newest-first
  * and keep the first N. `limit` counts CYCLES, not calendar months (Decision D1) — it

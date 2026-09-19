@@ -26,6 +26,8 @@ import { useNavigate } from 'react-router-dom';
 import { UpgradeModal } from '../ui/UpgradeModal';
 import { HISTORY_CAP_BODY } from '../../lib/planCopy';
 import { useBudgetCentreContext } from '../../context/BudgetCentreContext';
+import { useFinanceContext } from '../../context/FinanceContext';
+import { formatDateRange } from '../../lib/dates';
 
 export function PeriodNav({ periodLabel, isOldest, isLatest, onPrev, onNext, historyLocked = false, labelTestId }) {
   const navigate = useNavigate();
@@ -33,6 +35,11 @@ export function PeriodNav({ periodLabel, isOldest, isLatest, onPrev, onNext, his
   // header components — the modal is owned here, so the gate belongs here too.
   // Layout components reading this context is established (SidePanel.jsx).
   const { isOwner } = useBudgetCentreContext();
+  // Same reasoning for the range, plus a hard constraint: BudgetView and PaydayView
+  // are both AT the 200-line cap, so a new prop threaded through them would not fit.
+  // viewedCycle is the very cycle periodLabel names, so this cannot drift from it.
+  const { viewedCycle } = useFinanceContext();
+  const periodRange = formatDateRange(viewedCycle?.start_date, viewedCycle?.end_date);
   const [showHistoryUpgrade, setShowHistoryUpgrade] = useState(false);
   return (
     <>
@@ -45,9 +52,18 @@ export function PeriodNav({ periodLabel, isOldest, isLatest, onPrev, onNext, his
           style={{ background: 'none', border: 'none', padding: '8px', cursor: (historyLocked || !isOldest) ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isOldest ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <p data-testid={labelTestId} style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
-          {periodLabel}
-        </p>
+        {/* Name + range. Two periods can legally share a name (adjacent ranges are
+            valid under no_overlapping_cycles), so the range is what tells them apart. */}
+        <div style={{ textAlign: 'center', minWidth: 0 }}>
+          <p data-testid={labelTestId} style={{ fontSize: 16, fontWeight: 900, color: 'var(--c-text, #1c1917)', margin: 0 }}>
+            {periodLabel}
+          </p>
+          {periodRange && (
+            <p data-testid="period-range" style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-muted, #6b7280)', margin: '2px 0 0' }}>
+              {periodRange}
+            </p>
+          )}
+        </div>
         <button onClick={onNext} aria-label="Next period" disabled={isLatest}
           style={{ background: 'none', border: 'none', padding: '8px', cursor: isLatest ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isLatest ? 'var(--c-border, #e5e7eb)' : 'var(--c-primary, #064e3b)' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>

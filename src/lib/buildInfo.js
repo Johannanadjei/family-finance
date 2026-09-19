@@ -1,10 +1,10 @@
 /**
  * lib/buildInfo.js
  *
- * Identifies the build a client is actually running. Exposed as
- * `window.__BOS_BUILD__` (set in main.jsx) so you can read it straight from the
- * DevTools console — which is how the PWA update test tells "the new build took
- * over" apart from "the page merely reloaded". See CLAUDE.md §13.
+ * Identifies the build a client is actually running. Rendered by BuildStamp in the
+ * AuthFooter and Settings → Legal, and set on `window.__BOS_BUILD__` in main.jsx.
+ * That is how a PWA update test tells "the new build took over" apart from "the page
+ * merely reloaded" — the stamp changing is the proof. See CLAUDE.md §13.
  *
  * This file is BUNDLED, so bumping BUILD_MARKER changes the entry chunk's content
  * hash, which changes dist/sw.js, which is what makes the browser detect an update
@@ -13,4 +13,4 @@
  * For a verification deploy, bump ONLY the string below.
  */
 
-export const BUILD_MARKER = 'verification-deploy-3 — 2026-09-19T11:46:44Z';
+export const BUILD_MARKER = 'v2 — 2026-09-19';
