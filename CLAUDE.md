@@ -663,3 +663,5 @@ environment** (push to `dev`, open the Vercel URL). The loop:
    leave the tab open past 15s before deploying and the toast appears instead.
 4. DevTools → Application → Service Workers shows the new worker activating without
    a stuck "waiting" state.
+
+Verification deploy 1 — 2026-09-19T10:30:47Z
