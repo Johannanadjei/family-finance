@@ -57,8 +57,11 @@ export const offsetMonth = (ym, delta) => {
 };
 
 
-export const calcTotalIncome = (txs) =>
-  txs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
+// Literally the same function as calcTotalReceived (defined below) — income received
+// IS income. Delegating rather than re-implementing is what makes the two impossible
+// to drift apart; #4b was caused by exactly that drift. Safe despite the forward
+// reference: the body runs at call time, after the module has finished evaluating.
+export const calcTotalIncome = (txs) => calcTotalReceived(txs);
 
 export const calcTotalSpent = (txs) =>
   txs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
@@ -133,12 +136,46 @@ export const calcSpareMoney = (allIncome, fixedTotal, budgetSpend, spareSpend) =
 export const calcTotalExpected = (sources) =>
   sources.reduce((s, i) => s + Number(i.expected_amount || 0), 0);
 
-export const calcTotalReceived = (sources) =>
-  sources.reduce((s, i) => s + Number(i.received_amount || 0), 0);
+// ── Income received — ONE definition ────────────────────────────────────────
+// Received income is Σ non-deleted income TRANSACTIONS in the viewed cycle. Nothing
+// else. income_sources.received / received_amount / actual_pay_date are a DEPRECATED
+// cache: still written by the carry-forward RPCs (migrate_28/30 insert them as
+// false/0/NULL so a new period starts unpaid) but never read here and no longer
+// written by the client. See docs/engineering-decisions.md (#4b).
+//
+// WHY: Home summed income transactions while Payday summed the cache column, so a
+// hub where income was logged via "+" (income_source_id NULL) showed 55,884 on Home
+// and 0 received on Payday. Tapping mark-received then inserted a SECOND transaction.
+// Two definitions of one quantity is the bug; there is now one.
 
-export const calcAvailableNow = (sources, txs) => {
+const liveIncomeTxs = (txs) =>
+  (txs || []).filter(t => t.type === 'income' && !t.deleted_at);
+
+const sumAmount = (rows) => rows.reduce((s, t) => s + Number(t.amount || 0), 0);
+
+/** Σ live income transactions carrying this source's FK. The per-source receipt. */
+export const calcReceivedForSource = (txs, sourceId) =>
+  sumAmount(liveIncomeTxs(txs).filter(t => t.income_source_id === sourceId));
+
+/**
+ * Σ live income transactions with NO source FK — money logged through "+" as
+ * "Other / one-off". Counted in the total; surfaced separately on Payday so it is
+ * visible rather than silently missing from the tracker.
+ */
+export const calcUnassignedIncome = (txs) =>
+  sumAmount(liveIncomeTxs(txs).filter(t => !t.income_source_id));
+
+/**
+ * Σ ALL live income transactions in the cycle — assigned plus unassigned.
+ * Identical to calcTotalIncome by construction; both names exist because the UI
+ * says "Income received" on Home and "Received" on Payday, and they must never be
+ * able to disagree. Takes TRANSACTIONS, not sources (this signature changed in #4b).
+ */
+export const calcTotalReceived = (txs) => sumAmount(liveIncomeTxs(txs));
+
+export const calcAvailableNow = (txs) => {
   const today    = new Date();
-  const received = calcTotalReceived(sources);
+  const received = calcTotalReceived(txs);
   const spent    = txs
     .filter(t => {
       const d = new Date(t.date);

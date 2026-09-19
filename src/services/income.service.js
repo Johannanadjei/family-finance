@@ -130,9 +130,19 @@ export const updateIncomeSource = async (sourceId, updates) => {
   return { data, error };
 };
 
-/** Mark an income source as received. The matching income TRANSACTION is created
- * separately (transactions.service.js) — see the two-phase rule in CLAUDE.md §11.
- * @param {string} actualPayDate — 'YYYY-MM-DD' */
+/**
+ * Mark an income source received — IDEMPOTENT, server-side (#4b).
+ *
+ * Wraps the mark_income_received SECURITY DEFINER RPC (scripts/migrate_31…sql),
+ * replacing a client-side two-phase write whose insert was unconditional: a second
+ * call — two taps, a retry, a second device — created a SECOND income transaction,
+ * which is how one hub's income read double in production. The server now UPDATEs
+ * the live income transaction for this source+cycle if one exists and INSERTs only
+ * if not, both tables in one transaction.
+ *
+ * @param {string} actualPayDate — 'YYYY-MM-DD'; clamped into the period server-side
+ * @returns {Promise<{ data: object|null, error: any }>} data.created=false when idempotent.
+ */
 export const markReceived = async (sourceId, receivedAmount, actualPayDate) => {
   let amount, date;
   try {
@@ -143,20 +153,14 @@ export const markReceived = async (sourceId, receivedAmount, actualPayDate) => {
     return { data: null, error: e };
   }
 
-  const { data, error } = await supabase
-    .from('income_sources')
-    .update({
-      received:        true,
-      received_amount: amount,
-      actual_pay_date: date,
-    })
-    .eq('id', sourceId)
-    .is('deleted_at', null)
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('mark_income_received', {
+    p_source_id: sourceId,
+    p_amount:    amount,
+    p_date:      date,
+  });
 
-  if (error) console.error('[income.service] markReceived error:', error.message);
-  return { data, error };
+  if (error) { console.error('[income.service] markReceived error:', error.message); return { data: null, error }; }
+  return { data, error: null };
 };
 
 /** Mark an income source as pending — undo a received marking. */

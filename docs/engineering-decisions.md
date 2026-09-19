@@ -4329,3 +4329,65 @@ incl. **adjacent-is-not-overlap**, shared-boundary-day, soft-deleted, excludeId;
 periods differ by range, omitted when no cycle), `CreateBudgetPeriodSheet.test.jsx`
 (quick + custom range previews, overlap refused and named, adjacent allowed, CYC01
 still surfaced), `DateFields.test.jsx` (new). 1955 tests, audit 321/0.
+
+---
+
+## Income "received" had two definitions (#4b, 2026-09-19)
+
+**Symptom.** Home showed Income received 55,884; Payday showed 27,942 of 27,942.
+
+**Cause.** `useFinance.js` held two unrelated definitions of one quantity:
+`totalIncome = calcTotalIncome(txs)` (Σ income transactions) fed Home, while
+`totalReceived = calcTotalReceived(incomes)` summed the `income_sources.received_amount`
+CACHE COLUMN and fed Payday. Income logged through "+" never set `income_source_id`
+— the sheet wrote free text into `category_name` — so a receipt entered before its
+source existed was counted by Home and invisible to Payday. Payday therefore read
+0 received, mark-received was tapped to correct it, and because the client-side
+two-phase `markReceived` inserted unconditionally, a SECOND transaction appeared.
+
+**One definition now.** `calcTotalReceived(txs)` is Σ non-deleted income transactions
+in the cycle, and `calcTotalIncome` literally delegates to it — same function, two
+names, so they cannot drift. Per-source receipts come from `calcReceivedForSource`
+(match on the FK); `calcUnassignedIncome` covers the NULL-FK remainder. `useFinance`
+derives `received`/`received_amount` onto each source at ONE point, so
+`getIncomeStatus`, `pickNextUnpaid`, `IncomeCard` and `totalPending` all became
+consistent without changing their own code.
+
+**The columns are DEPRECATED, not dropped.** `income_sources.received`,
+`received_amount`, `actual_pay_date` are still written by `mark_income_received` and
+inserted by the carry-forward RPCs (`migrate_28`/`migrate_30` set them false/0/NULL
+so a new period starts unpaid, and their dry-runs assert exactly that). They are
+`NOT NULL DEFAULT` in `schema_base.sql`, so they cannot simply be ignored on insert.
+Nothing in the client reads them any more. Dropping them is a separate migration.
+
+**Unassigned income is shown, not ignored.** The "+" path now REQUIRES a source, with
+"Other / one-off" as an explicit choice writing a deliberate NULL FK. Payday's header
+counts everything (matching Home exactly) and breaks the one-off portion out as
+"Unassigned income". The picker's three states are distinct and load-bearing:
+`undefined` = nothing chosen (submit blocked), `null` = deliberate one-off, uuid = linked.
+
+**Idempotency belongs in the database.** `mark_income_received`
+(`scripts/migrate_31…sql`, SECURITY DEFINER) resolves the source's cycle and UPDATEs
+the live income transaction for that source+cycle if one exists, INSERTing only if
+none does — so two taps, a retry, or a second device all converge on one row. It also
+clamps the date into the period: a receipt dated outside its own period would resolve
+to a different cycle via `resolve_cycle_id` and escape the check on the next call.
+Both tables move in one transaction, removing the split-brain the client rollback
+used to paper over. New error codes INC01 (source not found/not writable) and INC02
+(no resolvable cycle); registry now CYC01-05, CAT01, GST01, HUB01, INC01-02, MEM01, SKN01.
+
+**Not e2e-testable yet.** The RPC round trip needs a staging Supabase project — the
+Stage 1 write-rail aborts writes against the shared production project, and as
+recorded above, any hub-owning fixture trips it on dashboard mount regardless.
+Client-layer idempotency is covered by vitest (T5-T7); the SQL file carries a manual
+verification block instead.
+
+**Test coverage added:** `finance.income.test.js` (new, split out when
+`finance.test.js` crossed the 600-line cap — linked/unlinked/mixed/soft-deleted, and
+the invariant that assigned + unassigned reconstructs the total),
+`useFinance.test.js` (unlinked income counts but leaves its source pending),
+`IncomeSourcePicker.test.jsx` (new — the three-state contract),
+`AddTransactionSheet.test.jsx` (submit blocked without a source; linked and one-off
+paths), `useFinance.income-mutations.test.js` (T4 rewritten for the RPC; T5-T7
+idempotency and rollback), `UnassignedIncomeRow.test.jsx` (new).
+1983 tests, audit 327/0.

@@ -26,57 +26,50 @@ const ONE_OFF_MARKER = '__one_off_bucket__';
 
 export function useIncomeMutations({ centreId, currency, cycles, incomes, txs, setIncomes, setTxs }) {
 
+  /**
+   * Confirm a payday receipt. ONE server call (#4b) — the RPC owns idempotency and
+   * atomicity, so this hook no longer orchestrates two writes or rolls them back.
+   *
+   * The optimistic update no longer touches income_sources' deprecated cache
+   * columns: `received` is DERIVED from transactions in useFinance, so adding the
+   * transaction optimistically is what flips the card to received. Writing both
+   * would be writing the same fact twice — which is the bug this closes.
+   */
   const markReceived = useCallback(async (sourceId, receivedAmount, actualPayDate) => {
     const income = incomes.find(i => i.id === sourceId);
     if (!income) return { error: new Error('Income source not found') };
 
-    // Phase 1 optimistic — update incomes state
-    const prevIncomes = incomes;
-    setIncomes(prev => prev.map(i =>
-      i.id === sourceId
-        ? { ...i, received: true, received_amount: receivedAmount, actual_pay_date: actualPayDate }
-        : i
-    ));
+    const prevTxs = txs;
+    const when    = actualPayDate || new Date().toISOString().split('T')[0];
 
-    // Phase 1 write — update income_sources in Supabase
-    const { error: incomeErr } = await dbMarkReceived(sourceId, receivedAmount, actualPayDate);
+    // Optimistic: replace an existing live receipt for this source in-place if there
+    // is one (mirrors the RPC's own update-or-insert), else prepend a temp row.
+    const existing = txs.find(t => t.type === 'income' && t.income_source_id === sourceId && !t.deleted_at);
+    setTxs(prev => existing
+      ? prev.map(t => (t.id === existing.id ? { ...t, amount: receivedAmount, date: when, _optimistic: true } : t))
+      : [{
+          id: crypto.randomUUID(), type: 'income', amount: receivedAmount, date: when,
+          week: getWeekForDate(when), category_name: income.label, currency,
+          description: income.label + ' received', source: 'main_app',
+          income_source_id: sourceId, cycle_id: income.cycle_id, _optimistic: true,
+        }, ...prev]);
 
-    if (incomeErr) {
-      setIncomes(prevIncomes);
-      console.error('[useIncomeMutations] markReceived phase 1 rollback:', incomeErr.message);
-      return { error: incomeErr };
+    const { data, error } = await dbMarkReceived(sourceId, receivedAmount, actualPayDate);
+
+    if (error) {
+      setTxs(prevTxs);
+      console.error('[useIncomeMutations] markReceived rollback:', error.message);
+      return { error };
     }
 
-    // Phase 2 write — create income transaction
-    const today      = actualPayDate || new Date().toISOString().split('T')[0];
-    const { data: txData, error: txErr } = await dbAddTransaction(centreId, {
-      date:             today,
-      week:             getWeekForDate(today),
-      type:             'income',
-      category_name:    income.label,
-      // Hub currency is authoritative for display — income_sources.currency is
-      // vestigial (migrate_20/21 aligned it to the hub; never read it back here).
-      currency:         currency,
-      amount:           receivedAmount,
-      description:      income.label + ' received',
-      source:           'main_app',
-      // Durable FK link to the source — survives label edits and lets delete /
-      // un-confirm find this tx by id instead of by category_name string match.
-      income_source_id: sourceId,
-    });
-
-    if (txErr) {
-      // Phase 2 failed — rollback both phases
-      setIncomes(prevIncomes);
-      await dbMarkPending(sourceId);
-      console.error('[useIncomeMutations] markReceived phase 2 rollback:', txErr.message);
-      return { error: txErr };
-    }
-
-    // Both phases succeeded — add transaction to local state if read-back succeeded
-    if (txData) setTxs(prev => [{ ...txData, _optimistic: false }, ...prev]);
+    // Settle the optimistic row against the server's authoritative transaction id.
+    setTxs(prev => prev.map(t => (
+      (t.income_source_id === sourceId && t.type === 'income' && t._optimistic)
+        ? { ...t, id: data?.transaction_id ?? t.id, amount: data?.amount ?? t.amount, date: data?.date ?? t.date, _optimistic: false }
+        : t
+    )));
     return { error: null };
-  }, [centreId, incomes, currency, setIncomes, setTxs]);
+  }, [incomes, currency, txs, setTxs]);
 
   const markPending = useCallback(async (sourceId) => {
     const income = incomes.find(i => i.id === sourceId);

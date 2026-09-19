@@ -33,7 +33,7 @@ import {
   calcTotalIncome, calcTotalSpent, calcBudgetUsedPct,
   getBudgetStatusFromBudget, calcTotalFixed, calcFixedSpent,
   calcSpareMoney,
-  calcTotalExpected, calcTotalReceived,
+  calcTotalExpected, calcTotalReceived, calcReceivedForSource, calcUnassignedIncome,
   calcWeeklyData, calcCategorySpend, calcTopCategories, pickNextUnpaid,
   getCurrentMonth,
 } from '../lib/finance';
@@ -224,13 +224,23 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
   // loader) transactions all scope to viewedCycleId — never the month string, which
   // Commit 13 drops. Categories was clock-derived in useBudgetCentre (Commit 8 bug);
   // it lives here now so one hook owns every cycle-aware slice.
-  const incomes        = useMemo(() => sliceByCycle(allIncomes, viewedCycleId),                 [allIncomes, viewedCycleId]);
+  // THE single derivation point for "received" (#4b). Each source's receipt is Σ its
+  // live income transactions in this cycle, spliced onto the row as `received_amount`
+  // + `received`. Everything downstream — getIncomeStatus, pickNextUnpaid, IncomeCard,
+  // totalPending — keeps reading those two fields and is now automatically consistent
+  // with Home, instead of reading the deprecated income_sources cache columns.
+  const incomes        = useMemo(() => sliceByCycle(allIncomes, viewedCycleId).map(s => {
+    const received_amount = calcReceivedForSource(txs, s.id);
+    return { ...s, received_amount, received: received_amount > 0 };
+  }), [allIncomes, viewedCycleId, txs]);
   const categories     = useMemo(() => sliceByCycle(allCategories || [], viewedCycleId),        [allCategories, viewedCycleId]);
 
   const monthlyIncome  = useMemo(() => calcTotalExpected(incomes),                              [incomes]);
   const totalIncome    = useMemo(() => calcTotalIncome(txs),                                    [txs]);
   const totalSpent     = useMemo(() => calcTotalSpent(txs),                                     [txs]);
-  const totalReceived  = useMemo(() => calcTotalReceived(incomes),                              [incomes]);
+  // Same selector Home reads — assigned + unassigned. Cannot diverge from totalIncome.
+  const totalReceived  = useMemo(() => calcTotalReceived(txs),                                  [txs]);
+  const unassignedIncome = useMemo(() => calcUnassignedIncome(txs),                             [txs]);
   const totalExpected  = useMemo(() => calcTotalExpected(incomes),                              [incomes]);
   const totalPending   = useMemo(() => incomes.filter(i => !i.received).reduce((sum, i) => sum + (i.expected_amount || 0), 0), [incomes]);
   const allIncome      = useMemo(() => totalIncome,                                                   [totalIncome]);
@@ -384,6 +394,7 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
     totalIncome,
     totalSpent,
     totalReceived,
+    unassignedIncome,   // Σ income txs with no source FK — Payday's "Unassigned income" row
     allIncome,
     totalExpected,
     totalPending,

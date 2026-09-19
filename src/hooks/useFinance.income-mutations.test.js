@@ -112,21 +112,60 @@ describe('useFinance — income mutation reconciliation', () => {
     expect(result.current.incomes).toHaveLength(0);
   });
 
-  // ── T4: parity with migrate_20/21 — the income tx always carries the HUB
-  //        currency, never the (vestigial) per-source currency, even when they
-  //        diverge. Pre-fix this stamped income.currency ('EUR'); post-fix it is
-  //        always the hub's 'GHS'. ──────────────────────────────────────────────
-  it('T4: markReceived stamps the income tx with the hub currency, ignoring a divergent income_sources.currency', async () => {
+  // ── T4: currency is now SERVER-owned. The RPC reads it from budget_centres, so
+  //        the client cannot stamp a divergent per-source currency even in
+  //        principle — the concern migrate_20/21 addressed is enforced by
+  //        construction rather than by a client-side choice. ──────────────────
+  it('T4: markReceived delegates to the RPC — the client never builds the income tx', async () => {
     const diverged = { ...SOURCE, received: false, received_amount: 0, currency: 'EUR' };
     const { result } = mount([], [diverged]);
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    markReceived.mockResolvedValue({ error: null });
-    addTransaction.mockResolvedValue({ data: { ...INCOME_TX, id: 'tx-9', currency: 'GHS' }, error: null });
+    markReceived.mockResolvedValue({ data: { transaction_id: 'tx-9', amount: 5000, date: '2026-05-25', created: true }, error: null });
     await act(async () => { await result.current.markReceived('inc-1', 5000, '2026-05-25'); });
 
-    expect(addTransaction).toHaveBeenCalledWith('centre-1', expect.objectContaining({ currency: 'GHS' }));
+    expect(markReceived).toHaveBeenCalledWith('inc-1', 5000, '2026-05-25');
+    expect(addTransaction).not.toHaveBeenCalled();
   });
+
+  // ── #4b idempotency at the client layer. The RPC is authoritative, but the
+  //    OPTIMISTIC path must not manufacture a duplicate either: a second confirm
+  //    updates the existing row in place. This is the two-taps-in-30-seconds shape
+  //    that doubled a hub's income in production. ────────────────────────────────
+  it('T5: a second markReceived updates the existing income tx instead of adding one', async () => {
+    const { result } = mount([{ ...INCOME_TX }], [{ ...SOURCE }]);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.txs.filter(t => t.type === 'income')).toHaveLength(1);
+
+    markReceived.mockResolvedValue({ data: { transaction_id: INCOME_TX.id, amount: 5000, date: '2026-05-25', created: false }, error: null });
+    await act(async () => { await result.current.markReceived('inc-1', 5000, '2026-05-25'); });
+
+    expect(result.current.txs.filter(t => t.type === 'income' && !t.deleted_at)).toHaveLength(1);
+    expect(result.current.allIncome).toBe(5000);
+  });
+
+  it('T6: a corrected amount edits the existing tx rather than stacking a second receipt', async () => {
+    const { result } = mount([{ ...INCOME_TX }], [{ ...SOURCE }]);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    markReceived.mockResolvedValue({ data: { transaction_id: INCOME_TX.id, amount: 7000, date: '2026-05-25', created: false }, error: null });
+    await act(async () => { await result.current.markReceived('inc-1', 7000, '2026-05-25'); });
+
+    expect(result.current.txs.filter(t => t.type === 'income' && !t.deleted_at)).toHaveLength(1);
+    expect(result.current.allIncome).toBe(7000);
+  });
+
+  it('T7: a failed RPC rolls the optimistic transaction back completely', async () => {
+    const { result } = mount([], [{ ...SOURCE, received: false, received_amount: 0 }]);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    markReceived.mockResolvedValue({ data: null, error: new Error('nope') });
+    await act(async () => { await result.current.markReceived('inc-1', 5000, '2026-05-25'); });
+
+    expect(result.current.txs.filter(t => t.type === 'income')).toHaveLength(0);
+    expect(result.current.allIncome).toBe(0);
+  });
+
 });
 
 // ── Phase 2B: income rollforward (copyIncomeSourcesToCycle) ─────────────────
