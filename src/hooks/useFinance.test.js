@@ -24,16 +24,39 @@ const CATS = [{ id:'cat-1', name:'Groceries', icon:'🛒', budget_amount:500, is
 // once a current cycle resolves. Tests that expect a fetch must seed this cycle.
 const CUR_CYCLE = { id:'cyc-cur', budget_centre_id:'centre-1', name:'Current', start_date: M+'-01', end_date: M+'-31', anchor_type:'calendar', deleted_at:null };
 const INC = [{ id:'inc-1', label:'Adjei Salary', expected_amount:30000, received:true, received_amount:30000, pay_day:31, pay_day_type:'last_working_day', currency:'GHS', month:M, cycle_id:'cyc-cur' },{ id:'inc-2', label:'Dita Salary', expected_amount:15000, received:false, received_amount:0, pay_day:25, pay_day_type:'fixed_date', currency:'GHS', month:M, cycle_id:'cyc-cur' }];
-const TXS = [{ id:'tx-1', type:'expense', amount:200, category_name:'Groceries', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false },{ id:'tx-2', type:'income', amount:30000, category_name:'Adjei Salary', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false }];
+const TXS = [{ id:'tx-1', type:'expense', amount:200, category_name:'Groceries', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false },{ id:'tx-2', type:'income', amount:30000, category_name:'Adjei Salary', date:'2026-05-19', week:'Week 3', currency:'GHS', source:'main_app', _optimistic:false, income_source_id:'inc-1' }];
 const go = (txs=TXS, inc=INC) => { getTransactionsByCycle.mockResolvedValue({data:txs,error:null}); getIncomeSources.mockResolvedValue({data:inc,error:null}); getCyclesForCentre.mockResolvedValue({data:[CUR_CYCLE],error:null}); return renderHook(()=>useFinance({centre:C,allCategories:CATS})); };
 describe('useFinance — derived values', () => {
   beforeEach(()=>{ vi.clearAllMocks(); });
   it('loads txs and incomes on mount', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.txs).toHaveLength(2); expect(result.current.incomes).toHaveLength(2); });
-  it('totalReceived = sum of received_amount', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.totalReceived).toBe(30000); });
+  it('totalReceived = sum of live income txs (derived, #4b)', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.totalReceived).toBe(30000); });
   it('totalSpent = sum of all expense txs', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.totalSpent).toBe(200); });
 
   it('monthlyIncome = sum of expected amounts', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.monthlyIncome).toBe(45000); });
   it('totalPending = totalExpected minus totalReceived', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.totalPending).toBe(15000); });
+  // #4b production shape: money logged via "+" carries no income_source_id. It must
+  // count toward totalReceived (Home's number), surface as unassignedIncome on Payday,
+  // and must NOT mark its lookalike source received — that mismatch is what prompted
+  // the duplicate mark-received tap.
+  it('unlinked income counts in the total, shows as unassigned, and leaves the source pending', async()=>{
+    const unlinked=[{id:'tx-9',type:'income',amount:27942,category_name:'Adjei',date:'2026-05-12',week:'Week 2',currency:'GHS',source:'main_app',_optimistic:false,income_source_id:null}];
+    const{result}=go(unlinked,[INC[0]]);
+    await waitFor(()=>expect(result.current.loading).toBe(false));
+    expect(result.current.totalReceived).toBe(27942);
+    expect(result.current.totalIncome).toBe(27942);
+    expect(result.current.unassignedIncome).toBe(27942);
+    expect(result.current.incomes[0].received).toBe(false);
+    expect(result.current.totalPending).toBe(30000);
+  });
+
+  it('a source-linked tx marks that source received and is not unassigned', async()=>{
+    const{result}=go();
+    await waitFor(()=>expect(result.current.loading).toBe(false));
+    expect(result.current.incomes.find(i=>i.id==='inc-1').received).toBe(true);
+    expect(result.current.incomes.find(i=>i.id==='inc-1').received_amount).toBe(30000);
+    expect(result.current.unassignedIncome).toBe(0);
+  });
+
   it('allIncome = totalIncome — all income transactions including salary confirmations', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.allIncome).toBe(30000); });
   it('spareMoney = allIncome − max(fixedTotal, budgetSpend) − spareSpend', async()=>{ const{result}=go(); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.spareMoney).toBe(29300); });
   it('spareMoney decreases by overspend when budgetSpend exceeds fixedTotal', async()=>{ const extra=[...TXS,{id:'tx-3',type:'expense',amount:1000,category_name:'Other',date:'2026-05-20',week:'Week 3',currency:'GHS',source:'main_app',_optimistic:false}]; const{result}=go(extra); await waitFor(()=>expect(result.current.loading).toBe(false)); expect(result.current.spareMoney).toBe(28800); });

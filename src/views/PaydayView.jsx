@@ -61,7 +61,7 @@ export function PaydayView() {
   if (financeValues.loading) return <PaydayViewSkeleton />;
 
   const {
-    incomes, allIncomes = [], error, totalReceived, totalExpected, totalPending, totalIncome, txs,
+    incomes, allIncomes = [], error, totalReceived, totalExpected, totalPending, totalIncome, txs, unassignedIncome,
     activeMonth, cycles = [], visibleCycles = [], activeCycle, activeCycleId, loadCycle, hubPlan,
     markReceived, markPending, updateExpectedAmount, copyIncomeSourcesToCycle,
   } = financeValues;
@@ -160,7 +160,7 @@ export function PaydayView() {
       <PaydayIncomeBody
         isFuture={isFuture}
         isPast={isPast}
-        isCurrent={isCurrent} cycle={viewedCycle}
+        isCurrent={isCurrent} cycle={viewedCycle} unassignedIncome={unassignedIncome}
         periodLabel={periodLabel}
         prevPeriodLabel={prevPeriodLabel}
         pastIncomeTxs={pastIncomeTxs}
