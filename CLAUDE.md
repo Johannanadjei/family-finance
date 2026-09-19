@@ -577,3 +577,89 @@ dashboard — looking exactly like data loss. The token gate (`waitForSession`) 
 fix; truthful errors + the `loaded` flag are defense-in-depth. Note one limit: a pure
 RLS-blocked `200 []` carries no error, so only the token gate prevents it — the
 truthful-error layer cannot, and `lib/auth.js warnOnEmptyColdLoad` is the residual canary.
+
+---
+
+## 13. PWA update lifecycle
+
+Installed users must not sit a launch behind after a deploy, and must never meet a
+raw `ChunkLoadError`. The split is: **the build owns `sw.js`, the app owns registration.**
+
+### Who owns what
+
+- **Build** — `VitePWA({ registerType: 'autoUpdate' })` in `vite.config.js` generates
+  `dist/sw.js` (generateSW, ~33 precache entries, `NavigationRoute` on `index.html`).
+- **App** — `initPwaUpdates()` in `src/lib/pwa.js`, called once from `src/main.jsx`
+  before React renders. `injectRegister: false` stops the build emitting
+  `registerSW.js` or injecting `<script id="vite-plugin-pwa:register-sw">`.
+
+Registration is application code precisely so the app can *decide* what an update
+does, instead of being reloaded out from under the user.
+
+### `injectRegister: false` drops two workbox defaults — set them explicitly
+
+`vite-plugin-pwa/dist/index.js:874` applies the `autoUpdate` defaults only when
+`injectRegister` is `'auto'` or unset:
+
+```js
+if ((injectRegister === "auto" || injectRegister == null) && registerType === "autoUpdate") {
+  workbox.skipWaiting = true;
+  workbox.clientsClaim = true;
+}
+```
+
+So `skipWaiting: true` and `clientsClaim: true` are now set by hand in the `workbox`
+block. Without them a new SW installs and waits forever. Verify after any PWA config
+change — `self.skipWaiting()` and `.clientsClaim()` must both appear in `dist/sw.js`:
+
+```
+grep -oE "self\.(skipWaiting|clientsClaim)\(\)|[a-z]\.clientsClaim\(\)" dist/sw.js
+```
+
+### The two update paths
+
+`registerSW` is called with `onNeedReload`. This is **required**: with
+`registerType: 'autoUpdate'` and no `onNeedReload`, vite-plugin-pwa's own `activated`
+handler calls `window.location.reload()` unconditionally
+(`dist/client/build/register.js:42-43`) and the toast path can never run.
+
+Both `onNeedReload` and a raw `controllerchange` land in one latched
+`onUpdateActivated()`, which branches on how long the page has been open:
+
+| Age of page load | Behaviour |
+|---|---|
+| `< 15s` (`FRESH_LAUNCH_MS`) | Silent `window.location.reload()` — the user has typed nothing and lost nothing |
+| `≥ 15s` | Dispatch `pwaUpdateReady`; `UpdateToast` shows a persistent "A new version of Money B.O.S is ready" banner with a **Reload** action |
+
+`UpdateToast` is mounted once in `main.jsx` *outside* both `Suspense` boundaries, so
+the owner app and the guest portal (`?guest=1`) get identical behaviour without either
+importing the other. It is not in `App.jsx` — App.jsx is at its 400-line cap.
+
+Updates are also checked hourly and on every `visibilitychange` back to visible,
+so a long-lived installed session notices a deploy without waiting for a relaunch.
+
+**Known limit — the latch is per page load.** A second deploy activating inside the
+same long session raises no second toast until the user reloads. Accepted: the first
+toast is still on screen and still correct.
+
+### ChunkLoadError recovery
+
+`vite:preloadError` (a precached chunk that 404s after a deploy) is caught,
+`preventDefault()`ed, and recovered with exactly one reload. A `sessionStorage` flag
+(`bos:preload-reloaded`) stops a genuinely-broken deploy becoming a reload loop; it is
+cleared 5s after a successful load so the next deploy gets its own recovery. If
+`sessionStorage` throws (private mode), the error is treated as already-reloaded — a
+missed recovery beats an infinite loop.
+
+### Testing an update
+
+Service workers need `http://localhost` or an HTTPS origin. Per
+`codespace-only-no-laptop`, the authoritative check for this project is a **deployed
+environment** (push to `dev`, open the Vercel URL). The loop:
+
+1. `npm run build && npx vite preview` — open it, let the SW install.
+2. Make a trivial visible change; `npm run build` again; redeploy/restart preview.
+3. Reopen the already-open tab. Within 15s of a fresh launch it reloads silently;
+   leave the tab open past 15s before deploying and the toast appears instead.
+4. DevTools → Application → Service Workers shows the new worker activating without
+   a stuck "waiting" state.

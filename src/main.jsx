@@ -1,7 +1,8 @@
 import { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
-import { setInstallPrompt } from './lib/pwa';
+import { setInstallPrompt, initPwaUpdates } from './lib/pwa';
+import { UpdateToast } from './components/ui/UpdateToast';
 
 // Capture beforeinstallprompt immediately — before React renders.
 // Stored in lib/pwa.js so InstallPrompt can read it even if it mounts after the event fired.
@@ -10,6 +11,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
   setInstallPrompt(e);
   window.dispatchEvent(new CustomEvent('pwaInstallReady'));
 });
+
+// Owns service-worker registration — the build no longer injects registerSW.js.
+// Runs before React renders so a fresh-launch update reloads while there is still
+// nothing to lose. See CLAUDE.md §13.
+initPwaUpdates();
 
 // Only React + CSS are imported above this line — no app code, no Supabase.
 // URL detection therefore runs before any app module has had a chance to load.
@@ -28,14 +34,18 @@ const LazyGuest = lazy(() =>
 );
 
 function Root() {
-  if (_isGuest) {
-    return (
+  // UpdateToast sits outside the Suspense boundary: one mount serves both the
+  // owner app and the guest portal, and neither has to import the other for it.
+  return (
+    <>
       <Suspense fallback={null}>
-        <LazyGuest centreId={_centreId} currency={_currency} />
+        {_isGuest
+          ? <LazyGuest centreId={_centreId} currency={_currency} />
+          : <LazyApp />}
       </Suspense>
-    );
-  }
-  return <Suspense fallback={null}><LazyApp /></Suspense>;
+      <UpdateToast />
+    </>
+  );
 }
 
 createRoot(document.getElementById('root')).render(
