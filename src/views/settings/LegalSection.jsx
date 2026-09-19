@@ -10,6 +10,8 @@
  * Labels mirror LegalView's NAV array (the canonical display strings).
  */
 
+import { BuildStamp } from '../../components/ui/BuildStamp';
+
 const LEGAL_LINKS = [
   { slug: 'privacy',    href: '/privacy',    label: 'Privacy Policy' },
   { slug: 'terms',      href: '/terms',      label: 'Terms of Service' },
@@ -43,6 +45,9 @@ export function LegalSection() {
             </svg>
           </a>
         ))}
+      </div>
+      <div style={{ paddingTop: 12, borderTop: '1px solid var(--c-border, #e5e7eb)' }}>
+        <BuildStamp />
       </div>
     </div>
   );
