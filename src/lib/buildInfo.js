@@ -13,4 +13,4 @@
  * For a verification deploy, bump ONLY the string below.
  */
 
-export const BUILD_MARKER = 'verification-deploy-2 — 2026-09-19T11:15:40Z';
+export const BUILD_MARKER = 'verification-deploy-3 — 2026-09-19T11:46:44Z';
