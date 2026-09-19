@@ -3,6 +3,12 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import { setInstallPrompt, initPwaUpdates } from './lib/pwa';
 import { UpdateToast } from './components/ui/UpdateToast';
+import { BUILD_MARKER } from './lib/buildInfo';
+
+// Which build this client is actually running — readable from the DevTools console.
+// The PWA update test uses it to tell a real takeover from a plain reload.
+window.__BOS_BUILD__ = BUILD_MARKER;
+console.info('[BOS] build', BUILD_MARKER);
 
 // Capture beforeinstallprompt immediately — before React renders.
 // Stored in lib/pwa.js so InstallPrompt can read it even if it mounts after the event fired.
