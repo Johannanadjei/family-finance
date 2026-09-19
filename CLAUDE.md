@@ -651,17 +651,37 @@ cleared 5s after a successful load so the next deploy gets its own recovery. If
 `sessionStorage` throws (private mode), the error is treated as already-reloaded — a
 missed recovery beats an infinite loop.
 
-### Testing an update
+### Verified in production — 2026-09-19
+
+Confirmed on a real installed Android PWA, not by inspecting build artefacts. Both
+paths behaved as designed:
+
+| Path | Scenario | Observed |
+|---|---|---|
+| Long-lived session | deploy 2 landed while the app was open past 15s | Update toast appeared; tapping **Reload** flipped the build stamp |
+| Fresh launch | app killed, deploy 3 landed, relaunched | Silent reload, stamp flipped, **no toast** — correct, nothing to lose |
+
+Treat the lifecycle as working. Re-verify only if `registerType`, `injectRegister`,
+the workbox block, or `initPwaUpdates()` changes — all four can break it silently,
+and green tests prove nothing here (the test suite mocks `virtual:pwa-register`).
+
+### Re-testing an update
 
 Service workers need `http://localhost` or an HTTPS origin. Per
 `codespace-only-no-laptop`, the authoritative check for this project is a **deployed
-environment** (push to `dev`, open the Vercel URL). The loop:
+environment**, and in practice an installed PWA — a desktop browser tab does not
+exercise the relaunch path.
 
-1. `npm run build && npx vite preview` — open it, let the SW install.
-2. Make a trivial visible change; `npm run build` again; redeploy/restart preview.
-3. Reopen the already-open tab. Within 15s of a fresh launch it reloads silently;
-   leave the tab open past 15s before deploying and the toast appears instead.
-4. DevTools → Application → Service Workers shows the new worker activating without
+`BUILD_MARKER` in `src/lib/buildInfo.js` is the observable signal: it renders via
+`BuildStamp` in the AuthFooter (pre-auth) and Settings → Legal (post-auth), and is
+also on `window.__BOS_BUILD__`. The stamp changing is the proof.
+
+1. Install the PWA from the deployed URL; note the stamp.
+2. Bump ONLY `BUILD_MARKER`, deploy. A docs-only edit will not work — it leaves the
+   bundle hashes and `sw.js` byte-identical, so no update is ever detected.
+3. Fresh-launch path: kill the app, deploy, relaunch → expect a silent reload and a
+   changed stamp.
+4. Long-session path: leave it open past 15s while the deploy lands → expect the
+   toast instead, and the stamp to change only after tapping **Reload**.
+5. DevTools → Application → Service Workers shows the new worker activating without
    a stuck "waiting" state.
-
-Verification deploy 1 — 2026-09-19T10:30:47Z
