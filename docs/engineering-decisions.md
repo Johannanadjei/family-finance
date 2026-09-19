@@ -4307,12 +4307,20 @@ on a two-same-month hub picked the wrong period; `migrate_29` now raises CYC05 o
 ambiguity instead. `month` should eventually be dropped from both tables — not done
 here, and it is a migration in its own right.
 
-**e2e limits.** `e2e/period-range.spec.js` is read-only by construction: the §0
-write-rail aborts Supabase writes because Stage 1 runs against the shared production
-project, so the spec cannot create a hub or a period. It uses the seeded `history`
-fixture and stops before submit — the overlap is refused client-side, so no write is
-attempted and the rail asserting clean is part of the proof. The server CYC01 round
-trip is unit-tested only; covering it for real needs a scratch DB (journey-e2e).
+**e2e limits.** `e2e/period-range.spec.js` was written stop-before-submit — the
+overlap is refused client-side, so pressing Create fires no request — and that was
+**not sufficient**. It failed CI (run 35444675358) on the §0 write-rail before any
+assertion ran: simply signing a hub-owning fixture into the dashboard makes the APP
+write, because `useAutoContinuePeriod` (`useFinance.js:175`) calls
+`ensure_current_budget_period` on mount whenever no period covers today and the viewer
+can manage cycles. The rail aborted the POSTs, so nothing was written to production.
+The spec is now `test.skip`ped at describe level with that reason and kept intact.
+
+**Until a staging Supabase project exists, Stage 1 e2e specs can only exercise
+pre-hub screens** (auth, PIN, onboarding) — the moment a hub's dashboard mounts,
+auto-continue writes and the rail fires; `smoke-signin` passes only because the
+`fresh` fixture owns zero hubs. No choice of fixture avoids this. The server CYC01
+round trip is unit-tested only, for the same reason (journey-e2e, backlog #6).
 
 **Test coverage added:** `dates.test.js` (`formatDateRange` — same-year, cross-month,
 cross-year, zero-strip, missing input), `cycles.test.js` (`overlapsExistingCycle`
