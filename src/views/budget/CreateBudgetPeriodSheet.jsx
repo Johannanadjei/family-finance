@@ -22,40 +22,24 @@
 import { useState, useEffect } from 'react';
 import { createPortal }        from 'react-dom';
 import { useModalChrome }      from '../../hooks/useModalChrome';
-import { getToday, formatMonth } from '../../lib/dates';
-import { nextUncoveredMonthRange, currentCalendarMonthRange, isWithinCurrentYear } from '../../lib/cycles';
+import { DateFields, inputStyle } from './DateFields';
+import { getToday, formatMonth, formatDateRange } from '../../lib/dates';
+import { nextUncoveredMonthRange, currentCalendarMonthRange, isWithinCurrentYear, overlapsExistingCycle } from '../../lib/cycles';
 
 const pad = (n) => String(n).padStart(2, '0');
 const isValidYMD = (y, m, d) => { const dt = new Date(y, m - 1, d); return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d; };
 
-const inputStyle = {
-  padding: '12px 10px', borderRadius: 10, border: '1.5px solid var(--c-border, #e5e7eb)',
-  fontSize: 15, fontWeight: 700, outline: 'none', background: 'var(--c-input-bg, #f9fafb)',
-  boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", color: 'var(--c-text, #1c1917)',
-  textAlign: 'center', width: '100%',
-};
 const primaryBtn = {
   padding: '14px', borderRadius: 12, border: 'none', background: 'var(--c-primary, #064e3b)',
   color: 'var(--c-btn-text, #fff)', fontSize: 15, fontWeight: 800, cursor: 'pointer',
   fontFamily: "'Nunito', sans-serif",
 };
-
-// Three-field DD/MM/YYYY row — mirrors AddTransactionSheet's date entry convention.
-function DateFields({ label, parts, onChange, testid }) {
-  const set = (key, raw) => onChange({ ...parts, [key]: raw.replace(/[^0-9]/g, '') });
-  return (
-    <div>
-      <p style={{ fontSize: 12, fontWeight: 800, color: 'var(--c-muted, #6b7280)', margin: '0 0 6px' }}>{label}</p>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input data-testid={`${testid}-day`}   type="number" min="1" max="31"   placeholder="DD"   value={parts.d} onChange={e => set('d', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-        <input data-testid={`${testid}-month`} type="number" min="1" max="12"   placeholder="MM"   value={parts.m} onChange={e => set('m', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-        <input data-testid={`${testid}-year`}  type="number" min="2020" max="2100" placeholder="YYYY" value={parts.y} onChange={e => set('y', e.target.value)} style={{ ...inputStyle, flex: 1.4 }} />
-      </div>
-    </div>
-  );
-}
+const rangeHint = { fontSize: 11, fontWeight: 700, color: 'var(--c-muted, #6b7280)', margin: '-4px 0 0', textAlign: 'center' };
 
 const blank = { d: '', m: '', y: '' };
+
+// 'YYYY-MM-DD' from a { d, m, y } trio, or null when any part is not a real date.
+const toISO = ({ d, m, y }) => (isValidYMD(+y, +m, +d) ? `${+y}-${pad(+m)}-${pad(+d)}` : null);
 
 export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate }) {
   const [mode,        setMode]        = useState('choose');
@@ -113,14 +97,23 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate
   };
 
   const saveCustom = () => {
-    const sy = +start.y, sm = +start.m, sd = +start.d;
-    const ey = +end.y,   em = +end.m,   ed = +end.d;
-    if (!isValidYMD(sy, sm, sd) || !isValidYMD(ey, em, ed)) { setError('Please enter valid start and end dates.'); return; }
-    const startDate = `${sy}-${pad(sm)}-${pad(sd)}`, endDate = `${ey}-${pad(em)}-${pad(ed)}`;
+    const startDate = toISO(start), endDate = toISO(end);
+    if (!startDate || !endDate) { setError('Please enter valid start and end dates.'); return; }
     if (endDate < startDate) { setError('End date must be on or after the start date.'); return; }
     if (!isWithinCurrentYear(startDate, endDate, getToday())) { setError(`Periods must be within ${getToday().slice(0, 4)}.`); return; }
+    // Client twin of no_overlapping_cycles. Naming the clashing period is the point:
+    // "overlaps September 2026" is unactionable when two periods share that name.
+    const clash = overlapsExistingCycle(cycles, startDate, endDate);
+    if (clash) {
+      setError(`That overlaps "${clash.name}" (${formatDateRange(clash.start_date, clash.end_date)}). Pick different dates.`);
+      return;
+    }
     save({ name: shownName.trim() || null, startDate, endDate, copyPrevious: copyPrev });
   };
+
+  // Live preview of what will be created. Empty until both dates parse in order.
+  const cs = toISO(start), ce = toISO(end);
+  const customRange = (cs && ce && ce >= cs) ? formatDateRange(cs, ce) : '';
 
   return createPortal(
     <>
@@ -151,6 +144,9 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate
                 : nextRange ? nextRange.name
                 : `Wait until ${Number(today.slice(0, 4)) + 1} to plan ahead`}
             </button>
+            {nextRange && !saving && (
+              <p data-testid="quick-next-month-range" style={rangeHint}>{formatDateRange(nextRange.start, nextRange.end)}</p>
+            )}
             <button data-testid="custom-period-btn" onClick={openCustom} disabled={saving}
               style={{ padding: '14px', borderRadius: 12, border: '1.5px solid var(--c-border, #e5e7eb)', background: 'var(--c-card, #fff)', color: 'var(--c-text, #1c1917)', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
               Custom period
@@ -168,6 +164,9 @@ export function CreateBudgetPeriodSheet({ isOpen, onClose, cycles = [], onCreate
               style={{ ...inputStyle, textAlign: 'left' }} />
             <DateFields label="Starts" parts={start} onChange={setStart} testid="period-start" />
             <DateFields label="Ends"   parts={end}   onChange={setEnd}   testid="period-end" />
+            {customRange && (
+              <p data-testid="custom-period-range" style={rangeHint}>{customRange}</p>
+            )}
 
             <button data-testid="copy-prev-toggle" onClick={() => setCopyPrev(v => !v)} aria-pressed={copyPrev}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
