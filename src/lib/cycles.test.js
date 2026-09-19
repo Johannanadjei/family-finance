@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { landingCycle, cycleForToday, cycleForDate, getCycleNav, sliceByCycle, currentCalendarMonthRange, nextUncoveredMonthRange, isWithinCurrentYear, visibleCycleWindow } from './cycles';
+import { overlapsExistingCycle, landingCycle, cycleForToday, cycleForDate, getCycleNav, sliceByCycle, currentCalendarMonthRange, nextUncoveredMonthRange, isWithinCurrentYear, visibleCycleWindow } from './cycles';
 
 // Three non-overlapping calendar cycles. Dates are 'YYYY-MM-DD' strings.
 const APR = { id: 'apr', start_date: '2026-04-01', end_date: '2026-04-30', deleted_at: null };
@@ -341,5 +341,56 @@ describe('no month→cycle resolver exists', () => {
     const mod = await import('./cycles');
     expect(mod.cycleForMonth).toBeUndefined();
     expect(mod.cycleIdForMonth).toBeUndefined();
+  });
+});
+
+describe('overlapsExistingCycle', () => {
+  // Inclusive both ends, matching no_overlapping_cycles' daterange(..., '[]').
+  const SEP_EARLY = { id: 'a', name: 'September 2026', start_date: '2026-09-01', end_date: '2026-09-17' };
+  const SEP_LATE  = { id: 'b', name: 'September 2026', start_date: '2026-09-18', end_date: '2026-10-18' };
+
+  it('returns null when the range is free', () => {
+    expect(overlapsExistingCycle([SEP_EARLY], '2026-11-01', '2026-11-30')).toBeNull();
+  });
+
+  // THE case behind this whole fix: the two periods that hid a hub's September data
+  // were ADJACENT, not overlapping. The DB constraint permitted them, correctly.
+  it('treats adjacent periods as NOT overlapping', () => {
+    expect(overlapsExistingCycle([SEP_EARLY], SEP_LATE.start_date, SEP_LATE.end_date)).toBeNull();
+  });
+
+  it('returns the clashing cycle when the ranges intersect', () => {
+    expect(overlapsExistingCycle([SEP_EARLY, SEP_LATE], '2026-09-10', '2026-09-20')).toBe(SEP_EARLY);
+  });
+
+  it('counts a single shared boundary day as an overlap', () => {
+    expect(overlapsExistingCycle([SEP_EARLY], '2026-09-17', '2026-09-30')).toBe(SEP_EARLY);
+  });
+
+  it('ignores soft-deleted cycles and the excluded id', () => {
+    const deleted = { ...SEP_EARLY, deleted_at: '2026-09-02T00:00:00Z' };
+    expect(overlapsExistingCycle([deleted], '2026-09-05', '2026-09-10')).toBeNull();
+    expect(overlapsExistingCycle([SEP_EARLY], '2026-09-05', '2026-09-10', 'a')).toBeNull();
+  });
+
+  it('returns null on missing input rather than throwing', () => {
+    expect(overlapsExistingCycle([SEP_EARLY], null, '2026-09-10')).toBeNull();
+    expect(overlapsExistingCycle(undefined, '2026-09-05', '2026-09-10')).toBeNull();
+  });
+});
+
+describe('landingCycle — legacy overlapping rows', () => {
+  // Pre-constraint data can still hold genuine overlaps. landingCycle must stay
+  // deterministic rather than depending on array order for which one it picks.
+  const A = { id: 'a', start_date: '2026-09-01', end_date: '2026-09-30' };
+  const B = { id: 'b', start_date: '2026-09-15', end_date: '2026-10-15' };
+
+  it('picks the first containing cycle and does so consistently', () => {
+    expect(landingCycle([A, B], '2026-09-20')).toBe(A);
+    expect(landingCycle([B, A], '2026-09-20')).toBe(B);
+  });
+
+  it('still resolves when only one of the overlapping pair contains today', () => {
+    expect(landingCycle([A, B], '2026-10-10')).toBe(B);
   });
 });

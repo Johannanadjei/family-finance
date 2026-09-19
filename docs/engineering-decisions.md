@@ -4256,3 +4256,68 @@ for wrong-PIN/locked, explicit null rather than an omitted arg, GST01 mapping),
 `useGuestAuth.test.jsx` (new — restore rules, tokenless-session rejection, ok-without-token
 refusal, lockout/wrong-PIN paths), plus GST01 UI states in `GuestTransactionForm.test.jsx`.
 1670 tests, audit 297/0.
+
+---
+
+## A period's name does not identify it — show the range (2026-09-19)
+
+**Symptom.** A hub's September data looked deleted. The hub held two periods,
+`1–17 Sep` and `18 Sep–18 Oct`, both labelled "September 2026". The app opened on the
+one containing today, which was empty; the earlier period's data was one prev-arrow
+away, but nothing on screen said so.
+
+**The two ranges did not overlap.** They are adjacent —
+`daterange('2026-09-01','2026-09-17','[]')` is `[Sep 1, Sep 18)` and
+`daterange('2026-09-18','2026-10-18','[]')` is `[Sep 18, Oct 19)`; `&&` is false. The
+`no_overlapping_cycles` GiST constraint was never violated, and both rows are
+legitimate data. **An overlap rule would not have prevented this**, and one already
+exists (`migrate_cycles_schema`), with `create_budget_period` trapping it as CYC01
+(`migrate_16`). No migration was added for this fix.
+
+**Selection was also correct.** `landingCycle` prioritises the cycle containing today
+(`useFinance.js`), which is exactly the empty one. Changing the fallback chain would
+not have helped either — its first rule already won. Left unchanged; tests added for
+the legacy-overlapping-rows case.
+
+**So the defect was presentational, and the fix is too.** `PeriodNav` now renders
+`formatDateRange(viewedCycle.start_date, viewedCycle.end_date)` beneath the period
+name, on all four cycle-navigated screens at once.
+
+**Why PeriodNav reads FinanceContext instead of taking a prop.** `BudgetView.jsx` and
+`PaydayView.jsx` were both sitting at exactly the 200-line audit cap, so a new prop
+threaded through four views and two header components did not fit — and `viewedCycle`
+is the very cycle `periodLabel` already names, so the two cannot drift. This follows
+the precedent in the same file for `isOwner`. Cost: `PeriodNav` now depends on two
+contexts, and every test that renders it (incl. `BudgetHeader`, `PaydayHeader`) needs
+a `useFinanceContext` mock. That broke 14 tests when first applied — the §9.5
+"test mocks include every context value" rule, caught pre-commit.
+
+**Client-side overlap check.** `overlapsExistingCycle` in `lib/cycles.js` mirrors the
+constraint's inclusive bounds (so adjacent stays legal) and lets the creator refuse
+before the round trip, naming the period clashed with — "overlaps September 2026" is
+unactionable when two periods share that name. Advisory only: a stale `cycles` array
+still falls through to the server's CYC01, which the sheet already surfaced.
+
+**`month` vs `cycle_id` on `budget_categories` / `income_sources`.** `cycle_id` is
+authoritative. The trigger resolves `month → cycle_id`, `sliceByCycle` filters on
+`cycle_id` alone, and `month` is derived from the cycle's `start_date` for the NOT NULL
+column and display only, never resolved back from. Rows carrying a June `cycle_id` with
+a September `month` are legacy from the pre-`migrate_29` first-wins month branch, which
+on a two-same-month hub picked the wrong period; `migrate_29` now raises CYC05 on
+ambiguity instead. `month` should eventually be dropped from both tables — not done
+here, and it is a migration in its own right.
+
+**e2e limits.** `e2e/period-range.spec.js` is read-only by construction: the §0
+write-rail aborts Supabase writes because Stage 1 runs against the shared production
+project, so the spec cannot create a hub or a period. It uses the seeded `history`
+fixture and stops before submit — the overlap is refused client-side, so no write is
+attempted and the rail asserting clean is part of the proof. The server CYC01 round
+trip is unit-tested only; covering it for real needs a scratch DB (journey-e2e).
+
+**Test coverage added:** `dates.test.js` (`formatDateRange` — same-year, cross-month,
+cross-year, zero-strip, missing input), `cycles.test.js` (`overlapsExistingCycle`
+incl. **adjacent-is-not-overlap**, shared-boundary-day, soft-deleted, excludeId;
+`landingCycle` legacy overlaps), `PeriodNav.test.jsx` (range renders, two same-named
+periods differ by range, omitted when no cycle), `CreateBudgetPeriodSheet.test.jsx`
+(quick + custom range previews, overlap refused and named, adjacent allowed, CYC01
+still surfaced), `DateFields.test.jsx` (new). 1955 tests, audit 321/0.

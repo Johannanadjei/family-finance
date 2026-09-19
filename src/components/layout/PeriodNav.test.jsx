@@ -20,7 +20,18 @@ vi.mock('../../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({ isOwner: mockIsOwner }),
 }));
 
-beforeEach(() => { mockNavigate.mockClear(); mockIsOwner = true; });
+// PeriodNav reads viewedCycle from FinanceContext to render the date range beneath
+// the period name — the line that tells two same-named periods apart.
+let mockViewedCycle = { id: 'c1', name: 'May 2026', start_date: '2026-05-01', end_date: '2026-05-31' };
+vi.mock('../../context/FinanceContext', () => ({
+  useFinanceContext: () => ({ viewedCycle: mockViewedCycle }),
+}));
+
+beforeEach(() => {
+  mockNavigate.mockClear();
+  mockIsOwner = true;
+  mockViewedCycle = { id: 'c1', name: 'May 2026', start_date: '2026-05-01', end_date: '2026-05-31' };
+});
 
 const base = {
   periodLabel: 'May 2026',
@@ -35,6 +46,30 @@ describe('PeriodNav', () => {
   it('renders the period label under the given labelTestId', () => {
     render(<PeriodNav {...base} />);
     expect(screen.getByTestId('test-period-label').textContent).toBe('May 2026');
+  });
+
+  it('renders the viewed cycle date range beneath the label', () => {
+    render(<PeriodNav {...base} />);
+    expect(screen.getByTestId('period-range').textContent).toBe('1 May – 31 May 2026');
+  });
+
+  // The bug this shipped for: two adjacent periods can legally share a name, so the
+  // name alone cannot tell a user which one they are looking at. The range can.
+  it('distinguishes two same-named periods by their ranges', () => {
+    mockViewedCycle = { id: 'a', name: 'September 2026', start_date: '2026-09-01', end_date: '2026-09-17' };
+    const first = render(<PeriodNav {...base} periodLabel="September 2026" />);
+    expect(screen.getByTestId('period-range').textContent).toBe('1 Sep – 17 Sep 2026');
+    first.unmount();
+
+    mockViewedCycle = { id: 'b', name: 'September 2026', start_date: '2026-09-18', end_date: '2026-10-18' };
+    render(<PeriodNav {...base} periodLabel="September 2026" />);
+    expect(screen.getByTestId('period-range').textContent).toBe('18 Sep – 18 Oct 2026');
+  });
+
+  it('omits the range when no cycle is viewed (legacy month fallback)', () => {
+    mockViewedCycle = null;
+    render(<PeriodNav {...base} />);
+    expect(screen.queryByTestId('period-range')).toBeNull();
   });
 
   it('isLatest disables Next; otherwise Next fires onNext', () => {

@@ -202,3 +202,70 @@ describe('CreateBudgetPeriodSheet', () => {
     expect(await screen.findByText(/must be within 2026/i)).toBeTruthy();
   });
 });
+
+// ── Period ranges + the client-side overlap refusal ──────────────────────────
+// A period's NAME does not identify it: two adjacent periods can legally both be
+// "September 2026". These show the dates the user is actually committing to, and
+// refuse a clash before the round trip so the error can name what it clashed with.
+describe('CreateBudgetPeriodSheet — ranges and overlap', () => {
+  const SEP_EARLY = { id: 'a', name: 'September 2026', start_date: '2026-09-01', end_date: '2026-09-17', deleted_at: null };
+
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-06-15T12:00:00Z')); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const fillRange = (s, e) => {
+    const [sy, sm, sd] = s.split('-');
+    const [ey, em, ed] = e.split('-');
+    fireEvent.change(screen.getByTestId('period-start-day'),   { target: { value: String(+sd) } });
+    fireEvent.change(screen.getByTestId('period-start-month'), { target: { value: String(+sm) } });
+    fireEvent.change(screen.getByTestId('period-start-year'),  { target: { value: sy } });
+    fireEvent.change(screen.getByTestId('period-end-day'),     { target: { value: String(+ed) } });
+    fireEvent.change(screen.getByTestId('period-end-month'),   { target: { value: String(+em) } });
+    fireEvent.change(screen.getByTestId('period-end-year'),    { target: { value: ey } });
+  };
+
+  it('shows the quick-create range under the button', () => {
+    renderSheet();
+    expect(screen.getByTestId('quick-next-month-range').textContent).toBe('1 Jul – 31 Jul 2026');
+  });
+
+  it('previews the custom range as the dates are entered', () => {
+    renderSheet();
+    goCustom();
+    fillRange('2026-09-18', '2026-10-18');
+    expect(screen.getByTestId('custom-period-range').textContent).toBe('18 Sep – 18 Oct 2026');
+  });
+
+  it('refuses an overlapping range and names the period it clashes with', () => {
+    const onCreate = vi.fn();
+    renderSheet({ cycles: [JUNE, SEP_EARLY], onCreate });
+    goCustom();
+    fillRange('2026-09-10', '2026-09-20');
+    fireEvent.click(screen.getByTestId('period-save-btn'));
+    expect(onCreate).not.toHaveBeenCalled();
+    expect(screen.getByTestId('create-period-sheet').textContent)
+      .toContain('overlaps "September 2026" (1 Sep – 17 Sep 2026)');
+  });
+
+  // The pair that caused the incident. Adjacent is legal — the sheet must not block it.
+  it('allows a period that merely abuts an existing one', () => {
+    const onCreate = vi.fn().mockResolvedValue({ error: null });
+    renderSheet({ cycles: [JUNE, SEP_EARLY], onCreate });
+    goCustom();
+    fillRange('2026-09-18', '2026-10-18');
+    fireEvent.click(screen.getByTestId('period-save-btn'));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+      startDate: '2026-09-18', endDate: '2026-10-18',
+    }));
+  });
+
+  it('still surfaces the server CYC01 when the client check is bypassed', async () => {
+    const onCreate = vi.fn().mockResolvedValue({ error: { code: 'CYC01' } });
+    renderSheet({ cycles: [JUNE], onCreate });   // stale list: the clash is invisible here
+    goCustom();
+    fillRange('2026-09-10', '2026-09-20');
+    fireEvent.click(screen.getByTestId('period-save-btn'));
+    expect(onCreate).toHaveBeenCalled();
+    expect(await screen.findByText(/overlaps an existing budget period/)).toBeTruthy();
+  });
+});
