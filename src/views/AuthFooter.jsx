@@ -11,6 +11,8 @@
  * (the canonical display strings). Rendered on the green gradient → white text.
  */
 
+import { BuildStamp } from '../components/ui/BuildStamp';
+
 const LEGAL_LINKS = [
   { slug: 'privacy',    href: '/privacy',    label: 'Privacy Policy' },
   { slug: 'terms',      href: '/terms',      label: 'Terms of Service' },
@@ -20,13 +22,16 @@ const LEGAL_LINKS = [
 
 export function AuthFooter() {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '6px 14px', maxWidth: 400 }}>
-      {LEGAL_LINKS.map(l => (
-        <a key={l.slug} data-testid={`auth-legal-link-${l.slug}`} href={l.href}
-          style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.75)', textDecoration: 'none' }}>
-          {l.label}
-        </a>
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, maxWidth: 400 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '6px 14px' }}>
+        {LEGAL_LINKS.map(l => (
+          <a key={l.slug} data-testid={`auth-legal-link-${l.slug}`} href={l.href}
+            style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.75)', textDecoration: 'none' }}>
+            {l.label}
+          </a>
+        ))}
+      </div>
+      <BuildStamp color="rgba(255,255,255,0.55)" />
     </div>
   );
 }
