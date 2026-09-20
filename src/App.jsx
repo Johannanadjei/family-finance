@@ -5,8 +5,10 @@
  * Applies theme CSS variables on mount and when prefs or active centre change.
  * Provides routing via BrowserRouter.
  *
- * DashboardShell lives inside BrowserRouter so it has access to useNavigate.
- * All UI state (panel, sheet, toast) is owned by DashboardShell.
+ * DashboardShell (components/layout/DashboardShell.jsx) lives inside BrowserRouter
+ * so it has access to useNavigate, and owns all dashboard UI state (panel, sheet,
+ * toast) plus the <Routes> block. It was extracted from this file to stay under
+ * the 400-line cap — this file is gates + providers + routing only.
  *
  * MULTI-CENTRE:
  *   activeCentreId is stored in localStorage (ffc_active_centre_id).
@@ -15,7 +17,7 @@
  */
 
 import { useState, useEffect, useCallback }      from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter }                        from 'react-router-dom';
 import { useAuth }                               from './hooks/useAuth';
 import { usePin }                                from './hooks/usePin';
 import { useBudgetCentre }                       from './hooks/useBudgetCentre';
@@ -24,139 +26,22 @@ import { useFinance }                            from './hooks/useFinance';
 import { useSubscription }                       from './hooks/useSubscription';
 import { useHubTier }                            from './hooks/useHubTier';
 import { DashboardProviders }                    from './components/providers/DashboardProviders';
-import { useBudgetCentreContext }                from './context/BudgetCentreContext';
-import { useFinanceContext }                     from './context/FinanceContext';
+import { DashboardShell }                        from './components/layout/DashboardShell';
 import { applyTheme, resolveSkin }                            from './lib/themes';
 import { loadActiveCentreId, saveActiveCentreId, loadPrefs } from './lib/storage';
 import { resetPasswordForEmail }                             from './services/auth.service';
 
 // Apply saved skin immediately so there's no flash of default theme on reload
 applyTheme(loadPrefs().themeSkin);
+
 import { AuthScreen }                            from './views/AuthScreen';
 import { PinScreen }                             from './views/PinScreen';
 import { PinSetupFlow }                          from './views/PinSetupFlow';
 import { OnboardingFlow }                        from './features/onboarding/OnboardingFlow';
-import { Header }                                from './components/layout/Header';
-import { BottomNav }                             from './components/layout/BottomNav';
-import { FAB }                                   from './components/layout/FAB';
-import { SidePanel }                             from './components/layout/SidePanel';
-import { CreateHubSheet }                        from './features/hubs/CreateHubSheet';
-import { PeriodSetupPrompt }                     from './components/PeriodSetupPrompt';
-import { ErrorBoundary }                         from './components/ui/ErrorBoundary';
 import { LoadingScreen, ErrorScreen, RemovedScreen } from './components/ui/StateScreens';
-import { HomeView }                              from './views/HomeView';
-import { PaydayView }                            from './views/PaydayView';
-import { DailyView }                             from './views/DailyView';
-import { BudgetView }                            from './views/BudgetView';
-import { LogView }                               from './views/LogView';
-import { PricingView }                           from './views/PricingView';
-import { AddTransactionSheet }                   from './views/daily/AddTransactionSheet';
-import { SettingsView }                          from './views/SettingsView';
-import { Toast }                                 from './components/ui/Toast';
-import { InstallPrompt }                         from './components/ui/InstallPrompt';
 import { JoinView }                              from './views/JoinView';
 import { LegalView, resolveLegalSlug }           from './views/LegalView';
 import { ResetPasswordScreen, isResetPasswordPath } from './views/ResetPasswordScreen';
-
-function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, newHubPlan, hubCount, onSwitchCentre, onHubCreated, onRestoreHub }) {
-  const navigate                           = useNavigate();
-  const isPricing                          = useLocation().pathname === '/pricing';  // chrome-less full-screen route
-  const { can }                            = useBudgetCentreContext();
-  const { incomes, loading, error, reload } = useFinanceContext();
-  const [panelOpen,       setPanelOpen]    = useState(false);
-  const [addSheetOpen,    setAddSheetOpen] = useState(false);
-  const [createHubOpen,   setCreateHubOpen] = useState(false);
-  const handleOpenCreateHub  = useCallback(() => { setPanelOpen(false); setCreateHubOpen(true); }, []);
-  const handleHubCreatedNav  = useCallback(async (id) => { await onHubCreated(id); navigate('/'); }, [onHubCreated, navigate]);
-  const [toast,           setToast]        = useState(null);
-  const [editTx,          setEditTx]       = useState(null);
-  const [errorDismissed,  setErrorDismissed] = useState(false);
-
-  // Surface a failed finance fetch as a retryable banner — never let it render as
-  // a silent empty dashboard (the data-loss-on-refresh class). Reset on each new error.
-  useEffect(() => { if (error) setErrorDismissed(false); }, [error]);
-
-  const handleSaved = (savedTx) => {
-    if (!savedTx) return;
-    if (
-      savedTx.type === 'income' &&
-      !loading &&
-      !incomes.some(src => src.label?.toLowerCase() === savedTx.category_name?.toLowerCase())
-    ) {
-      setToast({ tx: savedTx, kind: 'income' });
-    }
-  };
-
-  return (
-    <div id="app-shell" style={{
-      maxWidth:   440,
-      margin:     '0 auto',
-      minHeight:  '100vh',
-      background: 'var(--c-bg, #f3f4f6)',
-      fontFamily: "'Nunito', sans-serif",
-      position:   'relative',
-    }}>
-      <Header onOpenPanel={() => setPanelOpen(true)} />
-      <ErrorBoundary>
-        <main style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
-          {!isPricing && <PeriodSetupPrompt />}{/* ONE mount for the whole dashboard — self-hiding, self-routing */}
-          <Routes>
-            <Route path="/"         element={<HomeView />} />
-            <Route path="/payday"   element={<PaydayView />} />
-            <Route path="/daily"    element={<DailyView />} />
-            <Route path="/budget"   element={<BudgetView />} />
-            <Route path="/log"      element={<LogView onEditTx={(tx) => { setEditTx(tx); setAddSheetOpen(true); }} />} />
-            <Route path="/settings" element={<SettingsView />} />
-            <Route path="/pricing"  element={<PricingView />} />
-          </Routes>
-        </main>
-      </ErrorBoundary>
-      {!isPricing && can('log') && <FAB onClick={() => setAddSheetOpen(true)} />}
-      {!isPricing && <BottomNav />}
-      <AddTransactionSheet
-        isOpen={addSheetOpen}
-        onClose={() => { setAddSheetOpen(false); setEditTx(null); }}
-        onSaved={handleSaved}
-        editTx={editTx}
-      />
-      {toast?.kind === 'income' && (
-        <Toast
-          message="Set up your income sources in Settings for better tracking"
-          actionLabel="Go to Settings"
-          onEdit={() => { navigate('/settings'); setToast(null); }}
-          onDismiss={() => setToast(null)}
-        />
-      )}
-      {error && !errorDismissed && (
-        <Toast
-          message="Couldn't load your latest data."
-          actionLabel="Retry"
-          onEdit={() => reload()}
-          onDismiss={() => setErrorDismissed(true)}
-          autoDismissMs={null}
-        />
-      )}
-      {!panelOpen && <InstallPrompt />}
-      <SidePanel
-        isOpen={panelOpen}
-        onClose={() => setPanelOpen(false)}
-        centres={centres}
-        archivedCentres={archivedCentres}
-        activeCentreId={activeCentreId}
-        onSwitch={onSwitchCentre}
-        onCreateHub={handleOpenCreateHub}
-        onRestore={onRestoreHub}
-        userPlan={userPlan}
-        hubCount={hubCount}
-      />
-      <CreateHubSheet
-        isOpen={createHubOpen} plan={newHubPlan}
-        onClose={() => setCreateHubOpen(false)}
-        onComplete={handleHubCreatedNav}
-      />
-    </div>
-  );
-}
 
 export default function App() {
   const { user, loading: authLoading, signOut, isRecovery } = useAuth();

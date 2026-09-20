@@ -54,7 +54,11 @@ export function useHubFreshness({
       if (cancelled || inFlight) return;
       if (Date.now() - (lastLoadedAt?.current || 0) < staleAfterMs) return;
       inFlight = true;
+      // Catch, don't just finally: a rejecting reloadHub would escape this async
+      // handler as an unhandled rejection. The failure itself is already reported
+      // through the hub's `error` state; here we only have to release the guard.
       try { await reloadRef.current?.(); }
+      catch (err) { console.error('[useHubFreshness] refresh failed:', err?.message || err); }
       finally { inFlight = false; }
     };
 
