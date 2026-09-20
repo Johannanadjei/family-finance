@@ -499,4 +499,3 @@ describe('calcTopCategories', () => {
     expect(calcTopCategories(txs).length).toBe(5);
   });
 });
-

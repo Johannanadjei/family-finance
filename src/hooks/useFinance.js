@@ -35,6 +35,7 @@ import {
   calcWeeklyData, calcCategorySpend, calcTopCategories, pickNextUnpaid,
   getCurrentMonth,
 } from '../lib/finance';
+import { sortTxsByDate } from '../lib/activity';
 import { loadPrefs, saveThemeSkin as persistSkin, saveThemeAccent as persistAccent, saveNotifications as persistNotifs } from '../lib/storage';
 import { useHubLoad } from './useHubLoad';
 import { useHubFreshness } from './useHubFreshness';
@@ -195,6 +196,10 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
   const weeklyData     = useMemo(() => calcWeeklyData(txs, categories, monthlyIncome),         [txs, categories, monthlyIncome]);
   const categorySpend  = useMemo(() => calcCategorySpend(txs, categories),                     [txs, categories]);
   const topCategories  = useMemo(() => calcTopCategories(txs),                                  [txs]);
+  // Transaction-date order for the activity feed. `txs` itself keeps its load
+  // order (service order, with optimistic rows prepended for immediate feedback);
+  // this is the view that must read chronologically. See sortTxsByDate.
+  const txsByDate      = useMemo(() => sortTxsByDate(txs),                                      [txs]);
 
   // Pay dates resolve against the VIEWED PERIOD, never the clock's calendar month.
   const viewedCycle = useMemo(() => cycles.find(c => c.id === viewedCycleId) ?? null, [cycles, viewedCycleId]);
@@ -296,6 +301,7 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
   return {
     // Raw data
     txs,
+    txsByDate,      // txs newest-first by TRANSACTION DATE — the activity feed
     incomes,        // viewed-cycle slice — Payday / Home / totals
     allIncomes,     // every month — Settings' all-months view
     categories,     // viewed-cycle slice — feeds BudgetCentreContext + the totals below

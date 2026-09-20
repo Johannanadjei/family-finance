@@ -61,7 +61,7 @@ export function HomeView() {
   const {
     totalReceived, monthlyIncome, totalSpent, allIncome,
     healthPct, budgetStatus, nextUnpaid, totalExpected,
-    fixedTotal, spareMoney, budgetRemaining, txs,
+    fixedTotal, spareMoney, budgetRemaining, txs, txsByDate,
     loading, cyclesLoading, activeCycle, currentCycle, activeCycleId, loadCycle,
   } = financeValues;
 
@@ -162,7 +162,7 @@ export function HomeView() {
         </div>
       )}
       <BudgetHealthBar healthPct={healthPct} budgetStatus={budgetStatus} totalSpent={totalSpent} fixedTotal={fixedTotal} />
-      <RecentActivity txs={txs} showIncome={showIncome} />
+      <RecentActivity txs={txsByDate} showIncome={showIncome} />
     </div>
   );
 }

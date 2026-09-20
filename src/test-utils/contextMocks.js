@@ -103,6 +103,7 @@ export function makeFinanceMock(overrides = {}) {
       moveIncomeSourceToCycle:  vi.fn().mockResolvedValue({ data: null, error: null }),
       loadCycle:            vi.fn(),
       saveThemeSkin:        vi.fn(),
+      txsByDate:            mockTxs,
       reload:               vi.fn().mockResolvedValue(undefined),
       reloadHub:            vi.fn().mockResolvedValue(undefined),
       ...overrides,
