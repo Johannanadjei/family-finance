@@ -224,3 +224,30 @@ describe('webhook handler', () => {
     expect(res.statusCode).toBe(200);
   });
 });
+
+// ── config guard (wired at the top of the handler) ──────────────────────────
+// The webhook answers 503, not the usual 200 ack: a misconfigured route must keep the
+// event in Paystack's retry queue rather than silently consuming it.
+describe('webhook — config guard', () => {
+  it('refuses with 503 when a LIVE key is used outside production', async () => {
+    process.env.PAYSTACK_SECRET_KEY = 'sk_live_real';
+    process.env.VERCEL_ENV = 'preview';
+    const res = mockRes();
+    await handler(mockReq({ body: { event: 'charge.success', data: {} } }), res);
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toEqual({ error: 'server_misconfigured' });
+    delete process.env.VERCEL_ENV;
+    process.env.PAYSTACK_SECRET_KEY = SECRET;
+  });
+
+  it('proceeds to signature verification with a LIVE key in production', async () => {
+    process.env.PAYSTACK_SECRET_KEY = 'sk_live_real';
+    process.env.VERCEL_ENV = 'production';
+    const res = mockRes();
+    // Unsigned request: past the guard, so it must fail on the SIGNATURE (401), not 503.
+    await handler(mockReq({ body: { event: 'charge.success', data: {} } }), res);
+    expect(res.statusCode).toBe(401);
+    delete process.env.VERCEL_ENV;
+    process.env.PAYSTACK_SECRET_KEY = SECRET;
+  });
+});
