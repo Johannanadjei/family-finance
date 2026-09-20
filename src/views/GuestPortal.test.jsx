@@ -20,6 +20,10 @@ vi.mock('../hooks/useGuestAuth', () => ({
 
 // Stub applyTheme so no DOM errors
 vi.mock('../lib/themes', () => ({ applyTheme: vi.fn() }));
+// GuestPortal → useHubFreshness → realtime.service → lib/supabase. Mocked like every
+// other service the hook pulls in: without it the real Supabase client is constructed
+// at import time and throws "supabaseUrl is required" wherever VITE_* is unset (CI).
+vi.mock('../services/realtime.service', () => ({ subscribeToHubActivity: vi.fn(() => vi.fn()) }));
 
 const noSession = {
   session:      null,

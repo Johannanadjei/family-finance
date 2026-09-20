@@ -41,6 +41,10 @@ vi.mock('../lib/storage', () => ({
   loadPrefs: () => ({ themeSkin: 'family_warmth' }),
   saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn(),
 }));
+// useFinance → useHubFreshness → realtime.service → lib/supabase. Mocked like every
+// other service the hook pulls in: without it the real Supabase client is constructed
+// at import time and throws "supabaseUrl is required" wherever VITE_* is unset (CI).
+vi.mock('../services/realtime.service', () => ({ subscribeToHubActivity: vi.fn(() => vi.fn()) }));
 
 import { waitForSession } from '../lib/auth';
 import { getTransactionsByCycle } from '../services/transactions.service';
