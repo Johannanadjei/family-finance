@@ -55,7 +55,10 @@ export const getTransactionsByCycle = async (centreId, cycleId) => {
     .eq('budget_centre_id', centreId)
     .eq('cycle_id', cycleId)
     .is('deleted_at', null)
-    .order('date', { ascending: false });
+    .order('date', { ascending: false })
+    // created_at is the tiebreak for same-day rows, matching getTransactions.
+    // Without it, two transactions on the same date come back in arbitrary order.
+    .order('created_at', { ascending: false });
 
   if (error) console.error('[transactions.service] getTransactionsByCycle error:', error.message);
   if (!error) warnOnEmptyColdLoad('transactions', data);

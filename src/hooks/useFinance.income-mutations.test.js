@@ -25,6 +25,10 @@ vi.mock('../services/transactions.service', () => ({ getTransactionsByCycle: vi.
 vi.mock('../services/income.service', () => ({ getIncomeSources: vi.fn(), markReceived: vi.fn(), markPending: vi.fn(), updateExpectedAmount: vi.fn(), addIncomeSource: vi.fn(), bulkAddIncomeSources: vi.fn(), deleteIncomeSource: vi.fn(), updateIncomeSource: vi.fn(), moveIncomeSourceToCycle: vi.fn() }));
 vi.mock('../services/cycles.service', () => ({ getCyclesForCentre: vi.fn().mockResolvedValue({ data: [], error: null }) }));
 vi.mock('../lib/storage', () => ({ loadPrefs: () => ({ themeSkin: 'family_warmth' }), saveThemeSkin: vi.fn(), saveThemeAccent: vi.fn(), saveNotifications: vi.fn() }));
+// useFinance → useHubFreshness → realtime.service → lib/supabase. Mocked like every
+// other service the hook pulls in: without it the real Supabase client is constructed
+// at import time and throws "supabaseUrl is required" wherever VITE_* is unset (CI).
+vi.mock('../services/realtime.service', () => ({ subscribeToHubActivity: vi.fn(() => vi.fn()) }));
 
 import { getTransactionsByCycle, addTransaction, updateTransaction, deleteTransaction } from '../services/transactions.service';
 import { getIncomeSources, markReceived, markPending, addIncomeSource, bulkAddIncomeSources, deleteIncomeSource, updateIncomeSource, moveIncomeSourceToCycle as dbMove } from '../services/income.service';

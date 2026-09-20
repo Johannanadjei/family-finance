@@ -24,13 +24,18 @@ vi.mock('../lib/supabase', () => {
       from:   () => q,
       is:     () => q,
       eq:     (col, val) => { eqCalls.push([col, val]); return q; },
-      order:  (col, opts) => { orderCalls.push([col, opts]); return Promise.resolve(mockResult); },
+      // Chainable AND awaitable: getTransactionsByCycle/getTransactions chain two
+      // .order() calls (date, then created_at as the same-day tiebreak), so .order()
+      // must return the builder, and the builder must resolve when awaited.
+      order:  (col, opts) => { orderCalls.push([col, opts]); return q; },
       update: (vals) => { updateArgs.push(vals); return q; },
       single: () => Promise.resolve(singleResult),
       insert: (vals) => { insertArgs.push(vals); inserted = true; return q; },
     };
     // Chainable on the read path; terminal once .insert() has run.
     q.select = () => (inserted ? Promise.resolve(insertResult) : q);
+    // Makes the builder thenable, so `await …order().order()` yields mockResult.
+    q.then = (onOk, onErr) => Promise.resolve(mockResult).then(onOk, onErr);
     return q;
   };
   return {
@@ -64,6 +69,11 @@ describe('getTransactionsByCycle', () => {
     await getTransactionsByCycle('centre-1', 'cyc-99');
     expect(eqCalls).toContainEqual(['budget_centre_id', 'centre-1']);
     expect(eqCalls).toContainEqual(['cycle_id', 'cyc-99']);
+  });
+
+  it('breaks a same-day tie on created_at, so the order is stable', async () => {
+    await getTransactionsByCycle('centre-1', 'cyc-1');
+    expect(orderCalls).toContainEqual(['created_at', { ascending: false }]);
   });
 
   it('orders by date descending (most recent first)', async () => {

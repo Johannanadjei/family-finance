@@ -22,6 +22,11 @@ vi.mock('../context/BudgetCentreContext', () => ({
   useBudgetCentreContext: () => ({ centre: mockCentre, fmt: mockFmt, can: (p) => mockCan(p) }),
 }));
 
+const TXS = [
+  { id: 'tx-1', type: 'expense', amount: 200,   category_name: 'Groceries',    date: '2026-05-19', logged_by_name: 'Johannan' },
+  { id: 'tx-2', type: 'income',  amount: 30000, category_name: 'Adjei Salary', date: '2026-05-19', logged_by_name: 'Johannan' },
+];
+
 const mockFinance = {
   loading:       false,
   cyclesLoading: false,
@@ -45,10 +50,10 @@ const mockFinance = {
   activeCycleId: null,
   activeMonth:   getCurrentMonth(),
   loadCycle:     vi.fn(),
-  txs: [
-    { id: 'tx-1', type: 'expense', amount: 200,   category_name: 'Groceries',    date: '2026-05-19', logged_by_name: 'Johannan' },
-    { id: 'tx-2', type: 'income',  amount: 30000, category_name: 'Adjei Salary', date: '2026-05-19', logged_by_name: 'Johannan' },
-  ],
+  txs: TXS,
+  // The activity feed reads the date-sorted view, not the raw load order
+  // (useFinance.txsByDate → lib/finance.sortTxsByDate). Same rows here.
+  txsByDate: TXS,
 };
 
 vi.mock('../context/FinanceContext', () => ({
@@ -169,12 +174,13 @@ describe('HomeView', () => {
   });
 
   it('shows empty state when no transactions', () => {
+    // The feed reads txsByDate; txs still drives the stat cards above it.
     mockFinance.txs = [];
+    mockFinance.txsByDate = [];
     renderHome();
     expect(screen.getByText(/No transactions yet/)).toBeTruthy();
-    mockFinance.txs = [
-      { id: 'tx-1', type: 'expense', amount: 200, category_name: 'Groceries', date: '2026-05-19', logged_by_name: 'Johannan' },
-    ];
+    mockFinance.txs = TXS;
+    mockFinance.txsByDate = TXS;
   });
 
   // ── Cycles: current-cycle label + "now"-dashboard mount-reset (Commit 9) ──────
