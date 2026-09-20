@@ -26,9 +26,17 @@
  *
  * POST (not GET) despite being a read: the returned link is single-use and
  * short-lived, and POST keeps it off any intermediary cache.
+ *
+ * CONFIG GUARD: refuses to run when PAYSTACK_SECRET_KEY is a live key outside
+ * production (see _guards.js). Same hazard class as checkout.js and for the same
+ * reason — this route calls the LIVE Paystack API with that key, so a live key in a
+ * preview deploy would hand back a real customer's hosted manage page, from which a
+ * real subscription can be cancelled. No plan-code assertion: this route never reads
+ * them.
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { assertLiveKeyOnlyInProduction } from './_guards.js';
 
 const PAYSTACK_API = 'https://api.paystack.co';
 
@@ -45,6 +53,16 @@ export function manageLinkUrl(subscriptionCode) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
+
+  // 0. Configuration guard — same shape and same status as checkout.js: refuse before
+  //    any work, log the actionable message, return a generic body so nothing about the
+  //    server's configuration leaks to the caller.
+  try {
+    assertLiveKeyOnlyInProduction();
+  } catch (e) {
+    console.error(`[manage-link] config guard failed (${e.code}):`, e.message);
+    return res.status(500).json({ error: 'server_misconfigured' });
+  }
 
   // 1. Auth — identity is derived from the bearer token, not from the body.
   const authHeader = req.headers.authorization || '';

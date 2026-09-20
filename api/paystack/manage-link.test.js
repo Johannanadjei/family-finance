@@ -180,3 +180,39 @@ describe('manage-link handler — Paystack', () => {
     expect(res.statusCode).toBe(502);
   });
 });
+
+// ── config guard (wired at the top of the handler) ─────────────────────────
+// _guards.test.js covers the assertion itself; these prove the ROUTE refuses. The
+// hazard this closes is specific to manage-link: with a live key in a preview deploy
+// it would return a REAL customer's hosted manage page, from which a real subscription
+// can be cancelled.
+describe('manage-link — config guard', () => {
+  it('refuses to run a LIVE key outside production', async () => {
+    process.env.PAYSTACK_SECRET_KEY = 'sk_live_real';
+    process.env.VERCEL_ENV = 'preview';
+    const res = mockRes();
+    await handler(mockReq({ authorization: 'Bearer ok' }), res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toEqual({ error: 'server_misconfigured' });
+    expect(global.fetch).not.toHaveBeenCalled();   // never reached Paystack
+    expect(getUser).not.toHaveBeenCalled();        // refused before any work
+    delete process.env.VERCEL_ENV;
+  });
+
+  it('allows a LIVE key in production', async () => {
+    process.env.PAYSTACK_SECRET_KEY = 'sk_live_real';
+    process.env.VERCEL_ENV = 'production';
+    const res = mockRes();
+    await handler(mockReq({ authorization: 'Bearer ok' }), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ link: 'https://paystack.com/manage/xyz' });
+    expect(global.fetch).toHaveBeenCalled();
+    delete process.env.VERCEL_ENV;
+  });
+
+  it('runs normally with a test key and no VERCEL_ENV', async () => {
+    const res = mockRes();
+    await handler(mockReq({ authorization: 'Bearer ok' }), res);
+    expect(res.statusCode).toBe(200);
+  });
+});
