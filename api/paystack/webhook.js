@@ -19,10 +19,15 @@
  *
  * Env (server-only): PAYSTACK_SECRET_KEY, SUPABASE_URL (or VITE_SUPABASE_URL),
  * SUPABASE_SERVICE_ROLE_KEY.
+ *
+ * CONFIG GUARD: refuses to run when PAYSTACK_SECRET_KEY is a live key outside
+ * production (see _guards.js). It does NOT assert the plan codes — this route never
+ * reads them; it records whatever plan_code Paystack echoes on the event.
  */
 
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { assertLiveKeyOnlyInProduction } from './_guards.js';
 
 // The only events we act on. Everything else is acknowledged and ignored.
 //
@@ -143,6 +148,17 @@ async function getRawBody(req) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
+
+  // Configuration guard. 503, deliberately, and NOT the usual 200 ack: a live key in a
+  // non-production environment means we cannot safely process the event, and a 200
+  // would tell Paystack to stop retrying — silently dropping a real subscription event.
+  // A 503 keeps it in Paystack's retry queue so it lands once the config is corrected.
+  try {
+    assertLiveKeyOnlyInProduction();
+  } catch (e) {
+    console.error(`[webhook] config guard failed (${e.code}):`, e.message);
+    return res.status(503).json({ error: 'server_misconfigured' });
+  }
 
   const secret = process.env.PAYSTACK_SECRET_KEY;
 

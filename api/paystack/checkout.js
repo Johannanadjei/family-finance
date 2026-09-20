@@ -17,11 +17,17 @@
  *   PAYSTACK_PLAN_CODE_MONTHLY   PLN_… for ₵40/month
  *   PAYSTACK_PLAN_CODE_ANNUAL    PLN_… for ₵400/year
  *
- * Ships DARK: no UI calls this yet (Commit 2 wires the pricing page).
+ * CONFIG GUARDS: before doing any work this route asserts (1) a live secret key is only
+ * ever used in production, and (2) the two plan codes are present, well-formed and
+ * DISTINCT. Both are fail-closed and both throw PaystackConfigError — see _guards.js
+ * for why each exists. A serverless function has no startup hook, so "startup" is the
+ * first request: the assertions run per-invocation, which is cheap (two env reads and a
+ * regex) and has the advantage of catching an env change without a redeploy.
  */
 
 import { createClient } from '@supabase/supabase-js';
 import { PRICING } from '../../src/lib/pricing.js';
+import { assertLiveKeyOnlyInProduction, assertPlanCodesDistinct } from './_guards.js';
 
 const PAYSTACK_INIT_URL = 'https://api.paystack.co/transaction/initialize';
 
@@ -76,6 +82,17 @@ export function resolveCallbackUrl(req) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
+
+  // 0. Configuration guards — refuse to run a misconfigured payment route at all. The
+  //    error message names the fix; the response stays generic so nothing about the
+  //    server's configuration leaks to the caller.
+  try {
+    assertLiveKeyOnlyInProduction();
+    assertPlanCodesDistinct();
+  } catch (e) {
+    console.error(`[checkout] config guard failed (${e.code}):`, e.message);
+    return res.status(500).json({ error: 'server_misconfigured' });
+  }
 
   // 1. Auth — pull the bearer token; identity is derived from it, not from the body.
   const authHeader = req.headers.authorization || '';

@@ -223,3 +223,51 @@ describe('checkout handler — Paystack init', () => {
     expect(res.statusCode).toBe(502);
   });
 });
+
+// ── config guards (wired in §0 of the handler) ──────────────────────────────
+// _guards.test.js covers the assertions themselves; these prove the ROUTE refuses,
+// which is the property that matters. beforeEach restores a good env for each case.
+describe('checkout — config guards', () => {
+  it('refuses to run a LIVE key outside production', async () => {
+    process.env.PAYSTACK_SECRET_KEY = 'sk_live_real';
+    process.env.VERCEL_ENV = 'preview';
+    const res = mockRes();
+    await handler(mockReq({ authorization: 'Bearer ok', body: { plan_interval: 'monthly' } }), res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toEqual({ error: 'server_misconfigured' });
+    expect(global.fetch).not.toHaveBeenCalled();     // never reached Paystack
+    delete process.env.VERCEL_ENV;
+  });
+
+  it('allows a LIVE key in production', async () => {
+    process.env.PAYSTACK_SECRET_KEY = 'sk_live_real';
+    process.env.VERCEL_ENV = 'production';
+    const res = mockRes();
+    await handler(mockReq({ authorization: 'Bearer ok', body: { plan_interval: 'monthly' } }), res);
+    expect(res.statusCode).toBe(200);
+    expect(global.fetch).toHaveBeenCalled();
+    delete process.env.VERCEL_ENV;
+  });
+
+  it('refuses to run when both plan codes are the same', async () => {
+    process.env.PAYSTACK_PLAN_CODE_ANNUAL = process.env.PAYSTACK_PLAN_CODE_MONTHLY;
+    const res = mockRes();
+    await handler(mockReq({ authorization: 'Bearer ok', body: { plan_interval: 'annual' } }), res);
+    expect(res.statusCode).toBe(500);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses to run when a plan code is malformed', async () => {
+    process.env.PAYSTACK_PLAN_CODE_ANNUAL = 'Pro Annual';
+    const res = mockRes();
+    await handler(mockReq({ authorization: 'Bearer ok', body: { plan_interval: 'monthly' } }), res);
+    expect(res.statusCode).toBe(500);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('runs normally with a test key and two distinct PLN_ codes', async () => {
+    const res = mockRes();
+    await handler(mockReq({ authorization: 'Bearer ok', body: { plan_interval: 'monthly' } }), res);
+    expect(res.statusCode).toBe(200);
+  });
+});

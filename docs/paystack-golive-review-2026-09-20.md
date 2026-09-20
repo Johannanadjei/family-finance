@@ -1,3 +1,47 @@
+# Paystack Go-Live Review — 2026-09-20
+
+**Read-only review.** Nothing in the repository was modified to produce this; no branch
+was touched and no command with side effects was run. Every claim below is quoted from
+source on disk at commit `b50c16a` (`main`), not recalled or inferred.
+
+**Redaction:** any literal key or plan-code fragment found in the repo is shown truncated
+to its prefix plus `[REDACTED]`. See §2 — all six hits are fabricated test fixtures, not
+credentials.
+
+**Contents**
+
+1. [Go-live runbook (full)](#1-go-live-runbook-full)
+2. [Every place Paystack keys / URLs / secrets are read](#2-every-place-paystack-keys--urls--secrets-are-read)
+3. [Env var names](#3-env-var-names-names-only)
+4. [The webhook](#4-the-webhook)
+5. [What decides test vs live at runtime](#5-what-decides-test-vs-live-at-runtime)
+6. [The subscriptions table](#6-the-subscriptions-table)
+7. [Test-mode-only code paths](#7-test-mode-only-code-paths)
+8. [Summary — what a live switch would actually change](#summary--what-a-live-switch-would-actually-change)
+
+---
+
+# 1. Go-live runbook (full)
+
+Found at `docs/go-live-runbook.md` (546 lines).
+
+`grep -ril "paystack" docs/ *.md` also hits `docs/backlog.md`,
+`docs/engineering-decisions.md`, `docs/qa/phase-0a-inventory.md`,
+`docs/qa/fixture-accounts.md`, `docs/qa/phase-1-stage-1-coverage.md`, and `CLAUDE.md`.
+
+**CLAUDE.md has no Paystack section** — one incidental mention, line 450, inside §9.6,
+naming `apply_subscription_event` as the example of a service_role-only RPC.
+
+Reproduced verbatim below (fenced at five backticks because the runbook contains its own
+fenced blocks).
+
+> **Snapshot note.** This is the runbook **as it stood when the review was made** (546
+> lines, commit `b50c16a`). The very next commit — the one that also carries this file —
+> added a step to §5 requiring `GH_CHECKS_TOKEN` to be verified present *and unexpired*
+> before the redeploy, with the exact Vercel path. `docs/go-live-runbook.md` is the live
+> document; this embed is the reviewed state and is deliberately not kept in sync.
+
+`````markdown
 # Paystack Go-Live Runbook
 
 **Status:** DRAFT — not yet executed. Paystack is in **test mode** as of 2026-09-02.
@@ -277,28 +321,6 @@ codes, so a preview deploy can never charge a real card.**
 Vercel env vars are injected at build/deploy time. Editing them changes **nothing** on the
 currently-running deployment.
 
-- [ ] **FIRST — verify `GH_CHECKS_TOKEN` is present AND still valid.** `[VERIFY IN DASHBOARD]`
-      Exact path: **Vercel → the `family-finance` project → Settings → Environment Variables**,
-      Production scope, key `GH_CHECKS_TOKEN`.
-      Do this **before** triggering the deploy, not after it fails. `GH_CHECKS_TOKEN` is a
-      GitHub **fine-grained PAT**, and fine-grained PATs **expire** — §4 only asks whether the
-      variable exists, and an expired token still exists. `scripts/vercel-ignore-build.mjs`
-      cannot tell "expired" from "wrong": GitHub answers 401, the gate retries for five
-      minutes and then fails closed (`exit 0` = skip). The deploy is then **silently skipped**
-      and production keeps serving the old build with the OLD KEYS — which, at this exact
-      point in the runbook, means you believe you are live and you are not.
-      **Verify — both:**
-      - The variable is present in the **Production** scope (Vercel masks the value; you
-        cannot read it back, so presence is all the dashboard can tell you).
-      - It is not expired: **GitHub → Settings → Developer settings → Personal access tokens
-        → Fine-grained tokens**, find the token, confirm the expiry date is in the future and
-        that it still grants **Checks: read** on `Johannanadjei/family-finance`. If it has
-        expired or is close to it, regenerate it and update the Vercel value now — that
-        update is itself an env change, so it needs the deploy below to take effect anyway.
-      - After the deploy, the build log should contain
-        `[deploy-gate] CI green (…) — proceeding with deploy.` Its absence, or any
-        `[deploy-gate] FAIL-CLOSED: GitHub API still erroring at timeout`, is this token.
-
 - [ ] **Trigger a production deploy.**
       Either merge to `main` through the normal branch model (dev → staging → main), or use
       Vercel's **Redeploy** on the current production deployment.
@@ -566,3 +588,484 @@ charged incorrectly.
 **The single most dangerous step is §4→§5.** Env edits without a redeploy look successful and
 change nothing; a redeploy silently skipped by the CI gate looks like a deploy and changes
 nothing. Verify §5 explicitly before you put a real card into §6.
+`````
+
+---
+
+# 2. Every place Paystack keys / URLs / secrets are read
+
+`grep -rn "PAYSTACK\|paystack" src/ supabase/ scripts/ api/ --include=*.js --include=*.jsx --include=*.sql --include=*.ts -l`
+
+**Note: there is no `supabase/` directory** — the grep exits 2 on it. No Supabase Edge
+Functions exist in this repo.
+
+```
+src/services/billing.service.js          src/services/billing.service.test.js
+src/services/checkout.service.js         src/services/checkout.service.test.js
+src/lib/pricing.js                       src/views/PricingView.test.jsx
+scripts/f3_erasure_runbook.sql           scripts/apply_subscription_event_dryrun.sql
+scripts/migrate_19_subscriptions.sql     scripts/apply_subscription_event.sql
+api/paystack/checkout.js                 api/paystack/checkout.test.js
+api/paystack/webhook.js                  api/paystack/webhook.test.js
+api/paystack/manage-link.js              api/paystack/manage-link.test.js
+```
+
+## The actual secret / key / URL reads (non-test source)
+
+```
+api/paystack/checkout.js:104:    const secret = process.env.PAYSTACK_SECRET_KEY;
+api/paystack/checkout.js:106:      console.error('[checkout] missing PAYSTACK_SECRET_KEY');
+api/paystack/checkout.js:43:      monthly: 'PAYSTACK_PLAN_CODE_MONTHLY',
+api/paystack/checkout.js:44:      annual:  'PAYSTACK_PLAN_CODE_ANNUAL',
+api/paystack/checkout.js:26:    const PAYSTACK_INIT_URL = 'https://api.paystack.co/transaction/initialize';
+
+api/paystack/webhook.js:147:    const secret = process.env.PAYSTACK_SECRET_KEY;
+api/paystack/webhook.js:158:    if (!verifySignature(raw, req.headers['x-paystack-signature'], secret)) {
+api/paystack/webhook.js:175:    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+api/paystack/webhook.js:176:    createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY, …)
+
+api/paystack/manage-link.js:56:  const secret      = process.env.PAYSTACK_SECRET_KEY;
+api/paystack/manage-link.js:33:  const PAYSTACK_API = 'https://api.paystack.co';
+api/paystack/manage-link.js:43:  return `${PAYSTACK_API}/subscription/${encodeURIComponent(subscriptionCode)}/manage/link`;
+
+src/services/checkout.service.js:16:  const CHECKOUT_ENDPOINT    = '/api/paystack/checkout';
+src/services/billing.service.js:18:   const MANAGE_LINK_ENDPOINT = '/api/paystack/manage-link';
+```
+
+`src/lib/pricing.js:23,31` hold `paystack_plan_code: null` — dead fields, never read
+(runbook §9 confirms).
+
+## Literal-key audit
+
+Across the whole repo (excluding `node_modules`), matching `sk_(test|live)_…`,
+`pk_(test|live)_…`, `PLN_…`:
+
+```
+api/paystack/manage-link.test.js:60    process.env.PAYSTACK_SECRET_KEY = 'sk_test_[REDACTED]';
+api/paystack/manage-link.test.js:158   expect(opts.headers.Authorization).toBe('Bearer sk_test_[REDACTED]');
+api/paystack/webhook.test.js:20        const SECRET = 'sk_test_[REDACTED]';
+api/paystack/checkout.test.js:46       process.env.PAYSTACK_SECRET_KEY = 'sk_test_[REDACTED]';
+api/paystack/checkout.test.js:168      expect(opts.headers.Authorization).toBe('Bearer sk_test_[REDACTED]');
+docs/backlog.md:861                    both key forms; the test hardcodes `sk_test_[REDACTED]`.
+```
+
+All six are **fabricated fixtures inside test files**, not credentials. **No real key,
+and no `PLN_` plan code, is committed anywhere.** No `pk_*` anywhere at all.
+
+---
+
+# 3. Env var names (names only)
+
+## `.env.example` — actually set locally
+
+| Name | Scope |
+|---|---|
+| `VITE_SUPABASE_URL` | client bundle, all environments |
+| `VITE_SUPABASE_ANON_KEY` | client bundle, all environments |
+
+The file also **documents, in comments only**, five server-only vars it deliberately does
+not define: `PAYSTACK_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`,
+`PAYSTACK_PLAN_CODE_MONTHLY`, `PAYSTACK_PLAN_CODE_ANNUAL`.
+
+## Config files in the repo
+
+`vercel.json` declares **no env vars** — only rewrites, asset cache headers, and
+`ignoreCommand`. `.vercelignore` exists; there is no `supabase/config.toml`, no
+`.env.production`, no Vercel env manifest. **All env values live in the Vercel dashboard
+and cannot be read from this repo.**
+
+`scripts/vercel-ignore-build.mjs` reads three more: `VERCEL_GIT_COMMIT_REF`,
+`VERCEL_GIT_COMMIT_SHA` (both Vercel-injected), and `GH_CHECKS_TOKEN` (manually set).
+
+`vite.config.js` additionally reads `VERCEL_GIT_COMMIT_SHA` at build time for the build
+stamp (added 2026-09-20) — not a Paystack concern, listed for completeness.
+
+## Production vs Preview scoping
+
+| Name | Intended scope | Differs test vs live? |
+|---|---|---|
+| `PAYSTACK_SECRET_KEY` | Production = live; Preview/Dev = test | **Yes** |
+| `PAYSTACK_PLAN_CODE_MONTHLY` | Production = live; Preview/Dev = test | **Yes** |
+| `PAYSTACK_PLAN_CODE_ANNUAL` | Production = live; Preview/Dev = test | **Yes** |
+| `SUPABASE_SERVICE_ROLE_KEY` | all environments, same value | No |
+| `SUPABASE_URL` | all environments, same value | No |
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | all environments, same value | No |
+| `GH_CHECKS_TOKEN` | Production (only `main` is gated) | n/a |
+
+**This is intent, not observed state.** Nothing in the repo records which Vercel scope
+each var currently carries — §4 of the runbook exists precisely because that has to be
+confirmed by eye in the dashboard.
+
+---
+
+# 4. The webhook
+
+**A Vercel serverless function** (Node runtime) at `api/paystack/webhook.js` → public URL
+`https://moneybos.com/api/paystack/webhook`. Not a Supabase Edge Function; there is no
+`supabase/` directory.
+
+**Signature verification:** HMAC-SHA512 over the **raw request bytes**, keyed by
+`PAYSTACK_SECRET_KEY` (no separate webhook secret), compared with
+`crypto.timingSafeEqual` against `x-paystack-signature`. Length is checked first because
+`timingSafeEqual` throws on unequal lengths. Verification happens **before** any JSON
+parse or DB touch.
+
+**On `charge.success`:** `mapEvent` normalises it — `periodStart = data.paid_at`,
+`periodEnd = computeEnd(paid_at, interval)` (+1 month or +1 year), `user_id` from the
+metadata stamped at checkout, plus subscription/customer/plan codes — then calls
+`apply_subscription_event` via a service-role client. The SQL sets `tier='pro'`,
+`status='active'`, `cancel_at_period_end=false`.
+
+Full handler, verbatim:
+
+```js
+/**
+ * api/paystack/webhook.js — Vercel serverless function (Node runtime).
+ *
+ * The ONLY writer of the subscriptions table. Paystack POSTs subscription lifecycle
+ * events here; we verify the signature, normalize the payload, and hand it to the
+ * apply_subscription_event RPC (service_role). The handler stays thin on purpose —
+ * all the upsert/idempotency logic lives in SQL (CLAUDE.md §9.6).
+ *
+ * SIGNATURE: Paystack signs the RAW request body with HMAC-SHA512 keyed by your
+ * PAYSTACK_SECRET_KEY (there is NO separate webhook secret). We compute over the exact
+ * received bytes and timing-safe compare. An invalid signature is rejected BEFORE any
+ * DB touch — this is the only thing standing between a public URL and forged upgrades.
+ *
+ * RESPONSE CONTRACT:
+ *   - invalid signature        → 401 (a rejected request, not an internal error)
+ *   - valid sig, our error      → 200 (ack receipt; don't make Paystack retry an event we
+ *                                  own but failed to persist — the failure is logged)
+ *   - valid sig, unknown event  → 200 ignored
+ *
+ * Env (server-only): PAYSTACK_SECRET_KEY, SUPABASE_URL (or VITE_SUPABASE_URL),
+ * SUPABASE_SERVICE_ROLE_KEY.
+ */
+
+import crypto from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
+
+// The only events we act on. Everything else is acknowledged and ignored.
+//
+// not_renew vs disable: Paystack emits `subscription.not_renew` when a subscription
+// is set to stop renewing (what the hosted manage page's cancel does) and
+// `subscription.disable` when it is actually disabled. We forward BOTH and let
+// apply_subscription_event decide, so the outcome is correct whichever one arrives
+// — see that file's EVENT -> STATE MAP.
+const HANDLED = new Set([
+  'charge.success',
+  'subscription.create',
+  'subscription.not_renew',
+  'subscription.disable',
+  'invoice.payment_failed',
+]);
+
+/**
+ * Timing-safe HMAC-SHA512 check of the raw body against the x-paystack-signature header.
+ * @param {Buffer|string} rawBody  exact received bytes
+ * @param {string} signature        x-paystack-signature header value
+ * @param {string} secret           PAYSTACK_SECRET_KEY
+ * @returns {boolean}
+ */
+export function verifySignature(rawBody, signature, secret) {
+  if (!signature || !secret) return false;
+  const expected = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
+  const a = Buffer.from(expected);
+  const b = Buffer.from(String(signature));
+  if (a.length !== b.length) return false;   // timingSafeEqual requires equal lengths
+  return crypto.timingSafeEqual(a, b);
+}
+
+/** Map Paystack's interval vocabulary onto our canonical 'monthly' | 'annual'. */
+function canonInterval(v) {
+  if (!v) return null;
+  const s = String(v).toLowerCase();
+  if (s === 'monthly' || s === 'month') return 'monthly';
+  if (s === 'annual' || s === 'annually' || s === 'yearly' || s === 'year') return 'annual';
+  return null;
+}
+
+/** start ISO + interval → period-end ISO (provisional; subscription.* events override). */
+function computeEnd(startIso, interval) {
+  if (!startIso || !interval) return null;
+  const d = new Date(startIso);
+  if (Number.isNaN(d.getTime())) return null;
+  if (interval === 'monthly') d.setMonth(d.getMonth() + 1);
+  else if (interval === 'annual') d.setFullYear(d.getFullYear() + 1);
+  else return null;
+  return d.toISOString();
+}
+
+/**
+ * Normalize a Paystack event into apply_subscription_event RPC args.
+ * Returns null for events we don't handle.
+ * @param {object} event  parsed Paystack webhook body
+ * @returns {object|null} the RPC argument object (p_* keys), or null
+ */
+export function mapEvent(event) {
+  const type = event?.event;
+  if (!HANDLED.has(type)) return null;
+
+  const d        = event?.data || {};
+  const customer = d.customer || {};
+  const plan     = d.plan || d.subscription?.plan || {};
+  const metadata = d.metadata || {};
+
+  // metadata.plan_interval (we stamp it at checkout, already canonical) is preferred;
+  // Paystack's own plan.interval ('annually' etc.) is the fallback.
+  const interval = canonInterval(metadata.plan_interval) || canonInterval(plan.interval);
+
+  const subCode = d.subscription_code || d.subscription?.subscription_code || null;
+
+  // Period end: subscription.* events (create / not_renew / disable) carry
+  // next_payment_date (authoritative); a charge.success carries paid_at, from which
+  // we derive a provisional end. On a cancellation this is the date the customer
+  // has already paid through — which is exactly what keeps them Pro until then.
+  let periodStart = null;
+  let periodEnd   = null;
+  if (type === 'charge.success') {
+    periodStart = d.paid_at || d.paidAt || null;
+    periodEnd   = computeEnd(periodStart, interval);
+  } else {
+    periodEnd = d.next_payment_date || d.subscription?.next_payment_date || null;
+  }
+
+  return {
+    p_event_type:      type,
+    p_user_id:         metadata.user_id || null,
+    p_email:           customer.email || null,
+    p_subscription_id: subCode,
+    p_customer_id:     customer.customer_code || null,
+    p_plan_code:       plan.plan_code || null,
+    p_paystack_status: d.status || d.subscription?.status || null,
+    p_plan_interval:   interval,
+    p_period_start:    periodStart,
+    p_period_end:      periodEnd,
+  };
+}
+
+/**
+ * Read the raw request bytes. Vercel's Node body parsing is lazy, so reading the stream
+ * BEFORE touching req.body gives us the exact bytes Paystack signed. If the stream was
+ * already drained (a runtime pre-parsed it), fall back to the parsed body.
+ */
+async function getRawBody(req) {
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  if (chunks.length) return Buffer.concat(chunks);
+
+  if (Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === 'string') return Buffer.from(req.body, 'utf8');
+  if (req.body && typeof req.body === 'object') return Buffer.from(JSON.stringify(req.body), 'utf8');
+  return Buffer.alloc(0);
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
+
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+
+  let raw;
+  try {
+    raw = await getRawBody(req);
+  } catch (e) {
+    console.error('[webhook] raw body read failed:', e.message);
+    return res.status(200).json({ received: true });
+  }
+
+  // Verify BEFORE any parse or DB touch.
+  if (!verifySignature(raw, req.headers['x-paystack-signature'], secret)) {
+    console.error('[webhook] invalid signature');
+    return res.status(401).json({ error: 'invalid_signature' });
+  }
+
+  let event;
+  try {
+    event = JSON.parse(raw.toString('utf8'));
+  } catch (e) {
+    console.error('[webhook] malformed json:', e.message);
+    return res.status(200).json({ received: true });
+  }
+
+  const rpcArgs = mapEvent(event);
+  if (!rpcArgs) return res.status(200).json({ received: true, ignored: event?.event || null });
+
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false },
+    });
+    const { error } = await supabase.rpc('apply_subscription_event', rpcArgs);
+    if (error) console.error('[webhook] apply_subscription_event error:', error.message);
+  } catch (e) {
+    console.error('[webhook] rpc threw:', e.message);
+  }
+
+  // Always ack a validly-signed event so Paystack stops retrying. Failures are logged.
+  return res.status(200).json({ received: true });
+}
+```
+
+---
+
+# 5. What decides test vs live at runtime
+
+**Nothing. There is no discriminator anywhere in the code.**
+
+A grep for
+`sk_test|sk_live|pk_test|pk_live|startsWith('sk_|test_mode|testmode|is_live|sandbox|NODE_ENV|VERCEL_ENV|import.meta.env.(DEV|PROD|MODE)`
+across `src/`, `api/` and `scripts/*.mjs`, excluding tests, returns **exactly two hits —
+both JSDoc comments**:
+
+```
+api/paystack/checkout.js:14:    *   PAYSTACK_SECRET_KEY   Paystack API auth (sk_test_… / sk_live_…)
+api/paystack/manage-link.js:23: *   PAYSTACK_SECRET_KEY   Paystack API auth (sk_test_… / sk_live_…)
+```
+
+The mode is **entirely implicit in the value of `PAYSTACK_SECRET_KEY` in whichever Vercel
+environment the function is running in**. Paystack itself decides: the key you
+authenticate with determines which mode the API call and the HMAC belong to. The app
+never asks which mode it is in, never branches on it, never logs it, and cannot display
+it.
+
+Two consequences worth being explicit about:
+
+- There is **no guard** that would stop a live key landing in Preview, or a test key
+  surviving in Production. The runbook's Preview/Production separation is a dashboard
+  convention with no code enforcement behind it.
+- After the swap, the only in-app evidence of which mode you are in is **the absence of
+  Paystack's test-mode banner on their hosted page** (runbook §5). Nothing in your own UI
+  or logs says "live".
+
+---
+
+# 6. The `subscriptions` table
+
+Created by `scripts/migrate_19_subscriptions.sql`:
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` PK | `gen_random_uuid()` |
+| `user_id` | `uuid` NOT NULL | FK `auth.users(id)` ON DELETE CASCADE |
+| `tier` | `text` NOT NULL | CHECK `IN ('free','pro')` |
+| `status` | `text` NOT NULL | CHECK `IN ('active','canceled','past_due','incomplete')` |
+| `paystack_status` | `text` | raw Paystack string, debug/audit only |
+| `paystack_subscription_id` | `text` | `SUB_…` |
+| `paystack_customer_id` | `text` | `CUS_…` |
+| `paystack_plan_code` | `text` | `PLN_…` |
+| `plan_interval` | `text` | CHECK `NULL OR IN ('monthly','annual')` |
+| `current_period_start` | `timestamptz` | |
+| `current_period_end` | `timestamptz` | |
+| `cancel_at_period_end` | `boolean` NOT NULL | default `false` |
+| `created_at` / `updated_at` | `timestamptz` NOT NULL | default `now()` |
+| `deleted_at` | `timestamptz` | soft delete |
+
+Indexes:
+
+- `idx_subscriptions_user_id` — partial, `WHERE deleted_at IS NULL`
+- `idx_subscriptions_user_active` — **unique**, `WHERE deleted_at IS NULL AND status='active'`
+  (at most one active row per user)
+- `idx_subscriptions_paystack_sub_id` — **unique**, `WHERE paystack_subscription_id IS NOT NULL`
+
+RLS: own-row SELECT only (`subscriptions_select_own`). **No INSERT/UPDATE/DELETE policy at
+all** — revenue state is never client-writable. The webhook writes as service_role, which
+bypasses RLS.
+
+## What flips `is_pro`
+
+**There is no `is_pro` column.** It is derived, twice, from the same predicate:
+
+- Client — `resolveSubscription(row)` in `src/services/subscriptions.service.js:86`:
+
+  ```js
+  const periodOpen = !row.current_period_end || new Date(row.current_period_end) > now;
+  const isActive   = row.status === 'active' && periodOpen;
+  const tier       = isActive ? (row.tier || 'free') : 'free';
+  const isPro      = tier === 'pro';
+  ```
+
+  `useSubscription.jsx:61` memoises it; `useIsPro()` reads it from context.
+
+- Server — `hub_tier()`, `create_hub`, `create_invite`, `create_category`,
+  `create_categories_bulk`, `update_centre_skin` and `accept_invite` all apply
+  `status='active' AND (current_period_end IS NULL OR current_period_end > now())`.
+
+So **`status` and `current_period_end` jointly flip Pro**. `tier='free'` is never written —
+downgrade is implicit expiry. `cancel_at_period_end` is display/audit only and gates
+nothing.
+
+## What writes `period_end`
+
+Only `apply_subscription_event` (SECURITY DEFINER; `EXECUTE` revoked from `authenticated`
+and `anon`, granted to `service_role` only — `apply_subscription_event.sql:229-231`).
+
+Event → state map:
+
+| Event | Effect |
+|---|---|
+| `charge.success` | `tier='pro'`, `status='active'`, `cancel=false` |
+| `subscription.create` | `tier='pro'`, `status='active'`, `cancel=false` |
+| `invoice.payment_failed` | `status='past_due'`; tier and cancel flag preserved |
+| `subscription.not_renew` | `status` stays `'active'`, `cancel_at_period_end=true` |
+| `subscription.disable` | period still open → `active` + cancel true; elapsed **or NULL** → `canceled` |
+
+`period_end` only ever moves **forward** — `GREATEST(existing, incoming)` — so out-of-order
+webhook delivery can never shorten a paid period. On insert, only an activating intent
+creates a row (`skipped_no_row` otherwise), so a `canceled`/`past_due` phantom is never
+materialised.
+
+---
+
+# 7. Test-mode-only code paths
+
+**None.** Searching `src/` and `api/` for `test card`, `4084`, `408408`, `sandbox`,
+`dummy`, `stub`, `fake`, `mock` — excluding test files and `test-utils/` — returns only
+unrelated prose:
+
+```
+src/hooks/useModalChrome.js:9,26,65,87,141   "dummy history entry" (back-button intercept)
+src/hooks/useFinance.js:16                   "Never imports from mockData"
+src/lib/finance.js:3                         "No mock data."
+src/views/daily/IncomeSourcePicker.jsx:13    "forcing it into a fake one"
+src/components/layout/SidePanel.jsx:34       "the drawer's dummy sits below it"
+```
+
+No test card numbers, no `sandbox` strings, no hard-coded test plan codes, no
+mode-conditional UI. The only test-mode artefacts are the six fabricated `sk_test_…`
+strings inside the three `api/paystack/*.test.js` files (§2).
+
+Two stale-comment findings, neither functional:
+
+- `api/paystack/checkout.js:20` — *"Ships DARK: no UI calls this yet (Commit 2 wires the
+  pricing page)."* Wrong; `PricingView` is mounted and reachable. Runbook §9 already
+  records it.
+- `src/lib/pricing.js:23,31` — `paystack_plan_code: null` on both plans. Dead fields;
+  `resolvePlanCode()` reads env. Also recorded in §9.
+
+---
+
+# Summary — what a live switch would actually change
+
+Three Vercel Production environment variables, and nothing else in this repository.
+`PAYSTACK_SECRET_KEY` goes `sk_test_…` → `sk_live_…` and the two `PAYSTACK_PLAN_CODE_*`
+vars get the live `PLN_` codes created fresh in the Paystack dashboard's Live mode; a
+production redeploy then picks them up, because Vercel injects env at build time and
+editing a value changes nothing on the running deployment. No source file changes, no
+client rebuild is *required* by the key swap itself (no Paystack JS or public key is ever
+bundled — the card is collected entirely on Paystack's hosted page), and no code path
+anywhere asks which mode it is in: mode is implicit in the key value, which also doubles
+as the webhook HMAC secret, so swapping it flips API auth and signature verification in
+the same instant and any in-flight test-mode webhook retry starts returning 401. The
+database is unaffected — one shared Supabase project, one `subscriptions` table, live rows
+landing beside the test rows already in it, which is why the runbook insists the real-card
+verification rows are refunded *and* soft-deleted. The genuinely dangerous properties are
+all outside the code: nothing enforces that Preview keeps the test key, nothing validates
+that the annual env var holds the annual plan code (the first charge reads ₵400 either way
+— the swap only surfaces at renewal, on a customer's card), and a missing
+`GH_CHECKS_TOKEN` makes the gate fail closed so the redeploy is silently skipped while
+looking successful. Before any of that, the runbook's own §1 carries one hard blocker —
+`terms.md` §6.6 still states in-account cancellation "is not yet available" when that flow
+shipped 2026-09-02, and because the legal docs are `?raw`-bundled, fixing the file is inert
+until a separate deploy lands ahead of the key swap.
