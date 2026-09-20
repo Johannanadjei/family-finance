@@ -84,11 +84,14 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
     setLoading, setLoaded, setError,
   });
 
-  // Foreground refetch (multi-device freshness) — visibilitychange → visible and
-  // window 'online' call reloadHub() when the last clean fetch is over 30s old,
-  // debounced so tab-flicker cannot spam the network. Registers no listeners
-  // until a hub resolves. See useHubFreshness.
-  useHubFreshness({ centreId, reloadHub, lastLoadedAt });
+  // Multi-device freshness (see useHubFreshness):
+  //   realtime  — postgres_changes on the contentless hub_activity ticker, so a
+  //               change by any member lands here within ~1s
+  //   foreground — visibilitychange → visible and window 'online', when the last
+  //               clean fetch is over 30s old; the backstop for a missed event,
+  //               a killed socket, or a relaunch
+  // Registers nothing until a hub resolves.
+  useHubFreshness({ centreId, reloadHub, lastLoadedAt, realtime: true });
 
   useEffect(() => { loadCycles(); }, [loadCycles]);
 
