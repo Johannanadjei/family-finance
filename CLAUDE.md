@@ -676,12 +676,21 @@ exercise the relaunch path.
 `BuildStamp` in the AuthFooter (pre-auth) and Settings → Legal (post-auth), and is
 also on `window.__BOS_BUILD__`. The stamp changing is the proof.
 
+It is **derived, never typed** — `<short sha> · <build date>`, inlined by the
+`define` block in `vite.config.js` (`VERCEL_GIT_COMMIT_SHA` → `git rev-parse HEAD`
+→ `'local'`). So there is no marker to bump: any commit that changes shipped code
+changes the stamp, the entry chunk hash and `sw.js` automatically. A docs-only edit
+still correctly produces no update, because it produces no deploy.
+
 1. Install the PWA from the deployed URL; note the stamp.
-2. Bump ONLY `BUILD_MARKER`, deploy. A docs-only edit will not work — it leaves the
-   bundle hashes and `sw.js` byte-identical, so no update is ever detected.
+2. Deploy any commit that touches bundled code. (A docs-only edit will not work —
+   `paths-ignore` skips CI, so nothing builds and no update is ever detected.)
 3. Fresh-launch path: kill the app, deploy, relaunch → expect a silent reload and a
    changed stamp.
 4. Long-session path: leave it open past 15s while the deploy lands → expect the
    toast instead, and the stamp to change only after tapping **Reload**.
 5. DevTools → Application → Service Workers shows the new worker activating without
    a stuck "waiting" state.
+
+The stamp should equal the short SHA of the **merge commit on `main`** that was
+deployed — that is also what makes it greppable in the live bundle as a deploy check.
