@@ -9,7 +9,7 @@
  * local session state and delegates to the service layer.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { getCentreGuests, authenticateGuest } from '../services/guests.service';
 
 const SESSION_KEY = 'ffc_guest_session';
@@ -38,6 +38,10 @@ export function useGuestAuth(centreId) {
     return null;
   });
   const [guests,  setGuests]  = useState([]);
+  // ms timestamp of the last CLEAN guest-list fetch — the freshness gate's staleness
+  // input, same contract as useHubLoad.lastLoadedAt. A ref: read from an event
+  // handler, never rendered.
+  const lastLoadedAt          = useRef(0);
   const [loading, setLoading] = useState(true);  // true until first load completes
   const [error,   setError]   = useState(null);
 
@@ -48,6 +52,7 @@ export function useGuestAuth(centreId) {
     setLoading(false);
     if (svcError) { setError('Could not load guests. Please try again.'); return; }
     setGuests(data || []);
+    lastLoadedAt.current = Date.now();
   }, [centreId]);
 
   const authenticate = useCallback(async (guestId, pin) => {
@@ -93,5 +98,5 @@ export function useGuestAuth(centreId) {
     setError(null);
   }, []);
 
-  return { session, guests, loading, error, loadGuests, authenticate, signOut };
+  return { session, guests, loading, error, loadGuests, lastLoadedAt, authenticate, signOut };
 }

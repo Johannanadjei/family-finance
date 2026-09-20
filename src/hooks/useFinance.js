@@ -21,10 +21,8 @@
  * - txs always reflects current month unless loadMonth() is called
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { getTransactionsByCycle } from '../services/transactions.service';
-import { getIncomeSources } from '../services/income.service';
-import { getCyclesForCentre, createBudgetPeriod, resetBudgetPeriod } from '../services/cycles.service';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createBudgetPeriod, resetBudgetPeriod } from '../services/cycles.service';
 import { landingCycle, cycleForToday, sliceByCycle, visibleCycleWindow } from '../lib/cycles';
 import { getToday } from '../lib/dates';
 import { getLimitsForTier } from '../lib/plans';
@@ -38,7 +36,8 @@ import {
   getCurrentMonth,
 } from '../lib/finance';
 import { loadPrefs, saveThemeSkin as persistSkin, saveThemeAccent as persistAccent, saveNotifications as persistNotifs } from '../lib/storage';
-import { waitForSession } from '../lib/auth';
+import { useHubLoad } from './useHubLoad';
+import { useHubFreshness } from './useHubFreshness';
 import { useAutoContinuePeriod } from './useAutoContinuePeriod';
 import { useIncomeMutations } from './useIncomeMutations';
 import { useTransactionMutations } from './useTransactionMutations';
@@ -67,94 +66,29 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
   const [error,          setError]          = useState(null);
   const [prefs,          setPrefs]          = useState(() => loadPrefs());
 
-  // ── Load functions ────────────────────────────────────────────────────────
+  // ── Loaders ───────────────────────────────────────────────────────────────
+  // Extracted to useHubLoad (symmetric with useIncomeMutations /
+  // useTransactionMutations) to keep this hook within its size budget; the state
+  // still lives here and is passed in with its setters. That file owns the
+  // loud-vs-silent contract and the reloadHub() entry point this hook's freshness
+  // gate and realtime subscription both call.
+  //
+  // viewedCycleIdRef exists because reload()/reloadHub() need the viewed cycle id,
+  // which is derived BELOW (after cycles resolve). A render-phase ref write hands
+  // it to them at call time and keeps both callbacks stable.
+  const viewedCycleIdRef = useRef(null);
 
-  const loadTxs = useCallback(async (cycleId) => {
-    if (!centreId) return { data: [], error: null };
-    const result = await getTransactionsByCycle(centreId, cycleId);
-    if (result.error) console.error('[useFinance] loadTxs error:', result.error.message);
-    return result;
-  }, [centreId]);
+  const { loadCycles, load, reload, reloadHub, lastLoadedAt } = useHubLoad({
+    centreId, viewedCycleIdRef, reloadCategories,
+    setTxs, setAllIncomes, setCycles, setCyclesLoading,
+    setLoading, setLoaded, setError,
+  });
 
-  // Loads every month's sources (no month filter) into allIncomes. The active
-  // month is derived client-side (see `incomes` memo) so month navigation needs
-  // no refetch, and mutations have a single list to update.
-  const loadIncomes = useCallback(async () => {
-    if (!centreId) return { data: [], error: null };
-    const result = await getIncomeSources(centreId);
-    if (result.error) console.error('[useFinance] loadIncomes error:', result.error.message);
-    return result;
-  }, [centreId]);
-
-  // Transactions are read by cycle_id (Commit 11). `cycleId` is resolved by the
-  // gated loader effect below (after activeCycle is derived) — never undefined once
-  // we reach the Promise.all. Income still loads all-months (deferred to the
-  // client-slice migration); activeMonth state drives its `incomes` slice, so load
-  // needs only the cycle id. The full guard stack (centre validity, waitForSession,
-  // stale-clear) is preserved exactly — see useFinance.race.test.js.
-  const load = useCallback(async (cycleId) => {
-    if (!centreId) { setTxs([]); setAllIncomes([]); setLoaded(true); setLoading(false); return; }
-
-    setLoading(true);
-    setError(null);
-    // Clear stale data so a previous hub's rows can't bleed in during the fetch.
-    setTxs([]);
-    setAllIncomes([]);
-
-    // Auth-readiness gate — never query against an unhydrated/stale token (else a
-    // cold-load query races the refresh, RLS returns an empty 200 → silent data loss).
-    const { error: sessionErr } = await waitForSession();
-    if (sessionErr) {
-      console.error('[useFinance] session not ready:', sessionErr.message);
-      setError('Could not verify your session. Please retry.');
-      setLoading(false);
-      return;
-    }
-
-    // Cycles settled but none resolved yet (brand-new hub, auto-create in flight).
-    // Hold WITHOUT flipping `loaded` — a successful-empty here would be a phantom.
-    if (!cycleId) { setLoading(false); return; }
-
-    const [txResult, incomeResult] = await Promise.all([
-      loadTxs(cycleId),
-      loadIncomes(),
-    ]);
-
-    // Never let an error masquerade as data: `loaded` flips true only on a clean fetch.
-    let ok = true;
-    if (txResult.error)     { setError(txResult.error.message); ok = false; }
-    if (incomeResult.error) { setError(incomeResult.error.message); ok = false; }
-
-    setTxs(txResult.data || []);
-    setAllIncomes(incomeResult.data || []);
-    if (ok) setLoaded(true);
-    setLoading(false);
-  }, [centreId, loadTxs, loadIncomes]);
-
-  // ── Cycles ──────────────────────────────────────────────────────────────────
-  // Loaded once per centre (keyed on centreId, NOT activeMonth) — cycles span the
-  // whole hub, so month navigation must not refetch them.
-  const loadCycles = useCallback(async () => {
-    // Null-centre pre-settle: useFinance mounts above App's auth/centre gates, so
-    // this fires once with centreId === null before the centre resolves. We must
-    // NOT flip cyclesLoading false here — leaving it at its initial true keeps the
-    // views' `if (cyclesLoading) return null` gate engaged so they never render a
-    // phantom empty/zero frame (the setup banner + GHS 0) when the dashboard
-    // first mounts. Only a REAL loadCycles (valid centreId) settles the flag.
-    // See docs/engineering-decisions.md (cold-load flash post-mortem).
-    if (!centreId) { setCycles([]); return; }
-    setCyclesLoading(true);
-    const { error: sessionErr } = await waitForSession();
-    if (sessionErr) {
-      console.error('[useFinance] loadCycles session not ready:', sessionErr.message);
-      setCyclesLoading(false);
-      return;
-    }
-    const { data, error } = await getCyclesForCentre(centreId);
-    if (error) console.error('[useFinance] loadCycles error:', error.message);
-    setCycles(data || []);
-    setCyclesLoading(false);
-  }, [centreId]);
+  // Foreground refetch (multi-device freshness) — visibilitychange → visible and
+  // window 'online' call reloadHub() when the last clean fetch is over 30s old,
+  // debounced so tab-flicker cannot spam the network. Registers no listeners
+  // until a hub resolves. See useHubFreshness.
+  useHubFreshness({ centreId, reloadHub, lastLoadedAt });
 
   useEffect(() => { loadCycles(); }, [loadCycles]);
 
@@ -219,6 +153,9 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
   // The cycle whose data is loaded: the navigable selection, else the auto-resolved
   // current cycle. The single key for all client slices below (Commit 11.5).
   const viewedCycleId  = activeCycleId ?? activeCycle?.id ?? null;
+  // Render-phase ref write (the useModalChrome precedent): hands the resolved id to
+  // reload()/reloadHub(), which are created above and read it at call time.
+  viewedCycleIdRef.current = viewedCycleId;
 
   // Cycle slices of the all-rows arrays. Income, categories, and (via the gated
   // loader) transactions all scope to viewedCycleId — never the month string, which
@@ -334,15 +271,6 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
     return { data, error: null };
   }, [loadCycles]);
 
-  // ── Reload ────────────────────────────────────────────────────────────────
-
-  // Re-fetch the currently-viewed cycle. Resolves the cid via the same viewedCycle
-  // fallback the gated effect uses (activeCycleId is null until the user navigates).
-  const reload = useCallback(
-    () => load(activeCycleId ?? activeCycle?.id),
-    [load, activeCycleId, activeCycle?.id],
-  );
-
   // ── Preferences ───────────────────────────────────────────────────────────
 
   const saveThemeSkin = useCallback((skin) => {
@@ -431,6 +359,8 @@ export function useFinance({ centre, allCategories, hubPlan = null, memberRole =
     // Navigation
     loadMonth,
     reload,
+    reloadHub,      // silent re-fetch of every cycle-aware slice — foreground
+                    // refetch, pull-to-refresh and realtime all land here
 
     // State
     loading,
