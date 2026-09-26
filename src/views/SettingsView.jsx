@@ -56,8 +56,8 @@ export function SettingsView() {
       {/* Centre */}
       <CentreSettingsSection />
 
-      {/* Plan */}
-      <PlanSection />
+      {/* Plan — owner only: its CTA routes to /pricing, which is owner-gated */}
+      {isOwner && <PlanSection />}
 
       {/* Income Sources */}
       <IncomeSourcesSection />

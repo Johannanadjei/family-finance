@@ -286,15 +286,18 @@ describe('SettingsView', () => {
 
     await act(async () => { screen.getByTestId('upgrade-categories-btn').click(); });
 
-    // Scoped to the modal on purpose: PlanSection's own "Upgrade to Pro" link is
-    // still on this page and is deliberately NOT gated — it sells the viewer their
-    // own account tier, which is a legitimate purchase for any role. Only the
-    // hub-cap-driven CTA is withheld.
     const dialog = within(screen.getByTestId('upgrade-modal-category-settings'));
     expect(dialog.getByText(/category limit for this period/)).toBeTruthy();
     expect(dialog.getByTestId('ask-owner-note')).toBeTruthy();
     expect(dialog.queryByText('Upgrade to Pro')).toBeNull();
-    expect(screen.getByTestId('plan-cta')).toBeTruthy();   // account-scoped path intact
+    // PlanSection is hidden too: its CTA routes to /pricing, which is owner-gated
+    // (decision (a), 2026-09-26) — showing it would be a dead end.
+    expect(screen.queryByTestId('plan-cta')).toBeNull();
+  });
+
+  it('owner: shows the Plan section and its /pricing CTA', () => {
+    renderSettings();
+    expect(screen.getByTestId('plan-cta')).toBeTruthy();
   });
 
   it('PRO hub at 10 categories: no cap for anyone, owner or not', () => {

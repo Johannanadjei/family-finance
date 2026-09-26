@@ -93,6 +93,29 @@ describe('DashboardShell — pull to refresh', () => {
   });
 });
 
+// Owner-only route — decision (a), 2026-09-26. The signed-out case is App's auth gate
+// (App.pricing.test.jsx); DashboardShell only ever renders for a signed-in hub member.
+describe('DashboardShell — /pricing gate', () => {
+  it('owner: renders the pricing page, chrome-less', () => {
+    mount('/pricing');
+    expect(screen.getByText('pricing view')).toBeTruthy();
+    expect(screen.queryByTestId('access-blocked')).toBeNull();
+    expect(screen.queryByText('nav')).toBeNull();
+  });
+
+  it('non-owner member: AccessBlocked, with the bottom nav kept as a way out', async () => {
+    vi.resetModules();
+    vi.doMock('../../context/BudgetCentreContext', () => makeBudgetCentreMock({ isOwner: false, currentMemberRole: 'full_access' }));
+    const { DashboardShell: Shell } = await import('./DashboardShell');
+
+    render(<MemoryRouter initialEntries={['/pricing']}><Shell {...props} /></MemoryRouter>);
+    expect(screen.getByTestId('access-blocked')).toBeTruthy();
+    expect(screen.getByText('Plans and billing are only available to the hub owner.')).toBeTruthy();
+    expect(screen.queryByText('pricing view')).toBeNull();
+    expect(screen.getByText('nav')).toBeTruthy();
+  });
+});
+
 describe('DashboardShell — pull to refresh while loading', () => {
   it('is disabled behind the skeleton — there is nothing to refresh yet', async () => {
     vi.resetModules();

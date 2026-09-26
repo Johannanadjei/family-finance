@@ -29,6 +29,7 @@ import { SidePanel }                             from './SidePanel';
 import { CreateHubSheet }                        from '../../features/hubs/CreateHubSheet';
 import { PeriodSetupPrompt }                     from '../PeriodSetupPrompt';
 import { ErrorBoundary }                         from '../ui/ErrorBoundary';
+import { AccessBlocked }                         from '../ui/AccessBlocked';
 import { PullToRefresh }                         from '../ui/PullToRefresh';
 import { HomeView }                              from '../../views/HomeView';
 import { PaydayView }                            from '../../views/PaydayView';
@@ -43,8 +44,10 @@ import { InstallPrompt }                         from '../ui/InstallPrompt';
 
 export function DashboardShell({ centres, archivedCentres, activeCentreId, userPlan, newHubPlan, hubCount, onSwitchCentre, onHubCreated, onRestoreHub }) {
   const navigate                           = useNavigate();
-  const isPricing                          = useLocation().pathname === '/pricing';  // chrome-less full-screen route
-  const { can }                            = useBudgetCentreContext();
+  const { can, isOwner }                   = useBudgetCentreContext();
+  // Chrome-less full-screen route — owners only. A non-owner gets AccessBlocked there,
+  // which keeps the normal chrome so the bottom nav is still a way out.
+  const isPricing                          = useLocation().pathname === '/pricing' && isOwner;
   const { incomes, loading, error, reload, reloadHub } = useFinanceContext();
   const [panelOpen,       setPanelOpen]    = useState(false);
   const [addSheetOpen,    setAddSheetOpen] = useState(false);
@@ -91,7 +94,10 @@ export function DashboardShell({ centres, archivedCentres, activeCentreId, userP
             <Route path="/budget"   element={<BudgetView />} />
             <Route path="/log"      element={<LogView onEditTx={(tx) => { setEditTx(tx); setAddSheetOpen(true); }} />} />
             <Route path="/settings" element={<SettingsView />} />
-            <Route path="/pricing"  element={<PricingView />} />
+            {/* Owner-only: a Pro purchase upgrades the PAYER's account, and only the owner's
+                lifts this hub's caps — a member paying here buys nothing visible. Decision (a),
+                2026-09-26 (go-live runbook §1). */}
+            <Route path="/pricing"  element={isOwner ? <PricingView /> : <AccessBlocked message="Plans and billing are only available to the hub owner." />} />
           </Routes>
         </main>
         </PullToRefresh>

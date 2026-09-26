@@ -23,7 +23,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
   const [hoveredRow,  setHoveredRow]  = useState(null);
   const [installing,  setInstalling]  = useState(false);
   const navigate                      = useNavigate();
-  const { can }                       = useBudgetCentreContext();
+  const { can, isOwner }              = useBudgetCentreContext();
   const { signOut }                   = useAuth();
 
   const { dismissForNavigation } = useModalChrome({ isOpen, onClose });
@@ -185,6 +185,7 @@ export function SidePanel({ isOpen, onClose, centres, archivedCentres = [], acti
           <HubFooter
             userPlan={userPlan}
             hubCount={hubCount}
+            canUpgrade={isOwner}
             onCreateHub={onCreateHub}
             onUpgradeNavigate={() => { closeForNavigation(); navigate('/pricing'); }}
           />

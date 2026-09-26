@@ -91,7 +91,9 @@ drifted into, because money becoming real changes their consequences.
       **Verify:** `grep -l "DRAFT — pending" src/content/legal/*.md` returns either all four
       files or zero. Never a subset.
 
-- [ ] **🚫 BLOCKER — rewrite the stale cancellation clause in `terms.md` §6.6.**
+- [x] **🚫 BLOCKER — rewrite the stale cancellation clause in `terms.md` §6.6.** ✅ **FIXED 2026-09-20**
+      (`25edd74`, promoted to main `a73b18b`). Route (a)'s audience line was narrowed on
+      2026-09-26 to match the owner-only `/pricing` gate below.
       **Do not swap the live key in §4 until this is fixed AND deployed.** Unlike the counsel
       and DRAFT-banner items above, this is not a decision to record — it is a false statement
       in a public legal document, and it becomes a misdescription of a *paid* product the
@@ -120,7 +122,10 @@ drifted into, because money becoming real changes their consequences.
         Read §6.6 on the production deploy itself, not in the repo. This deploy is separate
         from, and must land **before**, the §5 redeploy.
 
-- [ ] **`/pricing` gating decision — the last open CAT01-lineage item.**
+- [x] **`/pricing` gating decision — the last open CAT01-lineage item.** ✅ **DECIDED 2026-09-26
+      (AJ): option (a)** — owner-only. `DashboardShell` renders `AccessBlocked` for non-owners;
+      Settings → Plan and the side panel's hub-cap upgrade are hidden for non-owners so
+      neither is a dead end. Recorded in `docs/backlog.md`.
       `App.jsx:108` mounts `<Route path="/pricing" element={<PricingView />} />` with **no
       role or tier guard**. `PricingView` keys only on the viewer's own `isPro`. The cap CTAs
       were gated by `useHubTier()` (shipped 2026-08-05), so no button leads a non-owner there
@@ -136,7 +141,10 @@ drifted into, because money becoming real changes their consequences.
       **Verify:** the choice is recorded in `docs/backlog.md` with a date. If (a) or (b),
       the change is deployed and tested *before* the key swap, not after.
 
-- [ ] **Confirm the two remaining accepted gaps still read as acceptable with real money.**
+- [x] **Confirm the two remaining accepted gaps still read as acceptable with real money.**
+      ✅ **RE-AFFIRMED 2026-09-26 (AJ): D3 stays won't-fix with live money** — it exposes only
+      the user's own data, the bypass is API-only, and the 3-cycle window is a soft Pro nudge,
+      not a privacy boundary. Recorded in `docs/backlog.md`.
       Write caps (categories, members) are RLS-enforced as of 2026-08-25. Still open by
       decision: the **history REST leak** (Leak 2 / D3 — `budget_cycles` returns all cycles;
       the 3-cycle Free window is client-side only in `visibleCycleWindow()`). D3's framing is
@@ -145,7 +153,7 @@ drifted into, because money becoming real changes their consequences.
       **Verify:** re-affirmed in writing, or fixed. Do not silently inherit it.
 
 - [ ] **Tests and audit are green on the exact commit you intend to have live.**
-      **Verify:** `npm test -- --run` (expect **1741** tests as of `797b3a6`) and
+      **Verify:** `npm test -- --run` (expect **2123** tests as of the 2026-09-26 `/pricing` gate commit) and
       `bash scripts/audit.sh` both zero-failure.
 
 - [ ] **Paystack business account is fully activated for live transactions.** `[VERIFY IN DASHBOARD]`
