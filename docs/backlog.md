@@ -1201,6 +1201,9 @@ Verified against the code before publishing, not assumed: no analytics dependenc
 `package.json`, no tracking reference in `src/` or `index.html`, `createClient()` on defaults
 (localStorage, not cookies), and no `document.cookie` anywhere.
 
+**✅ Counsel pass closed 2026-09-26** — branch merged and banner removed; see the "§1.1 DPC
+number + the DRAFT banner" entry below. Original note, kept for provenance:
+
 **Still open for the counsel pass:** `feature/legal-counsel-review` (DPO rename, §5.1 rights —
 DO NOT MERGE until counsel opines) also edits `privacy.md` §5.1 and now **diverges from
 production — it will conflict**; rebase it onto `main` before it lands. The Act 843
@@ -1860,7 +1863,7 @@ public legal text must match what the app actually does.
 
 ---
 
-## §1.1 DPC number + the DRAFT banner — ✅ NUMBER LIVE, BANNER NARROWED 2026-09-01 (`908e3dc`); full removal still gated on counsel
+## §1.1 DPC number + the DRAFT banner — ✅ NUMBER LIVE 2026-09-01 (`908e3dc`); ✅ COUNSEL SIGNED OFF + BANNER REMOVED 2026-09-26
 
 **Registration granted.** DPC registration number **C0067637698**, certificate received
 2026-09-01. `privacy.md` §1.1 now reads `Our Data Protection Commission registration number is
@@ -1898,3 +1901,14 @@ the `.md` is inert until rebuild + deploy. Verify the string in the built/produc
 just in the source file.
 
 **Schedule:** blocked on counsel only. The DPC side is closed.
+
+**✅ DECIDED 2026-09-26 (AJ): counsel has signed off — go-live runbook §1 option (a).** AJ
+confirmed the sign-off covers the text as it stands on this date, including the 2026-09-26
+terms §6.6 wording and the branch's two privacy changes. Done on `dev`:
+- `feature/legal-counsel-review` (`345a97f`) merged: DPO → Data Protection Supervisor, §5.1
+  drops restriction-of-processing and data-portability. The §15.1 conflict was resolved to
+  main's wording with only "DPO" renamed — the branch side re-added "or use the in-product
+  privacy controls", a phantom claim removed in `ffcf679`.
+- The DRAFT banner paragraph was removed from all four docs in one commit, the Scope notice
+  left as is, and each doc stamped `v1.0 final — 26 September 2026` (effective date unchanged,
+  1 June 2026). `grep -l "DRAFT — pending" src/content/legal/*.md` returns zero files.

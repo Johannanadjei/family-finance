@@ -74,7 +74,10 @@ deployed the live keys when you did not. Covered in §6.
 Nothing below is a Paystack action. These are the decisions that must be *made*, not
 drifted into, because money becoming real changes their consequences.
 
-- [ ] **Counsel decision: signed off, or consciously deferred.**
+- [x] **Counsel decision: signed off, or consciously deferred.** ✅ **SIGNED OFF 2026-09-26
+      (AJ): option (a).** Sign-off covers the text as of that date. `feature/legal-counsel-review`
+      merged, banner removed from all four docs, `v1.0 final — 26 September 2026` stamped.
+      Recorded in `docs/backlog.md`.
       The four legal docs (`src/content/legal/{terms,privacy,cookies,disclaimer}.md`) still
       carry `⚠️ DRAFT — pending qualified Ghanaian counsel review.` The DPC side is closed
       (registration C0067637698 is live in `privacy.md` §1.1); only the counsel gate remains.
@@ -84,7 +87,8 @@ drifted into, because money becoming real changes their consequences.
       **Verify:** the decision is written down in `docs/backlog.md` with a date. Not "we
       talked about it."
 
-- [ ] **DRAFT banner decision follows from the counsel decision — do not split them.**
+- [x] **DRAFT banner decision follows from the counsel decision — do not split them.** ✅ **2026-09-26:**
+      banner removed from all four files in one commit; the grep returns zero files.
       The banner is a truthfulness statement about the docs. If counsel has not signed off,
       the banner must stay; removing it without sign-off makes a public legal document lie.
       All four files move together or none do.

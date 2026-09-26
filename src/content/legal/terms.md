@@ -1,13 +1,11 @@
 # Part A — Terms of Service
 
-> **⚠️ DRAFT — pending qualified Ghanaian counsel review.** This document has been prepared as part of the Money BOS Limited Legal & Compliance Handbook (MBOS-LEG-HB-001 v1.0, effective 1 June 2026). It is published in draft form as a transparency artefact while the Company obtains formal counsel sign-off. The Company will replace this notice with a "v1.0 final" marker once that sign-off is obtained. Effective wording and legal interpretation are governed by Applicable Law of the Republic of Ghana.
-
 > **Scope notice.** This page is one of four public-facing instruments published from the Money BOS Limited Legal & Compliance Handbook (MBOS-LEG-HB-001). The handbook also contains internal-only instruments (Parts C, D, E, H, I) covering software licensing, data processing for enterprise customers, internal security policy, vendor management and incident response. References below to internal Parts are retained for cross-reference traceability and are available to enterprise customers and regulators on request to **info@moneybos.com**.
 
 
 **MONEY BOS LIMITED — TERMS OF SERVICE**
 
-Effective date: 1 June 2026  |  Version 1.0
+Effective date: 1 June 2026  |  v1.0 final — 26 September 2026
 
 **These Terms of Service (the “Terms”) form a binding agreement between Money BOS Limited (the “Company”, “we”, “us” or “our”) and the person or organisation that registers for, accesses or uses the Service (the “Customer”, “you” or “your”). **By creating an Account, clicking to accept these Terms, or accessing or using the Service, you confirm that you have read, understood and agree to be bound by these Terms. If you do not agree, you must not access or use the Service.
 

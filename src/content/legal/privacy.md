@@ -1,13 +1,11 @@
 # Part B — Privacy Policy
 
-> **⚠️ DRAFT — pending qualified Ghanaian counsel review.** This document has been prepared as part of the Money BOS Limited Legal & Compliance Handbook (MBOS-LEG-HB-001 v1.0, effective 1 June 2026). It is published in draft form as a transparency artefact while the Company obtains formal counsel sign-off. The Company will replace this notice with a "v1.0 final" marker once that sign-off is obtained. Effective wording and legal interpretation are governed by Applicable Law of the Republic of Ghana.
-
 > **Scope notice.** This page is one of four public-facing instruments published from the Money BOS Limited Legal & Compliance Handbook (MBOS-LEG-HB-001). The handbook also contains internal-only instruments (Parts C, D, E, H, I) covering software licensing, data processing for enterprise customers, internal security policy, vendor management and incident response. References below to internal Parts are retained for cross-reference traceability and are available to enterprise customers and regulators on request to **info@moneybos.com**.
 
 
 **MONEY BOS LIMITED — PRIVACY POLICY**
 
-Effective date: 1 June 2026  |  Version 1.0
+Effective date: 1 June 2026  |  v1.0 final — 26 September 2026
 
 **This Privacy Policy explains how Money BOS Limited (the “Company”, “we”, “us” or “our”) collects, uses, discloses and protects Personal Data in connection with the Money B.O.S service (the “Service”). **It is published in accordance with the Data Protection Act, 2012 (Act 843) of the Republic of Ghana and other Applicable Law. By using the Service you acknowledge the practices described here.
 
