@@ -1,13 +1,11 @@
 # Part B — Privacy Policy
 
-> **⚠️ DRAFT — pending qualified Ghanaian counsel review.** This document has been prepared as part of the Money BOS Limited Legal & Compliance Handbook (MBOS-LEG-HB-001 v1.0, effective 1 June 2026). It is published in draft form as a transparency artefact while the Company obtains formal counsel sign-off. The Company will replace this notice with a "v1.0 final" marker once that sign-off is obtained. Effective wording and legal interpretation are governed by Applicable Law of the Republic of Ghana.
-
 > **Scope notice.** This page is one of four public-facing instruments published from the Money BOS Limited Legal & Compliance Handbook (MBOS-LEG-HB-001). The handbook also contains internal-only instruments (Parts C, D, E, H, I) covering software licensing, data processing for enterprise customers, internal security policy, vendor management and incident response. References below to internal Parts are retained for cross-reference traceability and are available to enterprise customers and regulators on request to **info@moneybos.com**.
 
 
 **MONEY BOS LIMITED — PRIVACY POLICY**
 
-Effective date: 1 June 2026  |  Version 1.0
+Effective date: 1 June 2026  |  v1.0 final — 26 September 2026
 
 **This Privacy Policy explains how Money BOS Limited (the “Company”, “we”, “us” or “our”) collects, uses, discloses and protects Personal Data in connection with the Money B.O.S service (the “Service”). **It is published in accordance with the Data Protection Act, 2012 (Act 843) of the Republic of Ghana and other Applicable Law. By using the Service you acknowledge the practices described here.
 
@@ -17,7 +15,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 **1.1 **Money BOS Limited is a company incorporated in the Republic of Ghana and is the data controller responsible for Personal Data processed about individual users of the Service. Our registered particulars are: Money BOS Limited, incorporated in the Republic of Ghana, registered office 26–28 Obenesu Crescent, Cantonments, Accra, Ghana. Our Data Protection Commission registration number is C0067637698.
 
-**1.2 **We have designated a Data Protection Officer (“DPO”) who can be contacted at info@moneybos.com in respect of any question or request relating to this Policy or your Personal Data.
+**1.2 **We have designated a Data Protection Supervisor who can be contacted at info@moneybos.com in respect of any question or request relating to this Policy or your Personal Data.
 
 ## 2. Information We Collect
 
@@ -73,9 +71,9 @@ Effective date: 1 June 2026  |  Version 1.0
 
 ## 5. Data Subject Rights
 
-**5.1 **Subject to the conditions and exceptions in the Data Protection Act, 2012 (Act 843), you have the right to: (a) request access to the Personal Data we hold about you; (b) request correction of inaccurate or incomplete data; (c) request deletion of your data where there is no lawful ground to retain it; (d) object to or request restriction of certain Processing, including direct marketing; (e) request a copy of data you provided in a portable, machine-readable format where technically feasible; and (f) withdraw consent where Processing is based on consent.
+**5.1 **Subject to the conditions and exceptions in the Data Protection Act, 2012 (Act 843), you have the right to: (a) request access to the Personal Data we hold about you; (b) request correction of inaccurate or incomplete data; (c) request deletion of your data where there is no lawful ground to retain it; (d) object to certain Processing, including direct marketing; and (e) withdraw consent where Processing is based on consent.
 
-**5.2 **You may exercise these rights through your Account settings or by contacting the DPO. We will respond without undue delay and in any event within the period required by Applicable Law. We may need to verify your identity before acting on a request, and we may charge a reasonable fee or decline a request that is manifestly unfounded or excessive, to the extent permitted by law.
+**5.2 **You may exercise these rights through your Account settings or by contacting the Data Protection Supervisor. We will respond without undue delay and in any event within the period required by Applicable Law. We may need to verify your identity before acting on a request, and we may charge a reasonable fee or decline a request that is manifestly unfounded or excessive, to the extent permitted by law.
 
 **5.3 **If you are dissatisfied with how we handle your Personal Data, you may lodge a complaint with the Data Protection Commission of Ghana. We would, however, appreciate the opportunity to address your concerns before you approach the Commission.
 
@@ -119,7 +117,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 ## 11. Children’s Privacy
 
-**11.1 **The Service is not directed at children, and we do not knowingly collect Personal Data from any person under the age of eighteen (18). If we become aware that we have collected Personal Data from a person under eighteen without appropriate authority, we will delete it promptly. If you believe a child has provided us with Personal Data, please contact the DPO.
+**11.1 **The Service is not directed at children, and we do not knowingly collect Personal Data from any person under the age of eighteen (18). If we become aware that we have collected Personal Data from a person under eighteen without appropriate authority, we will delete it promptly. If you believe a child has provided us with Personal Data, please contact the Data Protection Supervisor.
 
 ## 12. Automated Decision-Making
 
@@ -139,7 +137,7 @@ Effective date: 1 June 2026  |  Version 1.0
 
 ## 15. How to Make a Privacy Request
 
-**15.1 **To make any privacy request — including access, correction, deletion, objection or withdrawal of consent — contact our DPO at info@moneybos.com. Please include enough detail for us to identify you and understand your request.
+**15.1 **To make any privacy request — including access, correction, deletion, objection or withdrawal of consent — contact our Data Protection Supervisor at info@moneybos.com. Please include enough detail for us to identify you and understand your request.
 
 **15.2 **We will acknowledge your request, may ask you to verify your identity, and will respond within the timeframe required by Applicable Law. There is no charge for most requests, although we may charge a reasonable fee or refuse to act where a request is manifestly unfounded, repetitive or excessive, to the extent permitted by law.
 
