@@ -4,12 +4,13 @@ Engineering work deferred past MVP. Cosmetic items live in `cosmetic-backlog.md`
 
 ---
 
-## Income carries TWO period keys — `month` + `cycle_id` — and mis-stamps on a hub with two same-month periods — 🔨 NEXT UP (diagnosed 2026-09-05, approved in principle, NOT built)
+## Income carries TWO period keys — `month` + `cycle_id` — and mis-stamps on a hub with two same-month periods — ✅ STEPS 1–2 SHIPPED (2bc1241, on main) · steps 3 (repair) + 4 (clipped-period message) OPEN
 
-**Status:** diagnosed, approved-in-principle, **NOT built**. The period auto-continue fix
-(state-cluster bugs 1 / 2 / 4) is **verified working on a real hub, on `dev`, and is NOT
-promoted to `staging`/`main` pending this income fix.** Bug 3 (payday countdown) is the
-symptom this entry closes.
+**Status (updated 2026-09-26):** steps 1–2 of the Sequence below are **shipped** —
+`cycle_id` is income's only key (`2bc1241`, 2026-09-10, with `migrate_29`) and the
+move-income action is built — and both are on `dev`, `staging` and `main`. **Still open:**
+step 3 (one-time repair of `b7e336d0` on "The house") and step 4 (clipped-period receipt
+message on auto-continue). Bug 3 (payday countdown) is the symptom this entry closes.
 
 **Two confirmed symptoms**, both below and both closed by step 1: **Payday empty** on
 "The house" (income stamped to the wrong September cycle `b7e336d0`), and
@@ -827,6 +828,15 @@ so its access is intentional rather than incidental.
 > legitimate product path — see the PlanSection copy entry), but it should be a conscious
 > decision at live-key time rather than an oversight.
 >
+> **✅ DECIDED 2026-09-26 (AJ): option (a) — `/pricing` is owner-only.** `DashboardShell`
+> renders `AccessBlocked` for anyone who is not the owner of the active hub (signed-out
+> visitors never get past App's auth gate). Two CTAs that would otherwise have become dead
+> ends for full-access members are hidden for non-owners: Settings → Plan (`PlanSection`)
+> and the side panel's "Upgrade to add more hubs" (`HubFooter` shows "switch to a hub you
+> own to upgrade" instead). Terms §6.6 route (a) narrowed to match; route (b), email, covers
+> everyone else. Trade-off accepted: a non-owner upgrades or manages their own plan from a
+> hub they own.
+>
 > Follow-on copy nit, non-blocking: see "PlanSection copy: 'upgrade your account' vs
 > 'upgrade this hub'".
 
@@ -971,8 +981,8 @@ Production and the Paystack dashboard (see Open question 1 above). In live mode 
 manage-link route returns links that cancel real subscriptions the first time it is used.
 
 **Still open / not addressed here:**
-- The `/pricing` route remains ungated (`App.jsx` mounts it with no role/tier guard) — see
-  the freemium CTA entry above. Unchanged by this work.
+- ~~The `/pricing` route remains ungated~~ — ✅ gated to hub owners 2026-09-26, decision (a);
+  see the freemium CTA entry above.
 - No in-app confirmation or "your plan ends on X" copy yet: `cancel_at_period_end` is now
   written but nothing reads it. That copy is the natural follow-up.
 - Which event Paystack actually emits on a hosted-page cancel (`not_renew` vs `disable`) has
@@ -1735,10 +1745,15 @@ after, the next paid-capability pass.
 > hand-driving PostgREST to see data that is already theirs. Re-open only if history becomes a
 > hard paid boundary rather than a nudge.
 >
+> **✅ RE-AFFIRMED FOR LIVE MONEY 2026-09-26 (AJ).** D3 stays won't-fix after the Paystack
+> live-key swap: it exposes only the user's own data, the bypass is API-only, and the 3-cycle
+> window is a soft Pro nudge, not a privacy boundary. (Go-live runbook §1.)
+>
 > **Bearing on the Paystack live-key swap.** The two *write* caps a paying hub actually
 > depends on — categories and members — are now enforced at the RLS layer, not just behind the
-> RPC front door. What remains open at live-key time is the ungated `/pricing` route (see the
-> freemium-CTA entry above) and the accepted Leak 2 nudge. Neither is a cap bypass.
+> RPC front door. What remained open at live-key time was the ungated `/pricing` route (see the
+> freemium-CTA entry above) and the accepted Leak 2 nudge. Neither is a cap bypass. Both were
+> settled 2026-09-26: `/pricing` gated to owners (decision (a)), Leak 2 re-affirmed won't-fix.
 >
 > **Historical record below** — the finding as originally written (2026-08-06). Kept for
 > provenance; item 1 and item 3 are closed by the banner above, item 2 is accepted.

@@ -9,9 +9,10 @@ import { SidePanel }                            from './SidePanel';
 
 const mockSignOut = vi.fn();
 let mockCan       = () => true;
+let mockIsOwner   = true;
 
 vi.mock('../../context/BudgetCentreContext', () => ({
-  useBudgetCentreContext: () => ({ can: (p) => mockCan(p) }),
+  useBudgetCentreContext: () => ({ can: (p) => mockCan(p), isOwner: mockIsOwner }),
 }));
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ signOut: mockSignOut }),
@@ -30,8 +31,8 @@ vi.mock('../../hooks/useModalChrome', () => ({
 // Footer behaviour (cap states + upgrade modal) is covered by HubFooter.test.jsx. Here the
 // mock is a clickable stub so we can drive its onUpgradeNavigate and test SidePanel's handler.
 vi.mock('./HubFooter', () => ({
-  HubFooter: ({ onUpgradeNavigate }) => (
-    <button data-testid="hub-footer" onClick={onUpgradeNavigate}>hub-footer</button>
+  HubFooter: ({ onUpgradeNavigate, canUpgrade }) => (
+    <button data-testid="hub-footer" data-can-upgrade={String(canUpgrade)} onClick={onUpgradeNavigate}>hub-footer</button>
   ),
 }));
 
@@ -64,7 +65,7 @@ const renderPanel = (props = {}) =>
   );
 
 describe('SidePanel', () => {
-  beforeEach(() => { mockCan = () => true; vi.clearAllMocks(); });
+  beforeEach(() => { mockCan = () => true; mockIsOwner = true; vi.clearAllMocks(); });
 
   it('renders all centre names', () => {
     renderPanel();
@@ -132,6 +133,18 @@ describe('SidePanel', () => {
     mockCan = () => false;
     renderPanel();
     expect(screen.queryByTestId('hub-footer')).toBeNull();
+  });
+
+  // /pricing is owner-gated, so the hub-cap upgrade CTA follows the active hub's ownership.
+  it('passes canUpgrade from isOwner to the hub footer', () => {
+    renderPanel();
+    expect(screen.getByTestId('hub-footer').dataset.canUpgrade).toBe('true');
+  });
+
+  it('full-access member (not the owner): hub footer gets canUpgrade=false', () => {
+    mockIsOwner = false;
+    renderPanel();
+    expect(screen.getByTestId('hub-footer').dataset.canUpgrade).toBe('false');
   });
 
   it('hub-cap upgrade: dismisses its chrome, closes the drawer, THEN navigates to /pricing', () => {

@@ -9,6 +9,8 @@
  * lib/plans.js — the client-side half of the defense-in-depth gate; the
  * create_hub RPC is the real enforcement):
  *   • at cap, free → active "Upgrade to add more hubs" → opens UpgradeModal
+ *                    (owner of the active hub only — /pricing is owner-gated, so a
+ *                    non-owner is told to switch to a hub they own instead)
  *   • at cap, pro  → static "Maximum N hubs reached" (no higher tier to upsell)
  *   • under cap    → "+ New BOS Hub" → onCreateHub
  *
@@ -17,6 +19,7 @@
  *
  * @param {'free'|'pro'} userPlan
  * @param {number}       hubCount   the caller's OWNED, active, non-archived hubs
+ * @param {boolean}      canUpgrade viewer owns the ACTIVE hub, so /pricing is reachable
  * @param {function}     onCreateHub
  * @param {function}     onUpgradeNavigate  routes to /pricing — owned by SidePanel so it
  *                                          can close the drawer AND dismiss its own modal-
@@ -27,7 +30,7 @@ import { useState }        from 'react';
 import { getLimitsForTier } from '../../lib/plans';
 import { UpgradeModal }    from '../ui/UpgradeModal';
 
-export function HubFooter({ userPlan, hubCount, onCreateHub, onUpgradeNavigate }) {
+export function HubFooter({ userPlan, hubCount, canUpgrade = true, onCreateHub, onUpgradeNavigate }) {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const maxHubs = getLimitsForTier(userPlan).maxHubs;
@@ -35,7 +38,9 @@ export function HubFooter({ userPlan, hubCount, onCreateHub, onUpgradeNavigate }
 
   return (
     <div style={{ padding: '12px 16px calc(16px + env(safe-area-inset-bottom, 20px))', borderTop: '1px solid var(--c-border, #e5e7eb)', flexShrink: 0 }}>
-      {atCap && userPlan === 'free' ? (
+      {atCap && userPlan === 'free' && !canUpgrade ? (
+        <p data-testid="upgrade-switch-hub-note" style={{ fontSize: 13, color: 'var(--c-muted, #6b7280)', margin: 0, fontWeight: 600, textAlign: 'center' }}>Hub limit reached — switch to a hub you own to upgrade</p>
+      ) : atCap && userPlan === 'free' ? (
         <button
           onClick={() => setUpgradeOpen(true)}
           data-testid="upgrade-add-hub-btn"

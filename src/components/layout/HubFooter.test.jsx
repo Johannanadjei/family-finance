@@ -28,6 +28,17 @@ describe('HubFooter', () => {
     expect(screen.queryByText(/reached your plan's hub limit/i)).toBeNull();   // modal closed
   });
 
+  it('free + at cap, not the active hub\'s owner: no upgrade CTA, points to a hub they own', () => {
+    render(<HubFooter userPlan="free" hubCount={1} canUpgrade={false} onCreateHub={vi.fn()} onUpgradeNavigate={vi.fn()} />);
+    expect(screen.queryByTestId('upgrade-add-hub-btn')).toBeNull();
+    expect(screen.getByTestId('upgrade-switch-hub-note').textContent).toMatch(/switch to a hub you own/i);
+  });
+
+  it('under cap, not the owner: still shows "+ New BOS Hub" (creating is not gated)', () => {
+    render(<HubFooter userPlan="free" hubCount={0} canUpgrade={false} onCreateHub={vi.fn()} />);
+    expect(screen.getByTestId('new-hub-btn')).toBeTruthy();
+  });
+
   it('pro + under cap: shows "+ New BOS Hub" and calls onCreateHub on click', () => {
     const onCreateHub = vi.fn();
     render(<HubFooter userPlan="pro" hubCount={2} onCreateHub={onCreateHub} />);
